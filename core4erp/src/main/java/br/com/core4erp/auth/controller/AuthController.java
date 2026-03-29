@@ -1,7 +1,6 @@
 package br.com.core4erp.auth.controller;
 
 import br.com.core4erp.auth.dto.LoginRequestDto;
-import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
