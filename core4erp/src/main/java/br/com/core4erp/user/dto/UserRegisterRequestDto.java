@@ -4,13 +4,17 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class UserRequestDto {
-
+public class UserRegisterRequestDto {
     @NotBlank
     private String name;
     @NotBlank
     private String email;
     @NotBlank
     private Long phoneNumber;
+    @NotBlank
+    private String username;
+    @NotBlank
+    private String password;
+    private String role;
 
 }
