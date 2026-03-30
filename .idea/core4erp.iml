@@ -28,5 +28,15 @@
     <orderEntry type="library" name="Gradle: org.springframework.security:spring-security-web:6.3.1" level="project" />
     <orderEntry type="library" name="Gradle: org.springframework.security:spring-security-config:6.3.1" level="project" />
     <orderEntry type="library" name="Gradle: org.springframework.security:spring-security-crypto:6.3.1" level="project" />
+    <orderEntry type="module-library" scope="PROVIDED">
+      <library>
+        <CLASSES>
+          <root url="jar://$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.42/lombok-1.18.42.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
+    <orderEntry type="library" name="Gradle: org.hibernate.orm:hibernate-envers:6.5.2.Final" level="project" />
   </component>
 </module>

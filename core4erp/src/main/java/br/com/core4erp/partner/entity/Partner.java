@@ -1,14 +1,17 @@
 package br.com.core4erp.partner.entity;
 
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.enums.PartnerType;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.envers.Audited;
 
 @Entity
 @Data
+@Audited
 @Table(name = "tb_partner")
-public class Partner {
+public class Partner extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

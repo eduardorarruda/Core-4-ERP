@@ -2,6 +2,7 @@ package br.com.core4erp.financialEntry.entity;
 
 import br.com.core4erp.category.entity.Category;
 import br.com.core4erp.checkingAccount.entity.CheckingAccount;
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.enums.EntryStatus;
 import br.com.core4erp.enums.EntryType;
 import br.com.core4erp.partner.entity.Partner;
@@ -15,7 +16,7 @@ import java.time.LocalDate;
 @Entity
 @Data
 @Table(name = "tb_financial_entry")
-public class FinancialEntry {
+public class FinancialEntry extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

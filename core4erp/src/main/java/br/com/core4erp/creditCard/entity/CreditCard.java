@@ -1,16 +1,19 @@
 package br.com.core4erp.creditCard.entity;
 
 import br.com.core4erp.checkingAccount.entity.CheckingAccount;
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.envers.Audited;
 
 import java.math.BigDecimal;
 
 @Entity
 @Data
+@Audited
 @Table(name = "tb_credit_card")
-public class CreditCard {
+public class CreditCard extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

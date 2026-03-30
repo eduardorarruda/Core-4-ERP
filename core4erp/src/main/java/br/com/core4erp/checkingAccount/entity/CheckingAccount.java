@@ -1,5 +1,6 @@
 package br.com.core4erp.checkingAccount.entity;
 
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -9,7 +10,7 @@ import java.math.BigDecimal;
 @Entity
 @Data
 @Table(name = "tb_checking_account")
-public class CheckingAccount {
+public class CheckingAccount extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

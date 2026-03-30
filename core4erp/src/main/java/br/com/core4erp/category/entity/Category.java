@@ -1,5 +1,6 @@
 package br.com.core4erp.category.entity;
 
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -7,7 +8,7 @@ import lombok.Data;
 @Entity
 @Data
 @Table(name = "tb_category")
-public class Category {
+public class Category extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -1,6 +1,7 @@
 package br.com.core4erp.creditCardTransaction.entity;
 
 import br.com.core4erp.category.entity.Category;
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.creditCard.entity.CreditCard;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
@@ -12,7 +13,7 @@ import java.time.LocalDate;
 @Entity
 @Data
 @Table(name = "tb_credit_card_transaction")
-public class CreditCardTransaction {
+public class CreditCardTransaction extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
