@@ -7,6 +7,8 @@ import br.com.core4erp.user.dto.UserRegisterRequestDto;
 import br.com.core4erp.user.dto.UserUpdateRequestDto;
 import br.com.core4erp.user.entity.User;
 import br.com.core4erp.user.repository.UserRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -76,6 +78,14 @@ public class UserService {
             throw new RuntimeException("Usuário não encontrado");
         return auth.get().getUser();
 
+    }
+
+    public User getUserByAuthentication(){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Optional<User> user = userRepository.findByName(authentication.getName());
+        if(user.isEmpty())
+            throw new RuntimeException("Usuario nao encontrado");
+        return user.get();
     }
 
 }

@@ -19,7 +19,7 @@ public class CreditCard extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false, length = 100)
-    private String name;
+    private String creditCardName;
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal limitAmount;
     @Column(nullable = false)
