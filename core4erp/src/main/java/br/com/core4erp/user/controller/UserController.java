@@ -27,7 +27,7 @@ public class UserController {
 
             return new ResponseEntity<>(HttpStatus.NOT_ACCEPTABLE);
         }catch(Exception e){
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 
@@ -37,7 +37,7 @@ public class UserController {
             userService.updateUser(request);
             return ResponseEntity.ok().build();
         }catch(Exception e){
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
     }
 
@@ -48,7 +48,7 @@ public class UserController {
             return ResponseEntity.ok().build();
         }catch (Exception e){
 
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
 
         }
     }
