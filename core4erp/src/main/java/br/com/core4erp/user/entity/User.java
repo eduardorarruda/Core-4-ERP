@@ -1,13 +1,14 @@
 package br.com.core4erp.user.entity;
 
 
+import br.com.core4erp.config.auditing.Auditable;
 import jakarta.persistence.*;
 import lombok.Data;
 
 @Data
 @Entity
 @Table(name = "tb_user")
-public class User {
+public class User extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

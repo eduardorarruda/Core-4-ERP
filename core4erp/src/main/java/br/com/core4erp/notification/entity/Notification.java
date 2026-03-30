@@ -1,5 +1,6 @@
 package br.com.core4erp.notification.entity;
 
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.enums.NotificationType;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 @Entity
 @Data
 @Table(name = "tb_notification")
-public class Notification {
+public class Notification extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

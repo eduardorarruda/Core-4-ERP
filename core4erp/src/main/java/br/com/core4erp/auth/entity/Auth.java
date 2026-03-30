@@ -1,13 +1,16 @@
 package br.com.core4erp.auth.entity;
 
+import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.user.entity.User;
 import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.envers.Audited;
 
 @Data
 @Entity
+@Audited
 @Table(name = "tb_auth")
-public class Auth {
+public class Auth extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
