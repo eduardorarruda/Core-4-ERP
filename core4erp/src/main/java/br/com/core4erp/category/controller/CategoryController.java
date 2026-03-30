@@ -21,19 +21,19 @@ import java.util.Optional;
 public class CategoryController {
 
     private final CategoryService categoryService;
-    private final UserRepository userRepositoty;
+    private final UserRepository userRepository;
 
     public CategoryController(CategoryService categoryService,
                               UserRepository userRepository){
         this.categoryService = categoryService;
-        this.userRepositoty = userRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping("/create")
     public ResponseEntity<?> createCategory(@Valid @RequestBody CategoryRequestDto request){
         try{
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            Optional<User> user = userRepositoty.findByName(authentication.getName());
+            Optional<User> user = userRepository.findByName(authentication.getName());
             if(user.isEmpty())
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 
