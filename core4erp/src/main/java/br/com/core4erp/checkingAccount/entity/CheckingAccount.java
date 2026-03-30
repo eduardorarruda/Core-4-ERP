@@ -16,6 +16,8 @@ public class CheckingAccount extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(nullable = false)
+    private String checkingAccountAlias;
+    @Column(nullable = false)
     private String description;
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal balance = BigDecimal.ZERO;
