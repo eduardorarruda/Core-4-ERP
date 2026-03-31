@@ -8,7 +8,6 @@ import org.hibernate.envers.Audited;
 
 @Data
 @Entity
-@Audited
 @Table(name = "tb_auth")
 public class Auth extends Auditable {
 

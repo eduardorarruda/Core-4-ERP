@@ -9,7 +9,6 @@ import org.hibernate.envers.Audited;
 
 @Entity
 @Data
-@Audited
 @Table(name = "tb_partner")
 public class Partner extends Auditable {
 
