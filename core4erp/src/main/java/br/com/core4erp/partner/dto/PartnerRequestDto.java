@@ -12,6 +12,6 @@ public class PartnerRequestDto {
     @NotBlank
     private String partnerName;
     @NotBlank
-    private String partnerType;
+    private PartnerType partnerType;
 
 }
