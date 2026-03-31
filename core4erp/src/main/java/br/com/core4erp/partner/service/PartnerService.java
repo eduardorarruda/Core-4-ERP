@@ -22,7 +22,7 @@ public class PartnerService {
 
         Partner partner = new Partner();
         partner.setName(request.getPartnerName());
-        partner.setType(PartnerType.valueOf(request.getPartnerType()));
+        partner.setType(request.getPartnerType());
         partner.setUser(user);
 
         partnerRepository.save(partner);
@@ -31,7 +31,7 @@ public class PartnerService {
 
     public void updatePartner(PartnerRequestDto request){
         Partner partner = getPartnerById(request.getPartnerId());
-        partner.setType(request.setPartnerType());
+        partner.setType(request.getPartnerType());
         partner.setName(request.getPartnerName());
 
         partnerRepository.save(partner);
