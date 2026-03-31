@@ -38,5 +38,8 @@
       </library>
     </orderEntry>
     <orderEntry type="library" name="Gradle: org.hibernate.orm:hibernate-envers:6.5.2.Final" level="project" />
+    <orderEntry type="library" name="Gradle: io.github.cdimascio:dotenv-java:3.0.0" level="project" />
+    <orderEntry type="library" name="Gradle: org.springframework.boot:spring-boot-autoconfigure:3.3.2" level="project" />
+    <orderEntry type="library" name="Gradle: org.springframework.boot:spring-boot:3.3.2" level="project" />
   </component>
 </module>

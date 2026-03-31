@@ -11,7 +11,6 @@ import java.math.BigDecimal;
 
 @Entity
 @Data
-@Audited
 @Table(name = "tb_credit_card")
 public class CreditCard extends Auditable {
 
