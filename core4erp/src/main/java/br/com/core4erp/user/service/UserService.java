@@ -33,24 +33,18 @@ public class UserService {
 
     public Boolean registerAccount(UserRegisterRequestDto request) {
         try{
-
-            Optional<User> usernameExists = userRepository.findByName(request.getName());
-            if(usernameExists.isPresent())
-                throw new RuntimeException("Usuário já cadastrado");
+            if(findUserByUsernameBoolean(request.getUsername()))
+                throw new RuntimeException("Username já existe");
 
             User user = new User();
             user.setName(request.getName());
             user.setEmail(request.getEmail());
             user.setPhoneNumber(request.getPhoneNumber());
             user = userRepository.save(user);
-
             authService.register(user, request.getUsername(), request.getPassword(), request.getRole());
             return true;
-
         }catch(Exception e){
-
             return false;
-
         }
 
     }
@@ -81,6 +75,11 @@ public class UserService {
             throw new RuntimeException("Usuário não encontrado");
         return auth.get().getUser();
 
+    }
+
+    private boolean findUserByUsernameBoolean(String username){
+        Optional<Auth> auth = authRepository.findByUsername(username);
+        return auth.isPresent();
     }
 
     public User getUserByAuthentication(){
