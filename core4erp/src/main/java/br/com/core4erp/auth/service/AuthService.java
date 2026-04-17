@@ -2,68 +2,68 @@ package br.com.core4erp.auth.service;
 
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.LoginResponseDto;
-import br.com.core4erp.auth.entity.Auth;
-import br.com.core4erp.auth.repository.AuthRepository;
-import br.com.core4erp.user.entity.User;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import br.com.core4erp.auth.dto.MeResponseDto;
+import br.com.core4erp.auth.dto.RegistrarRequestDto;
+import br.com.core4erp.config.security.JwtService;
+import br.com.core4erp.usuario.entity.Usuario;
+import br.com.core4erp.usuario.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
 
-    private final AuthenticationManager authenticationManager;
-    private final AuthRepository authRepository;
+    private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public AuthService(AuthenticationManager authenticationManager,
-                       AuthRepository authRepository,
-                       PasswordEncoder passwordEncoder) {
-        this.authenticationManager = authenticationManager;
-        this.authRepository = authRepository;
+    public AuthService(UsuarioRepository usuarioRepository,
+                       PasswordEncoder passwordEncoder,
+                       JwtService jwtService) {
+        this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+    }
+
+    @Transactional
+    public MeResponseDto registrar(RegistrarRequestDto request) {
+        if (usuarioRepository.existsByEmail(request.email())) {
+            throw new IllegalArgumentException("Email já cadastrado");
+        }
+
+        Usuario usuario = new Usuario();
+        usuario.setNome(request.nome());
+        usuario.setEmail(request.email());
+        usuario.setSenhaHash(passwordEncoder.encode(request.senha()));
+        usuario.setTelefone(request.telefone());
+        usuario.setRole("ROLE_USER");
+
+        usuario = usuarioRepository.save(usuario);
+        return toMeResponse(usuario);
     }
 
     public LoginResponseDto login(LoginRequestDto request) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername(),
-                        request.getPassword()
-                )
-        );
+        Usuario usuario = usuarioRepository.findByEmail(request.email())
+                .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas"));
 
-        Optional<Auth> auth = authRepository.findByUsername(authentication.getName());
-        if(auth.isEmpty())
-            throw new RuntimeException("Credencial autenticada não encontrada");
+        if (!passwordEncoder.matches(request.senha(), usuario.getSenhaHash())) {
+            throw new BadCredentialsException("Credenciais inválidas");
+        }
 
-
-        return new LoginResponseDto(
-                "Login realizado com sucesso",
-                auth.get().getUsername(),
-                auth.get().getRole()
-        );
+        String token = jwtService.generateToken(usuario.getEmail());
+        return new LoginResponseDto(token);
     }
 
-    public void register(User user, String username, String password, String role) {
-
-        Optional<Auth> usernameExists = authRepository.findByUsername(username);
-        if(usernameExists.isPresent())
-            throw new RuntimeException("Username cadastrado");
-
-        Auth auth = new Auth();
-        auth.setUsername(username);
-        auth.setPassword(passwordEncoder.encode(password));
-        if(role.isEmpty())
-            auth.setRole("normal-user");
-        auth.setRole(role);
-        auth.setUser(user);
-
-        authRepository.save(auth);
-
+    public MeResponseDto me(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        return toMeResponse(usuario);
     }
 
+    private MeResponseDto toMeResponse(Usuario u) {
+        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole());
+    }
 }
