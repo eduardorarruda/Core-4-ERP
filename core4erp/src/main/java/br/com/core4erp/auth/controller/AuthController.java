@@ -1,5 +1,6 @@
 package br.com.core4erp.auth.controller;
 
+import br.com.core4erp.auth.dto.AtualizarPerfilRequestDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
@@ -34,5 +35,12 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<MeResponseDto> me(Authentication authentication) {
         return ResponseEntity.ok(authService.me(authentication.getName()));
+    }
+
+    @PutMapping("/perfil")
+    public ResponseEntity<MeResponseDto> atualizarPerfil(
+            @Valid @RequestBody AtualizarPerfilRequestDto dto,
+            Authentication authentication) {
+        return ResponseEntity.ok(authService.atualizarPerfil(authentication.getName(), dto));
     }
 }

@@ -6,6 +6,7 @@ import {
   LogOut, Tag
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { getUsuario } from '../../lib/api';
 
 const NAV = [
   { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard' },
@@ -23,6 +24,10 @@ const NAV = [
 
 export default function Sidebar({ onClose }) {
   const navigate = useNavigate();
+  const usuario = getUsuario();
+  const navVisivel = NAV.filter(
+    (item) => item.id !== 'audit' || usuario?.role === 'ROLE_ADMIN'
+  );
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -43,7 +48,7 @@ export default function Sidebar({ onClose }) {
       </NavLink>
 
       <nav className="flex flex-col gap-1 flex-1 w-full overflow-y-auto no-scrollbar">
-        {NAV.map((item) => (
+        {navVisivel.map((item) => (
           <NavLink
             key={item.id}
             to={item.path}

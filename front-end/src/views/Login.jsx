@@ -18,6 +18,8 @@ export default function Login() {
     try {
       const data = await auth.login(email, senha);
       localStorage.setItem('access_token', data.accessToken);
+      const usuario = await auth.me();
+      localStorage.setItem('usuario', JSON.stringify(usuario));
       navigate('/dashboard');
     } catch (err) {
       setErro(err.message || 'Credenciais inválidas');

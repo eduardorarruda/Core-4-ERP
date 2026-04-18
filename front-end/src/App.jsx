@@ -15,11 +15,20 @@ import ContasFinanceiras from './views/ContasFinanceiras';
 import Cartoes from './views/Cartoes';
 import Investimentos from './views/Investimentos';
 import Notificacoes from './views/Notificacoes';
-import { TransactionProvider } from './context/TransactionContext';
+import Configuracoes from './views/Configuracoes';
+import { getUsuario } from './lib/api';
 import { cn } from './lib/utils';
 
 function isAuthenticated() {
   return Boolean(localStorage.getItem('access_token'));
+}
+
+function AdminRoute({ children }) {
+  const usuario = getUsuario();
+  if (!usuario || usuario.role !== 'ROLE_ADMIN') {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
 }
 
 function ProtectedLayout({ children }) {
@@ -55,29 +64,27 @@ function ProtectedLayout({ children }) {
 
 export default function App() {
   return (
-    <TransactionProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login"    element={<Login />} />
-          <Route path="/register" element={<Register />} />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login"    element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
+        <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
+        <Route path="/reconciliation"   element={<ProtectedLayout><Reconciliation /></ProtectedLayout>} />
+        <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
+        <Route path="/audit"            element={<ProtectedLayout><AdminRoute><Audit /></AdminRoute></ProtectedLayout>} />
+        <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
+        <Route path="/categorias"       element={<ProtectedLayout><Categorias /></ProtectedLayout>} />
+        <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
+        <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
+        <Route path="/cartoes"          element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />
+        <Route path="/investimentos"    element={<ProtectedLayout><Investimentos /></ProtectedLayout>} />
+        <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
+        <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
 
-          <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
-          <Route path="/reconciliation"   element={<ProtectedLayout><Reconciliation /></ProtectedLayout>} />
-          <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
-          <Route path="/audit"            element={<ProtectedLayout><Audit /></ProtectedLayout>} />
-          <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
-          <Route path="/categorias"       element={<ProtectedLayout><Categorias /></ProtectedLayout>} />
-          <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
-          <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
-          <Route path="/cartoes"          element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />
-          <Route path="/investimentos"    element={<ProtectedLayout><Investimentos /></ProtectedLayout>} />
-          <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
-
-          <Route path="/"  element={<Navigate to="/dashboard" replace />} />
-          <Route path="*"  element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </TransactionProvider>
+        <Route path="/"  element={<Navigate to="/dashboard" replace />} />
+        <Route path="*"  element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

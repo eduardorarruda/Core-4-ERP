@@ -28,4 +28,7 @@ public class Usuario extends Auditable {
 
     @Column(nullable = false, length = 50)
     private String role = "ROLE_USER";
+
+    @Column(columnDefinition = "TEXT")
+    private String fotoPerfil;
 }
