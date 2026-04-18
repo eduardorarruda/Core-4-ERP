@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface ContaCorrenteRepository extends JpaRepository<ContaCorrente, Long> {
     List<ContaCorrente> findAllByUsuarioId(Long usuarioId);
     Optional<ContaCorrente> findByIdAndUsuarioId(Long id, Long usuarioId);
+    boolean existsByNumeroContaAndUsuarioId(String numeroConta, Long usuarioId);
 }

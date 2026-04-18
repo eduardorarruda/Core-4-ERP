@@ -3,8 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import Dashboard from './views/Dashboard';
-import Transactions from './views/Transactions';
 import Reconciliation from './views/Reconciliation';
+import Categorias from './views/Categorias';
 import Reports from './views/Reports';
 import Audit from './views/Audit';
 import Login from './views/Login';
@@ -61,14 +61,13 @@ export default function App() {
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
 
+
           <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
-          <Route path="/transactions"     element={<ProtectedLayout><Transactions /></ProtectedLayout>} />
           <Route path="/reconciliation"   element={<ProtectedLayout><Reconciliation /></ProtectedLayout>} />
           <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
           <Route path="/audit"            element={<ProtectedLayout><Audit /></ProtectedLayout>} />
-
-          {/* Módulos novos */}
           <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
+          <Route path="/categorias"       element={<ProtectedLayout><Categorias /></ProtectedLayout>} />
           <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
           <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
           <Route path="/cartoes"          element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />

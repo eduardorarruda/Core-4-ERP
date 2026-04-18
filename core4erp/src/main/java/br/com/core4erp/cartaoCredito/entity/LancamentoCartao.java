@@ -38,10 +38,8 @@ public class LancamentoCartao extends Auditable {
     /** UUID para agrupar parcelas de um mesmo lançamento. */
     private String grupoParcelamento;
 
-    @Column(nullable = false)
     private Integer numeroParcela = 1;
 
-    @Column(nullable = false)
     private Integer totalParcelas = 1;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

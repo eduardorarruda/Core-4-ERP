@@ -28,13 +28,16 @@ public record ContaCreateDto(
 
         Long parceiroId,
 
-        /** Número de parcelas (>=1). Se >1, gera lote com grupoParcelamento. */
         @PositiveOrZero
         Integer quantidadeParcelas,
 
-        /** Intervalo em meses entre parcelas (padrão: 1). */
         Integer intervaloMeses,
 
-        /** true = divide o valor total pelas parcelas; false = repete o valor em cada parcela. */
-        Boolean dividirValor
+        Boolean dividirValor,
+
+        String numeroDocumento,
+
+        BigDecimal acrescimo,
+
+        BigDecimal desconto
 ) {}

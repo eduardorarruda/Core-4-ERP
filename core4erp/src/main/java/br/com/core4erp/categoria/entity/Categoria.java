@@ -19,6 +19,8 @@ public class Categoria extends Auditable {
     @Column(nullable = false)
     private String descricao;
 
+    private String icone;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;

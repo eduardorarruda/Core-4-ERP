@@ -40,6 +40,14 @@ public class Conta extends Auditable {
     @Column(nullable = false, length = 10)
     private StatusConta status = StatusConta.PENDENTE;
 
+    private String numeroDocumento;
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal acrescimo = BigDecimal.ZERO;
+
+    @Column(precision = 15, scale = 2)
+    private BigDecimal desconto = BigDecimal.ZERO;
+
     /** UUID para agrupar parcelas geradas em lote. */
     private String grupoParcelamento;
 

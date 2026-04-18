@@ -62,4 +62,9 @@ public class ContaController {
                                                     @Valid @RequestBody BaixaRequestDto dto) {
         return ResponseEntity.ok(contaService.baixar(id, dto));
     }
+
+    @DeleteMapping("/{id}/baixa")
+    public ResponseEntity<ContaResponseDto> estornar(@PathVariable Long id) {
+        return ResponseEntity.ok(contaService.estornar(id));
+    }
 }

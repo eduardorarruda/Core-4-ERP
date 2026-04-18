@@ -36,6 +36,7 @@ public class CategoriaService {
     public CategoriaResponseDto criar(CategoriaRequestDto dto) {
         Categoria categoria = new Categoria();
         categoria.setDescricao(dto.descricao());
+        categoria.setIcone(dto.icone());
         categoria.setUsuario(securityCtx.getUsuario());
         return CategoriaResponseDto.from(categoriaRepository.save(categoria));
     }
@@ -44,6 +45,7 @@ public class CategoriaService {
     public CategoriaResponseDto atualizar(Long id, CategoriaRequestDto dto) {
         Categoria categoria = findOwned(id);
         categoria.setDescricao(dto.descricao());
+        categoria.setIcone(dto.icone());
         return CategoriaResponseDto.from(categoriaRepository.save(categoria));
     }
 

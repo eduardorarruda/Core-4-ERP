@@ -10,7 +10,10 @@ import java.time.LocalDate;
 public record ContaResponseDto(
         Long id,
         String descricao,
+        String numeroDocumento,
         BigDecimal valorOriginal,
+        BigDecimal acrescimo,
+        BigDecimal desconto,
         LocalDate dataVencimento,
         TipoConta tipo,
         StatusConta status,
@@ -19,17 +22,19 @@ public record ContaResponseDto(
         Integer totalParcelas,
         Long categoriaId,
         String categoriaDescricao,
+        String categoriaIcone,
         Long parceiroId,
         String parceiroNome
 ) {
     public static ContaResponseDto from(Conta c) {
         return new ContaResponseDto(
-                c.getId(), c.getDescricao(), c.getValorOriginal(), c.getDataVencimento(),
-                c.getTipo(), c.getStatus(), c.getGrupoParcelamento(),
-                c.getNumeroParcela(), c.getTotalParcelas(),
-                c.getCategoria().getId(), c.getCategoria().getDescricao(),
+                c.getId(), c.getDescricao(), c.getNumeroDocumento(),
+                c.getValorOriginal(), c.getAcrescimo(), c.getDesconto(),
+                c.getDataVencimento(), c.getTipo(), c.getStatus(),
+                c.getGrupoParcelamento(), c.getNumeroParcela(), c.getTotalParcelas(),
+                c.getCategoria().getId(), c.getCategoria().getDescricao(), c.getCategoria().getIcone(),
                 c.getParceiro() != null ? c.getParceiro().getId() : null,
-                c.getParceiro() != null ? c.getParceiro().getNome() : null
+                c.getParceiro() != null ? c.getParceiro().getRazaoSocial() : null
         );
     }
 }

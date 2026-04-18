@@ -18,11 +18,12 @@ public class ContaCorrente extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String numeroConta;
+
+    private String agencia;
+
     @Column(nullable = false)
     private String descricao;
-
-    @Column(nullable = false, length = 100)
-    private String apelido;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal saldo = BigDecimal.ZERO;

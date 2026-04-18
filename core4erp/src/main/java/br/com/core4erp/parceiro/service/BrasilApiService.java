@@ -49,22 +49,16 @@ public class BrasilApiService {
             @JsonProperty("bairro") String bairro,
             @JsonProperty("municipio") String municipio,
             @JsonProperty("uf") String uf,
-            @JsonProperty("cep") String cep
+            @JsonProperty("cep") String cep,
+            @JsonProperty("ddd_telefone_1") String dddTelefone1,
+            @JsonProperty("email") String email
     ) {
-        public String enderecoCompleto() {
-            StringBuilder sb = new StringBuilder();
-            append(sb, logradouro);
-            if (numero != null && !numero.isBlank()) sb.append(", ").append(numero);
-            if (complemento != null && !complemento.isBlank()) sb.append(" ").append(complemento);
-            if (bairro != null && !bairro.isBlank()) sb.append(" - ").append(bairro);
-            if (municipio != null && !municipio.isBlank()) sb.append(", ").append(municipio);
-            if (uf != null && !uf.isBlank()) sb.append("/").append(uf);
-            if (cep != null && !cep.isBlank()) sb.append(" - CEP ").append(cep);
-            return sb.toString();
-        }
-
-        private void append(StringBuilder sb, String val) {
-            if (val != null && !val.isBlank()) sb.append(val);
+        public String telefoneFormatado() {
+            if (dddTelefone1 == null || dddTelefone1.isBlank()) return null;
+            String digits = dddTelefone1.replaceAll("[^\\d]", "");
+            if (digits.length() == 10) return "(" + digits.substring(0, 2) + ") " + digits.substring(2, 6) + "-" + digits.substring(6);
+            if (digits.length() == 11) return "(" + digits.substring(0, 2) + ") " + digits.substring(2, 7) + "-" + digits.substring(7);
+            return dddTelefone1;
         }
     }
 }

@@ -16,14 +16,16 @@ public record LancamentoResponseDto(
         Integer numeroParcela,
         Integer totalParcelas,
         Long categoriaId,
-        String categoriaDescricao
+        String categoriaDescricao,
+        boolean faturaFechada
 ) {
-    public static LancamentoResponseDto from(LancamentoCartao l) {
+    public static LancamentoResponseDto from(LancamentoCartao l, boolean faturaFechada) {
         return new LancamentoResponseDto(
                 l.getId(), l.getDescricao(), l.getValor(), l.getDataCompra(),
                 l.getMesFatura(), l.getAnoFatura(),
                 l.getGrupoParcelamento(), l.getNumeroParcela(), l.getTotalParcelas(),
-                l.getCategoria().getId(), l.getCategoria().getDescricao()
+                l.getCategoria().getId(), l.getCategoria().getDescricao(),
+                faturaFechada
         );
     }
 }

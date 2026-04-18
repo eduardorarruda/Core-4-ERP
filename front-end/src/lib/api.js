@@ -61,6 +61,7 @@ export const parceiros = {
   criar: (dto) => request('/api/parceiros', { method: 'POST', body: JSON.stringify(dto) }),
   atualizar: (id, dto) => request(`/api/parceiros/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/parceiros/${id}`, { method: 'DELETE' }),
+  buscarCnpj: (cnpj) => request(`/api/parceiros/cnpj/${cnpj}`),
 };
 
 // ── Contas Correntes ──────────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ export const contas = {
   atualizar: (id, dto) => request(`/api/contas/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/contas/${id}`, { method: 'DELETE' }),
   baixar: (id, dto) => request(`/api/contas/${id}/baixa`, { method: 'PATCH', body: JSON.stringify(dto) }),
+  estornar: (id) => request(`/api/contas/${id}/baixa`, { method: 'DELETE' }),
 };
 
 // ── Cartões de Crédito ────────────────────────────────────────────────────────

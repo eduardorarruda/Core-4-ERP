@@ -1,28 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, CheckCheck, RefreshCw } from 'lucide-react';
 import { notificacoes as api } from '../lib/api';
+import Toast from '../components/ui/Toast';
 
 export default function Notificacoes() {
   const [lista, setLista] = useState([]);
   const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [msg, setMsg] = useState('');
+  const [toast, setToast] = useState(null);
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
-    try { setLista(await api.listar()); } catch (e) { setErro(e.message); }
+    try { setLista(await api.listar()); } catch (e) { setToast({ message: e.message, type: 'error' }); }
   }
 
   async function marcar(id) {
     try { await api.marcarLida(id); setLista(l => l.filter(n => n.id !== id)); }
-    catch (e) { setErro(e.message); }
+    catch (e) { setToast({ message: e.message, type: 'error' }); }
   }
 
   async function sincronizar() {
-    setCarregando(true); setMsg(''); setErro('');
-    try { await api.sincronizar(); await carregar(); setMsg('Sincronização concluída!'); }
-    catch (e) { setErro(e.message); }
+    setCarregando(true);
+    try { await api.sincronizar(); await carregar(); setToast({ message: 'Sincronização concluída!', type: 'success' }); }
+    catch (e) { setToast({ message: e.message, type: 'error' }); }
     finally { setCarregando(false); }
   }
 
@@ -33,12 +33,9 @@ export default function Notificacoes() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3"><Bell className="w-6 h-6 text-primary" /><h1 className="text-2xl font-bold text-white">Notificações</h1></div>
         <button onClick={sincronizar} disabled={carregando} className="flex items-center gap-2 border border-white/10 text-zinc-300 px-4 py-2 rounded-xl hover:bg-white/5 text-sm disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} /> Sincronizar
+          <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />{carregando ? 'SINCRONIZANDO...' : 'Sincronizar'}
         </button>
       </div>
-
-      {erro && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-2">{erro}</p>}
-      {msg && <p className="text-green-400 text-sm bg-green-400/10 border border-green-400/20 rounded-xl px-4 py-2">{msg}</p>}
 
       <div className="space-y-3">
         {lista.map(n => (
@@ -59,6 +56,8 @@ export default function Notificacoes() {
           </div>
         )}
       </div>
+
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
