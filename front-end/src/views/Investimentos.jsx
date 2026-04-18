@@ -108,7 +108,7 @@ export default function Investimentos() {
             <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Nova Transação</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1"><label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Tipo *</label>
-                <select className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none" value={tForm.tipoTransacao} onChange={e => setTForm(f => ({ ...f, tipoTransacao: e.target.value }))}>
+                <select className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none" value={tForm.tipoTransacao} onChange={e => setTForm(f => ({ ...f, tipoTransacao: e.target.value, contaCorrenteOrigemId: '' }))}>
                   {TIPO_TRANSACAO.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -118,10 +118,13 @@ export default function Investimentos() {
               <div className="space-y-1"><label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Data *</label>
                 <input type="date" className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:ring-1 focus:ring-primary" value={tForm.dataTransacao} onChange={e => setTForm(f => ({ ...f, dataTransacao: e.target.value }))} required />
               </div>
-              {tForm.tipoTransacao === 'APORTE' && (
-                <div className="space-y-1"><label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Conta Corrente (débito)</label>
-                  <select className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none" value={tForm.contaCorrenteOrigemId} onChange={e => setTForm(f => ({ ...f, contaCorrenteOrigemId: e.target.value }))}>
-                    <option value="">— Opcional —</option>{ccs.map(c => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
+              {tForm.tipoTransacao !== 'RENDIMENTO' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                    {tForm.tipoTransacao === 'APORTE' ? 'Conta Corrente (débito) *' : 'Conta Corrente (crédito) *'}
+                  </label>
+                  <select required className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none" value={tForm.contaCorrenteOrigemId} onChange={e => setTForm(f => ({ ...f, contaCorrenteOrigemId: e.target.value }))}>
+                    <option value="">— Selecione —</option>{ccs.map(c => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
                   </select>
                 </div>
               )}

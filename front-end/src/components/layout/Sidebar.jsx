@@ -1,12 +1,12 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Wallet, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
   LogOut, Tag
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { getUsuario } from '../../lib/api';
+import { useAuth } from '../../hooks/useAuth';
 
 const NAV = [
   { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard' },
@@ -23,17 +23,10 @@ const NAV = [
 ];
 
 export default function Sidebar({ onClose }) {
-  const navigate = useNavigate();
-  const usuario = getUsuario();
+  const { usuario, logout } = useAuth();
   const navVisivel = NAV.filter(
     (item) => item.id !== 'audit' || usuario?.role === 'ROLE_ADMIN'
   );
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('usuario');
-    navigate('/login');
-  };
 
   return (
     <aside className="group/sidebar h-screen sticky top-0 w-16 hover:w-56 transition-all duration-300 ease-in-out overflow-hidden bg-surface flex flex-col items-start py-8 gap-4 z-50 border-r border-white/5">
@@ -73,7 +66,7 @@ export default function Sidebar({ onClose }) {
       </nav>
 
       <button
-        onClick={handleLogout}
+        onClick={logout}
         className="px-4 py-2 flex items-center gap-3 text-zinc-400 hover:text-red-400 transition-colors w-full"
         title="Sair"
       >

@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { categorias as api } from '../lib/api';
 import Toast from '../components/ui/Toast';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import FormField, { inputCls, labelCls } from '../components/ui/FormField';
 
 const ICONES = [
   { nome: 'ShoppingCart', componente: ShoppingCart },
@@ -39,8 +41,6 @@ export function IconeCategoria({ nome, className = 'w-5 h-5' }) {
 }
 
 const empty = { descricao: '', icone: '' };
-const inputCls = 'w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:ring-1 focus:ring-primary text-sm';
-const labelCls = 'text-xs font-bold uppercase tracking-widest text-zinc-500';
 
 export default function Categorias() {
   const [lista, setLista] = useState([]);
@@ -48,6 +48,7 @@ export default function Categorias() {
   const [editId, setEditId] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [toast, setToast] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => { carregar(); }, []);
 
@@ -72,10 +73,17 @@ export default function Categorias() {
     }
   }
 
-  async function deletar(id) {
-    if (!confirm('Excluir categoria?')) return;
-    try { await api.deletar(id); await carregar(); setToast({ message: 'Categoria excluída!', type: 'success' }); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
+  function deletar(id) {
+    setConfirmAction({
+      title: 'Excluir categoria',
+      message: 'Tem certeza que deseja excluir esta categoria?',
+      confirmLabel: 'Excluir',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        try { await api.deletar(id); await carregar(); setToast({ message: 'Categoria excluída!', type: 'success' }); }
+        catch (e) { setToast({ message: e.message, type: 'error' }); }
+      },
+    });
   }
 
   function editar(c) { setForm({ descricao: c.descricao, icone: c.icone || '' }); setEditId(c.id); }
@@ -147,6 +155,7 @@ export default function Categorias() {
         {lista.length === 0 && <p className="text-zinc-500 col-span-4 text-center py-8">Nenhuma categoria cadastrada</p>}
       </div>
 
+      {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );

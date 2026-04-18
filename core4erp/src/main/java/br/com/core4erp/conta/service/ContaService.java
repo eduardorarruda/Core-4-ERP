@@ -81,6 +81,11 @@ public class ContaService {
         return ContaResponseDto.from(findOwned(id));
     }
 
+    /**
+     * Cria uma conta financeira com suporte a parcelamento: se {@code quantidadeParcelas > 1},
+     * gera N registros com vencimentos espaçados por {@code intervaloMeses}. Quando
+     * {@code dividirValor=true}, o valor total é dividido igualmente entre as parcelas.
+     */
     @Transactional
     public List<ContaResponseDto> criar(ContaCreateDto dto) {
         Usuario usuario = securityCtx.getUsuario();
@@ -173,6 +178,10 @@ public class ContaService {
         contaRepository.delete(conta);
     }
 
+    /**
+     * Registra o pagamento/recebimento de uma conta: cria um registro {@link br.com.core4erp.conta.entity.ContaBaixada},
+     * aplica juros/multa/acréscimo/desconto ao valor original e ajusta o saldo da conta corrente informada.
+     */
     @Transactional
     public ContaResponseDto baixar(Long id, BaixaRequestDto dto) {
         Conta conta = findOwned(id);
@@ -214,6 +223,10 @@ public class ContaService {
         return ContaResponseDto.from(contaRepository.save(conta));
     }
 
+    /**
+     * Estorna a baixa de uma conta: reverte o saldo na conta corrente, remove o {@code ContaBaixada}
+     * e, se a conta era originada do fechamento de uma fatura de cartão, reabre a fatura.
+     */
     @Transactional
     public ContaResponseDto estornar(Long id) {
         Conta conta = findOwned(id);

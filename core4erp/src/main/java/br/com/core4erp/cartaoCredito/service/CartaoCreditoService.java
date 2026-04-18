@@ -22,12 +22,17 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -62,11 +67,23 @@ public class CartaoCreditoService {
     // ── Cartões ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<CartaoCreditoResponseDto> listar() {
+    public Page<CartaoCreditoResponseDto> listar(Pageable pageable) {
         Long uid = securityCtx.getUsuarioId();
-        return cartaoRepo.findAllByUsuarioId(uid).stream()
-                .map(c -> CartaoCreditoResponseDto.from(c, calcularLimiteUsado(c)))
-                .toList();
+        Page<CartaoCredito> page = cartaoRepo.findAllByUsuarioId(uid, pageable);
+        if (page.isEmpty()) return page.map(c -> CartaoCreditoResponseDto.from(c, BigDecimal.ZERO));
+
+        YearMonth fim = YearMonth.now();
+        YearMonth inicio = fim.minusMonths(5);
+        List<Long> ids = page.getContent().stream().map(CartaoCredito::getId).toList();
+        Map<Long, BigDecimal> limitesUsados = new HashMap<>();
+        lancamentoRepo.sumValorByCartaoIdsAndPeriod(
+                ids,
+                inicio.getMonthValue(), inicio.getYear(),
+                fim.getMonthValue(), fim.getYear()
+        ).forEach(row -> limitesUsados.put((Long) row[0], (BigDecimal) row[1]));
+
+        return page.map(c -> CartaoCreditoResponseDto.from(c,
+                limitesUsados.getOrDefault(c.getId(), BigDecimal.ZERO)));
     }
 
     @Transactional(readOnly = true)
@@ -121,6 +138,10 @@ public class CartaoCreditoService {
                 .toList();
     }
 
+    /**
+     * Cria um ou mais lançamentos no cartão. Se {@code quantidadeParcelas > 1}, distribui o valor
+     * pelas faturas subsequentes e agrupa sob o mesmo {@code grupoParcelamento}.
+     */
     @Transactional
     public List<LancamentoResponseDto> criarLancamento(Long cartaoId, LancamentoRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
@@ -185,6 +206,12 @@ public class CartaoCreditoService {
     // ── Fechamento de fatura ──────────────────────────────────────────────────
 
     @Transactional
+    /**
+     * Fecha a fatura de um mês/ano: soma todos os lançamentos do período, gera uma
+     * {@link br.com.core4erp.conta.entity.Conta} a pagar com vencimento no dia configurado no cartão
+     * e marca a fatura como {@code FECHADA}. Lança {@link IllegalStateException} se já fechada ou
+     * se não houver lançamentos.
+     */
     public ContaResponseDto fecharFatura(Long cartaoId, FechamentoFaturaRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
         Long uid = securityCtx.getUsuarioId();

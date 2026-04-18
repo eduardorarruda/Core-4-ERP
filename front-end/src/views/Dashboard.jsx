@@ -100,8 +100,8 @@ export default function Dashboard() {
             </div>
           }
         >
-          <div className="h-[200px] sm:h-[300px] w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full mt-4">
+            <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={cashFlowData}>
                 <defs>
                   <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
@@ -148,8 +148,8 @@ export default function Dashboard() {
 
         {/* Resultados de Caixa */}
         <BentoCard className="col-span-12 lg:col-span-6" title="Resultados de Caixa">
-          <div className="h-64 w-full mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="w-full mt-4">
+            <ResponsiveContainer width="100%" height={256}>
               <BarChart data={resultsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#353534" vertical={false} />
                 <XAxis dataKey="name" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
@@ -207,7 +207,7 @@ export default function Dashboard() {
         {/* Despesas por Categoria */}
         <BentoCard className="col-span-12 lg:col-span-4 flex flex-col items-center justify-center" title="Despesas por Categoria">
           <div className="relative w-48 h-48 mt-4">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width={192} height={192}>
               <PieChart>
                 <Pie
                   data={pieData}

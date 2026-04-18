@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
 import { parceiros as api } from '../lib/api';
 import Toast from '../components/ui/Toast';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import FormField, { inputCls, labelCls } from '../components/ui/FormField';
 
 const TIPOS = ['CLIENTE', 'FORNECEDOR', 'AMBOS'];
 
@@ -11,18 +13,6 @@ const empty = {
   bairro: '', municipio: '', uf: '', telefone: '', email: '',
 };
 
-const inputCls = 'w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:ring-1 focus:ring-primary text-sm';
-const labelCls = 'text-xs font-bold uppercase tracking-widest text-zinc-500';
-
-function Field({ label, children }) {
-  return (
-    <div className="space-y-1">
-      <label className={labelCls}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
 export default function Parceiros() {
   const [lista, setLista] = useState([]);
   const [form, setForm] = useState(empty);
@@ -30,6 +20,8 @@ export default function Parceiros() {
   const [salvando, setSalvando] = useState(false);
   const [buscandoCnpj, setBuscandoCnpj] = useState(false);
   const [toast, setToast] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => { carregar(); }, []);
 
@@ -67,8 +59,23 @@ export default function Parceiros() {
     finally { setBuscandoCnpj(false); }
   }, []);
 
+  function validateForm() {
+    const errs = {};
+    if (!form.razaoSocial.trim()) errs.razaoSocial = 'Razão social é obrigatória';
+    if (!form.tipo) errs.tipo = 'Selecione o tipo';
+    if (form.cpfCnpj) {
+      const digits = form.cpfCnpj.replace(/\D/g, '');
+      if (digits.length !== 11 && digits.length !== 14) errs.cpfCnpj = 'CPF deve ter 11 dígitos ou CNPJ 14';
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Formato de email inválido';
+    return errs;
+  }
+
   async function salvar(e) {
     e.preventDefault();
+    const errs = validateForm();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
     setSalvando(true);
     try {
       if (editId) await api.atualizar(editId, form);
@@ -83,10 +90,17 @@ export default function Parceiros() {
     }
   }
 
-  async function deletar(id) {
-    if (!confirm('Excluir parceiro?')) return;
-    try { await api.deletar(id); await carregar(); setToast({ message: 'Parceiro excluído!', type: 'success' }); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
+  function deletar(id) {
+    setConfirmAction({
+      title: 'Excluir parceiro',
+      message: 'Tem certeza que deseja excluir este parceiro?',
+      confirmLabel: 'Excluir',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        try { await api.deletar(id); await carregar(); setToast({ message: 'Parceiro excluído!', type: 'success' }); }
+        catch (e) { setToast({ message: e.message, type: 'error' }); }
+      },
+    });
   }
 
   function editar(p) {
@@ -116,24 +130,24 @@ export default function Parceiros() {
         <div>
           <p className="text-xs text-zinc-600 uppercase tracking-widest font-bold mb-3">Dados Gerais</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Field label="CPF / CNPJ">
+            <FormField label="CPF / CNPJ" error={errors.cpfCnpj}>
               <div className="relative">
                 <input className={inputCls} value={form.cpfCnpj} onChange={handleCpfCnpjChange} placeholder="000.000.000-00" />
                 {buscandoCnpj && <span className="absolute right-3 top-3 text-xs text-primary animate-pulse">Buscando...</span>}
               </div>
-            </Field>
-            <Field label="Razão Social *">
+            </FormField>
+            <FormField label="Razão Social" required error={errors.razaoSocial}>
               <input className={inputCls} value={form.razaoSocial} onChange={set('razaoSocial')} required />
-            </Field>
-            <Field label="Nome Fantasia">
+            </FormField>
+            <FormField label="Nome Fantasia">
               <input className={inputCls} value={form.nomeFantasia} onChange={set('nomeFantasia')} />
-            </Field>
-            <Field label="Tipo *">
+            </FormField>
+            <FormField label="Tipo" required error={errors.tipo}>
               <select className={inputCls} value={form.tipo} onChange={set('tipo')} required>
                 <option value="">Selecione</option>
                 {TIPOS.map(t => <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>)}
               </select>
-            </Field>
+            </FormField>
           </div>
         </div>
 
@@ -141,27 +155,27 @@ export default function Parceiros() {
         <div>
           <p className="text-xs text-zinc-600 uppercase tracking-widest font-bold mb-3">Endereço</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Field label="CEP">
+            <FormField label="CEP">
               <input className={inputCls} value={form.cep} onChange={set('cep')} placeholder="00000-000" maxLength={9} />
-            </Field>
-            <Field label="Logradouro">
+            </FormField>
+            <FormField label="Logradouro">
               <input className={inputCls} value={form.logradouro} onChange={set('logradouro')} />
-            </Field>
-            <Field label="Número">
+            </FormField>
+            <FormField label="Número">
               <input className={inputCls} value={form.numero} onChange={set('numero')} />
-            </Field>
-            <Field label="Complemento">
+            </FormField>
+            <FormField label="Complemento">
               <input className={inputCls} value={form.complemento} onChange={set('complemento')} />
-            </Field>
-            <Field label="Bairro / Distrito">
+            </FormField>
+            <FormField label="Bairro / Distrito">
               <input className={inputCls} value={form.bairro} onChange={set('bairro')} />
-            </Field>
-            <Field label="Município">
+            </FormField>
+            <FormField label="Município">
               <input className={inputCls} value={form.municipio} onChange={set('municipio')} />
-            </Field>
-            <Field label="UF">
+            </FormField>
+            <FormField label="UF">
               <input className={inputCls} value={form.uf} onChange={set('uf')} maxLength={2} placeholder="SP" />
-            </Field>
+            </FormField>
           </div>
         </div>
 
@@ -169,12 +183,12 @@ export default function Parceiros() {
         <div>
           <p className="text-xs text-zinc-600 uppercase tracking-widest font-bold mb-3">Contato</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field label="Telefone">
+            <FormField label="Telefone">
               <input className={inputCls} value={form.telefone} onChange={set('telefone')} placeholder="(11) 99999-9999" />
-            </Field>
-            <Field label="Email">
+            </FormField>
+            <FormField label="Email" error={errors.email}>
               <input type="email" className={inputCls} value={form.email} onChange={set('email')} placeholder="email@empresa.com.br" />
-            </Field>
+            </FormField>
           </div>
         </div>
 
@@ -234,6 +248,7 @@ export default function Parceiros() {
         </table>
       </div>
 
+      {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );

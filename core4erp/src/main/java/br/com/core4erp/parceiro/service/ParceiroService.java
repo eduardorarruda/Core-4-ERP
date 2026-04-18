@@ -6,10 +6,10 @@ import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class ParceiroService {
@@ -26,11 +26,13 @@ public class ParceiroService {
         this.brasilApiService = brasilApiService;
     }
 
-    public List<ParceiroResponseDto> listar() {
-        return parceiroRepository.findAllByUsuarioId(securityCtx.getUsuarioId())
-                .stream().map(ParceiroResponseDto::from).toList();
+    @Transactional(readOnly = true)
+    public Page<ParceiroResponseDto> listar(Pageable pageable) {
+        return parceiroRepository.findAllByUsuarioId(securityCtx.getUsuarioId(), pageable)
+                .map(ParceiroResponseDto::from);
     }
 
+    @Transactional(readOnly = true)
     public ParceiroResponseDto buscarPorId(Long id) {
         return ParceiroResponseDto.from(findOwned(id));
     }

@@ -40,6 +40,9 @@ dependencies {
 	// OpenAPI / Swagger
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
+	// Rate limiting
+	implementation 'com.bucket4j:bucket4j-core:8.7.0'
+
 	// Flyway
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-postgresql'

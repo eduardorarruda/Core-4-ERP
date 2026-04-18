@@ -23,11 +23,13 @@ public class ContaCorrenteService {
         this.securityCtx = securityCtx;
     }
 
+    @Transactional(readOnly = true)
     public List<ContaCorrenteResponseDto> listar() {
         return repository.findAllByUsuarioId(securityCtx.getUsuarioId())
                 .stream().map(ContaCorrenteResponseDto::from).toList();
     }
 
+    @Transactional(readOnly = true)
     public ContaCorrenteResponseDto buscarPorId(Long id) {
         return ContaCorrenteResponseDto.from(findOwned(id));
     }

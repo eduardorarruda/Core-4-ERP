@@ -1,18 +1,15 @@
 package br.com.core4erp.dashboard.service;
 
-import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.conta.repository.ContaRepository;
-import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto.DespesaPorCategoriaDto;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto.FluxoMensalDto;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
-import br.com.core4erp.investimento.entity.ContaInvestimento;
 import br.com.core4erp.investimento.repository.ContaInvestimentoRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -50,26 +47,26 @@ public class DashboardService {
         this.lancamentoRepo = lancamentoRepo;
     }
 
+    /**
+     * Agrega os dados financeiros do usuário autenticado em uma única resposta: saldo das contas correntes,
+     * totais a pagar/receber, patrimônio em investimentos, limite total e usado de cartões,
+     * fluxo mensal dos últimos 6 meses e top-5 despesas por categoria do mês corrente.
+     * Todas as somas são feitas via queries agregadas no banco para evitar carregamento em memória.
+     */
     @Transactional(readOnly = true)
     public DashboardResponseDto getDashboard() {
         Long uid = securityCtx.getUsuarioId();
         LocalDate hoje = LocalDate.now();
         List<StatusConta> pendentes = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
 
-        BigDecimal saldoCC = contaCorrenteRepo.findAllByUsuarioId(uid).stream()
-                .map(ContaCorrente::getSaldo)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal saldoCC = contaCorrenteRepo.sumSaldoByUsuarioId(uid);
 
         BigDecimal totalAPagar = contaRepo.sumByTipoAndStatus(uid, TipoConta.PAGAR, pendentes);
         BigDecimal totalAReceber = contaRepo.sumByTipoAndStatus(uid, TipoConta.RECEBER, pendentes);
 
-        BigDecimal patrimonio = investimentoRepo.findAllByUsuarioId(uid).stream()
-                .map(ContaInvestimento::getSaldoAtual)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal patrimonio = investimentoRepo.sumSaldoAtualByUsuarioId(uid);
 
-        BigDecimal limiteTotal = cartaoRepo.findAllByUsuarioId(uid).stream()
-                .map(CartaoCredito::getLimite)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal limiteTotal = cartaoRepo.sumLimiteByUsuarioId(uid);
 
         YearMonth now = YearMonth.now();
         YearMonth sixAgo = now.minusMonths(5);
@@ -81,7 +78,9 @@ public class DashboardService {
         LocalDate inicioFluxo = hoje.withDayOfMonth(1).minusMonths(5);
         LocalDate fimFluxo = hoje.withDayOfMonth(hoje.lengthOfMonth());
         Map<YearMonth, ContaRepository.FluxoMensalProjection> fluxoMap =
-                contaRepo.fluxoMensal(uid, inicioFluxo, fimFluxo).stream()
+                contaRepo.fluxoMensal(uid, inicioFluxo, fimFluxo,
+                        StatusConta.PAGO, StatusConta.RECEBIDO,
+                        List.of(StatusConta.PAGO, StatusConta.RECEBIDO)).stream()
                         .collect(Collectors.toMap(
                                 p -> YearMonth.of(p.getAno(), p.getMes()),
                                 p -> p));
@@ -97,7 +96,9 @@ public class DashboardService {
         }
 
         List<DespesaPorCategoriaDto> despesas = contaRepo
-                .despesasPorCategoria(uid, hoje.getMonthValue(), hoje.getYear(), PageRequest.of(0, 5))
+                .despesasPorCategoria(uid, TipoConta.PAGAR,
+                        List.of(StatusConta.PENDENTE, StatusConta.ATRASADO, StatusConta.PAGO),
+                        hoje.getMonthValue(), hoje.getYear(), PageRequest.of(0, 5))
                 .stream()
                 .map(p -> new DespesaPorCategoriaDto(p.getCategoria(), p.getTotal()))
                 .toList();
