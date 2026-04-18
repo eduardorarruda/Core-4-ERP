@@ -4,18 +4,23 @@ import br.com.core4erp.enums.TipoParceiro;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDate;
-
 public record ParceiroRequestDto(
-        @NotBlank(message = "Nome é obrigatório")
-        String nome,
+        @NotBlank(message = "Razão social é obrigatória")
+        String razaoSocial,
+
+        String nomeFantasia,
+        String cpfCnpj,
 
         @NotNull(message = "Tipo é obrigatório")
         TipoParceiro tipo,
 
-        String razaoSocial,
-        String nomeFantasia,
-        String cpfCnpj,
-        String endereco,
-        LocalDate dataNascimentoFundacao
+        String logradouro,
+        String numero,
+        String complemento,
+        String cep,
+        String bairro,
+        String municipio,
+        String uf,
+        String telefone,
+        String email
 ) {}

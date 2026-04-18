@@ -58,34 +58,43 @@ public class ParceiroService {
     }
 
     private void preencherCampos(Parceiro p, ParceiroRequestDto dto) {
-        p.setNome(dto.nome());
-        p.setTipo(dto.tipo());
+        p.setNome(dto.razaoSocial()); // coluna nome mantida para compatibilidade
         p.setRazaoSocial(dto.razaoSocial());
         p.setNomeFantasia(dto.nomeFantasia());
         p.setCpfCnpj(dto.cpfCnpj());
-        p.setEndereco(dto.endereco());
-        p.setDataNascimentoFundacao(dto.dataNascimentoFundacao());
+        p.setTipo(dto.tipo());
+        p.setLogradouro(dto.logradouro());
+        p.setNumero(dto.numero());
+        p.setComplemento(dto.complemento());
+        p.setCep(dto.cep());
+        p.setBairro(dto.bairro());
+        p.setMunicipio(dto.municipio());
+        p.setUf(dto.uf());
+        p.setTelefone(dto.telefone());
+        p.setEmail(dto.email());
     }
 
-    /** Enriquece via BrasilAPI quando CNPJ presente e razaoSocial/endereco ausentes. */
     private void enrichCnpj(Parceiro p) {
         String cpfCnpj = p.getCpfCnpj();
         if (cpfCnpj == null) return;
         String digits = cpfCnpj.replaceAll("[^\\d]", "");
         if (digits.length() != 14) return;
-        boolean faltaRazao = p.getRazaoSocial() == null || p.getRazaoSocial().isBlank();
-        boolean faltaEndereco = p.getEndereco() == null || p.getEndereco().isBlank();
-        if (!faltaRazao && !faltaEndereco) return;
 
         brasilApiService.buscarCnpj(digits).ifPresent(data -> {
-            if (faltaRazao && data.razaoSocial() != null) p.setRazaoSocial(data.razaoSocial());
-            if (faltaEndereco) {
-                String end = data.enderecoCompleto();
-                if (!end.isBlank()) p.setEndereco(end);
+            if ((p.getRazaoSocial() == null || p.getRazaoSocial().isBlank()) && data.razaoSocial() != null) {
+                p.setRazaoSocial(data.razaoSocial());
+                p.setNome(data.razaoSocial());
             }
-            if (p.getNomeFantasia() == null && data.nomeFantasia() != null) {
-                p.setNomeFantasia(data.nomeFantasia());
-            }
+            if (p.getNomeFantasia() == null && data.nomeFantasia() != null) p.setNomeFantasia(data.nomeFantasia());
+            if (p.getLogradouro() == null && data.logradouro() != null) p.setLogradouro(data.logradouro());
+            if (p.getNumero() == null && data.numero() != null) p.setNumero(data.numero());
+            if (p.getComplemento() == null && data.complemento() != null) p.setComplemento(data.complemento());
+            if (p.getCep() == null && data.cep() != null) p.setCep(data.cep());
+            if (p.getBairro() == null && data.bairro() != null) p.setBairro(data.bairro());
+            if (p.getMunicipio() == null && data.municipio() != null) p.setMunicipio(data.municipio());
+            if (p.getUf() == null && data.uf() != null) p.setUf(data.uf());
+            if (p.getTelefone() == null) p.setTelefone(data.telefoneFormatado());
+            if (p.getEmail() == null && data.email() != null) p.setEmail(data.email());
         });
     }
 

@@ -34,6 +34,10 @@ public class ContaCorrenteService {
 
     @Transactional
     public ContaCorrenteResponseDto criar(ContaCorrenteRequestDto dto) {
+        Long usuarioId = securityCtx.getUsuarioId();
+        if (repository.existsByNumeroContaAndUsuarioId(dto.numeroConta(), usuarioId)) {
+            throw new IllegalArgumentException("Número de conta já cadastrado");
+        }
         ContaCorrente conta = new ContaCorrente();
         preencherCampos(conta, dto);
         conta.setUsuario(securityCtx.getUsuario());
@@ -82,7 +86,8 @@ public class ContaCorrenteService {
     }
 
     private void preencherCampos(ContaCorrente c, ContaCorrenteRequestDto dto) {
-        c.setApelido(dto.apelido());
+        c.setNumeroConta(dto.numeroConta());
+        c.setAgencia(dto.agencia());
         c.setDescricao(dto.descricao());
         c.setSaldo(dto.saldo());
     }

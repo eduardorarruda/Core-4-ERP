@@ -7,8 +7,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDate;
-
 @Getter
 @Setter
 @Entity
@@ -32,10 +30,21 @@ public class Parceiro extends Auditable {
     @Column(length = 18)
     private String cpfCnpj;
 
-    @Column(length = 500)
-    private String endereco;
+    private String logradouro;
+    private String numero;
+    private String complemento;
 
-    private LocalDate dataNascimentoFundacao;
+    @Column(length = 9)
+    private String cep;
+
+    private String bairro;
+    private String municipio;
+
+    @Column(length = 2)
+    private String uf;
+
+    private String telefone;
+    private String email;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "usuario_id", nullable = false)

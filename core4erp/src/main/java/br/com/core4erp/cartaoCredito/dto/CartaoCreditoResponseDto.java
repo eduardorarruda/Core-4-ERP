@@ -11,7 +11,7 @@ public record CartaoCreditoResponseDto(
         Integer diaFechamento,
         Integer diaVencimento,
         Long contaCorrenteId,
-        String contaCorrenteApelido,
+        String contaCorrenteDescricao,
         BigDecimal limiteUsado,
         BigDecimal limiteLivre
 ) {
@@ -20,7 +20,7 @@ public record CartaoCreditoResponseDto(
         return new CartaoCreditoResponseDto(
                 c.getId(), c.getNome(), c.getLimite(),
                 c.getDiaFechamento(), c.getDiaVencimento(),
-                c.getContaCorrente().getId(), c.getContaCorrente().getApelido(),
+                c.getContaCorrente().getId(), c.getContaCorrente().getDescricao(),
                 limiteUsado, livre
         );
     }

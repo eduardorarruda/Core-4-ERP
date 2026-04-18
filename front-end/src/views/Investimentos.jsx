@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, Plus, X } from 'lucide-react';
 import { investimentos as api, contasCorrentes as ccApi } from '../lib/api';
+import Toast from '../components/ui/Toast';
 
 const TIPOS = ['RENDA_FIXA', 'RENDA_VARIAVEL', 'FUNDOS', 'CRIPTO', 'OUTROS'];
 const TIPO_TRANSACAO = ['APORTE', 'RESGATE', 'RENDIMENTO'];
@@ -12,34 +13,45 @@ export default function Investimentos() {
   const [contaSel, setContaSel] = useState(null);
   const [transacoes, setTransacoes] = useState([]);
   const [tForm, setTForm] = useState({ tipoTransacao: 'APORTE', valor: '', dataTransacao: '', contaCorrenteOrigemId: '' });
-  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [salvandoTransacao, setSalvandoTransacao] = useState(false);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    api.listar().then(setLista).catch(e => setErro(e.message));
+    api.listar().then(setLista).catch(e => setToast({ message: e.message, type: 'error' }));
     ccApi.listar().then(setCcs).catch(() => {});
   }, []);
 
   async function criar(e) {
-    e.preventDefault(); setErro('');
-    try { await api.criar(form); api.listar().then(setLista); setForm({ nome: '', tipo: 'RENDA_FIXA' }); }
-    catch (e) { setErro(e.message); }
+    e.preventDefault();
+    setSalvando(true);
+    try {
+      await api.criar(form);
+      const l = await api.listar(); setLista(l);
+      setForm({ nome: '', tipo: 'RENDA_FIXA' });
+      setToast({ message: 'Conta de investimento criada!', type: 'success' });
+    } catch (e) { setToast({ message: e.message, type: 'error' }); }
+    finally { setSalvando(false); }
   }
 
   async function abrir(c) {
     setContaSel(c);
-    api.transacoes.listar(c.id).then(setTransacoes).catch(e => setErro(e.message));
+    api.transacoes.listar(c.id).then(setTransacoes).catch(e => setToast({ message: e.message, type: 'error' }));
   }
 
   async function registrar(e) {
-    e.preventDefault(); setErro('');
+    e.preventDefault();
+    setSalvandoTransacao(true);
     try {
       await api.transacoes.registrar(contaSel.id, { ...tForm, valor: parseFloat(tForm.valor), contaCorrenteOrigemId: tForm.contaCorrenteOrigemId ? Number(tForm.contaCorrenteOrigemId) : null });
       const updated = await api.buscar(contaSel.id);
       setContaSel(updated);
-      api.listar().then(setLista);
-      api.transacoes.listar(contaSel.id).then(setTransacoes);
+      const [l, t] = await Promise.all([api.listar(), api.transacoes.listar(contaSel.id)]);
+      setLista(l); setTransacoes(t);
       setTForm({ tipoTransacao: 'APORTE', valor: '', dataTransacao: '', contaCorrenteOrigemId: '' });
-    } catch (e) { setErro(e.message); }
+      setToast({ message: 'Transação registrada!', type: 'success' });
+    } catch (e) { setToast({ message: e.message, type: 'error' }); }
+    finally { setSalvandoTransacao(false); }
   }
 
   const totalSaldo = lista.reduce((s, c) => s + Number(c.saldoAtual), 0);
@@ -52,8 +64,6 @@ export default function Investimentos() {
         <p className="text-xs uppercase tracking-widest text-primary font-bold mb-1">Patrimônio Total</p>
         <p className="text-3xl font-bold text-white">R$ {totalSaldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
       </div>
-
-      {erro && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-2">{erro}</p>}
 
       {!contaSel && (
         <>
@@ -69,7 +79,7 @@ export default function Investimentos() {
                 </select>
               </div>
             </div>
-            <button type="submit" className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 flex items-center gap-2"><Plus className="w-4 h-4" /> Criar</button>
+            <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2"><Plus className="w-4 h-4" />{salvando ? 'GRAVANDO...' : 'Criar'}</button>
           </form>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -111,12 +121,12 @@ export default function Investimentos() {
               {tForm.tipoTransacao === 'APORTE' && (
                 <div className="space-y-1"><label className="text-xs font-bold uppercase tracking-widest text-zinc-500">Conta Corrente (débito)</label>
                   <select className="w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none" value={tForm.contaCorrenteOrigemId} onChange={e => setTForm(f => ({ ...f, contaCorrenteOrigemId: e.target.value }))}>
-                    <option value="">— Opcional —</option>{ccs.map(c => <option key={c.id} value={c.id}>{c.apelido}</option>)}
+                    <option value="">— Opcional —</option>{ccs.map(c => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
                   </select>
                 </div>
               )}
             </div>
-            <button type="submit" className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 text-sm">Registrar</button>
+            <button type="submit" disabled={salvandoTransacao} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm">{salvandoTransacao ? 'GRAVANDO...' : 'Registrar'}</button>
           </form>
 
           <div className="bg-surface-low rounded-2xl border border-white/5 overflow-hidden">
@@ -138,6 +148,8 @@ export default function Investimentos() {
           </div>
         </div>
       )}
+
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

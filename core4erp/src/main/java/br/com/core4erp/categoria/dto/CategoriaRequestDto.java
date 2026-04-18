@@ -4,5 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record CategoriaRequestDto(
         @NotBlank(message = "Descrição é obrigatória")
-        String descricao
+        String descricao,
+
+        String icone
 ) {}

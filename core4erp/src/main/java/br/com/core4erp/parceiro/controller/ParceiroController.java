@@ -2,6 +2,7 @@ package br.com.core4erp.parceiro.controller;
 
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
+import br.com.core4erp.parceiro.service.BrasilApiService;
 import br.com.core4erp.parceiro.service.ParceiroService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -15,9 +16,18 @@ import java.util.List;
 public class ParceiroController {
 
     private final ParceiroService parceiroService;
+    private final BrasilApiService brasilApiService;
 
-    public ParceiroController(ParceiroService parceiroService) {
+    public ParceiroController(ParceiroService parceiroService, BrasilApiService brasilApiService) {
         this.parceiroService = parceiroService;
+        this.brasilApiService = brasilApiService;
+    }
+
+    @GetMapping("/cnpj/{cnpj}")
+    public ResponseEntity<BrasilApiService.CnpjData> buscarCnpj(@PathVariable String cnpj) {
+        return brasilApiService.buscarCnpj(cnpj)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping
