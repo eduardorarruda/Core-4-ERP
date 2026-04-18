@@ -54,7 +54,7 @@ export function getUsuario() {
 
 // ── Categorias ────────────────────────────────────────────────────────────────
 export const categorias = {
-  listar: () => request('/api/categorias'),
+  listar: () => request('/api/categorias').then(p => p.content),
   buscar: (id) => request(`/api/categorias/${id}`),
   criar: (dto) => request('/api/categorias', { method: 'POST', body: JSON.stringify(dto) }),
   atualizar: (id, dto) => request(`/api/categorias/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
@@ -63,7 +63,7 @@ export const categorias = {
 
 // ── Parceiros ─────────────────────────────────────────────────────────────────
 export const parceiros = {
-  listar: () => request('/api/parceiros'),
+  listar: () => request('/api/parceiros').then(p => p.content),
   buscar: (id) => request(`/api/parceiros/${id}`),
   criar: (dto) => request('/api/parceiros', { method: 'POST', body: JSON.stringify(dto) }),
   atualizar: (id, dto) => request(`/api/parceiros/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
@@ -97,7 +97,7 @@ export const contas = {
 
 // ── Cartões de Crédito ────────────────────────────────────────────────────────
 export const cartoes = {
-  listar: () => request('/api/cartoes'),
+  listar: () => request('/api/cartoes').then(p => p.content),
   buscar: (id) => request(`/api/cartoes/${id}`),
   criar: (dto) => request('/api/cartoes', { method: 'POST', body: JSON.stringify(dto) }),
   atualizar: (id, dto) => request(`/api/cartoes/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),

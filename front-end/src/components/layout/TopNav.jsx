@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Bell, History, Menu, Settings, LogOut } from 'lucide-react';
-import { getUsuario } from '../../lib/api';
+import { useAuth } from '../../hooks/useAuth';
 
 function getInitials(nome) {
   if (!nome) return '?';
@@ -13,11 +13,24 @@ function getInitials(nome) {
     .join('');
 }
 
-export default function TopNav({ onMenuClick }) {
+export default function TopNav({ onMenuClick, onSearch }) {
   const navigate = useNavigate();
+  const { usuario, logout } = useAuth();
   const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
-  const usuario = getUsuario();
+  const debounceRef = useRef(null);
+
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearch?.(value);
+    }, 300);
+  }, [onSearch]);
+
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -28,12 +41,6 @@ export default function TopNav({ onMenuClick }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('usuario');
-    navigate('/login');
-  };
 
   return (
     <header className="sticky top-0 w-full z-40 bg-surface/80 backdrop-blur-xl flex justify-between items-center h-16 px-4 lg:px-8 shadow-[0px_20px_40px_rgba(0,0,0,0.4)]">
@@ -51,6 +58,8 @@ export default function TopNav({ onMenuClick }) {
             className="w-full bg-surface-low border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-zinc-600 outline-none"
             placeholder="Search..."
             type="text"
+            value={searchTerm}
+            onChange={handleSearchChange}
           />
         </div>
       </div>
@@ -98,7 +107,7 @@ export default function TopNav({ onMenuClick }) {
                 Configurações da Conta
               </button>
               <button
-                onClick={handleLogout}
+                onClick={logout}
                 className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:bg-surface-highest transition-colors"
               >
                 <LogOut className="w-4 h-4" />

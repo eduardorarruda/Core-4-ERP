@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Landmark, Plus, Pencil, Trash2, ArrowRightLeft } from 'lucide-react';
 import { contasCorrentes as api } from '../lib/api';
 import Toast from '../components/ui/Toast';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import FormField, { inputCls, labelCls } from '../components/ui/FormField';
 
 const empty = { numeroConta: '', agencia: '', descricao: '', saldo: '' };
 
@@ -14,6 +16,8 @@ export default function ContasCorrentes() {
   const [salvando, setSalvando] = useState(false);
   const [salvandoTransf, setSalvandoTransf] = useState(false);
   const [toast, setToast] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => { carregar(); }, []);
 
@@ -21,8 +25,20 @@ export default function ContasCorrentes() {
     try { setLista(await api.listar()); } catch (e) { setToast({ message: e.message, type: 'error' }); }
   }
 
+  function validateForm() {
+    const errs = {};
+    if (!form.numeroConta.trim()) errs.numeroConta = 'Número da conta é obrigatório';
+    if (!form.agencia.trim()) errs.agencia = 'Agência é obrigatória';
+    if (!form.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
+    if (form.saldo === '' || isNaN(parseFloat(form.saldo))) errs.saldo = 'Saldo deve ser um número válido';
+    return errs;
+  }
+
   async function salvar(e) {
     e.preventDefault();
+    const errs = validateForm();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
     setSalvando(true);
     try {
       const dto = { ...form, saldo: parseFloat(form.saldo) };
@@ -37,10 +53,17 @@ export default function ContasCorrentes() {
     }
   }
 
-  async function deletar(id) {
-    if (!confirm('Excluir conta?')) return;
-    try { await api.deletar(id); await carregar(); setToast({ message: 'Conta excluída!', type: 'success' }); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
+  function deletar(id) {
+    setConfirmAction({
+      title: 'Excluir conta corrente',
+      message: 'Tem certeza que deseja excluir esta conta corrente?',
+      confirmLabel: 'Excluir',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        try { await api.deletar(id); await carregar(); setToast({ message: 'Conta excluída!', type: 'success' }); }
+        catch (e) { setToast({ message: e.message, type: 'error' }); }
+      },
+    });
   }
 
   async function transferir(e) {
@@ -65,8 +88,6 @@ export default function ContasCorrentes() {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
   const total = lista.reduce((s, c) => s + Number(c.saldo), 0);
-  const inputCls = 'w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:ring-1 focus:ring-primary';
-  const labelCls = 'text-xs font-bold uppercase tracking-widest text-zinc-500';
 
   return (
     <div className="space-y-6">
@@ -89,24 +110,21 @@ export default function ContasCorrentes() {
         <form onSubmit={transferir} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Transferência</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className={labelCls}>Origem</label>
+            <FormField label="Origem">
               <select className={inputCls} value={transf.contaOrigemId} onChange={e => setTransf(f => ({ ...f, contaOrigemId: e.target.value }))} required>
                 <option value="">Selecione</option>
                 {lista.map(c => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
               </select>
-            </div>
-            <div className="space-y-1">
-              <label className={labelCls}>Destino</label>
+            </FormField>
+            <FormField label="Destino">
               <select className={inputCls} value={transf.contaDestinoId} onChange={e => setTransf(f => ({ ...f, contaDestinoId: e.target.value }))} required>
                 <option value="">Selecione</option>
                 {lista.map(c => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
               </select>
-            </div>
-            <div className="space-y-1">
-              <label className={labelCls}>Valor (R$)</label>
+            </FormField>
+            <FormField label="Valor (R$)">
               <input type="number" step="0.01" min="0.01" className={inputCls} value={transf.valor} onChange={e => setTransf(f => ({ ...f, valor: e.target.value }))} required />
-            </div>
+            </FormField>
           </div>
           <button type="submit" disabled={salvandoTransf} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50">
             {salvandoTransf ? 'GRAVANDO...' : 'Transferir'}
@@ -117,22 +135,18 @@ export default function ContasCorrentes() {
       <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
         <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editId ? 'Editar' : 'Nova'} Conta</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <label className={labelCls}>Número da Conta *</label>
+          <FormField label="Número da Conta" required error={errors.numeroConta}>
             <input className={inputCls} value={form.numeroConta} onChange={set('numeroConta')} required placeholder="Ex: 12345-6" />
-          </div>
-          <div className="space-y-1">
-            <label className={labelCls}>Agência *</label>
+          </FormField>
+          <FormField label="Agência" required error={errors.agencia}>
             <input className={inputCls} value={form.agencia} onChange={set('agencia')} required placeholder="Ex: 0001" />
-          </div>
-          <div className="space-y-1">
-            <label className={labelCls}>Descrição *</label>
+          </FormField>
+          <FormField label="Descrição" required error={errors.descricao}>
             <input className={inputCls} value={form.descricao} onChange={set('descricao')} required placeholder="Ex: Conta Principal" />
-          </div>
-          <div className="space-y-1">
-            <label className={labelCls}>Saldo Inicial (R$) *</label>
+          </FormField>
+          <FormField label="Saldo Inicial (R$)" required error={errors.saldo}>
             <input type="number" step="0.01" className={inputCls} value={form.saldo} onChange={set('saldo')} required placeholder="0,00" />
-          </div>
+          </FormField>
         </div>
         <div className="flex gap-3">
           <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
@@ -161,6 +175,7 @@ export default function ContasCorrentes() {
         {lista.length === 0 && <p className="text-zinc-500 col-span-3 text-center py-8">Nenhuma conta cadastrada</p>}
       </div>
 
+      {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );

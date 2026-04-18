@@ -2,7 +2,7 @@ package br.com.core4erp.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 
 public record RegistrarRequestDto(
         @NotBlank(message = "Nome é obrigatório")
@@ -13,7 +13,10 @@ public record RegistrarRequestDto(
         String email,
 
         @NotBlank(message = "Senha é obrigatória")
-        @Size(min = 6, message = "Senha deve ter no mínimo 6 caracteres")
+        @Pattern(
+                regexp = "^(?=.*[A-Za-z])(?=.*\\d).{6,}$",
+                message = "Senha deve ter mínimo 6 caracteres, incluindo letra e número"
+        )
         String senha,
 
         Long telefone

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { CreditCard, Plus, Trash2, X, Pencil, Lock } from 'lucide-react';
 import { cartoes as api, contasCorrentes as ccApi, categorias as catApi } from '../lib/api';
 import Toast from '../components/ui/Toast';
+import ConfirmModal from '../components/ui/ConfirmModal';
+import FormField, { inputCls, inputSmCls, labelCls } from '../components/ui/FormField';
 
 const emptyLancForm = { descricao: '', valor: '', dataCompra: '', mesFatura: '', anoFatura: '', categoriaId: '', quantidadeParcelas: 1 };
 
@@ -21,6 +23,8 @@ export default function Cartoes() {
   const [salvandoEdit, setSalvandoEdit] = useState(false);
   const [salvandoFatura, setSalvandoFatura] = useState(false);
   const [toast, setToast] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     api.listar().then(setLista).catch(e => setToast({ message: e.message, type: 'error' }));
@@ -33,8 +37,37 @@ export default function Cartoes() {
     setLancamentos(l);
   }
 
+  function validateCartaoForm() {
+    const errs = {};
+    if (!form.nome.trim()) errs.nome = 'Nome é obrigatório';
+    if (!form.limite || parseFloat(form.limite) <= 0) errs.limite = 'Limite deve ser maior que zero';
+    const dia1 = Number(form.diaFechamento);
+    if (!dia1 || dia1 < 1 || dia1 > 31) errs.diaFechamento = 'Dia deve ser entre 1 e 31';
+    const dia2 = Number(form.diaVencimento);
+    if (!dia2 || dia2 < 1 || dia2 > 31) errs.diaVencimento = 'Dia deve ser entre 1 e 31';
+    if (!form.contaCorrenteId) errs.contaCorrenteId = 'Selecione uma conta corrente';
+    return errs;
+  }
+
+  function validateLancForm() {
+    const errs = {};
+    if (!lancForm.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
+    if (!lancForm.valor || parseFloat(lancForm.valor) <= 0) errs.valor = 'Valor deve ser maior que zero';
+    if (!lancForm.dataCompra) errs.dataCompra = 'Data é obrigatória';
+    const mes = Number(lancForm.mesFatura);
+    if (!mes || mes < 1 || mes > 12) errs.mesFatura = 'Mês deve ser entre 1 e 12';
+    if (!lancForm.anoFatura || Number(lancForm.anoFatura) < 2000) errs.anoFatura = 'Ano inválido';
+    if (!lancForm.categoriaId) errs.categoriaId = 'Selecione uma categoria';
+    const parc = Number(lancForm.quantidadeParcelas);
+    if (!parc || parc < 1) errs.quantidadeParcelas = 'Mínimo 1 parcela';
+    return errs;
+  }
+
   async function criarCartao(e) {
     e.preventDefault();
+    const errs = validateCartaoForm();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
     setSalvando(true);
     try {
       await api.criar({ ...form, limite: parseFloat(form.limite), diaFechamento: Number(form.diaFechamento), diaVencimento: Number(form.diaVencimento), contaCorrenteId: Number(form.contaCorrenteId) });
@@ -45,21 +78,32 @@ export default function Cartoes() {
     finally { setSalvando(false); }
   }
 
-  async function deletarCartao(id) {
-    if (!confirm('Excluir cartão?')) return;
-    try { await api.deletar(id); api.listar().then(setLista); setToast({ message: 'Cartão excluído!', type: 'success' }); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
+  function deletarCartao(id) {
+    setConfirmAction({
+      title: 'Excluir cartão',
+      message: 'Tem certeza que deseja excluir este cartão? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        try { await api.deletar(id); api.listar().then(setLista); setToast({ message: 'Cartão excluído!', type: 'success' }); }
+        catch (e) { setToast({ message: e.message, type: 'error' }); }
+      },
+    });
   }
 
   async function abrirCartao(c) {
     setCartaoSel(c);
     setEditLancId(null);
+    setErrors({});
     const l = await api.lancamentos.listar(c.id);
     setLancamentos(l);
   }
 
   async function criarLancamento(e) {
     e.preventDefault();
+    const errs = validateLancForm();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setErrors({});
     setSalvandoLanc(true);
     try {
       await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), mesFatura: Number(lancForm.mesFatura), anoFatura: Number(lancForm.anoFatura), categoriaId: Number(lancForm.categoriaId), quantidadeParcelas: Number(lancForm.quantidadeParcelas) });
@@ -87,13 +131,20 @@ export default function Cartoes() {
     finally { setSalvandoEdit(false); }
   }
 
-  async function deletarLancamento(id) {
-    if (!confirm('Excluir lançamento?')) return;
-    try {
-      await api.lancamentos.deletar(cartaoSel.id, id);
-      await recarregarLancamentos();
-      setToast({ message: 'Lançamento excluído!', type: 'success' });
-    } catch (e) { setToast({ message: e.message, type: 'error' }); }
+  function deletarLancamento(id) {
+    setConfirmAction({
+      title: 'Excluir lançamento',
+      message: 'Tem certeza que deseja excluir este lançamento?',
+      confirmLabel: 'Excluir',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        try {
+          await api.lancamentos.deletar(cartaoSel.id, id);
+          await recarregarLancamentos();
+          setToast({ message: 'Lançamento excluído!', type: 'success' });
+        } catch (e) { setToast({ message: e.message, type: 'error' }); }
+      },
+    });
   }
 
   async function fecharFatura(e) {
@@ -108,10 +159,6 @@ export default function Cartoes() {
     finally { setSalvandoFatura(false); }
   }
 
-  const inputCls = 'w-full bg-surface border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:ring-1 focus:ring-primary';
-  const inputSmCls = 'w-full bg-surface border border-white/5 rounded-xl px-4 py-2 text-white outline-none focus:ring-1 focus:ring-primary text-sm';
-  const labelCls = 'text-xs font-bold uppercase tracking-widest text-zinc-500';
-
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -125,18 +172,16 @@ export default function Cartoes() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Novo Cartão</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[['Nome', 'nome', 'text'], ['Limite (R$)', 'limite', 'number'], ['Dia Fechamento', 'diaFechamento', 'number'], ['Dia Vencimento', 'diaVencimento', 'number']].map(([lbl, key, type]) => (
-              <div key={key} className="space-y-1">
-                <label className={labelCls}>{lbl}</label>
+              <FormField key={key} label={lbl} error={errors[key]}>
                 <input type={type} step={type === 'number' && key === 'limite' ? '0.01' : '1'} min={key.includes('Dia') ? 1 : undefined} max={key.includes('Dia') ? 31 : undefined} className={inputCls} value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} required />
-              </div>
+              </FormField>
             ))}
-            <div className="space-y-1">
-              <label className={labelCls}>Conta Corrente *</label>
+            <FormField label="Conta Corrente" required error={errors.contaCorrenteId}>
               <select className={inputCls} value={form.contaCorrenteId} onChange={e => setForm(f => ({ ...f, contaCorrenteId: e.target.value }))} required>
                 <option value="">Selecione</option>
                 {ccs.map(c => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
               </select>
-            </div>
+            </FormField>
           </div>
           <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
             <Plus className="w-4 h-4" />{salvando ? 'GRAVANDO...' : 'Criar'}
@@ -187,17 +232,15 @@ export default function Cartoes() {
               <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Novo Lançamento</h3>
               <div className="space-y-3">
                 {[['Descrição', 'descricao', 'text'], ['Valor (R$)', 'valor', 'number'], ['Data Compra', 'dataCompra', 'date'], ['Mês Fatura (1-12)', 'mesFatura', 'number'], ['Ano Fatura', 'anoFatura', 'number'], ['Nº Parcelas', 'quantidadeParcelas', 'number']].map(([lbl, key, type]) => (
-                  <div key={key} className="space-y-1">
-                    <label className={labelCls}>{lbl}</label>
+                  <FormField key={key} label={lbl} error={errors[key]}>
                     <input type={type} step={key === 'valor' ? '0.01' : '1'} className={inputSmCls} value={lancForm[key]} onChange={e => setLancForm(f => ({ ...f, [key]: e.target.value }))} required />
-                  </div>
+                  </FormField>
                 ))}
-                <div className="space-y-1">
-                  <label className={labelCls}>Categoria *</label>
+                <FormField label="Categoria" required error={errors.categoriaId}>
                   <select className={inputSmCls} value={lancForm.categoriaId} onChange={e => setLancForm(f => ({ ...f, categoriaId: e.target.value }))} required>
                     <option value="">Selecione</option>{cats.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
                   </select>
-                </div>
+                </FormField>
               </div>
               <button type="submit" disabled={salvandoLanc} className="bg-primary text-on-primary font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2">
                 <Plus className="w-3 h-3" />{salvandoLanc ? 'GRAVANDO...' : 'Lançar'}
@@ -209,10 +252,9 @@ export default function Cartoes() {
               <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Fechar Fatura</h3>
               <div className="space-y-3">
                 {[['Mês (1-12)', 'mes'], ['Ano', 'ano']].map(([lbl, key]) => (
-                  <div key={key} className="space-y-1">
-                    <label className={labelCls}>{lbl}</label>
+                  <FormField key={key} label={lbl}>
                     <input type="number" className={inputSmCls} value={fechForm[key]} onChange={e => setFechForm(f => ({ ...f, [key]: e.target.value }))} required />
-                  </div>
+                  </FormField>
                 ))}
               </div>
               <button type="submit" disabled={salvandoFatura} className="bg-orange-600 text-white font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm">
@@ -239,33 +281,27 @@ export default function Cartoes() {
                     <tr key={l.id} className="border-b border-white/5 bg-white/[0.03]">
                       <td colSpan={5} className="px-6 py-4">
                         <form onSubmit={salvarEdicao} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="space-y-1">
-                            <label className={labelCls}>Descrição</label>
+                          <FormField label="Descrição">
                             <input className={inputSmCls} value={editForm.descricao} onChange={e => setEditForm(f => ({ ...f, descricao: e.target.value }))} required />
-                          </div>
-                          <div className="space-y-1">
-                            <label className={labelCls}>Valor (R$)</label>
+                          </FormField>
+                          <FormField label="Valor (R$)">
                             <input type="number" step="0.01" className={inputSmCls} value={editForm.valor} onChange={e => setEditForm(f => ({ ...f, valor: e.target.value }))} required />
-                          </div>
-                          <div className="space-y-1">
-                            <label className={labelCls}>Data Compra</label>
+                          </FormField>
+                          <FormField label="Data Compra">
                             <input type="date" className={inputSmCls} value={editForm.dataCompra} onChange={e => setEditForm(f => ({ ...f, dataCompra: e.target.value }))} required />
-                          </div>
-                          <div className="space-y-1">
-                            <label className={labelCls}>Mês Fatura</label>
+                          </FormField>
+                          <FormField label="Mês Fatura">
                             <input type="number" min="1" max="12" className={inputSmCls} value={editForm.mesFatura} onChange={e => setEditForm(f => ({ ...f, mesFatura: e.target.value }))} required />
-                          </div>
-                          <div className="space-y-1">
-                            <label className={labelCls}>Ano Fatura</label>
+                          </FormField>
+                          <FormField label="Ano Fatura">
                             <input type="number" className={inputSmCls} value={editForm.anoFatura} onChange={e => setEditForm(f => ({ ...f, anoFatura: e.target.value }))} required />
-                          </div>
-                          <div className="space-y-1">
-                            <label className={labelCls}>Categoria</label>
+                          </FormField>
+                          <FormField label="Categoria">
                             <select className={inputSmCls} value={editForm.categoriaId} onChange={e => setEditForm(f => ({ ...f, categoriaId: e.target.value }))} required>
                               <option value="">Selecione</option>
                               {cats.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
                             </select>
-                          </div>
+                          </FormField>
                           <div className="flex items-end gap-2 col-span-2">
                             <button type="submit" disabled={salvandoEdit} className="bg-primary text-on-primary font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm">
                               {salvandoEdit ? 'SALVANDO...' : 'Salvar'}
@@ -318,6 +354,7 @@ export default function Cartoes() {
         </div>
       )}
 
+      {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );

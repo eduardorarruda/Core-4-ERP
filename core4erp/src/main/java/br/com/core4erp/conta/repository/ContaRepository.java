@@ -40,31 +40,36 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
     @Query("""
         SELECT EXTRACT(MONTH FROM c.dataVencimento) AS mes,
                EXTRACT(YEAR  FROM c.dataVencimento) AS ano,
-               COALESCE(SUM(CASE WHEN c.status = 'PAGO'     THEN c.valorOriginal ELSE 0 END), 0) AS totalPago,
-               COALESCE(SUM(CASE WHEN c.status = 'RECEBIDO' THEN c.valorOriginal ELSE 0 END), 0) AS totalRecebido
+               COALESCE(SUM(CASE WHEN c.status = :statusPago     THEN c.valorOriginal ELSE 0 END), 0) AS totalPago,
+               COALESCE(SUM(CASE WHEN c.status = :statusRecebido THEN c.valorOriginal ELSE 0 END), 0) AS totalRecebido
         FROM Conta c
         WHERE c.usuario.id = :uid
           AND c.dataVencimento BETWEEN :inicio AND :fim
-          AND c.status IN ('PAGO', 'RECEBIDO')
+          AND c.status IN :statuses
         GROUP BY EXTRACT(YEAR FROM c.dataVencimento), EXTRACT(MONTH FROM c.dataVencimento)
         ORDER BY EXTRACT(YEAR FROM c.dataVencimento) ASC, EXTRACT(MONTH FROM c.dataVencimento) ASC
         """)
     List<FluxoMensalProjection> fluxoMensal(@Param("uid") Long uid,
                                              @Param("inicio") LocalDate inicio,
-                                             @Param("fim") LocalDate fim);
+                                             @Param("fim") LocalDate fim,
+                                             @Param("statusPago") StatusConta statusPago,
+                                             @Param("statusRecebido") StatusConta statusRecebido,
+                                             @Param("statuses") Collection<StatusConta> statuses);
 
     @Query("""
         SELECT c.categoria.descricao AS categoria, SUM(c.valorOriginal) AS total
         FROM Conta c
         WHERE c.usuario.id = :uid
-          AND c.tipo = 'PAGAR'
-          AND c.status IN ('PENDENTE', 'ATRASADO', 'PAGO')
+          AND c.tipo = :tipo
+          AND c.status IN :statuses
           AND EXTRACT(MONTH FROM c.dataVencimento) = :mes
           AND EXTRACT(YEAR  FROM c.dataVencimento) = :ano
         GROUP BY c.categoria.descricao
         ORDER BY SUM(c.valorOriginal) DESC
         """)
     List<DespesaCategoriaProjection> despesasPorCategoria(@Param("uid") Long uid,
+                                                           @Param("tipo") TipoConta tipo,
+                                                           @Param("statuses") Collection<StatusConta> statuses,
                                                            @Param("mes") int mes,
                                                            @Param("ano") int ano,
                                                            Pageable pageable);
@@ -95,3 +100,4 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
         BigDecimal getTotal();
     }
 }
+

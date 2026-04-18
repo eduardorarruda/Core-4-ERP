@@ -1,5 +1,7 @@
 package br.com.core4erp.config.persistence;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -7,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class SchemaPatch {
+
+    private static final Logger log = LoggerFactory.getLogger(SchemaPatch.class);
 
     private final JdbcTemplate jdbc;
 
@@ -35,7 +39,8 @@ public class SchemaPatch {
     private void executar(String sql) {
         try {
             jdbc.execute(sql);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.warn("SchemaPatch: falha ao executar '{}': {}", sql, e.getMessage());
         }
     }
 }

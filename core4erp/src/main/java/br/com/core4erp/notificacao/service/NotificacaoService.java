@@ -21,6 +21,7 @@ public class NotificacaoService {
         this.securityCtx = securityCtx;
     }
 
+    @Transactional(readOnly = true)
     public List<NotificacaoResponseDto> listarNaoLidas() {
         return repository.findByUsuarioIdAndLidaFalseOrderByDataCriacaoDesc(securityCtx.getUsuarioId())
                 .stream().map(NotificacaoResponseDto::from).toList();

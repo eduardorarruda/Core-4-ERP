@@ -36,11 +36,13 @@ public class InvestimentoService {
 
     // ── Contas de Investimento ────────────────────────────────────────────────
 
+    @Transactional(readOnly = true)
     public List<ContaInvestimentoResponseDto> listar() {
         return contaRepo.findAllByUsuarioId(securityCtx.getUsuarioId())
                 .stream().map(ContaInvestimentoResponseDto::from).toList();
     }
 
+    @Transactional(readOnly = true)
     public ContaInvestimentoResponseDto buscarPorId(Long id) {
         return ContaInvestimentoResponseDto.from(findOwnedConta(id));
     }
@@ -74,6 +76,7 @@ public class InvestimentoService {
 
     // ── Transações ────────────────────────────────────────────────────────────
 
+    @Transactional(readOnly = true)
     public List<TransacaoInvestimentoResponseDto> listarTransacoes(Long contaId) {
         findOwnedConta(contaId);
         return transacaoRepo.findAllByContaInvestimentoIdAndUsuarioId(contaId, securityCtx.getUsuarioId())

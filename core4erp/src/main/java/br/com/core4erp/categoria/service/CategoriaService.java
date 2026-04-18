@@ -6,10 +6,10 @@ import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class CategoriaService {
@@ -22,12 +22,14 @@ public class CategoriaService {
         this.securityCtx = securityCtx;
     }
 
-    public List<CategoriaResponseDto> listar() {
+    @Transactional(readOnly = true)
+    public Page<CategoriaResponseDto> listar(Pageable pageable) {
         Long usuarioId = securityCtx.getUsuarioId();
-        return categoriaRepository.findAllByUsuarioId(usuarioId)
-                .stream().map(CategoriaResponseDto::from).toList();
+        return categoriaRepository.findAllByUsuarioId(usuarioId, pageable)
+                .map(CategoriaResponseDto::from);
     }
 
+    @Transactional(readOnly = true)
     public CategoriaResponseDto buscarPorId(Long id) {
         return CategoriaResponseDto.from(findOwned(id));
     }
