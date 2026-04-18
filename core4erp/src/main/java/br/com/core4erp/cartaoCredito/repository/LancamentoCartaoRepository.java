@@ -35,4 +35,14 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                          @Param("anoInicio") Integer anoInicio,
                                          @Param("mesFim") Integer mesFim,
                                          @Param("anoFim") Integer anoFim);
+
+    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
+           "WHERE l.usuario.id = :uid " +
+           "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
+           "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)")
+    BigDecimal sumValorByUsuarioAndPeriod(@Param("uid") Long uid,
+                                          @Param("mesInicio") Integer mesInicio,
+                                          @Param("anoInicio") Integer anoInicio,
+                                          @Param("mesFim") Integer mesFim,
+                                          @Param("anoFim") Integer anoFim);
 }

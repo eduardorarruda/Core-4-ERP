@@ -43,7 +43,14 @@ export const auth = {
     request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone }) }),
 
   me: () => request('/api/auth/me'),
+
+  atualizarPerfil: (dto) =>
+    request('/api/auth/perfil', { method: 'PUT', body: JSON.stringify(dto) }),
 };
+
+export function getUsuario() {
+  return JSON.parse(localStorage.getItem('usuario') || 'null');
+}
 
 // ── Categorias ────────────────────────────────────────────────────────────────
 export const categorias = {
@@ -125,4 +132,9 @@ export const investimentos = {
     listar: (contaId) => request(`/api/investimentos/${contaId}/transacoes`),
     registrar: (contaId, dto) => request(`/api/investimentos/${contaId}/transacoes`, { method: 'POST', body: JSON.stringify(dto) }),
   },
+};
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+export const dashboard = {
+  resumo: () => request('/api/dashboard'),
 };

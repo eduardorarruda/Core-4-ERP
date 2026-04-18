@@ -1,5 +1,6 @@
 package br.com.core4erp.auth.service;
 
+import br.com.core4erp.auth.dto.AtualizarPerfilRequestDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
@@ -63,7 +64,21 @@ public class AuthService {
         return toMeResponse(usuario);
     }
 
+    @Transactional
+    public MeResponseDto atualizarPerfil(String email, AtualizarPerfilRequestDto dto) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        usuario.setNome(dto.nome());
+        if (dto.novaSenha() != null && !dto.novaSenha().isBlank()) {
+            usuario.setSenhaHash(passwordEncoder.encode(dto.novaSenha()));
+        }
+        if (dto.fotoPerfil() != null) {
+            usuario.setFotoPerfil(dto.fotoPerfil());
+        }
+        return toMeResponse(usuarioRepository.save(usuario));
+    }
+
     private MeResponseDto toMeResponse(Usuario u) {
-        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole());
+        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole(), u.getFotoPerfil());
     }
 }
