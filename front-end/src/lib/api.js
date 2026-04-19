@@ -1,25 +1,23 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
-function getToken() {
-  return localStorage.getItem('access_token');
-}
-
 function clearAuth() {
-  localStorage.removeItem('access_token');
   localStorage.removeItem('usuario');
 }
 
 async function request(path, options = {}) {
-  const token = getToken();
+  const { skipAuthRedirect, ...fetchOptions } = options;
   const headers = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...fetchOptions.headers,
   };
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...fetchOptions,
+    headers,
+    credentials: 'include',
+  });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !skipAuthRedirect) {
     clearAuth();
     window.location.href = '/login';
     throw new Error('Sessão expirada');
@@ -37,10 +35,13 @@ async function request(path, options = {}) {
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
   login: (email, senha) =>
-    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }) }),
+    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true }),
+
+  logout: () =>
+    request('/api/auth/logout', { method: 'POST' }),
 
   registrar: (nome, email, senha, telefone) =>
-    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone }) }),
+    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone }), skipAuthRedirect: true }),
 
   me: () => request('/api/auth/me'),
 

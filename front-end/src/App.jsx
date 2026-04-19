@@ -20,7 +20,7 @@ import { getUsuario } from './lib/api';
 import { cn } from './lib/utils';
 
 function isAuthenticated() {
-  return Boolean(localStorage.getItem('access_token'));
+  return Boolean(localStorage.getItem('usuario'));
 }
 
 function AdminRoute({ children }) {

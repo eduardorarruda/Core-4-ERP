@@ -17,9 +17,6 @@ public class Parceiro extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String nome;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private TipoParceiro tipo;

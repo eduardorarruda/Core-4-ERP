@@ -16,9 +16,7 @@ export default function Login() {
     setErro('');
     setCarregando(true);
     try {
-      const data = await auth.login(email, senha);
-      localStorage.setItem('access_token', data.accessToken);
-      const usuario = await auth.me();
+      const usuario = await auth.login(email, senha);
       localStorage.setItem('usuario', JSON.stringify(usuario));
       navigate('/dashboard');
     } catch (err) {

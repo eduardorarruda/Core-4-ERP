@@ -60,7 +60,6 @@ public class ParceiroService {
     }
 
     private void preencherCampos(Parceiro p, ParceiroRequestDto dto) {
-        p.setNome(dto.razaoSocial()); // coluna nome mantida para compatibilidade
         p.setRazaoSocial(dto.razaoSocial());
         p.setNomeFantasia(dto.nomeFantasia());
         p.setCpfCnpj(dto.cpfCnpj());
@@ -85,7 +84,6 @@ public class ParceiroService {
         brasilApiService.buscarCnpj(digits).ifPresent(data -> {
             if ((p.getRazaoSocial() == null || p.getRazaoSocial().isBlank()) && data.razaoSocial() != null) {
                 p.setRazaoSocial(data.razaoSocial());
-                p.setNome(data.razaoSocial());
             }
             if (p.getNomeFantasia() == null && data.nomeFantasia() != null) p.setNomeFantasia(data.nomeFantasia());
             if (p.getLogradouro() == null && data.logradouro() != null) p.setLogradouro(data.logradouro());
