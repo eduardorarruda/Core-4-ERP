@@ -4,6 +4,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -59,6 +60,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDto> handleIllegalState(IllegalStateException e) {
         return ResponseEntity.status(400).body(new ErrorResponseDto(
                 "ESTADO_INVALIDO", e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponseDto> handleAuthentication(AuthenticationException e) {
+        return ResponseEntity.status(401).body(new ErrorResponseDto(
+                "CREDENCIAIS_INVALIDAS", e.getMessage(), LocalDateTime.now()
         ));
     }
 

@@ -2,7 +2,6 @@ package br.com.core4erp.auth.service;
 
 import br.com.core4erp.auth.dto.AtualizarPerfilRequestDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
-import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.config.security.JwtService;
@@ -16,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+
+    public record LoginResult(String token, MeResponseDto usuario) {}
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -46,7 +47,7 @@ public class AuthService {
         return toMeResponse(usuario);
     }
 
-    public LoginResponseDto login(LoginRequestDto request) {
+    public LoginResult login(LoginRequestDto request) {
         Usuario usuario = usuarioRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas"));
 
@@ -55,7 +56,7 @@ public class AuthService {
         }
 
         String token = jwtService.generateToken(usuario.getEmail());
-        return new LoginResponseDto(token);
+        return new LoginResult(token, toMeResponse(usuario));
     }
 
     public MeResponseDto me(String email) {
