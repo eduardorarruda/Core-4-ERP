@@ -11,8 +11,11 @@ public class EnvConfig {
                 .ignoreIfMissing()
                 .load();
 
-        System.setProperty("DB_URL", dotenv.get("DB_URL"));
-        System.setProperty("DB_USERNAME", dotenv.get("DB_USERNAME"));
-        System.setProperty("DB_PASSWORD", dotenv.get("DB_PASSWORD"));
+        for (String key : new String[]{"DB_URL", "DB_USERNAME", "DB_PASSWORD", "SECRET_KEY", "CORS_ORIGINS", "TOKEN_EXPIRATION"}) {
+            String value = dotenv.get(key);
+            if (value != null) {
+                System.setProperty(key, value);
+            }
+        }
     }
 }

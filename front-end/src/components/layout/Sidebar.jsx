@@ -1,66 +1,80 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ArrowLeftRight, Wallet, BarChart3, Gavel, Settings, HelpCircle } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import {
+  LayoutDashboard, Wallet, BarChart3, Gavel,
+  Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
+  LogOut, Tag
+} from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../hooks/useAuth';
+
+const NAV = [
+  { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard' },
+  { id: 'parceiros',        icon: Users,           label: 'Parceiros',        path: '/parceiros' },
+  { id: 'categorias',       icon: Tag,             label: 'Categorias',       path: '/categorias' },
+  { id: 'contas-correntes', icon: Landmark,        label: 'Contas Correntes', path: '/contas-correntes' },
+  { id: 'contas',           icon: FileText,        label: 'Lançamentos',      path: '/contas' },
+  { id: 'cartoes',          icon: CreditCard,      label: 'Cartões',          path: '/cartoes' },
+  { id: 'investimentos',    icon: TrendingUp,      label: 'Investimentos',    path: '/investimentos' },
+  { id: 'notificacoes',     icon: Bell,            label: 'Notificações',     path: '/notificacoes' },
+  { id: 'reconciliation',   icon: Wallet,          label: 'Conciliação',      path: '/reconciliation' },
+  { id: 'reports',          icon: BarChart3,       label: 'Relatórios',       path: '/reports' },
+  { id: 'audit',            icon: Gavel,           label: 'Auditoria',        path: '/audit' },
+];
 
 export default function Sidebar({ onClose }) {
-  const navigate = useNavigate();
-  const navItems = [
-    { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { id: 'transactions', icon: ArrowLeftRight, label: 'Lançamentos', path: '/transactions' },
-    { id: 'reconciliation', icon: Wallet, label: 'Conciliação', path: '/reconciliation' },
-    { id: 'reports', icon: BarChart3, label: 'Relatórios', path: '/reports' },
-    { id: 'audit-log', icon: Gavel, label: 'Auditoria', path: '/audit' },
-  ];
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    navigate('/login');
-  };
+  const { usuario, logout } = useAuth();
+  const navVisivel = NAV.filter(
+    (item) => item.id !== 'audit' || usuario?.role === 'ROLE_ADMIN'
+  );
 
   return (
-    <aside className="h-screen sticky top-0 w-20 bg-surface flex flex-col items-center py-8 gap-8 z-50 border-r border-white/5">
-      <div className="mb-4 flex flex-col items-center gap-4">
-        <NavLink to="/dashboard" className="text-primary font-bold text-xl tracking-tighter cursor-pointer">
-          C4
-        </NavLink>
-      </div>
+    <aside className="group/sidebar h-screen sticky top-0 w-16 hover:w-56 transition-all duration-300 ease-in-out overflow-hidden bg-surface flex flex-col items-start py-8 gap-4 z-50 border-r border-white/5">
+      <NavLink
+        to="/dashboard"
+        className="px-4 mb-2 flex items-center gap-3 text-primary font-bold text-xl tracking-tighter cursor-pointer w-full"
+      >
+        <span className="shrink-0">C4</span>
+        <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap text-sm">
+          Core 4 ERP
+        </span>
+      </NavLink>
 
-      <nav className="flex flex-col items-center gap-6 flex-1 w-full">
-        {navItems.map((item) => {
-          return (
-            <NavLink
-              key={item.id}
-              to={item.path}
-              onClick={onClose}
-              className={({ isActive }) => cn(
-                "relative w-full py-3 flex justify-center transition-all duration-200 group",
-                isActive
-                  ? "text-white border-l-2 border-primary bg-gradient-to-r from-primary/10 to-transparent"
-                  : "text-zinc-400 hover:text-zinc-100"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon className={cn("w-6 h-6", isActive && "text-primary")} />
-                  <span className="absolute left-20 bg-surface-highest px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-widest whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl border border-white/5 z-50">
-                    {item.label}
-                  </span>
-                </>
-              )}
-            </NavLink>
-          );
-        })}
+      <nav className="flex flex-col gap-1 flex-1 w-full overflow-y-auto no-scrollbar">
+        {navVisivel.map((item) => (
+          <NavLink
+            key={item.id}
+            to={item.path}
+            onClick={onClose}
+            className={({ isActive }) => cn(
+              'w-full px-4 py-3 flex items-center gap-3 transition-all duration-200',
+              isActive
+                ? 'text-white border-l-2 border-primary bg-gradient-to-r from-primary/10 to-transparent'
+                : 'text-zinc-400 hover:text-zinc-100'
+            )}
+          >
+            {({ isActive }) => (
+              <>
+                <item.icon className={cn('w-5 h-5 shrink-0', isActive && 'text-primary')} />
+                <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap">
+                  {item.label}
+                </span>
+              </>
+            )}
+          </NavLink>
+        ))}
       </nav>
 
-      <div className="flex flex-col items-center gap-6 pb-4">
-        <button className="text-zinc-400 hover:text-zinc-100 transition-colors">
-          <Settings className="w-6 h-6" />
-        </button>
-        <button className="text-zinc-400 hover:text-zinc-100 transition-colors">
-          <HelpCircle className="w-6 h-6" />
-        </button>
-      </div>
+      <button
+        onClick={logout}
+        className="px-4 py-2 flex items-center gap-3 text-zinc-400 hover:text-red-400 transition-colors w-full"
+        title="Sair"
+      >
+        <LogOut className="w-5 h-5 shrink-0" />
+        <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap">
+          Sair
+        </span>
+      </button>
     </aside>
   );
 }

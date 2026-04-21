@@ -1,8 +1,9 @@
 package br.com.core4erp.config.security;
 
-import br.com.core4erp.auth.entity.Auth;
-import br.com.core4erp.auth.repository.AuthRepository;
+import br.com.core4erp.usuario.entity.Usuario;
+import br.com.core4erp.usuario.repository.UsuarioRepository;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -12,21 +13,22 @@ import java.util.List;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
-    private final AuthRepository authRepository;
 
-    public CustomUserDetailsService(AuthRepository authRepository) {
-        this.authRepository = authRepository;
+    private final UsuarioRepository usuarioRepository;
+
+    public CustomUserDetailsService(UsuarioRepository usuarioRepository) {
+        this.usuarioRepository = usuarioRepository;
     }
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        Auth auth = authRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Credencial não encontrada"));
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + email));
 
-        return new org.springframework.security.core.userdetails.User(
-                auth.getUsername(),
-                auth.getPassword(),
-                List.of(new SimpleGrantedAuthority("ROLE_" + auth.getRole()))
+        return new User(
+                usuario.getEmail(),
+                usuario.getSenhaHash(),
+                List.of(new SimpleGrantedAuthority(usuario.getRole()))
         );
     }
 }
