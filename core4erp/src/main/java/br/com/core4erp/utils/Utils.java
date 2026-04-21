@@ -23,8 +23,8 @@ public class Utils {
     public static final String MASK_CNPJ = "##.###.###/####-##";
     public static final String MASK_CPF = "###.###.###-##";
 
-    private static final int[] PESO_CPF = {11, 10, 9, 8, 7, 6, 5, 4, 3, 2};
-    private static final int[] PESO_CNPJ = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+    private static final int[] PESO_CPF = { 11, 10, 9, 8, 7, 6, 5, 4, 3, 2 };
+    private static final int[] PESO_CNPJ = { 6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2 };
     private static final String EMAIL_PATTERN = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$";
 
     public static String notNull(Object object) {
@@ -32,7 +32,7 @@ public class Utils {
     }
 
     public static Integer notNull(Integer integer) {
-        if(integer == null){
+        if (integer == null) {
             return 0;
         }
         return integer;
@@ -83,7 +83,7 @@ public class Utils {
         }
     }
 
-    public static Integer collectionSize(Collection collection) {
+    public static Integer collectionSize(Collection<?> collection) {
         return collection == null ? 0 : collection.size();
     }
 
@@ -103,7 +103,7 @@ public class Utils {
         return string == null || string.trim().isEmpty();
     }
 
-    public static boolean isNullOrEmpty(Collection collection) {
+    public static boolean isNullOrEmpty(Collection<?> collection) {
         return collection == null || collection.isEmpty();
     }
 
@@ -201,7 +201,7 @@ public class Utils {
     public static String removeAccents(String text) {
         return text == null ? null
                 : Normalizer.normalize(text, Normalizer.Form.NFD)
-                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "").trim();
+                        .replaceAll("\\p{InCombiningDiacriticalMarks}+", "").trim();
     }
 
     public static String onlyNumbers(String text) {
@@ -335,14 +335,14 @@ public class Utils {
     }
 
     public static String emailMask(String email) {
-        if(email == null || email.isEmpty()){
+        if (email == null || email.isEmpty()) {
             return email;
         }
         int length = email.length();
         int start = length / 3;
         int end = (length * 2) / 3;
         StringBuilder masked = new StringBuilder();
-        for(int i = 0; i < length ; i++){
+        for (int i = 0; i < length; i++) {
             masked.append((i > start && i < end) ? "*" : email.charAt(i));
         }
         return masked.toString();
@@ -381,7 +381,7 @@ public class Utils {
         return socialNumber;
     }
 
-    //PRIVATE METHODS
+    // PRIVATE METHODS
     private static int calcularDigito(String str, int[] peso) {
         int soma = 0;
         for (int indice = str.length() - 1, digito; indice >= 0; indice--) {
@@ -443,7 +443,7 @@ public class Utils {
     public static Map<String, String> extractPhoneData(String phoneNumber) {
         Map<String, String> phoneData = new HashMap<>();
 
-        //Se o telefone começa com + então é internacional
+        // Se o telefone começa com + então é internacional
         String[] dados = phoneNumber.split(" ");
         if (phoneNumber.startsWith("+")) {
             if (dados.length == 3) {
@@ -463,7 +463,7 @@ public class Utils {
             }
         }
 
-        //Se após a extração ainda não houver dados utiliza o método antigo
+        // Se após a extração ainda não houver dados utiliza o método antigo
         if (phoneData.isEmpty()) {
             phoneData.put("ddi", "55");
             phoneData.put("ddd", extractDDD(phoneNumber));
@@ -506,7 +506,8 @@ public class Utils {
             return "Mastercard";
         } else if (cardNumber.replace(" ", "").matches("^3[47][0-9]{13}$")) {
             return "American Express";
-        } else if (cardNumber.replace(" ", "").matches("^((636368)|(438935)|(504175)|(451416)|(636297)|(5067)|(4576)|(4011))[0-9]{10}$")) {
+        } else if (cardNumber.replace(" ", "")
+                .matches("^((636368)|(438935)|(504175)|(451416)|(636297)|(5067)|(4576)|(4011))[0-9]{10}$")) {
             return "Elo";
         } else {
             return "Hipercard";
@@ -522,8 +523,7 @@ public class Utils {
     }
 
     public static boolean isUUID(String codigo) {
-        String regex =
-                "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+        String regex = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
         return Pattern.matches(regex, codigo);
     }
 
@@ -547,33 +547,43 @@ public class Utils {
         }
 
         String firstName = splited[0];
-        if(splited.length > 1) {
+        if (splited.length > 1) {
             String lastName = splited[splited.length - 1];
-            if (!firstName.isEmpty() && firstName.length() + 1 + (middleNamesCount*2) + lastName.length() <= maxLength) { //verifica se cabe primeiro nome, abreviações e Ultimo nome
+            if (!firstName.isEmpty()
+                    && firstName.length() + 1 + (middleNamesCount * 2) + lastName.length() <= maxLength) { // verifica
+                                                                                                           // se cabe
+                                                                                                           // primeiro
+                                                                                                           // nome,
+                                                                                                           // abreviações
+                                                                                                           // e Ultimo
+                                                                                                           // nome
                 StringBuilder sb = new StringBuilder(lastName);
-//                System.out.println("----");
-                for(int i = splited.length - 2; i > 0; i--) {// itera do penultimo nome até o segundo
-                    if(!splited[i].isEmpty() && firstName.length() + 1 + sb.length() + splited[i].length() + 1 + ((middleNamesCount-1)*2) <= maxLength) { //verifica se o split possui caracteres, e se a soma dele com o espaço, primeiro e ultimo nome cabem completamente
+                // System.out.println("----");
+                for (int i = splited.length - 2; i > 0; i--) {// itera do penultimo nome até o segundo
+                    if (!splited[i].isEmpty() && firstName.length() + 1 + sb.length() + splited[i].length() + 1
+                            + ((middleNamesCount - 1) * 2) <= maxLength) { // verifica se o split possui caracteres, e
+                                                                           // se a soma dele com o espaço, primeiro e
+                                                                           // ultimo nome cabem completamente
                         sb.insert(0, " ").insert(0, splited[i]);
-                    } else if(!splited[i].isEmpty() && sb.length() + 2 <= maxLength) {
+                    } else if (!splited[i].isEmpty() && sb.length() + 2 <= maxLength) {
                         sb.insert(0, " ").insert(0, splited[i].charAt(0));
                     }
                 }
-                sb.insert(0, " ").insert(0,firstName);
+                sb.insert(0, " ").insert(0, firstName);
 
                 return sb.toString().trim();
             } else {
                 StringBuilder sb = new StringBuilder(firstName);
-//                System.out.println("====");
-                for(int i = 1; i < splited.length - 1 && i < maxSplits ; i++) {
-                    if(!splited[i].isEmpty() && sb.length() + 2 <= maxLength) {
+                // System.out.println("====");
+                for (int i = 1; i < splited.length - 1 && i < maxSplits; i++) {
+                    if (!splited[i].isEmpty() && sb.length() + 2 <= maxLength) {
                         sb.append(" ").append(splited[i].charAt(0));
                     }
 
                 }
-                if(sb.length() + lastName.length() + 1 <= maxLength) {
+                if (sb.length() + lastName.length() + 1 <= maxLength) {
                     sb.append(" ").append(lastName);
-                } else if(sb.length() + 2 <= maxLength){
+                } else if (sb.length() + 2 <= maxLength) {
                     sb.append(" ").append(lastName.charAt(0));
                 }
 
@@ -581,7 +591,7 @@ public class Utils {
             }
         }
 
-        if(firstName.length() > maxLength) {
+        if (firstName.length() > maxLength) {
             return firstName.substring(0, maxLength);
         } else {
             return firstName;
@@ -601,11 +611,11 @@ public class Utils {
 
     public static boolean validatePhoneNumberPix(String phoneNumber, String dddList) {
         String number = Utils.onlyNumbers(phoneNumber);
-        if(number.length() != 11) {
+        if (number.length() != 11) {
             return false;
         }
 
-        if(!number.substring(2, 3).equals("9")) {
+        if (!number.substring(2, 3).equals("9")) {
             return false;
         }
 
@@ -615,7 +625,7 @@ public class Utils {
     }
 
     public static Boolean validateIpAddress(String ip) {
-        if(isIPv4(ip)){
+        if (isIPv4(ip)) {
             return true;
         }
         return isIPv6(ip);
@@ -684,8 +694,8 @@ public class Utils {
     }
 
     public static boolean isEqualsIgnoreCase(@NotNull String s1, String... s2) {
-        for(String s : s2){
-            if(s1.equalsIgnoreCase(s.trim())){
+        for (String s : s2) {
+            if (s1.equalsIgnoreCase(s.trim())) {
                 return true;
             }
         }
@@ -695,6 +705,7 @@ public class Utils {
 
     /**
      * Verifica em um objeto se existem atributos null, "null" ou listas vazias
+     * 
      * @param obj
      * @param prefixo
      * @return
@@ -767,15 +778,15 @@ public class Utils {
     public static String normalizeMessage(String message) {
         String normalize = Normalizer.normalize(message, Normalizer.Form.NFD);
 
-        //A expressão \\p{M} representa todos os caracteres de marcação.
-        //Ao substituí-los por "", os acentos são removidos.
+        // A expressão \\p{M} representa todos os caracteres de marcação.
+        // Ao substituí-los por "", os acentos são removidos.
         String removeAccentuation = normalize.replaceAll("\\p{M}", "");
 
-        //remover caracteres ocultos ou não aceitos pelo ASCII
+        // remover caracteres ocultos ou não aceitos pelo ASCII
         return removeAccentuation.replaceAll("[^\\x00-\\x7F]", "");
     }
 
-    public static  <T extends Enum<T>> T getEnumGenerics(Class<T> typeEnum, String field) {
+    public static <T extends Enum<T>> T getEnumGenerics(Class<T> typeEnum, String field) {
         if (Objects.nonNull(field)) {
             try {
                 return Enum.valueOf(typeEnum, field.toUpperCase());
@@ -789,7 +800,8 @@ public class Utils {
 
     public static <T> T normalizeTextObject(T object) {
 
-        if (object == null) return null;
+        if (object == null)
+            return null;
 
         Class<?> clazz = object.getClass();
         Field[] fields = clazz.getDeclaredFields();
@@ -815,13 +827,14 @@ public class Utils {
     }
 
     private static String normalizeString(String value) {
-        if (value == null) return null;
+        if (value == null)
+            return null;
 
         String noAccents = Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", ""); // remove acentos
 
         return noAccents
-                .replaceAll("[;]", " ")      // remove ;
+                .replaceAll("[;]", " ") // remove ;
                 .replaceAll("[\\r\\n]", " ") // remove quebras de linha
                 .trim();
     }
@@ -833,7 +846,8 @@ public class Utils {
     }
 
     public static String maskName(String name) {
-        if (name == null || name.isBlank()) return "";
+        if (name == null || name.isBlank())
+            return "";
 
         String[] parts = name.trim().split(" ");
         String first = parts[0];
@@ -846,16 +860,19 @@ public class Utils {
     }
 
     public static String maskPhone(String phone) {
-        if (phone == null || phone.length() < 2) return phone;
+        if (phone == null || phone.length() < 2)
+            return phone;
 
         String digits = phone.replaceAll("\\D", "");
-        if (digits.length() <= 2) return "**";
+        if (digits.length() <= 2)
+            return "**";
 
         return digits.substring(0, 2) + "*****" + digits.substring(digits.length() - 2);
     }
 
     public static String maskBirthdate(String date) {
-        if (date == null || !date.contains("-")) return date;
+        if (date == null || !date.contains("-"))
+            return date;
 
         // aceita formato yyyy-MM-dd ou dd/MM/yyyy se adaptado
         if (date.matches("\\d{4}-\\d{2}-\\d{2}")) {
@@ -866,7 +883,8 @@ public class Utils {
     }
 
     public static String clobToString(Clob clob) {
-        if (clob == null) return null;
+        if (clob == null)
+            return null;
         try (Reader reader = clob.getCharacterStream()) {
             StringBuilder sb = new StringBuilder();
             char[] buffer = new char[2048];
@@ -906,13 +924,11 @@ public class Utils {
             digits = digits.substring(0, 2) + "9" + digits.substring(2);
         } else if (digits.length() != 11) {
             throw new IllegalArgumentException(
-                    "Telefone invalido. Use DDD + numero (8 ou 9 digitos). Recebido: " + phoneInput
-            );
+                    "Telefone invalido. Use DDD + numero (8 ou 9 digitos). Recebido: " + phoneInput);
         }
 
         String ddd = digits.substring(0, 2);
         String mobile = digits.substring(2); // 9 digitos
-
 
         return String.format("+55 (%s) %s-%s",
                 ddd,

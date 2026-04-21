@@ -1,14 +1,46 @@
-import React from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, History, Menu } from 'lucide-react';
+import { Search, Bell, History, Menu, Settings, LogOut } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
-export default function TopNav({ onMenuClick }) {
+function getInitials(nome) {
+  if (!nome) return '?';
+  return nome
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('');
+}
+
+export default function TopNav({ onMenuClick, onSearch }) {
   const navigate = useNavigate();
+  const { usuario, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const wrapperRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    navigate('/login');
-  };
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onSearch?.(value);
+    }, 300);
+  }, [onSearch]);
+
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="sticky top-0 w-full z-40 bg-surface/80 backdrop-blur-xl flex justify-between items-center h-16 px-4 lg:px-8 shadow-[0px_20px_40px_rgba(0,0,0,0.4)]">
@@ -26,6 +58,8 @@ export default function TopNav({ onMenuClick }) {
             className="w-full bg-surface-low border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-zinc-600 outline-none"
             placeholder="Search..."
             type="text"
+            value={searchTerm}
+            onChange={handleSearchChange}
           />
         </div>
       </div>
@@ -38,13 +72,49 @@ export default function TopNav({ onMenuClick }) {
         <button className="hover:bg-surface-medium p-2 rounded-lg transition-all text-zinc-400 hidden xs:block">
           <History className="w-5 h-5" />
         </button>
-        <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full overflow-hidden border border-white/10 cursor-pointer hover:border-primary/50 transition-colors" onClick={handleLogout}>
-          <img
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDNW_eS8hzpzv6sGpq4inGYNVwDkBWDm6VV7tV2IkSdNcpytKRU8XDSBelJUEaYCyHzfSXR-1wIcWCzjpZjf9jQuc1p8lUCblg8ibGWFv1_pRFlAadchf-8kKpOHQChDWAVUTt1ljiOGY2eEGUBBXUb70v_E9vIEwNIzy8UC-rPxDIQs4TVrTxT0iLF1Xwv5MB7aNRjUYRp05LlaMfBIaV3RfMHO_lvH4boS0lFEe_Mjvph-emquMhuHoxVqc9_57xwXrpZirOZJYc"
-            alt="Profile"
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
+
+        <div className="relative" ref={wrapperRef}>
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="w-8 h-8 lg:w-10 lg:h-10 rounded-full overflow-hidden border border-white/10 cursor-pointer hover:border-primary/50 transition-colors flex items-center justify-center bg-surface-medium"
+          >
+            {usuario?.fotoPerfil ? (
+              <img
+                src={usuario.fotoPerfil}
+                alt="Perfil"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-xs font-bold text-white select-none">
+                {getInitials(usuario?.nome)}
+              </span>
+            )}
+          </button>
+
+          {open && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-medium border border-white/10 shadow-xl overflow-hidden z-50">
+              {usuario && (
+                <div className="px-4 py-3 border-b border-white/10">
+                  <p className="text-xs font-bold text-white truncate">{usuario.nome}</p>
+                  <p className="text-[10px] text-zinc-500 truncate">{usuario.email}</p>
+                </div>
+              )}
+              <button
+                onClick={() => { setOpen(false); navigate('/configuracoes'); }}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:bg-surface-highest hover:text-white transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                Configurações da Conta
+              </button>
+              <button
+                onClick={logout}
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:bg-surface-highest transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

@@ -1,15 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout, BarChart3, Wallet } from 'lucide-react';
 import { motion } from 'motion/react';
+import { auth } from '../lib/api';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [erro, setErro] = useState('');
+  const [carregando, setCarregando] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    localStorage.setItem('isAuthenticated', 'true');
-    navigate('/dashboard');
+    setErro('');
+    setCarregando(true);
+    try {
+      const usuario = await auth.login(email, senha);
+      localStorage.setItem('usuario', JSON.stringify(usuario));
+      navigate('/dashboard');
+    } catch (err) {
+      setErro(err.message || 'Credenciais inválidas');
+    } finally {
+      setCarregando(false);
+    }
   };
 
   return (
@@ -20,7 +34,7 @@ export default function Login() {
           <div className="w-10 h-10 bg-primary flex items-center justify-center rounded-xl">
             <Layout className="w-6 h-6 text-on-primary" />
           </div>
-          <h1 className="text-xl font-bold tracking-tighter text-white">Financial Architect</h1>
+          <h1 className="text-xl font-bold tracking-tighter text-white">Core 4 ERP</h1>
         </div>
 
         <div className="max-w-sm w-full mx-auto">
@@ -37,50 +51,50 @@ export default function Login() {
                 id="email"
                 placeholder="nome@empresa.com"
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-xs font-bold uppercase tracking-widest text-zinc-500" htmlFor="password">Senha</label>
-                <a className="text-xs font-medium text-primary hover:underline" href="#">Esqueceu a senha?</a>
-              </div>
+              <label className="text-xs font-bold uppercase tracking-widest text-zinc-500" htmlFor="password">Senha</label>
               <input
                 className="w-full bg-surface-low border border-white/5 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
                 id="password"
                 placeholder="••••••••"
                 type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
                 required
               />
             </div>
 
-            <div className="flex items-center">
-              <input className="w-4 h-4 rounded border-white/10 bg-surface-low text-primary focus:ring-primary" id="remember" type="checkbox" />
-              <label className="ml-2 text-sm text-zinc-400" htmlFor="remember">Lembrar de mim</label>
-            </div>
+            {erro && (
+              <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2">
+                {erro}
+              </p>
+            )}
 
             <button
-              className="w-full bg-primary hover:opacity-90 text-on-primary font-bold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-primary/10"
+              className="w-full bg-primary hover:opacity-90 text-on-primary font-bold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-primary/10 disabled:opacity-50"
               type="submit"
+              disabled={carregando}
             >
-              Entrar no Sistema
+              {carregando ? 'Autenticando…' : 'Entrar no Sistema'}
             </button>
           </form>
 
           <div className="mt-8 pt-8 border-t border-white/5 text-center">
             <p className="text-sm text-zinc-500">
-              Não tem uma conta? <a className="text-primary font-semibold hover:underline" href="#">Solicite acesso</a>
+              Não tem uma conta?{' '}
+              <a className="text-primary font-semibold hover:underline" href="/register">Cadastre-se</a>
             </p>
           </div>
         </div>
 
         <footer className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-zinc-600">
-          <div className="flex gap-6">
-            <a className="hover:text-primary transition-colors" href="#">Privacy Policy</a>
-            <a className="hover:text-primary transition-colors" href="#">Terms of Service</a>
-          </div>
-          <span>© 2024 Financial Architect</span>
+          <span>© 2024 Core 4 ERP</span>
         </footer>
       </section>
 
@@ -88,12 +102,6 @@ export default function Login() {
       <section className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden bg-background">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-br from-surface via-surface/95 to-primary/5 z-10"></div>
-          <img
-            className="w-full h-full object-cover opacity-40 grayscale"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuC25-gjIqJQrnHP4ynKrd-_O7xbYbJoZYXjRCaxk3OaXtrhtss0Ma6oE6ApJSg8APmHr9k7Z0ItKoTTnMvF66obwKhS2Nw9AUsoY6y35xOXkE0Vne0168r2Czom1hHfCWm1QNhIcK97BTubsOX_czmxGPZ6G4aWCqOEojdCnv5ceAtyvH8DhJykAVf-HgzVs3TmKIvdvLcjqMmDI086iE2eYQRncW2bbxBtKXWt7y7003wFL9OgAd8cooEBbWGYpXmMj7glfJzJ0xQ"
-            alt="Architecture"
-            referrerPolicy="no-referrer"
-          />
         </div>
 
         <div className="relative z-20 max-w-2xl px-12">
@@ -122,7 +130,7 @@ export default function Login() {
             className="space-y-6"
           >
             <p className="text-lg xl:text-xl text-zinc-400 font-light max-w-lg leading-relaxed">
-              Transforme dados complexos em decisões estratégicas com nossa interface modular projetada para alta performance.
+              Transforme dados complexos em decisões estratégicas com nossa interface modular.
             </p>
 
             <div className="grid grid-cols-2 gap-4 mt-12">
