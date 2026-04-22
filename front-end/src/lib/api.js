@@ -139,3 +139,11 @@ export const investimentos = {
 export const dashboard = {
   resumo: () => request('/api/dashboard'),
 };
+
+// ── Chat IA ───────────────────────────────────────────────────────────────────
+export const chat = {
+  enviar: (mensagem) =>
+    request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }),
+  limparHistorico: () =>
+    request('/api/chat/historico', { method: 'DELETE' }),
+};
