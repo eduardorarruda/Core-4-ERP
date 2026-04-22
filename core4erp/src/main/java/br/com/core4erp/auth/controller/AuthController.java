@@ -70,7 +70,7 @@ public class AuthController {
         return ResponseCookie.from("access_token", value)
                 .httpOnly(true)
                 .secure(false)
-                .sameSite("Strict")
+                .sameSite("Lax")
                 .path("/")
                 .maxAge(maxAgeSeconds)
                 .build()
