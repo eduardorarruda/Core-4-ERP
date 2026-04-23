@@ -1,6 +1,8 @@
 package br.com.core4erp.exception;
 
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ErrorResponseDto> handleNotFound(EntityNotFoundException e) {
@@ -72,6 +76,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDto> handleGeneral(Exception e) {
+        log.error("[ERRO_INTERNO] Exceção não tratada:", e);
         return ResponseEntity.status(500).body(new ErrorResponseDto(
                 "ERRO_INTERNO", "Erro interno do servidor", LocalDateTime.now()
         ));
