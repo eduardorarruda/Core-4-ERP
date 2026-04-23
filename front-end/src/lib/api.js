@@ -147,3 +147,25 @@ export const chat = {
   limparHistorico: () =>
     request('/api/chat/historico', { method: 'DELETE' }),
 };
+
+// ── Relatórios (download binário) ─────────────────────────────────────────────
+async function downloadRelatorio(path) {
+  const res = await fetch(`${BASE_URL}${path}`, { credentials: 'include' });
+  if (res.status === 401) {
+    clearAuth();
+    window.location.href = '/login';
+    throw new Error('Sessão expirada');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.mensagem || `Erro ${res.status}`);
+  }
+  return res.blob();
+}
+
+export const relatorios = {
+  fluxoCaixa:    (inicio, fim) => downloadRelatorio(`/api/relatorios/fluxo-caixa?inicio=${inicio}&fim=${fim}`),
+  contasAbertas: (inicio, fim) => downloadRelatorio(`/api/relatorios/contas-abertas?inicio=${inicio}&fim=${fim}`),
+  extrato:       (inicio, fim) => downloadRelatorio(`/api/relatorios/extrato?inicio=${inicio}&fim=${fim}`),
+  dre:           (inicio, fim) => downloadRelatorio(`/api/relatorios/dre?inicio=${inicio}&fim=${fim}`),
+};
