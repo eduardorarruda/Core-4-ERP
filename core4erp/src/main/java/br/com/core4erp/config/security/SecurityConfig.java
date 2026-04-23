@@ -1,7 +1,9 @@
 package br.com.core4erp.config.security;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -31,6 +33,11 @@ public class SecurityConfig {
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
+                                                // Libera dispatches assíncronos (CRÍTICO para SseEmitter/Streaming)
+                                                .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
+                                                // Libera requisições de Preflight do CORS
+                                                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                                                // Rotas públicas
                                                 .requestMatchers(
                                                                 "/api/auth/registrar",
                                                                 "/api/auth/login",

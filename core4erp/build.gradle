@@ -53,8 +53,8 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 
 	// Spring AI
-	implementation platform('org.springframework.ai:spring-ai-bom:1.0.0')
-	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	implementation platform('org.springframework.ai:spring-ai-bom:1.1.4')
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
 	// Excel report generation
 	implementation 'org.apache.poi:poi-ooxml:5.3.0'
