@@ -149,6 +149,14 @@ export const chat = {
 };
 
 // ── Relatórios (download binário) ─────────────────────────────────────────────
+function relatorioQs(inicio, fim, params = {}) {
+  const entries = { inicio, fim, ...params };
+  const filtered = Object.fromEntries(
+    Object.entries(entries).filter(([, v]) => v !== null && v !== undefined && v !== '')
+  );
+  return new URLSearchParams(filtered).toString();
+}
+
 async function downloadRelatorio(path) {
   const res = await fetch(`${BASE_URL}${path}`, { credentials: 'include' });
   if (res.status === 401) {
@@ -164,8 +172,21 @@ async function downloadRelatorio(path) {
 }
 
 export const relatorios = {
-  fluxoCaixa:    (inicio, fim) => downloadRelatorio(`/api/relatorios/fluxo-caixa?inicio=${inicio}&fim=${fim}`),
-  contasAbertas: (inicio, fim) => downloadRelatorio(`/api/relatorios/contas-abertas?inicio=${inicio}&fim=${fim}`),
-  extrato:       (inicio, fim) => downloadRelatorio(`/api/relatorios/extrato?inicio=${inicio}&fim=${fim}`),
-  dre:           (inicio, fim) => downloadRelatorio(`/api/relatorios/dre?inicio=${inicio}&fim=${fim}`),
+  // ── Downloads Excel (.xlsx) ───────────────────────────────────────────────
+  fluxoCaixa:    (inicio, fim, p) => downloadRelatorio(`/api/relatorios/fluxo-caixa?${relatorioQs(inicio, fim, p)}`),
+  contasAbertas: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/contas-abertas?${relatorioQs(inicio, fim, p)}`),
+  extrato:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/extrato?${relatorioQs(inicio, fim, p)}`),
+  dre:           (inicio, fim, p) => downloadRelatorio(`/api/relatorios/dre?${relatorioQs(inicio, fim, p)}`),
+  investimentos: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/investimentos?${relatorioQs(inicio, fim, p)}`),
+  cartoes:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/cartoes?${relatorioQs(inicio, fim, p)}`),
+
+  // ── Dados JSON (visualização online e PDF) ────────────────────────────────
+  dados: {
+    fluxoCaixa:    (inicio, fim, p) => request(`/api/relatorios/fluxo-caixa/dados?${relatorioQs(inicio, fim, p)}`),
+    contasAbertas: (inicio, fim, p) => request(`/api/relatorios/contas-abertas/dados?${relatorioQs(inicio, fim, p)}`),
+    extrato:       (inicio, fim, p) => request(`/api/relatorios/extrato/dados?${relatorioQs(inicio, fim, p)}`),
+    dre:           (inicio, fim, p) => request(`/api/relatorios/dre/dados?${relatorioQs(inicio, fim, p)}`),
+    investimentos: (inicio, fim, p) => request(`/api/relatorios/investimentos/dados?${relatorioQs(inicio, fim, p)}`),
+    cartoes:       (inicio, fim, p) => request(`/api/relatorios/cartoes/dados?${relatorioQs(inicio, fim, p)}`),
+  },
 };

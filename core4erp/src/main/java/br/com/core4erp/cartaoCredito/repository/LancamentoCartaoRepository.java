@@ -46,6 +46,17 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                           @Param("mesFim") Integer mesFim,
                                           @Param("anoFim") Integer anoFim);
 
+    @Query("SELECT l FROM LancamentoCartao l " +
+           "WHERE l.usuario.id = :uid " +
+           "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
+           "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim) " +
+           "ORDER BY l.anoFatura, l.mesFatura, l.dataCompra")
+    List<LancamentoCartao> findByUsuarioIdAndFaturaPeriod(@Param("uid") Long uid,
+                                                          @Param("mesInicio") Integer mesInicio,
+                                                          @Param("anoInicio") Integer anoInicio,
+                                                          @Param("mesFim") Integer mesFim,
+                                                          @Param("anoFim") Integer anoFim);
+
     /** Single query returning [cartaoId, sumValor] for a set of cards — avoids N+1 in listar(). */
     @Query("SELECT l.cartaoCredito.id, COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
            "WHERE l.cartaoCredito.id IN :cartaoIds " +
