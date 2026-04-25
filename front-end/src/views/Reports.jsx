@@ -137,10 +137,10 @@ export default function Reports() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-1">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary mb-1">
           Relatórios Financeiros
         </h1>
-        <p className="text-zinc-500 text-xs sm:text-sm font-medium">
+        <p className="text-text-primary/50 text-xs sm:text-sm font-medium">
           Visualize online, exporte em PDF ou Excel para o período desejado.
         </p>
       </div>

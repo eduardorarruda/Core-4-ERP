@@ -1,7 +1,8 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, History, Menu, Settings, LogOut } from 'lucide-react';
+import { Search, Bell, History, Menu, Settings, LogOut, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { ThemeContext } from '../../context/ThemeContext';
 
 function getInitials(nome) {
   if (!nome) return '?';
@@ -16,6 +17,7 @@ function getInitials(nome) {
 export default function TopNav({ onMenuClick, onSearch }) {
   const navigate = useNavigate();
   const { usuario, logout } = useAuth();
+  const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -48,18 +50,26 @@ export default function TopNav({ onMenuClick, onSearch }) {
       </div>
 
       <div className="flex items-center gap-2 lg:gap-6 text-primary">
-        <button className="hover:bg-surface-medium p-2 rounded-lg transition-all relative text-zinc-400 hidden xs:block">
+        <button className="hover:bg-surface-medium p-2 rounded-lg transition-all relative text-text-primary/60 hidden xs:block">
           <Bell className="w-5 h-5" />
           <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
         </button>
-        <button className="hover:bg-surface-medium p-2 rounded-lg transition-all text-zinc-400 hidden xs:block">
+        <button className="hover:bg-surface-medium p-2 rounded-lg transition-all text-text-primary/60 hidden xs:block">
           <History className="w-5 h-5" />
+        </button>
+
+        <button
+          onClick={toggleTheme}
+          title="Alternar tema"
+          className="hover:bg-surface-medium p-2 rounded-lg transition-colors duration-200 text-text-primary/60 hover:text-text-primary"
+        >
+          {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
         </button>
 
         <div className="relative" ref={wrapperRef}>
           <button
             onClick={() => setOpen((v) => !v)}
-            className="w-8 h-8 lg:w-10 lg:h-10 rounded-full overflow-hidden border border-white/10 cursor-pointer hover:border-primary/50 transition-colors flex items-center justify-center bg-surface-medium"
+            className="w-8 h-8 lg:w-10 lg:h-10 rounded-full overflow-hidden border border-text-primary/10 cursor-pointer hover:border-primary/50 transition-colors flex items-center justify-center bg-surface-medium"
           >
             {usuario?.fotoPerfil ? (
               <img
@@ -68,30 +78,30 @@ export default function TopNav({ onMenuClick, onSearch }) {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <span className="text-xs font-bold text-white select-none">
+              <span className="text-xs font-bold text-text-primary select-none">
                 {getInitials(usuario?.nome)}
               </span>
             )}
           </button>
 
           {open && (
-            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-medium border border-white/10 shadow-xl overflow-hidden z-50">
+            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-surface-medium border border-text-primary/10 shadow-xl overflow-hidden z-50">
               {usuario && (
-                <div className="px-4 py-3 border-b border-white/10">
-                  <p className="text-xs font-bold text-white truncate">{usuario.nome}</p>
-                  <p className="text-[10px] text-zinc-500 truncate">{usuario.email}</p>
+                <div className="px-4 py-3 border-b border-text-primary/10">
+                  <p className="text-xs font-bold text-text-primary truncate">{usuario.nome}</p>
+                  <p className="text-[10px] text-text-primary/50 truncate">{usuario.email}</p>
                 </div>
               )}
               <button
                 onClick={() => { setOpen(false); navigate('/configuracoes'); }}
-                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-zinc-300 hover:bg-surface-highest hover:text-white transition-colors"
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-text-primary/80 hover:bg-surface-highest hover:text-text-primary transition-colors"
               >
                 <Settings className="w-4 h-4" />
                 Configurações da Conta
               </button>
               <button
                 onClick={logout}
-                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:bg-surface-highest transition-colors"
+                className="flex items-center gap-3 w-full px-4 py-3 text-sm text-error hover:bg-surface-highest transition-colors"
               >
                 <LogOut className="w-4 h-4" />
                 Sair

@@ -91,8 +91,8 @@ export default function ReportCard({
               <Icon className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-bold text-white text-sm">{title}</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">{description}</p>
+              <h3 className="font-bold text-text-primary text-sm">{title}</h3>
+              <p className="text-xs text-text-primary/50 leading-relaxed">{description}</p>
             </div>
           </div>
 

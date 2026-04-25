@@ -120,15 +120,15 @@ export default function Parceiros() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Users className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold text-white">Parceiros</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Parceiros</h1>
       </div>
 
-      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editId ? 'Editar' : 'Novo'} Parceiro</h2>
+      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-6">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">{editId ? 'Editar' : 'Novo'} Parceiro</h2>
 
         {/* Dados Gerais */}
         <div>
-          <p className="text-xs text-zinc-600 uppercase tracking-widest font-bold mb-3">Dados Gerais</p>
+          <p className="text-xs text-text-primary/40 uppercase tracking-widest font-bold mb-3">Dados Gerais</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <FormField label="CPF / CNPJ" error={errors.cpfCnpj}>
               <div className="relative">
@@ -153,7 +153,7 @@ export default function Parceiros() {
 
         {/* Endereço */}
         <div>
-          <p className="text-xs text-zinc-600 uppercase tracking-widest font-bold mb-3">Endereço</p>
+          <p className="text-xs text-text-primary/40 uppercase tracking-widest font-bold mb-3">Endereço</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <FormField label="CEP">
               <input className={inputCls} value={form.cep} onChange={set('cep')} placeholder="00000-000" maxLength={9} />
@@ -181,7 +181,7 @@ export default function Parceiros() {
 
         {/* Contato */}
         <div>
-          <p className="text-xs text-zinc-600 uppercase tracking-widest font-bold mb-3">Contato</p>
+          <p className="text-xs text-text-primary/40 uppercase tracking-widest font-bold mb-3">Contato</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Telefone">
               <input className={inputCls} value={form.telefone} onChange={set('telefone')} placeholder="(11) 99999-9999" />
@@ -197,7 +197,7 @@ export default function Parceiros() {
             <Plus className="w-4 h-4" />{salvando ? 'GRAVANDO...' : editId ? 'Salvar' : 'Criar'}
           </button>
           {editId && (
-            <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-white/10 text-zinc-400 hover:text-white">
+            <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
               Cancelar
             </button>
           )}
@@ -205,10 +205,10 @@ export default function Parceiros() {
       </form>
 
       {/* Lista */}
-      <div className="bg-surface-low rounded-2xl border border-white/5 overflow-hidden">
+      <div className="bg-surface-low rounded-2xl border border-text-primary/5 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/5 text-zinc-500">
+            <tr className="border-b border-text-primary/5 text-text-primary/50">
               <th className="text-left px-6 py-3 text-xs font-bold uppercase tracking-widest">Razão Social</th>
               <th className="text-left px-6 py-3 text-xs font-bold uppercase tracking-widest">CPF/CNPJ</th>
               <th className="text-left px-6 py-3 text-xs font-bold uppercase tracking-widest">Tipo</th>
@@ -219,30 +219,30 @@ export default function Parceiros() {
           </thead>
           <tbody>
             {lista.map(p => (
-              <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+              <tr key={p.id} className="border-b border-text-primary/5 hover:bg-white/[0.02] transition-colors">
                 <td className="px-6 py-4">
-                  <p className="font-medium text-white">{p.razaoSocial}</p>
-                  {p.nomeFantasia && <p className="text-xs text-zinc-500">{p.nomeFantasia}</p>}
+                  <p className="font-medium text-text-primary">{p.razaoSocial}</p>
+                  {p.nomeFantasia && <p className="text-xs text-text-primary/50">{p.nomeFantasia}</p>}
                 </td>
-                <td className="px-6 py-4 text-zinc-400">{p.cpfCnpj || '—'}</td>
+                <td className="px-6 py-4 text-text-primary/60">{p.cpfCnpj || '—'}</td>
                 <td className="px-6 py-4">
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary">{p.tipo}</span>
                 </td>
-                <td className="px-6 py-4 text-zinc-400">{p.municipio ? `${p.municipio}/${p.uf}` : '—'}</td>
-                <td className="px-6 py-4 text-zinc-400 text-xs">
+                <td className="px-6 py-4 text-text-primary/60">{p.municipio ? `${p.municipio}/${p.uf}` : '—'}</td>
+                <td className="px-6 py-4 text-text-primary/60 text-xs">
                   {p.telefone && <div>{p.telefone}</div>}
                   {p.email && <div>{p.email}</div>}
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2 justify-end">
-                    <button onClick={() => editar(p)} className="text-zinc-500 hover:text-primary"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => deletar(p.id)} className="text-zinc-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => editar(p)} className="text-text-primary/50 hover:text-primary"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => deletar(p.id)} className="text-text-primary/50 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
             ))}
             {lista.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-10 text-zinc-500">Nenhum parceiro cadastrado</td></tr>
+              <tr><td colSpan={6} className="text-center py-10 text-text-primary/50">Nenhum parceiro cadastrado</td></tr>
             )}
           </tbody>
         </table>
