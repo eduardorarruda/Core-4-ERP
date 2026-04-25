@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Bucket> chatBuckets = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
 
     public RateLimitFilter(ObjectMapper objectMapper) {
@@ -30,21 +31,28 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return !path.equals("/api/auth/login") && !path.equals("/api/auth/registrar");
+        return !path.equals("/api/auth/login")
+                && !path.equals("/api/auth/registrar")
+                && !path.startsWith("/api/chat");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String ip = resolveClientIp(request);
-        Bucket bucket = resolveBucket(ip);
+        String path = request.getServletPath();
+        boolean isChat = path.startsWith("/api/chat");
+        Bucket bucket = isChat ? resolveChatBucket(ip) : resolveBucket(ip);
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
         } else {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            objectMapper.writeValue(response.getWriter(), Map.of("erro", "Muitas tentativas. Aguarde 1 minuto."));
+            String msg = isChat
+                    ? "Limite de mensagens atingido. Aguarde 1 minuto."
+                    : "Muitas tentativas. Aguarde 1 minuto.";
+            objectMapper.writeValue(response.getWriter(), Map.of("erro", msg));
         }
     }
 
@@ -54,6 +62,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         .addLimit(Bandwidth.builder()
                                 .capacity(10)
                                 .refillIntervally(10, Duration.ofMinutes(1))
+                                .build())
+                        .build());
+    }
+
+    private Bucket resolveChatBucket(String ip) {
+        return chatBuckets.computeIfAbsent(ip, k ->
+                Bucket.builder()
+                        .addLimit(Bandwidth.builder()
+                                .capacity(30)
+                                .refillIntervally(30, Duration.ofMinutes(1))
                                 .build())
                         .build());
     }

@@ -29,6 +29,9 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
     List<Conta> findByUsuarioIdAndStatusAndDataVencimentoBefore(
             Long usuarioId, StatusConta status, LocalDate data);
 
+    List<Conta> findByUsuarioIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(
+            Long usuarioId, Collection<StatusConta> statuses, LocalDate inicio, LocalDate fim);
+
     // ── Dashboard queries ─────────────────────────────────────────────────────
 
     @Query("SELECT COALESCE(SUM(c.valorOriginal), 0) FROM Conta c " +

@@ -1,22 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
-/**
- * Custom confirmation modal replacing native confirm().
- *
- * Usage:
- *   const [confirmAction, setConfirmAction] = useState(null);
- *
- *   function handleDelete(id) {
- *     setConfirmAction({
- *       title: 'Excluir item',
- *       message: 'Tem certeza que deseja excluir este item?',
- *       onConfirm: () => { doDelete(id); setConfirmAction(null); },
- *     });
- *   }
- *
- *   {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
- */
 export default function ConfirmModal({
   title = 'Confirmar ação',
   message = 'Tem certeza que deseja continuar?',
@@ -46,16 +30,16 @@ export default function ConfirmModal({
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onCancel}
       />
 
       {/* Modal Card */}
-      <div className="relative bg-surface-low border border-white/10 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 slide-in-from-bottom-2 duration-200">
+      <div className="relative bg-surface-low border border-text-primary/10 rounded-2xl shadow-2xl max-w-sm w-full animate-in zoom-in-95 slide-in-from-bottom-2 duration-200">
         {/* Close button */}
         <button
           onClick={onCancel}
-          className="absolute top-3 right-3 text-zinc-500 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
+          className="absolute top-3 right-3 text-text-primary/50 hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-surface-medium"
         >
           <X className="w-4 h-4" />
         </button>
@@ -71,8 +55,8 @@ export default function ConfirmModal({
               }`} />
             </div>
             <div>
-              <h3 className="text-white font-bold text-sm">{title}</h3>
-              <p className="text-zinc-400 text-sm mt-1 leading-relaxed">{message}</p>
+              <h3 className="text-text-primary font-bold text-sm">{title}</h3>
+              <p className="text-text-primary/60 text-sm mt-1 leading-relaxed">{message}</p>
             </div>
           </div>
 
@@ -80,7 +64,7 @@ export default function ConfirmModal({
           <div className="flex justify-end gap-3 pt-2">
             <button
               onClick={onCancel}
-              className="px-4 py-2 rounded-xl border border-white/10 text-zinc-400 hover:text-white hover:border-white/20 transition-all text-sm font-medium"
+              className="px-4 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary hover:border-text-primary/20 transition-all text-sm font-medium"
             >
               {cancelLabel}
             </button>

@@ -14,17 +14,54 @@
   --color-secondary: #ACC7FF;
   --color-error: #FFB4AB;
 
+  --color-text-primary: #FAFAFA;
+
+  --color-success-surface: #022c22;
+  --color-success-text: #6ee7b7;
+  --color-success-border: rgba(52, 211, 153, 0.3);
+  --color-error-surface: #450a0a;
+  --color-error-text: #fca5a5;
+  --color-error-border: rgba(239, 68, 68, 0.3);
+
   --radius-xl: 0.75rem;
 }
 
 @layer base {
   body {
-    @apply bg-surface text-white font-sans antialiased;
+    @apply bg-surface font-sans antialiased;
+    color: var(--color-text-primary);
+  }
+
+  html:not(.dark) {
+    --color-surface: #F4F4F5;
+    --color-surface-low: #FFFFFF;
+    --color-surface-medium: #E4E4E7;
+    --color-surface-highest: #D4D4D8;
+
+    --color-primary: #059669;
+    --color-on-primary: #FFFFFF;
+    --color-secondary: #2563EB;
+    --color-error: #DC2626;
+
+    --color-text-primary: #18181B;
+
+    --color-success-surface: #ECFDF5;
+    --color-success-text: #065F46;
+    --color-success-border: rgba(16, 185, 129, 0.3);
+    --color-error-surface: #FEF2F2;
+    --color-error-text: #991B1B;
+    --color-error-border: rgba(239, 68, 68, 0.3);
+  }
+}
+
+@layer utilities {
+  .text-base-content {
+    color: var(--color-text-primary);
   }
 }
 
 .glass-panel {
-  background: rgba(42, 42, 42, 0.6);
+  background: color-mix(in srgb, var(--color-surface-medium) 60%, transparent);
   backdrop-filter: blur(12px);
 }
 
