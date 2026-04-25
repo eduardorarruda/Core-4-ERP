@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown } from 'lucide-react';
-import { contas as api, categorias as catApi, parceiros as parApi, contasCorrentes as ccApi } from '../lib/api';
+import { contas as api, categorias as catApi, parceiros as parApi, contasCorrentes as ccApi, assinaturas as assinaturasApi } from '../lib/api';
 import Toast from '../components/ui/Toast';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls, labelCls } from '../components/ui/FormField';
@@ -25,6 +25,7 @@ export default function ContasFinanceiras() {
   const [cats, setCats] = useState([]);
   const [pars, setPars] = useState([]);
   const [ccs, setCcs] = useState([]);
+  const [assinaturasAtivas, setAssinaturasAtivas] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [baixaId, setBaixaId] = useState(null);
   const [baixaForm, setBaixaForm] = useState(emptyBaixa);
@@ -40,6 +41,7 @@ export default function ContasFinanceiras() {
     catApi.listar().then(setCats).catch(() => {});
     parApi.listar().then(setPars).catch(() => {});
     ccApi.listar().then(setCcs).catch(() => {});
+    assinaturasApi.listarAtivas().then(setAssinaturasAtivas).catch(() => {});
     carregar(emptyFiltros);
   }, []);
 
@@ -266,6 +268,41 @@ export default function ContasFinanceiras() {
       <form onSubmit={criar} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-4">
         <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">Nova Conta</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          {assinaturasAtivas.length > 0 && (
+            <FormField label="Preencher de Assinatura (opcional)">
+              <select
+                className={`${inputCls} appearance-none`}
+                value=""
+                onChange={e => {
+                  const id = Number(e.target.value);
+                  if (!id) return;
+                  const assin = assinaturasAtivas.find(a => a.id === id);
+                  if (!assin) return;
+                  const hoje = new Date();
+                  let venc = new Date(hoje.getFullYear(), hoje.getMonth(), assin.diaVencimento);
+                  if (venc < hoje) venc = new Date(hoje.getFullYear(), hoje.getMonth() + 1, assin.diaVencimento);
+                  const dataVencimento = venc.toISOString().split('T')[0];
+                  setForm(f => ({
+                    ...f,
+                    descricao: assin.descricao,
+                    valorOriginal: String(assin.valor),
+                    categoriaId: String(assin.categoriaId),
+                    parceiroId: assin.parceiroId ? String(assin.parceiroId) : '',
+                    dataVencimento,
+                    tipo: 'PAGAR',
+                  }));
+                }}
+              >
+                <option value="">— Selecionar assinatura —</option>
+                {assinaturasAtivas.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.descricao} — R$ {Number(a.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (dia {a.diaVencimento})
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          )}
 
           <FormField label="Nº Documento">
             <input className={inputCls} value={form.numeroDocumento} onChange={e => setF('numeroDocumento')(e.target.value)} placeholder="NF-001, Boleto..." />

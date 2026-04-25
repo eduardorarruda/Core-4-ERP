@@ -135,6 +135,16 @@ export const investimentos = {
   },
 };
 
+// ── Assinaturas ───────────────────────────────────────────────────────────────
+export const assinaturas = {
+  listar: () => request('/api/assinaturas'),
+  listarAtivas: () => request('/api/assinaturas/ativas'),
+  buscar: (id) => request(`/api/assinaturas/${id}`),
+  criar: (dto) => request('/api/assinaturas', { method: 'POST', body: JSON.stringify(dto) }),
+  atualizar: (id, dto) => request(`/api/assinaturas/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deletar: (id) => request(`/api/assinaturas/${id}`, { method: 'DELETE' }),
+};
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboard = {
   resumo: () => request('/api/dashboard'),
@@ -181,6 +191,7 @@ export const relatorios = {
   dre:           (inicio, fim, p) => downloadRelatorio(`/api/relatorios/dre?${relatorioQs(inicio, fim, p)}`),
   investimentos: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/investimentos?${relatorioQs(inicio, fim, p)}`),
   cartoes:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/cartoes?${relatorioQs(inicio, fim, p)}`),
+  assinaturas:   (ativas, p) => downloadRelatorio(`/api/relatorios/assinaturas?${relatorioQs('', '', { ativas, ...p })}`),
 
   // ── Dados JSON (visualização online e PDF) ────────────────────────────────
   dados: {
@@ -191,5 +202,6 @@ export const relatorios = {
     dre:           (inicio, fim, p) => request(`/api/relatorios/dre/dados?${relatorioQs(inicio, fim, p)}`),
     investimentos: (inicio, fim, p) => request(`/api/relatorios/investimentos/dados?${relatorioQs(inicio, fim, p)}`),
     cartoes:       (inicio, fim, p) => request(`/api/relatorios/cartoes/dados?${relatorioQs(inicio, fim, p)}`),
+    assinaturas:   (ativas) => request(`/api/relatorios/assinaturas/dados?ativas=${ativas ?? true}`),
   },
 };

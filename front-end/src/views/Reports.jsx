@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard, Wallet } from 'lucide-react';
+import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard, Wallet, Repeat } from 'lucide-react';
 import { relatorios, categorias, parceiros, cartoes, contasCorrentes, investimentos } from '../lib/api';
 import Toast from '../components/ui/Toast';
 import ReportCard from '../components/reports/ReportCard';
@@ -127,6 +127,20 @@ const REPORT_CARDS = [
     filterConfig: [
       { key: 'cartaoId',    label: 'Cartão',     type: 'async-select', fetchFn: fetchCartoes    },
       { key: 'categoriaId', label: 'Categoria',  type: 'async-select', fetchFn: fetchCategorias },
+    ],
+  },
+  {
+    id: 'R07',
+    title: 'Assinaturas Recorrentes',
+    description: 'Listagem de todas as assinaturas com custo mensal e anual projetado.',
+    icon: Repeat,
+    onGetData: (_i, _f, params) => relatorios.dados.assinaturas(params?.ativas),
+    onDownloadXlsx: (_i, _f, params) => relatorios.assinaturas(params?.ativas),
+    filterConfig: [
+      { key: 'ativas', label: 'Status', type: 'select', options: [
+        { value: 'true',  label: 'Somente Ativas'   },
+        { value: 'false', label: 'Somente Inativas'  },
+      ]},
     ],
   },
 ];
