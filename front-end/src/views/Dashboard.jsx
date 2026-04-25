@@ -1,20 +1,25 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell,
+  BarChart, Bar, PieChart, Pie, Cell, ReferenceLine,
 } from 'recharts';
-import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon, Repeat } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon, Repeat, RefreshCw } from 'lucide-react';
 import BentoCard from '../components/ui/BentoCard';
+import PageHeader from '../components/ui/PageHeader';
+import Badge from '../components/ui/Badge';
 import SaldoDetalhadoPanel from '../components/dashboard/SaldoDetalhadoPanel';
 import { dashboard, investimentos, assinaturas as assinaturasApi } from '../lib/api';
+import { brl } from '../lib/formatters';
 import { cn } from '../lib/utils';
 import { ThemeContext } from '../context/ThemeContext';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const COLORS_DARK = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD8A8', '#D8A8FF', '#A8FFD8'];
 const COLORS_LIGHT = ['#059669', '#2563EB', '#DC2626', '#D97706', '#7C3AED', '#0891B2'];
-const brl = (v) => Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
+const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
 
 export default function Dashboard() {
   const { theme } = useContext(ThemeContext);
@@ -22,19 +27,23 @@ export default function Dashboard() {
   const [carregando, setCarregando] = useState(true);
   const [carteira, setCarteira] = useState([]);
   const [assinaturasLista, setAssinaturasLista] = useState([]);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  useEffect(() => {
-    dashboard.resumo()
-      .then(setDados)
-      .catch(() => {})
-      .finally(() => setCarregando(false));
-    investimentos.listar()
-      .then(setCarteira)
-      .catch(() => {});
-    assinaturasApi.listar()
-      .then(setAssinaturasLista)
-      .catch(() => {});
-  }, []);
+  const fetchAll = () => {
+    setCarregando(true);
+    Promise.all([
+      dashboard.resumo().catch(() => null),
+      investimentos.listar().catch(() => []),
+      assinaturasApi.listar().catch(() => []),
+    ]).then(([d, inv, assin]) => {
+      if (d) setDados(d);
+      setCarteira(inv ?? []);
+      setAssinaturasLista(assin ?? []);
+      setLastUpdate(new Date());
+    }).finally(() => setCarregando(false));
+  };
+
+  useEffect(() => { fetchAll(); }, []);
 
   const isDark = theme === 'dark';
   const COLORS = isDark ? COLORS_DARK : COLORS_LIGHT;
@@ -43,25 +52,24 @@ export default function Dashboard() {
   const tooltipBg = isDark ? '#1C1B1B' : '#FFFFFF';
   const tooltipTextColor = isDark ? '#FAFAFA' : '#18181B';
   const emptyPieColor = isDark ? '#353534' : '#D4D4D8';
-
-  // Cores das linhas/áreas e barras — pastéis no dark, saturadas no light
   const colorEntradas = isDark ? '#6EFFC0' : '#059669';
   const colorSaidas   = isDark ? '#FFB4AB' : '#DC2626';
   const colorIncome   = isDark ? '#ACC7FF' : '#2563EB';
   const colorExpense  = isDark ? '#FFB4AB' : '#DC2626';
 
   const fluxoMensal = dados?.fluxoMensal ?? [];
-  const cashFlowData = fluxoMensal.map((m) => ({
+
+  const cashFlowData = useMemo(() => fluxoMensal.map((m) => ({
     name: MESES[m.mes - 1],
     entradas: Number(m.totalRecebido),
     saidas: Number(m.totalPago),
-  }));
+  })), [fluxoMensal]);
 
-  const resultsData = fluxoMensal.map((m) => ({
+  const resultsData = useMemo(() => fluxoMensal.map((m) => ({
     name: MESES[m.mes - 1],
     income: Number(m.totalRecebido),
     expense: Number(m.totalPago),
-  }));
+  })), [fluxoMensal]);
 
   const despesas = dados?.despesasPorCategoria ?? [];
   const pieData = despesas.length > 0
@@ -83,7 +91,8 @@ export default function Dashboard() {
 
   const patrimonioTotal = carteira.reduce((s, c) => s + Number(c.saldoAtual ?? 0), 0);
 
-  const assinaturasAtivas = assinaturasLista.filter(a => a.ativa);
+  const assinaturasAtivas = assinaturasLista.filter((a) => a.ativa)
+    .sort((a, b) => Number(b.valor) - Number(a.valor));
   const totalMensalAssin = assinaturasAtivas.reduce((s, a) => s + Number(a.valor), 0);
   const assinPorCat = assinaturasAtivas.reduce((acc, a) => {
     acc[a.categoriaDescricao] = (acc[a.categoriaDescricao] || 0) + Number(a.valor);
@@ -93,33 +102,44 @@ export default function Dashboard() {
     name, value, color: COLORS[i % COLORS.length],
   }));
 
-  const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
-  const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
+  const mediaEntradas = cashFlowData.length > 0
+    ? cashFlowData.reduce((s, m) => s + m.entradas, 0) / cashFlowData.length
+    : 0;
 
   const tooltipStyle = { backgroundColor: tooltipBg, border: 'none', borderRadius: '8px', fontSize: '12px', color: tooltipTextColor };
 
-  if (carregando) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-text-primary/50 text-sm animate-pulse">Carregando dashboard...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary">Dashboard Principal</h1>
-        <p className="text-text-primary/50 text-xs sm:text-sm">Visão Geral do seu ecossistema financeiro</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Visão geral do seu ecossistema financeiro"
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-text-primary/30 hidden sm:block">
+              Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button
+              onClick={fetchAll}
+              disabled={carregando}
+              aria-label="Atualizar dashboard"
+              className="p-2 rounded-xl bg-surface-medium border border-text-primary/5 text-text-primary/60 hover:text-text-primary hover:border-text-primary/10 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={cn('w-4 h-4', carregando && 'animate-spin')} />
+            </button>
+          </div>
+        }
+      />
 
       {/* Alertas */}
       {(vencendoHoje > 0 || atrasadas > 0) && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 animate-fade-in-up animate-stagger-1">
           {atrasadas > 0 && (
             <Link to="/contas" className="flex items-center gap-2 px-4 py-2 bg-red-950/60 border border-red-500/30 rounded-xl text-red-300 text-xs font-bold hover:bg-red-950/80 transition-colors">
               <AlertTriangle className="w-4 h-4" />
-              {atrasadas} conta{atrasadas > 1 ? 's' : ''} atrasada{atrasadas > 1 ? 's' : ''}
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse-dot" />
+                {atrasadas} conta{atrasadas > 1 ? 's' : ''} atrasada{atrasadas > 1 ? 's' : ''}
+              </span>
             </Link>
           )}
           {vencendoHoje > 0 && (
@@ -134,7 +154,8 @@ export default function Dashboard() {
       <div className="grid grid-cols-12 gap-4 lg:gap-6">
         {/* Fluxo de Caixa */}
         <BentoCard
-          className="col-span-12 lg:col-span-8 relative"
+          className="col-span-12 lg:col-span-8 animate-fade-in-up animate-stagger-1"
+          loading={carregando}
           title="Fluxo de Caixa — Últimos 6 Meses"
           headerAction={
             <div className="flex gap-2">
@@ -158,14 +179,16 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
                 <XAxis dataKey="name" stroke={axisColor} fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(value) => `R$ ${brl(value)}`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
+                {mediaEntradas > 0 && (
+                  <ReferenceLine y={mediaEntradas} stroke={colorEntradas} strokeDasharray="4 4" strokeOpacity={0.4} />
+                )}
                 <Area type="monotone" dataKey="entradas" stroke={colorEntradas} fillOpacity={1} fill="url(#colorEntradas)" strokeWidth={2} />
                 <Area type="monotone" dataKey="saidas" stroke={colorSaidas} fillOpacity={1} fill="url(#colorSaidas)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Resumo dos 6 meses */}
           <div className="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-text-primary/5">
             <div className="bg-surface-low rounded-xl p-4 space-y-1">
               <div className="flex items-center gap-1.5">
@@ -199,20 +222,24 @@ export default function Dashboard() {
         </BentoCard>
 
         {/* Posição Financeira */}
-        <div className="col-span-12 lg:col-span-4">
+        <div className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-2">
           <SaldoDetalhadoPanel />
         </div>
 
         {/* Resultados de Caixa */}
-        <BentoCard className="col-span-12 lg:col-span-6" title="Resultados de Caixa">
+        <BentoCard
+          className="col-span-12 lg:col-span-6 animate-fade-in-up animate-stagger-2"
+          loading={carregando}
+          title="Resultados de Caixa"
+        >
           <div className="w-full mt-4">
             <ResponsiveContainer width="100%" height={256}>
               <BarChart data={resultsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
                 <XAxis dataKey="name" stroke={axisColor} fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} formatter={(value) => `R$ ${brl(value)}`} />
-                <Bar dataKey="income" name="Receitas" fill={colorIncome} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="expense" name="Despesas" fill={colorExpense} radius={[2, 2, 0, 0]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
+                <Bar dataKey="income" name="Receitas" fill={colorIncome} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expense" name="Despesas" fill={colorExpense} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -223,7 +250,11 @@ export default function Dashboard() {
         </BentoCard>
 
         {/* Resultado do Mês */}
-        <BentoCard className="col-span-12 lg:col-span-6" title="Resultado do Mês Atual">
+        <BentoCard
+          className="col-span-12 lg:col-span-6 animate-fade-in-up animate-stagger-3"
+          loading={carregando}
+          title="Resultado do Mês Atual"
+        >
           <div className="space-y-8 mt-4">
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-text-primary/50">
@@ -251,7 +282,7 @@ export default function Dashboard() {
             </div>
             <div className="pt-4 border-t border-text-primary/5">
               <p className="text-[10px] text-text-primary/50 uppercase font-bold tracking-widest">Saldo Total (Contas Correntes)</p>
-              <p className={cn('text-3xl font-bold', saldo >= 0 ? 'text-primary' : 'text-error')}>
+              <p className={cn('text-3xl font-bold font-display', saldo >= 0 ? 'text-primary' : 'text-error')}>
                 R$ {brl(saldo)}
               </p>
             </div>
@@ -259,29 +290,24 @@ export default function Dashboard() {
         </BentoCard>
 
         {/* Despesas por Categoria */}
-        <BentoCard className="col-span-12 lg:col-span-4 flex flex-col items-center justify-center" title="Despesas por Categoria">
+        <BentoCard
+          className="col-span-12 lg:col-span-4 flex flex-col items-center justify-center animate-fade-in-up animate-stagger-3"
+          loading={carregando}
+          title="Despesas por Categoria"
+        >
           <div className="relative w-48 h-48 mt-4">
             <ResponsiveContainer width={192} height={192}>
               <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                  stroke="none"
-                >
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(value) => `R$ ${brl(value)}`} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-xl font-bold text-primary">R$ {brl(totalDespesasCat)}</span>
+              <span className="text-xl font-bold text-primary font-display">R$ {brl(totalDespesasCat)}</span>
               <span className="text-[10px] text-text-primary/50 uppercase font-bold tracking-tighter">Mês Atual</span>
             </div>
           </div>
@@ -296,29 +322,28 @@ export default function Dashboard() {
         </BentoCard>
 
         {/* Carteira de Investimentos */}
-        <BentoCard className="col-span-12 lg:col-span-4" title="Carteira de Investimentos"
+        <BentoCard
+          className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-4"
+          loading={carregando}
+          title="Carteira de Investimentos"
           headerAction={
             <Link to="/investimentos" className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
               Ver tudo →
             </Link>
           }
         >
-          {/* Patrimônio total */}
           <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-0.5">Patrimônio Total</p>
-              <p className="text-2xl font-bold text-text-primary">R$ {brl(patrimonioTotal)}</p>
+              <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(patrimonioTotal)}</p>
             </div>
             <PieIcon className="w-8 h-8 text-primary opacity-40" />
           </div>
 
-          {/* Lista de contas */}
           {carteira.length === 0 ? (
             <div className="py-6 text-center">
               <p className="text-sm text-text-primary/50">Nenhuma carteira cadastrada</p>
-              <Link to="/investimentos" className="text-xs text-primary hover:underline mt-1 block">
-                Cadastrar investimento
-              </Link>
+              <Link to="/investimentos" className="text-xs text-primary hover:underline mt-1 block">Cadastrar investimento</Link>
             </div>
           ) : (
             <div className="space-y-2">
@@ -337,10 +362,7 @@ export default function Dashboard() {
                       <span className="text-xs font-bold text-text-primary shrink-0 ml-2">R$ {brl(c.saldoAtual)}</span>
                     </div>
                     <div className="h-1 w-full bg-surface-medium rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary/60 rounded-full transition-all duration-700"
-                        style={{ width: `${pct.toFixed(1)}%` }}
-                      />
+                      <div className="h-full bg-primary/60 rounded-full transition-all duration-700" style={{ width: `${pct.toFixed(1)}%` }} />
                     </div>
                     <p className="text-[10px] text-text-primary/40 text-right">{pct.toFixed(1)}% do total</p>
                   </div>
@@ -352,7 +374,8 @@ export default function Dashboard() {
 
         {/* Assinaturas Recorrentes */}
         <BentoCard
-          className="col-span-12 lg:col-span-4"
+          className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-5"
+          loading={carregando}
           title="Assinaturas Recorrentes"
           headerAction={
             <Link to="/assinaturas" className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
@@ -363,7 +386,7 @@ export default function Dashboard() {
           <div className="bg-error/10 border border-error/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4 mt-2">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-error mb-0.5">Custo Mensal</p>
-              <p className="text-2xl font-bold text-text-primary">R$ {brl(totalMensalAssin)}</p>
+              <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(totalMensalAssin)}</p>
               <p className="text-[10px] text-text-primary/50 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
             </div>
             <Repeat className="w-8 h-8 text-error opacity-40" />
@@ -372,15 +395,8 @@ export default function Dashboard() {
           {pieAssinaturas.length > 0 && (
             <ResponsiveContainer width="100%" height={160}>
               <PieChart>
-                <Pie
-                  data={pieAssinaturas}
-                  cx="50%" cy="50%"
-                  innerRadius={40} outerRadius={65}
-                  paddingAngle={4} dataKey="value" stroke="none"
-                >
-                  {pieAssinaturas.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
+                <Pie data={pieAssinaturas} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value" stroke="none">
+                  {pieAssinaturas.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
               </PieChart>
@@ -388,7 +404,7 @@ export default function Dashboard() {
           )}
 
           <div className="space-y-2 mt-2">
-            {assinaturasAtivas.slice(0, 4).map(a => (
+            {assinaturasAtivas.slice(0, 4).map((a) => (
               <div key={a.id} className="flex items-center justify-between bg-surface-low rounded-lg px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-text-primary truncate">{a.descricao}</p>
@@ -407,10 +423,14 @@ export default function Dashboard() {
         </BentoCard>
 
         {/* Acesso Rápido */}
-        <BentoCard className="col-span-12 lg:col-span-4" title="Acesso Rápido">
+        <BentoCard
+          className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-6"
+          loading={carregando}
+          title="Acesso Rápido"
+        >
           <div className="grid grid-cols-2 gap-3 mt-4">
             {[
-              { label: 'Lançamentos', path: '/contas', color: 'text-secondary' },
+              { label: 'Lançamentos', path: '/contas', color: 'text-secondary', count: atrasadas > 0 ? `${atrasadas} atrasada${atrasadas > 1 ? 's' : ''}` : null },
               { label: 'Cartões', path: '/cartoes', color: 'text-primary' },
               { label: 'Investimentos', path: '/investimentos', color: 'text-primary' },
               { label: 'Parceiros', path: '/parceiros', color: 'text-text-primary/80' },
@@ -418,9 +438,15 @@ export default function Dashboard() {
               <Link
                 key={item.path}
                 to={item.path}
-                className="p-4 bg-surface-low rounded-xl hover:bg-surface-medium transition-colors"
+                className="p-4 bg-surface-low rounded-xl hover:bg-surface-medium transition-colors group"
               >
                 <span className={`text-xs font-bold uppercase tracking-widest ${item.color}`}>{item.label}</span>
+                {item.count && (
+                  <p className="text-[10px] text-error mt-1 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse-dot" />
+                    {item.count}
+                  </p>
+                )}
               </Link>
             ))}
           </div>

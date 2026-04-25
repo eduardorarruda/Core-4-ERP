@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Layout, BarChart3, Wallet } from 'lucide-react';
+import { Layout, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { auth } from '../lib/api';
+import { PasswordInput } from '../components/ui/FormField';
+import { cn } from '../lib/utils';
+
+const inputCls = 'w-full bg-surface-low border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none placeholder:text-text-primary/30 text-sm font-body';
+
+const STATS = [
+  { label: 'Crescimento', value: '+24.8%', icon: '📈' },
+  { label: 'Controle', value: '100%', icon: '🎯' },
+  { label: 'Módulos', value: '10+', icon: '⚡' },
+  { label: 'Relatórios', value: '∞', icon: '📊' },
+];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -28,61 +39,96 @@ export default function Login() {
 
   return (
     <main className="flex min-h-screen bg-surface">
-      {/* Left Side: Form Section */}
+      {/* Left Side */}
       <section className="w-full lg:w-[450px] xl:w-[550px] flex flex-col justify-between p-8 md:p-16 bg-surface z-10">
         <div className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-primary flex items-center justify-center rounded-xl">
-            <Layout className="w-6 h-6 text-on-primary" />
+          <div className="w-10 h-10 bg-primary/10 border border-primary/20 flex items-center justify-center rounded-xl">
+            <Layout className="w-5 h-5 text-primary" />
           </div>
-          <h1 className="text-xl font-bold tracking-tighter text-text-primary">Core 4 ERP</h1>
+          <h1 className="text-xl font-bold tracking-tighter text-text-primary font-display">Core 4 ERP</h1>
         </div>
 
         <div className="max-w-sm w-full mx-auto">
-          <header className="mb-10">
-            <h2 className="text-3xl font-bold tracking-tight text-text-primary mb-2">Login</h2>
-            <p className="text-text-primary/50 text-sm">Bem-vindo de volta ao Core 4 ERP.</p>
-          </header>
+          <motion.header
+            className="mb-10"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h2 className="text-3xl font-bold tracking-tight text-text-primary mb-2 font-display">Bem-vindo de volta</h2>
+            <p className="text-text-primary/50 text-sm font-body">Faça login para acessar o Core 4 ERP.</p>
+          </motion.header>
 
-          <form className="space-y-6" onSubmit={handleLogin}>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-text-primary/60" htmlFor="email">Email</label>
+          <form className="space-y-5" onSubmit={handleLogin}>
+            <motion.div
+              className="space-y-1.5"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
+              <label className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-body" htmlFor="email">
+                Email
+              </label>
               <input
-                className="w-full bg-surface-low border border-text-primary/5 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none placeholder:text-text-primary/40"
+                className={inputCls}
                 id="email"
                 placeholder="nome@empresa.com"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
               />
-            </div>
+            </motion.div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-text-primary/60" htmlFor="password">Senha</label>
-              <input
-                className="w-full bg-surface-low border border-text-primary/5 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none placeholder:text-text-primary/40"
+            <motion.div
+              className="space-y-1.5"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.15 }}
+            >
+              <label className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-body" htmlFor="password">
+                Senha
+              </label>
+              <PasswordInput
                 id="password"
                 placeholder="••••••••"
-                type="password"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 required
+                autoComplete="current-password"
               />
-            </div>
+            </motion.div>
 
             {erro && (
-              <p className="text-sm text-error bg-error/10 border border-error/20 rounded-lg px-4 py-2">
+              <motion.p
+                className="text-sm text-error bg-error/10 border border-error/20 rounded-xl px-4 py-3"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
                 {erro}
-              </p>
+              </motion.p>
             )}
 
-            <button
-              className="w-full bg-primary hover:opacity-90 text-on-primary font-bold py-4 rounded-xl transition-all active:scale-[0.98] shadow-lg shadow-primary/10 disabled:opacity-50"
+            <motion.button
+              className={cn(
+                'w-full bg-primary hover:opacity-90 text-on-primary font-bold py-3.5 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2',
+              )}
               type="submit"
               disabled={carregando}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
             >
-              {carregando ? 'Autenticando…' : 'Entrar no Sistema'}
-            </button>
+              {carregando ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Autenticando…
+                </>
+              ) : (
+                'Entrar no Sistema'
+              )}
+            </motion.button>
           </form>
 
           <div className="mt-8 pt-8 border-t border-text-primary/5 text-center">
@@ -93,18 +139,16 @@ export default function Login() {
           </div>
         </div>
 
-        <footer className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-text-primary/40">
-          <span>© 2024 Core 4 ERP</span>
+        <footer className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-text-primary/30">
+          <span>© 2025 Core 4 ERP</span>
         </footer>
       </section>
 
-      {/* Right Side: Hero Section */}
-      <section className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden bg-surface">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-surface via-surface/95 to-primary/5 z-10"></div>
-        </div>
+      {/* Right Side */}
+      <section className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden bg-surface-low">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
 
-        <div className="relative z-20 max-w-2xl px-12">
+        <div className="relative z-10 max-w-lg px-12 w-full">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -118,33 +162,40 @@ export default function Login() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl xl:text-7xl font-bold tracking-tighter leading-[1.1] text-text-primary mb-8"
+            className="text-5xl xl:text-6xl font-bold tracking-tighter leading-[1.1] text-text-primary mb-8 font-display"
           >
-            A Arquiteta da Sua <span className="text-primary italic">Liberdade Financeira</span>
+            A Arquiteta da Sua{' '}
+            <span className="text-gradient-primary italic">Liberdade Financeira</span>
           </motion.h2>
 
-          <motion.div
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="space-y-6"
+            className="text-lg text-text-primary/50 font-light max-w-md leading-relaxed mb-12 font-body"
           >
-            <p className="text-lg xl:text-xl text-text-primary/60 font-light max-w-lg leading-relaxed">
-              Transforme dados complexos em decisões estratégicas com nossa interface modular.
-            </p>
+            Transforme dados complexos em decisões estratégicas com nossa interface modular e inteligente.
+          </motion.p>
 
-            <div className="grid grid-cols-2 gap-4 mt-12">
-              <div className="p-6 rounded-xl bg-surface-highest/40 backdrop-blur-md border border-text-primary/5">
-                <BarChart3 className="w-8 h-8 text-primary mb-2" />
-                <div className="text-sm font-bold uppercase tracking-widest text-text-primary/60 mb-1">Crescimento</div>
-                <div className="text-2xl font-bold text-text-primary">+24.8%</div>
-              </div>
-              <div className="p-6 rounded-xl bg-surface-highest/40 backdrop-blur-md border border-text-primary/5">
-                <Wallet className="w-8 h-8 text-secondary mb-2" />
-                <div className="text-sm font-bold uppercase tracking-widest text-text-primary/60 mb-1">Capital</div>
-                <div className="text-2xl font-bold text-text-primary">R$ 4.2M</div>
-              </div>
-            </div>
+          <motion.div
+            className="grid grid-cols-2 gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            {STATS.map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: 0.35 + i * 0.05 }}
+                className="p-5 rounded-2xl bg-surface border border-text-primary/5 hover:border-text-primary/10 transition-colors"
+              >
+                <div className="text-2xl mb-2">{stat.icon}</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 mb-1 font-body">{stat.label}</div>
+                <div className="text-2xl font-bold text-text-primary font-display">{stat.value}</div>
+              </motion.div>
+            ))}
           </motion.div>
         </div>
       </section>

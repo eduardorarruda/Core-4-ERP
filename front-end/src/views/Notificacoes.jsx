@@ -1,63 +1,98 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, CheckCheck, RefreshCw } from 'lucide-react';
 import { notificacoes as api } from '../lib/api';
-import Toast from '../components/ui/Toast';
+import PageHeader from '../components/ui/PageHeader';
+import Badge from '../components/ui/Badge';
+import EmptyState from '../components/ui/EmptyState';
+import { formatDateTime } from '../lib/formatters';
+import { useToast } from '../hooks/useToast';
+
+const TIPO_VARIANT = { VENCIMENTO: 'error', FATURA: 'warning' };
+const TIPO_BORDER = { VENCIMENTO: 'border-l-4 border-l-error', FATURA: 'border-l-4 border-l-amber-500' };
 
 export default function Notificacoes() {
+  const toast = useToast();
   const [lista, setLista] = useState([]);
   const [carregando, setCarregando] = useState(false);
-  const [toast, setToast] = useState(null);
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
-    try { setLista(await api.listar()); } catch (e) { setToast({ message: e.message, type: 'error' }); }
+    try { setLista(await api.listar()); }
+    catch (e) { toast.error(e.message); }
   }
 
   async function marcar(id) {
-    try { await api.marcarLida(id); setLista(l => l.filter(n => n.id !== id)); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
+    try {
+      await api.marcarLida(id);
+      setLista((l) => l.filter((n) => n.id !== id));
+    } catch (e) {
+      toast.error(e.message);
+    }
   }
 
   async function sincronizar() {
     setCarregando(true);
-    try { await api.sincronizar(); await carregar(); setToast({ message: 'Sincronização concluída!', type: 'success' }); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
-    finally { setCarregando(false); }
+    try {
+      await api.sincronizar();
+      await carregar();
+      toast.success('Sincronização concluída!');
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setCarregando(false);
+    }
   }
-
-  const TIPO_STYLE = { VENCIMENTO: 'border-l-4 border-red-500', FATURA: 'border-l-4 border-orange-500' };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3"><Bell className="w-6 h-6 text-primary" /><h1 className="text-2xl font-bold text-text-primary">Notificações</h1></div>
-        <button onClick={sincronizar} disabled={carregando} className="flex items-center gap-2 border border-text-primary/10 text-text-primary/80 px-4 py-2 rounded-xl hover:bg-surface-medium text-sm disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />{carregando ? 'SINCRONIZANDO...' : 'Sincronizar'}
-        </button>
-      </div>
+      <PageHeader
+        title="Notificações"
+        subtitle="Alertas de vencimentos e faturas"
+        actions={
+          <button
+            onClick={sincronizar}
+            disabled={carregando}
+            className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />
+            {carregando ? 'Sincronizando...' : 'Sincronizar'}
+          </button>
+        }
+      />
 
-      <div className="space-y-3">
-        {lista.map(n => (
-          <div key={n.id} className={`bg-surface-low rounded-2xl p-5 flex items-start justify-between gap-4 ${TIPO_STYLE[n.tipo] || ''}`}>
-            <div>
-              <p className="text-text-primary text-sm">{n.mensagem}</p>
-              <p className="text-xs text-text-primary/50 mt-1">{new Date(n.dataCriacao).toLocaleString('pt-BR')} · <span className="font-bold">{n.tipo}</span></p>
+      {lista.length === 0 ? (
+        <EmptyState
+          icon={Bell}
+          title="Sem notificações"
+          description="Você não tem notificações não lidas no momento."
+        />
+      ) : (
+        <div className="space-y-3">
+          {lista.map((n) => (
+            <div
+              key={n.id}
+              className={`bg-surface-medium rounded-2xl p-5 flex items-start justify-between gap-4 hover:shadow-elevated transition-all ${TIPO_BORDER[n.tipo] || ''}`}
+            >
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <p className="text-text-primary text-sm leading-relaxed">{n.mensagem}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-text-primary/40">{formatDateTime(n.dataCriacao)}</span>
+                  <Badge variant={TIPO_VARIANT[n.tipo] ?? 'neutral'} size="sm">{n.tipo}</Badge>
+                </div>
+              </div>
+              <button
+                onClick={() => marcar(n.id)}
+                title="Marcar como lida"
+                aria-label="Marcar notificação como lida"
+                className="p-1.5 text-text-primary/40 hover:text-green-400 rounded-lg hover:bg-green-400/10 transition-colors shrink-0"
+              >
+                <CheckCheck className="w-5 h-5" />
+              </button>
             </div>
-            <button onClick={() => marcar(n.id)} title="Marcar como lida" className="text-text-primary/60 hover:text-green-400 shrink-0">
-              <CheckCheck className="w-5 h-5" />
-            </button>
-          </div>
-        ))}
-        {lista.length === 0 && (
-          <div className="text-center py-16 text-text-primary/50">
-            <Bell className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>Sem notificações não lidas</p>
-          </div>
-        )}
-      </div>
-
-      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+          ))}
+        </div>
+      )}
     </div>
   );
 }
