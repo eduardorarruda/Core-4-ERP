@@ -8,7 +8,7 @@ Sistema de gestão financeira pessoal com autenticação JWT, multi-tenancy por 
 
 | Ferramenta | Versão mínima |
 |------------|--------------|
-| Java | 21 |
+| Java | 17 |
 | Gradle | 8+ |
 | Node.js | 20+ |
 | PostgreSQL | 15+ |

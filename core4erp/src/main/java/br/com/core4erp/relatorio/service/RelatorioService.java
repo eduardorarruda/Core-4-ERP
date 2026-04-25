@@ -1,5 +1,7 @@
 package br.com.core4erp.relatorio.service;
 
+import br.com.core4erp.assinatura.entity.Assinatura;
+import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
@@ -41,17 +43,20 @@ public class RelatorioService {
     private final ContaBaixadaRepository baixadaRepo;
     private final TransacaoInvestimentoRepository transacaoRepo;
     private final LancamentoCartaoRepository lancamentoRepo;
+    private final AssinaturaRepository assinaturaRepo;
 
     public RelatorioService(SecurityContextUtils securityCtx,
                             ContaRepository contaRepo,
                             ContaBaixadaRepository baixadaRepo,
                             TransacaoInvestimentoRepository transacaoRepo,
-                            LancamentoCartaoRepository lancamentoRepo) {
+                            LancamentoCartaoRepository lancamentoRepo,
+                            AssinaturaRepository assinaturaRepo) {
         this.securityCtx = securityCtx;
         this.contaRepo = contaRepo;
         this.baixadaRepo = baixadaRepo;
         this.transacaoRepo = transacaoRepo;
         this.lancamentoRepo = lancamentoRepo;
+        this.assinaturaRepo = assinaturaRepo;
     }
 
     // ── Fluxo de Caixa ───────────────────────────────────────────────────────
@@ -396,6 +401,42 @@ public class RelatorioService {
         return new RelatorioResponseDto(new GraficoDto(labels, series), cabecalho, linhas, totais);
     }
 
+    // ── Assinaturas ──────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public RelatorioResponseDto getDadosAssinaturas(Boolean soAtivas) {
+        Long uid = securityCtx.getUsuarioId();
+        List<Assinatura> lista = (soAtivas == null || soAtivas)
+                ? assinaturaRepo.findAllByUsuarioIdAndAtiva(uid, true)
+                : assinaturaRepo.findAllByUsuarioId(uid);
+
+        Map<String, BigDecimal> porCategoria = new LinkedHashMap<>();
+        BigDecimal totalAtivas = BigDecimal.ZERO;
+
+        List<String> cabecalho = List.of("Descrição", "Valor Mensal (R$)", "Dia Vencimento", "Categoria", "Parceiro", "Status");
+        List<List<Object>> linhas = new ArrayList<>();
+
+        for (Assinatura a : lista) {
+            String cat = a.getCategoria().getDescricao();
+            String par = a.getParceiro() != null
+                    ? (a.getParceiro().getNomeFantasia() != null && !a.getParceiro().getNomeFantasia().isBlank()
+                        ? a.getParceiro().getNomeFantasia() : a.getParceiro().getRazaoSocial())
+                    : "-";
+            String status = Boolean.TRUE.equals(a.getAtiva()) ? "Ativa" : "Inativa";
+            linhas.add(List.of(a.getDescricao(), a.getValor().doubleValue(), a.getDiaVencimento(), cat, par, status));
+            porCategoria.merge(cat, a.getValor(), BigDecimal::add);
+            if (Boolean.TRUE.equals(a.getAtiva())) totalAtivas = totalAtivas.add(a.getValor());
+        }
+
+        List<String> labels = new ArrayList<>(porCategoria.keySet());
+        Map<String, List<Number>> series = new LinkedHashMap<>();
+        series.put("Valor", labels.stream().map(l -> (Number) porCategoria.get(l).doubleValue()).toList());
+
+        List<Object> totais = List.of("TOTAL ATIVO", totalAtivas.doubleValue(), "", "", "", "");
+
+        return new RelatorioResponseDto(new GraficoDto(labels, series), cabecalho, linhas, totais);
+    }
+
     // ── Cartões de Crédito ───────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -469,7 +510,7 @@ public class RelatorioService {
             int row = 0;
             Row titleRow = sheet.createRow(row++);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue(titulo + " — " + inicio + " a " + fim);
+            titleCell.setCellValue(inicio != null ? titulo + " — " + inicio + " a " + fim : titulo);
             titleCell.setCellStyle(titleStyle);
             row++;
 
