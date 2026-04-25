@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: core4erp
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d core4erp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./core4erp
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/core4erp
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SECRET_KEY: ${SECRET_KEY}
+      TOKEN_EXPIRATION: ${TOKEN_EXPIRATION:-604800000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health 2>/dev/null || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  frontend:
+    build: ./front-end
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
