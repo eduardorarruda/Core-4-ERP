@@ -1,5 +1,7 @@
 package br.com.core4erp.chat.tools.consulta;
 
+import br.com.core4erp.assinatura.dto.AssinaturaResponseDto;
+import br.com.core4erp.assinatura.service.AssinaturaService;
 import br.com.core4erp.cartaoCredito.dto.CartaoCreditoResponseDto;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
 import br.com.core4erp.categoria.dto.CategoriaResponseDto;
@@ -28,19 +30,22 @@ public class ConsultaTools {
     private final CartaoCreditoService cartaoCreditoService;
     private final InvestimentoService investimentoService;
     private final NotificacaoService notificacaoService;
+    private final AssinaturaService assinaturaService;
 
     public ConsultaTools(DashboardService dashboardService,
                          ContaCorrenteService contaCorrenteService,
                          CategoriaService categoriaService,
                          CartaoCreditoService cartaoCreditoService,
                          InvestimentoService investimentoService,
-                         NotificacaoService notificacaoService) {
+                         NotificacaoService notificacaoService,
+                         AssinaturaService assinaturaService) {
         this.dashboardService = dashboardService;
         this.contaCorrenteService = contaCorrenteService;
         this.categoriaService = categoriaService;
         this.cartaoCreditoService = cartaoCreditoService;
         this.investimentoService = investimentoService;
         this.notificacaoService = notificacaoService;
+        this.assinaturaService = assinaturaService;
     }
 
     @Tool(description = """
@@ -101,5 +106,14 @@ public class ConsultaTools {
             """)
     public List<NotificacaoResponseDto> consultarNotificacoes() {
         return notificacaoService.listarNaoLidas();
+    }
+
+    @Tool(description = """
+            Lista as assinaturas e recorrências do usuário com valor mensal e dia de vencimento.
+            Use para: "Quais minhas assinaturas?", "Quanto gasto em assinaturas?",
+            "Tenho alguma assinatura vencendo no dia X?".
+            """)
+    public List<AssinaturaResponseDto> consultarAssinaturas() {
+        return assinaturaService.listar();
     }
 }

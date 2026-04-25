@@ -1,5 +1,6 @@
 package br.com.core4erp.dashboard.service;
 
+import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
@@ -39,6 +40,7 @@ public class DashboardService {
     private final ContaBaixadaRepository baixadaRepo;
     private final TransacaoInvestimentoRepository transacaoInvRepo;
     private final FaturaCartaoRepository faturaCartaoRepo;
+    private final AssinaturaRepository assinaturaRepo;
 
     public DashboardService(SecurityContextUtils securityCtx,
                             ContaCorrenteRepository contaCorrenteRepo,
@@ -48,7 +50,8 @@ public class DashboardService {
                             LancamentoCartaoRepository lancamentoRepo,
                             ContaBaixadaRepository baixadaRepo,
                             TransacaoInvestimentoRepository transacaoInvRepo,
-                            FaturaCartaoRepository faturaCartaoRepo) {
+                            FaturaCartaoRepository faturaCartaoRepo,
+                            AssinaturaRepository assinaturaRepo) {
         this.securityCtx = securityCtx;
         this.contaCorrenteRepo = contaCorrenteRepo;
         this.contaRepo = contaRepo;
@@ -58,6 +61,7 @@ public class DashboardService {
         this.baixadaRepo = baixadaRepo;
         this.transacaoInvRepo = transacaoInvRepo;
         this.faturaCartaoRepo = faturaCartaoRepo;
+        this.assinaturaRepo = assinaturaRepo;
     }
 
     /**
@@ -119,11 +123,14 @@ public class DashboardService {
         Long vencendoHoje = contaRepo.countByStatusAndData(uid, pendentes, hoje);
         Long atrasadas = contaRepo.countByStatusAndDataBefore(uid, pendentes, hoje);
 
+        BigDecimal totalMensalAssinaturas = assinaturaRepo.sumValorAtivasByUsuarioId(uid);
+
         return new DashboardResponseDto(
                 saldoCC, totalAPagar, totalAReceber, patrimonio,
                 limiteTotal, limiteUsado,
                 fluxoMensal, despesas,
-                vencendoHoje, atrasadas);
+                vencendoHoje, atrasadas,
+                totalMensalAssinaturas);
     }
 
     @Transactional(readOnly = true)

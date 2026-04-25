@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Wallet, BarChart3, Gavel,
+  LayoutDashboard, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
-  LogOut, Tag
+  LogOut, Tag, Repeat, CalendarDays
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,8 +16,9 @@ const NAV = [
   { id: 'contas',           icon: FileText,        label: 'Lançamentos',      path: '/contas' },
   { id: 'cartoes',          icon: CreditCard,      label: 'Cartões',          path: '/cartoes' },
   { id: 'investimentos',    icon: TrendingUp,      label: 'Investimentos',    path: '/investimentos' },
+  { id: 'assinaturas',      icon: Repeat,          label: 'Assinaturas',      path: '/assinaturas' },
   { id: 'notificacoes',     icon: Bell,            label: 'Notificações',     path: '/notificacoes' },
-  { id: 'reconciliation',   icon: Wallet,          label: 'Conciliação',      path: '/reconciliation' },
+  { id: 'calendario',       icon: CalendarDays,    label: 'Calendário',       path: '/calendario' },
   { id: 'reports',          icon: BarChart3,       label: 'Relatórios',       path: '/reports' },
   { id: 'audit',            icon: Gavel,           label: 'Auditoria',        path: '/audit' },
 ];
