@@ -68,4 +68,16 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                                 @Param("anoInicio") Integer anoInicio,
                                                 @Param("mesFim") Integer mesFim,
                                                 @Param("anoFim") Integer anoFim);
+
+    @Query("""
+        SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l
+        WHERE l.usuario.id = :uid
+        AND NOT EXISTS (
+            SELECT 1 FROM FaturaCartao f
+            WHERE f.cartaoCredito.id = l.cartaoCredito.id
+            AND f.mes = l.mesFatura AND f.ano = l.anoFatura
+            AND f.status = 'FECHADA' AND f.usuario.id = :uid
+        )
+    """)
+    BigDecimal sumLancamentosEmFaturasAbertasByUsuario(@Param("uid") Long uid);
 }

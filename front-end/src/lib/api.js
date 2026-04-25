@@ -138,6 +138,7 @@ export const investimentos = {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboard = {
   resumo: () => request('/api/dashboard'),
+  saldoDetalhado: () => request('/api/dashboard/saldo-detalhado'),
 };
 
 // ── Chat IA ───────────────────────────────────────────────────────────────────
@@ -173,6 +174,7 @@ async function downloadRelatorio(path) {
 
 export const relatorios = {
   // ── Downloads Excel (.xlsx) ───────────────────────────────────────────────
+  posicaoFinanceira: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/posicao-financeira?${relatorioQs(inicio, fim, p)}`),
   fluxoCaixa:    (inicio, fim, p) => downloadRelatorio(`/api/relatorios/fluxo-caixa?${relatorioQs(inicio, fim, p)}`),
   contasAbertas: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/contas-abertas?${relatorioQs(inicio, fim, p)}`),
   extrato:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/extrato?${relatorioQs(inicio, fim, p)}`),
@@ -182,6 +184,7 @@ export const relatorios = {
 
   // ── Dados JSON (visualização online e PDF) ────────────────────────────────
   dados: {
+    posicaoFinanceira: (inicio, fim, p) => request(`/api/relatorios/posicao-financeira/dados?${relatorioQs(inicio, fim, p)}`),
     fluxoCaixa:    (inicio, fim, p) => request(`/api/relatorios/fluxo-caixa/dados?${relatorioQs(inicio, fim, p)}`),
     contasAbertas: (inicio, fim, p) => request(`/api/relatorios/contas-abertas/dados?${relatorioQs(inicio, fim, p)}`),
     extrato:       (inicio, fim, p) => request(`/api/relatorios/extrato/dados?${relatorioQs(inicio, fim, p)}`),

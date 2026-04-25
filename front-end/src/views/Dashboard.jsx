@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
-import { TrendingUp, Wallet, Receipt, AlertTriangle, Target, Bolt, CreditCard } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon } from 'lucide-react';
 import BentoCard from '../components/ui/BentoCard';
-import { dashboard } from '../lib/api';
+import SaldoDetalhadoPanel from '../components/dashboard/SaldoDetalhadoPanel';
+import { dashboard, investimentos } from '../lib/api';
 import { cn } from '../lib/utils';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -16,12 +17,16 @@ const brl = (v) => Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigit
 export default function Dashboard() {
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [carteira, setCarteira] = useState([]);
 
   useEffect(() => {
     dashboard.resumo()
       .then(setDados)
       .catch(() => {})
       .finally(() => setCarregando(false));
+    investimentos.listar()
+      .then(setCarteira)
+      .catch(() => {});
   }, []);
 
   const fluxoMensal = dados?.fluxoMensal ?? [];
@@ -48,12 +53,17 @@ export default function Dashboard() {
   const totalDespesasCat = despesas.reduce((acc, d) => acc + Number(d.total), 0);
 
   const saldo = Number(dados?.saldoTotalContasCorrentes ?? 0);
-  const aReceber = Number(dados?.totalAReceber ?? 0);
-  const aPagar = Number(dados?.totalAPagar ?? 0);
-  const patrimonio = Number(dados?.patrimonioInvestimentos ?? 0);
-  const limiteDisp = Number(dados?.limiteTotalCartoes ?? 0) - Number(dados?.limiteUsadoTotalCartoes ?? 0);
   const vencendoHoje = dados?.contasVencendoHoje ?? 0;
   const atrasadas = dados?.contasAtrasadas ?? 0;
+
+  const totalEntradas6m = cashFlowData.reduce((s, m) => s + m.entradas, 0);
+  const totalSaidas6m   = cashFlowData.reduce((s, m) => s + m.saidas, 0);
+  const resultado6m     = totalEntradas6m - totalSaidas6m;
+
+  const patrimonioTotal = carteira.reduce((s, c) => s + Number(c.saldoAtual ?? 0), 0);
+
+  const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
+  const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-zinc-400' };
 
   if (carregando) {
     return (
@@ -101,7 +111,7 @@ export default function Dashboard() {
           }
         >
           <div className="w-full mt-4">
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={cashFlowData}>
                 <defs>
                   <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
@@ -124,27 +134,44 @@ export default function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </BentoCard>
 
-        {/* Saldos */}
-        <BentoCard className="col-span-12 lg:col-span-4" title="Saldos de Caixa">
-          <div className="space-y-3 mt-4">
-            {[
-              { label: 'Contas Correntes', value: saldo, icon: Wallet, color: saldo >= 0 ? 'primary' : 'error' },
-              { label: 'A Receber', value: aReceber, icon: TrendingUp, color: 'secondary' },
-              { label: 'A Pagar', value: aPagar, icon: Receipt, color: 'error' },
-              { label: 'Investimentos', value: patrimonio, icon: TrendingUp, color: 'primary' },
-              { label: 'Limite Disponível (Cartões)', value: limiteDisp, icon: CreditCard, color: limiteDisp >= 0 ? 'primary' : 'error' },
-            ].map((item, i) => (
-              <div key={i} className={`p-3 bg-surface-low rounded-lg flex justify-between items-center ${item.color === 'error' ? 'border-l-4 border-error/50' : item.color === 'secondary' ? 'border-l-4 border-secondary/50' : ''}`}>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">{item.label}</p>
-                <p className={`text-sm font-bold ${item.color === 'error' ? 'text-error' : item.color === 'secondary' ? 'text-secondary' : 'text-primary'}`}>
-                  R$ {brl(item.value)}
-                </p>
+          {/* Resumo dos 6 meses */}
+          <div className="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-white/5">
+            <div className="bg-surface-low rounded-xl p-4 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Entradas</span>
               </div>
-            ))}
+              <p className="text-base font-bold text-primary">R$ {brl(totalEntradas6m)}</p>
+              <p className="text-[10px] text-zinc-600">acumulado 6 meses</p>
+            </div>
+            <div className="bg-surface-low rounded-xl p-4 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <TrendingDown className="w-3.5 h-3.5 text-error" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Saídas</span>
+              </div>
+              <p className="text-base font-bold text-error">R$ {brl(totalSaidas6m)}</p>
+              <p className="text-[10px] text-zinc-600">acumulado 6 meses</p>
+            </div>
+            <div className={cn('bg-surface-low rounded-xl p-4 space-y-1', resultado6m < 0 && 'border border-error/20')}>
+              <div className="flex items-center gap-1.5">
+                {resultado6m >= 0
+                  ? <TrendingUp className="w-3.5 h-3.5 text-secondary" />
+                  : <TrendingDown className="w-3.5 h-3.5 text-error" />}
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Resultado</span>
+              </div>
+              <p className={cn('text-base font-bold', resultado6m >= 0 ? 'text-secondary' : 'text-error')}>
+                {resultado6m >= 0 ? '+' : ''}R$ {brl(resultado6m)}
+              </p>
+              <p className="text-[10px] text-zinc-600">saldo do período</p>
+            </div>
           </div>
         </BentoCard>
+
+        {/* Posição Financeira */}
+        <div className="col-span-12 lg:col-span-4">
+          <SaldoDetalhadoPanel />
+        </div>
 
         {/* Resultados de Caixa */}
         <BentoCard className="col-span-12 lg:col-span-6" title="Resultados de Caixa">
@@ -244,17 +271,59 @@ export default function Dashboard() {
           </div>
         </BentoCard>
 
-        {/* Metas */}
-        <BentoCard className="col-span-12 lg:col-span-4 flex flex-col justify-between group overflow-hidden relative" title="Metas e Performance">
-          <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
-          <div className="py-8 text-center space-y-3">
-            <Target className="w-12 h-12 text-zinc-700 mx-auto" />
-            <p className="text-sm text-zinc-400 font-medium">Recurso não configurado</p>
+        {/* Carteira de Investimentos */}
+        <BentoCard className="col-span-12 lg:col-span-4" title="Carteira de Investimentos"
+          headerAction={
+            <Link to="/investimentos" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-primary transition-colors">
+              Ver tudo →
+            </Link>
+          }
+        >
+          {/* Patrimônio total */}
+          <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-0.5">Patrimônio Total</p>
+              <p className="text-2xl font-bold text-white">R$ {brl(patrimonioTotal)}</p>
+            </div>
+            <PieIcon className="w-8 h-8 text-primary opacity-40" />
           </div>
-          <button className="w-full bg-primary text-on-primary py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all flex items-center justify-center gap-2">
-            <Bolt className="w-4 h-4" />
-            Configurar Metas
-          </button>
+
+          {/* Lista de contas */}
+          {carteira.length === 0 ? (
+            <div className="py-6 text-center">
+              <p className="text-sm text-zinc-500">Nenhuma carteira cadastrada</p>
+              <Link to="/investimentos" className="text-xs text-primary hover:underline mt-1 block">
+                Cadastrar investimento
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {carteira.map((c) => {
+                const pct = patrimonioTotal > 0 ? (Number(c.saldoAtual) / patrimonioTotal) * 100 : 0;
+                const color = TIPO_COLOR[c.tipo] ?? 'text-zinc-400';
+                return (
+                  <div key={c.id} className="bg-surface-low rounded-lg px-3 py-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn('text-[9px] font-bold uppercase tracking-widest shrink-0', color)}>
+                          {TIPO_LABEL[c.tipo] ?? c.tipo}
+                        </span>
+                        <span className="text-xs text-zinc-300 truncate font-medium">{c.nome}</span>
+                      </div>
+                      <span className="text-xs font-bold text-white shrink-0 ml-2">R$ {brl(c.saldoAtual)}</span>
+                    </div>
+                    <div className="h-1 w-full bg-surface-medium rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary/60 rounded-full transition-all duration-700"
+                        style={{ width: `${pct.toFixed(1)}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-zinc-600 text-right">{pct.toFixed(1)}% do total</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </BentoCard>
 
         {/* Acesso Rápido */}

@@ -180,6 +180,26 @@ public class RelatorioController {
         return xlsxResponse(resource, "cartoes", inicio, fim);
     }
 
+    // ── Posição Financeira ───────────────────────────────────────────────────
+
+    @Operation(summary = "Dados JSON da Posição Financeira Completa")
+    @GetMapping("/posicao-financeira/dados")
+    public ResponseEntity<RelatorioResponseDto> posicaoFinanceiraDados(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
+        return ResponseEntity.ok(relatorioService.getDadosPosicaoFinanceira(inicio, fim));
+    }
+
+    @Operation(summary = "Download XLSX da Posição Financeira Completa")
+    @GetMapping("/posicao-financeira")
+    public ResponseEntity<Resource> posicaoFinanceiraExcel(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
+        RelatorioResponseDto dados = relatorioService.getDadosPosicaoFinanceira(inicio, fim);
+        Resource resource = relatorioService.gerarExcel(dados, "Posição Financeira Completa", inicio, fim);
+        return xlsxResponse(resource, "posicao-financeira", inicio, fim);
+    }
+
     // ── Helper ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<Resource> xlsxResponse(Resource resource, String nome, LocalDate inicio, LocalDate fim) {

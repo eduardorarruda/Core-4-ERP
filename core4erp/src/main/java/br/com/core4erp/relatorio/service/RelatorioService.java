@@ -316,6 +316,86 @@ public class RelatorioService {
         return new RelatorioResponseDto(new GraficoDto(labels, series), cabecalho, linhas, totais);
     }
 
+    // ── Posição Financeira ───────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public RelatorioResponseDto getDadosPosicaoFinanceira(LocalDate inicio, LocalDate fim) {
+        Long uid = securityCtx.getUsuarioId();
+
+        List<ContaBaixada> baixadas = baixadaRepo
+                .findByUsuarioIdAndDataPagamentoBetweenOrderByDataPagamento(uid, inicio, fim);
+        List<TransacaoInvestimento> transacoes = transacaoRepo
+                .findByUsuarioIdAndDataTransacaoBetweenOrderByDataTransacao(uid, inicio, fim);
+
+        BigDecimal totalPago = baixadas.stream()
+                .filter(b -> b.getConta().getTipo() == TipoConta.PAGAR)
+                .map(ContaBaixada::getValorFinal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalRecebido = baixadas.stream()
+                .filter(b -> b.getConta().getTipo() == TipoConta.RECEBER)
+                .map(ContaBaixada::getValorFinal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalAportado = transacoes.stream()
+                .filter(t -> t.getTipoTransacao() == TipoTransacaoInvestimento.APORTE)
+                .map(TransacaoInvestimento::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalResgatado = transacoes.stream()
+                .filter(t -> t.getTipoTransacao() == TipoTransacaoInvestimento.RESGATE)
+                .map(TransacaoInvestimento::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalRendimento = transacoes.stream()
+                .filter(t -> t.getTipoTransacao() == TipoTransacaoInvestimento.RENDIMENTO)
+                .map(TransacaoInvestimento::getValor).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal entradasTotal = totalRecebido.add(totalResgatado);
+        BigDecimal saidasTotal   = totalPago.add(totalAportado);
+        BigDecimal saldoLiquido  = entradasTotal.subtract(saidasTotal);
+
+        List<YearMonth> meses = mesesEntreDatas(inicio, fim);
+        List<String> labels = meses.stream().map(m -> m.format(LABEL_FMT)).toList();
+
+        Map<YearMonth, BigDecimal> mapPago     = zeroMap(meses);
+        Map<YearMonth, BigDecimal> mapRecebido = zeroMap(meses);
+        Map<YearMonth, BigDecimal> mapAporte   = zeroMap(meses);
+        Map<YearMonth, BigDecimal> mapResgate  = zeroMap(meses);
+
+        baixadas.forEach(b -> {
+            YearMonth ym = YearMonth.from(b.getDataPagamento());
+            if (!mapPago.containsKey(ym)) return;
+            if (b.getConta().getTipo() == TipoConta.PAGAR)
+                mapPago.merge(ym, b.getValorFinal(), BigDecimal::add);
+            else
+                mapRecebido.merge(ym, b.getValorFinal(), BigDecimal::add);
+        });
+
+        transacoes.forEach(t -> {
+            YearMonth ym = YearMonth.from(t.getDataTransacao());
+            if (!mapAporte.containsKey(ym)) return;
+            if (t.getTipoTransacao() == TipoTransacaoInvestimento.APORTE)
+                mapAporte.merge(ym, t.getValor(), BigDecimal::add);
+            else if (t.getTipoTransacao() == TipoTransacaoInvestimento.RESGATE)
+                mapResgate.merge(ym, t.getValor(), BigDecimal::add);
+        });
+
+        Map<String, List<Number>> series = new LinkedHashMap<>();
+        series.put("Recebido", toNumberList(meses, mapRecebido));
+        series.put("Pago",     toNumberList(meses, mapPago));
+        series.put("Aporte",   toNumberList(meses, mapAporte));
+        series.put("Resgate",  toNumberList(meses, mapResgate));
+
+        List<String> cabecalho = List.of("Componente", "Valor (R$)", "Tipo", "Observação");
+        List<List<Object>> linhas = new ArrayList<>();
+        linhas.add(List.of("Contas Recebidas",    totalRecebido.doubleValue(),  "Entrada", "Contas status=RECEBIDO no período"));
+        linhas.add(List.of("Resgates de Invest.", totalResgatado.doubleValue(), "Entrada", "Resgates de investimento no período"));
+        linhas.add(List.of("Rendimentos",         totalRendimento.doubleValue(),"Neutro",  "Rendimentos creditados no período"));
+        linhas.add(List.of("Contas Pagas",        totalPago.doubleValue(),      "Saída",   "Contas status=PAGO no período"));
+        linhas.add(List.of("Aportes em Invest.",  totalAportado.doubleValue(),  "Saída",   "Aportes enviados a investimentos"));
+
+        List<Object> totais = List.of(
+                "Saldo Líquido do Período",
+                saldoLiquido.doubleValue(),
+                saldoLiquido.compareTo(BigDecimal.ZERO) >= 0 ? "Positivo" : "Negativo",
+                String.format("Entradas R$ %.2f | Saídas R$ %.2f", entradasTotal.doubleValue(), saidasTotal.doubleValue()));
+
+        return new RelatorioResponseDto(new GraficoDto(labels, series), cabecalho, linhas, totais);
+    }
+
     // ── Cartões de Crédito ───────────────────────────────────────────────────
 
     @Transactional(readOnly = true)

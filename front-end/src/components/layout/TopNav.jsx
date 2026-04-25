@@ -45,23 +45,6 @@ export default function TopNav({ onMenuClick, onSearch }) {
   return (
     <header className="sticky top-0 w-full z-40 bg-surface/80 backdrop-blur-xl flex justify-between items-center h-16 px-4 lg:px-8 shadow-[0px_20px_40px_rgba(0,0,0,0.4)]">
       <div className="flex items-center gap-4 lg:gap-8 flex-1">
-        <button
-          onClick={onMenuClick}
-          className="lg:hidden p-2 text-zinc-400 hover:text-primary transition-colors"
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-        <span className="text-white font-bold text-sm lg:text-lg uppercase tracking-widest whitespace-nowrap hidden sm:block">Financial Architect</span>
-        <div className="relative w-full max-w-[200px] lg:max-w-md group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-primary transition-colors" />
-          <input
-            className="w-full bg-surface-low border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-zinc-600 outline-none"
-            placeholder="Search..."
-            type="text"
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
-        </div>
       </div>
 
       <div className="flex items-center gap-2 lg:gap-6 text-primary">
