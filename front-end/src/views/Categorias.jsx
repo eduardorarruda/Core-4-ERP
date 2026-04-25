@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Tag, Plus, Pencil, Trash2,
+  Tag, Plus, Pencil, Trash2, Loader2,
   ShoppingCart, Home, Car, Utensils, Heart, Zap, Wifi,
   GraduationCap, Plane, Music, Gift, Coffee, Dumbbell, Shirt,
   Briefcase, TrendingUp, DollarSign, Landmark, CreditCard, Wallet,
 } from 'lucide-react';
 import { categorias as api } from '../lib/api';
-import Toast from '../components/ui/Toast';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls, labelCls } from '../components/ui/FormField';
+import PageHeader from '../components/ui/PageHeader';
+import EmptyState from '../components/ui/EmptyState';
+import { useToast } from '../hooks/useToast';
+import { cn } from '../lib/utils';
 
 const ICONES = [
   { nome: 'ShoppingCart', componente: ShoppingCart },
@@ -34,7 +37,7 @@ const ICONES = [
 ];
 
 export function IconeCategoria({ nome, className = 'w-5 h-5' }) {
-  const entry = ICONES.find(i => i.nome === nome);
+  const entry = ICONES.find((i) => i.nome === nome);
   if (!entry) return <Tag className={className} />;
   const Icone = entry.componente;
   return <Icone className={className} />;
@@ -43,18 +46,18 @@ export function IconeCategoria({ nome, className = 'w-5 h-5' }) {
 const empty = { descricao: '', icone: '' };
 
 export default function Categorias() {
+  const toast = useToast();
   const [lista, setLista] = useState([]);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [salvando, setSalvando] = useState(false);
-  const [toast, setToast] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
     try { setLista(await api.listar()); }
-    catch (e) { setToast({ message: e.message, type: 'error' }); }
+    catch (e) { toast.error(e.message); }
   }
 
   async function salvar(e) {
@@ -63,11 +66,12 @@ export default function Categorias() {
     try {
       if (editId) await api.atualizar(editId, form);
       else await api.criar(form);
-      setForm(empty); setEditId(null);
-      setToast({ message: editId ? 'Categoria atualizada!' : 'Categoria criada!', type: 'success' });
+      setForm(empty);
+      setEditId(null);
+      toast.success(editId ? 'Categoria atualizada!' : 'Categoria criada!');
       await carregar();
     } catch (err) {
-      setToast({ message: err.message, type: 'error' });
+      toast.error(err.message);
     } finally {
       setSalvando(false);
     }
@@ -80,27 +84,47 @@ export default function Categorias() {
       confirmLabel: 'Excluir',
       onConfirm: async () => {
         setConfirmAction(null);
-        try { await api.deletar(id); await carregar(); setToast({ message: 'Categoria excluída!', type: 'success' }); }
-        catch (e) { setToast({ message: e.message, type: 'error' }); }
+        try {
+          await api.deletar(id);
+          await carregar();
+          toast.success('Categoria excluída!');
+        } catch (e) {
+          toast.error(e.message);
+        }
       },
     });
   }
 
   function editar(c) { setForm({ descricao: c.descricao, icone: c.icone || '' }); setEditId(c.id); }
 
+  const PreviewIcon = ICONES.find((i) => i.nome === form.icone)?.componente ?? null;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Tag className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold text-text-primary">Categorias</h1>
-      </div>
+      <PageHeader title="Categorias" subtitle="Organização dos seus lançamentos" />
 
-      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">{editId ? 'Editar' : 'Nova'} Categoria</h2>
+      <form onSubmit={salvar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-5 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
+            {editId ? 'Editar' : 'Nova'} Categoria
+          </h2>
+          {PreviewIcon && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg border border-primary/20">
+              <PreviewIcon className="w-4 h-4 text-primary" />
+              <span className="text-xs text-primary font-bold">{form.descricao || 'Preview'}</span>
+            </div>
+          )}
+        </div>
 
         <div className="space-y-1 max-w-sm">
           <label className={labelCls}>Descrição *</label>
-          <input className={inputCls} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} required placeholder="Ex: Alimentação" />
+          <input
+            className={inputCls}
+            value={form.descricao}
+            onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
+            required
+            placeholder="Ex: Alimentação"
+          />
         </div>
 
         <div className="space-y-3">
@@ -110,53 +134,82 @@ export default function Categorias() {
               <button
                 key={nome}
                 type="button"
-                onClick={() => setForm(f => ({ ...f, icone: nome }))}
+                onClick={() => setForm((f) => ({ ...f, icone: nome }))}
                 title={nome}
-                className={`p-3 rounded-xl border transition-all ${
+                aria-label={nome}
+                className={cn(
+                  'p-3 rounded-xl border transition-all hover:scale-105',
                   form.icone === nome
                     ? 'bg-primary/20 border-primary text-primary'
                     : 'bg-surface border-text-primary/5 text-text-primary/50 hover:border-text-primary/20 hover:text-text-primary/80'
-                }`}
+                )}
               >
                 <Icone className="w-5 h-5 mx-auto" />
               </button>
             ))}
           </div>
-          {form.icone && (
-            <p className="text-xs text-text-primary/50">Selecionado: <span className="text-primary font-medium">{form.icone}</span></p>
-          )}
         </div>
 
         <div className="flex gap-3">
-          <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-            <Plus className="w-4 h-4" />{salvando ? 'GRAVANDO...' : editId ? 'Salvar' : 'Criar'}
+          <button
+            type="submit"
+            disabled={salvando}
+            className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+          >
+            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {salvando ? 'Gravando...' : editId ? 'Salvar' : 'Criar'}
           </button>
-          {editId && <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary">Cancelar</button>}
+          {editId && (
+            <button
+              type="button"
+              onClick={() => { setForm(empty); setEditId(null); }}
+              className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors"
+            >
+              Cancelar
+            </button>
+          )}
         </div>
       </form>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {lista.map(c => {
-          const entry = ICONES.find(i => i.nome === c.icone);
-          const Icone = entry ? entry.componente : Tag;
-          return (
-            <div key={c.id} className="bg-surface-low rounded-2xl p-4 border border-text-primary/5 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Icone className="w-5 h-5 text-primary" />
+      {lista.length === 0 ? (
+        <EmptyState icon={Tag} title="Nenhuma categoria" description="Crie categorias para organizar seus lançamentos financeiros." />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {lista.map((c) => {
+            const entry = ICONES.find((i) => i.nome === c.icone);
+            const Icone = entry ? entry.componente : Tag;
+            return (
+              <div
+                key={c.id}
+                className="bg-surface-medium border border-text-primary/5 rounded-2xl p-4 flex items-center gap-3 hover:border-text-primary/10 hover:scale-[1.02] transition-all cursor-default"
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center shrink-0">
+                  <Icone className="w-5 h-5 text-primary" />
+                </div>
+                <span className="font-medium text-text-primary flex-1 text-sm truncate">{c.descricao}</span>
+                <div className="flex gap-1 shrink-0">
+                  <button
+                    onClick={() => editar(c)}
+                    aria-label={`Editar categoria ${c.descricao}`}
+                    className="text-text-primary/40 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => deletar(c.id)}
+                    aria-label={`Excluir categoria ${c.descricao}`}
+                    className="text-text-primary/40 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-              <span className="font-medium text-text-primary flex-1 text-sm">{c.descricao}</span>
-              <div className="flex gap-1">
-                <button onClick={() => editar(c)} className="text-text-primary/50 hover:text-primary p-1"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => deletar(c.id)} className="text-text-primary/50 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            </div>
-          );
-        })}
-        {lista.length === 0 && <p className="text-text-primary/50 col-span-4 text-center py-8">Nenhuma categoria cadastrada</p>}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
-      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
