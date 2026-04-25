@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,12 +9,15 @@ import BentoCard from '../components/ui/BentoCard';
 import SaldoDetalhadoPanel from '../components/dashboard/SaldoDetalhadoPanel';
 import { dashboard, investimentos } from '../lib/api';
 import { cn } from '../lib/utils';
+import { ThemeContext } from '../context/ThemeContext';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const COLORS = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD8A8', '#D8A8FF', '#A8FFD8'];
+const COLORS_DARK = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD8A8', '#D8A8FF', '#A8FFD8'];
+const COLORS_LIGHT = ['#059669', '#2563EB', '#DC2626', '#D97706', '#7C3AED', '#0891B2'];
 const brl = (v) => Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
 export default function Dashboard() {
+  const { theme } = useContext(ThemeContext);
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [carteira, setCarteira] = useState([]);
@@ -28,6 +31,20 @@ export default function Dashboard() {
       .then(setCarteira)
       .catch(() => {});
   }, []);
+
+  const isDark = theme === 'dark';
+  const COLORS = isDark ? COLORS_DARK : COLORS_LIGHT;
+  const gridColor = isDark ? '#353534' : '#E4E4E7';
+  const axisColor = isDark ? '#52525b' : '#71717a';
+  const tooltipBg = isDark ? '#1C1B1B' : '#FFFFFF';
+  const tooltipTextColor = isDark ? '#FAFAFA' : '#18181B';
+  const emptyPieColor = isDark ? '#353534' : '#D4D4D8';
+
+  // Cores das linhas/áreas e barras — pastéis no dark, saturadas no light
+  const colorEntradas = isDark ? '#6EFFC0' : '#059669';
+  const colorSaidas   = isDark ? '#FFB4AB' : '#DC2626';
+  const colorIncome   = isDark ? '#ACC7FF' : '#2563EB';
+  const colorExpense  = isDark ? '#FFB4AB' : '#DC2626';
 
   const fluxoMensal = dados?.fluxoMensal ?? [];
   const cashFlowData = fluxoMensal.map((m) => ({
@@ -45,7 +62,7 @@ export default function Dashboard() {
   const despesas = dados?.despesasPorCategoria ?? [];
   const pieData = despesas.length > 0
     ? despesas.map((d, i) => ({ name: d.categoria, value: Number(d.total), color: COLORS[i % COLORS.length] }))
-    : [{ name: 'Sem Despesas', value: 1, color: '#353534' }];
+    : [{ name: 'Sem Despesas', value: 1, color: emptyPieColor }];
 
   const mesAtual = fluxoMensal[fluxoMensal.length - 1];
   const receitasMes = Number(mesAtual?.totalRecebido ?? 0);
@@ -63,12 +80,14 @@ export default function Dashboard() {
   const patrimonioTotal = carteira.reduce((s, c) => s + Number(c.saldoAtual ?? 0), 0);
 
   const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
-  const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-zinc-400' };
+  const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
+
+  const tooltipStyle = { backgroundColor: tooltipBg, border: 'none', borderRadius: '8px', fontSize: '12px', color: tooltipTextColor };
 
   if (carregando) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-zinc-500 text-sm animate-pulse">Carregando dashboard...</div>
+        <div className="text-text-primary/50 text-sm animate-pulse">Carregando dashboard...</div>
       </div>
     );
   }
@@ -76,8 +95,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">Dashboard Principal</h1>
-        <p className="text-zinc-500 text-xs sm:text-sm">Visão Geral do seu ecossistema financeiro</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary">Dashboard Principal</h1>
+        <p className="text-text-primary/50 text-xs sm:text-sm">Visão Geral do seu ecossistema financeiro</p>
       </div>
 
       {/* Alertas */}
@@ -106,7 +125,7 @@ export default function Dashboard() {
           headerAction={
             <div className="flex gap-2">
               <span className="px-2 sm:px-3 py-1 bg-surface-low rounded-full text-[8px] sm:text-[10px] font-bold text-primary">ENTRADAS</span>
-              <span className="px-2 sm:px-3 py-1 bg-surface-low rounded-full text-[8px] sm:text-[10px] font-bold text-zinc-400">SAÍDAS</span>
+              <span className="px-2 sm:px-3 py-1 bg-surface-low rounded-full text-[8px] sm:text-[10px] font-bold text-text-primary/60">SAÍDAS</span>
             </div>
           }
         >
@@ -115,55 +134,52 @@ export default function Dashboard() {
               <AreaChart data={cashFlowData}>
                 <defs>
                   <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6EFFC0" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#6EFFC0" stopOpacity={0}/>
+                    <stop offset="5%" stopColor={colorEntradas} stopOpacity={isDark ? 0.3 : 0.2}/>
+                    <stop offset="95%" stopColor={colorEntradas} stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#FFB4AB" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#FFB4AB" stopOpacity={0}/>
+                    <stop offset="5%" stopColor={colorSaidas} stopOpacity={isDark ? 0.3 : 0.15}/>
+                    <stop offset="95%" stopColor={colorSaidas} stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#353534" vertical={false} />
-                <XAxis dataKey="name" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1C1B1B', border: 'none', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(value) => `R$ ${brl(value)}`}
-                />
-                <Area type="monotone" dataKey="entradas" stroke="#6EFFC0" fillOpacity={1} fill="url(#colorEntradas)" strokeWidth={2} />
-                <Area type="monotone" dataKey="saidas" stroke="#FFB4AB" fillOpacity={1} fill="url(#colorSaidas)" strokeWidth={2} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis dataKey="name" stroke={axisColor} fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(value) => `R$ ${brl(value)}`} />
+                <Area type="monotone" dataKey="entradas" stroke={colorEntradas} fillOpacity={1} fill="url(#colorEntradas)" strokeWidth={2} />
+                <Area type="monotone" dataKey="saidas" stroke={colorSaidas} fillOpacity={1} fill="url(#colorSaidas)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
 
           {/* Resumo dos 6 meses */}
-          <div className="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-white/5">
+          <div className="grid grid-cols-3 gap-3 mt-6 pt-5 border-t border-text-primary/5">
             <div className="bg-surface-low rounded-xl p-4 space-y-1">
               <div className="flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Entradas</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50">Entradas</span>
               </div>
               <p className="text-base font-bold text-primary">R$ {brl(totalEntradas6m)}</p>
-              <p className="text-[10px] text-zinc-600">acumulado 6 meses</p>
+              <p className="text-[10px] text-text-primary/40">acumulado 6 meses</p>
             </div>
             <div className="bg-surface-low rounded-xl p-4 space-y-1">
               <div className="flex items-center gap-1.5">
                 <TrendingDown className="w-3.5 h-3.5 text-error" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Saídas</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50">Saídas</span>
               </div>
               <p className="text-base font-bold text-error">R$ {brl(totalSaidas6m)}</p>
-              <p className="text-[10px] text-zinc-600">acumulado 6 meses</p>
+              <p className="text-[10px] text-text-primary/40">acumulado 6 meses</p>
             </div>
             <div className={cn('bg-surface-low rounded-xl p-4 space-y-1', resultado6m < 0 && 'border border-error/20')}>
               <div className="flex items-center gap-1.5">
                 {resultado6m >= 0
                   ? <TrendingUp className="w-3.5 h-3.5 text-secondary" />
                   : <TrendingDown className="w-3.5 h-3.5 text-error" />}
-                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Resultado</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50">Resultado</span>
               </div>
               <p className={cn('text-base font-bold', resultado6m >= 0 ? 'text-secondary' : 'text-error')}>
                 {resultado6m >= 0 ? '+' : ''}R$ {brl(resultado6m)}
               </p>
-              <p className="text-[10px] text-zinc-600">saldo do período</p>
+              <p className="text-[10px] text-text-primary/40">saldo do período</p>
             </div>
           </div>
         </BentoCard>
@@ -178,18 +194,15 @@ export default function Dashboard() {
           <div className="w-full mt-4">
             <ResponsiveContainer width="100%" height={256}>
               <BarChart data={resultsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#353534" vertical={false} />
-                <XAxis dataKey="name" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1C1B1B', border: 'none', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(value) => `R$ ${brl(value)}`}
-                />
-                <Bar dataKey="income" name="Receitas" fill="#ACC7FF" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="expense" name="Despesas" fill="#FFB4AB" radius={[2, 2, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis dataKey="name" stroke={axisColor} fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(value) => `R$ ${brl(value)}`} />
+                <Bar dataKey="income" name="Receitas" fill={colorIncome} radius={[2, 2, 0, 0]} />
+                <Bar dataKey="expense" name="Despesas" fill={colorExpense} radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex justify-center gap-8 mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+          <div className="flex justify-center gap-8 mt-4 text-[10px] font-bold uppercase tracking-widest text-text-primary/50">
             <div className="flex items-center gap-2"><span className="w-3 h-3 bg-secondary rounded-full"></span> Receitas</div>
             <div className="flex items-center gap-2"><span className="w-3 h-3 bg-error rounded-full"></span> Despesas</div>
           </div>
@@ -199,7 +212,7 @@ export default function Dashboard() {
         <BentoCard className="col-span-12 lg:col-span-6" title="Resultado do Mês Atual">
           <div className="space-y-8 mt-4">
             <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-text-primary/50">
                 <span>Receitas Recebidas</span>
                 <span className="text-secondary">R$ {brl(receitasMes)}</span>
               </div>
@@ -211,7 +224,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-text-primary/50">
                 <span>Despesas Pagas</span>
                 <span className="text-error">R$ {brl(despesasMes)}</span>
               </div>
@@ -222,8 +235,8 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-            <div className="pt-4 border-t border-white/5">
-              <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Saldo Total (Contas Correntes)</p>
+            <div className="pt-4 border-t border-text-primary/5">
+              <p className="text-[10px] text-text-primary/50 uppercase font-bold tracking-widest">Saldo Total (Contas Correntes)</p>
               <p className={cn('text-3xl font-bold', saldo >= 0 ? 'text-primary' : 'text-error')}>
                 R$ {brl(saldo)}
               </p>
@@ -250,22 +263,19 @@ export default function Dashboard() {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1C1B1B', border: 'none', borderRadius: '8px', fontSize: '12px' }}
-                  formatter={(value) => `R$ ${brl(value)}`}
-                />
+                <Tooltip contentStyle={tooltipStyle} formatter={(value) => `R$ ${brl(value)}`} />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <span className="text-xl font-bold text-primary">R$ {brl(totalDespesasCat)}</span>
-              <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-tighter">Mês Atual</span>
+              <span className="text-[10px] text-text-primary/50 uppercase font-bold tracking-tighter">Mês Atual</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 w-full mt-8">
             {pieData.map((entry, index) => (
               <div key={index} className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-                <span className="text-[10px] text-zinc-400 uppercase font-bold truncate">{entry.name}</span>
+                <span className="text-[10px] text-text-primary/60 uppercase font-bold truncate">{entry.name}</span>
               </div>
             ))}
           </div>
@@ -274,7 +284,7 @@ export default function Dashboard() {
         {/* Carteira de Investimentos */}
         <BentoCard className="col-span-12 lg:col-span-4" title="Carteira de Investimentos"
           headerAction={
-            <Link to="/investimentos" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-primary transition-colors">
+            <Link to="/investimentos" className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
               Ver tudo →
             </Link>
           }
@@ -283,7 +293,7 @@ export default function Dashboard() {
           <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-0.5">Patrimônio Total</p>
-              <p className="text-2xl font-bold text-white">R$ {brl(patrimonioTotal)}</p>
+              <p className="text-2xl font-bold text-text-primary">R$ {brl(patrimonioTotal)}</p>
             </div>
             <PieIcon className="w-8 h-8 text-primary opacity-40" />
           </div>
@@ -291,7 +301,7 @@ export default function Dashboard() {
           {/* Lista de contas */}
           {carteira.length === 0 ? (
             <div className="py-6 text-center">
-              <p className="text-sm text-zinc-500">Nenhuma carteira cadastrada</p>
+              <p className="text-sm text-text-primary/50">Nenhuma carteira cadastrada</p>
               <Link to="/investimentos" className="text-xs text-primary hover:underline mt-1 block">
                 Cadastrar investimento
               </Link>
@@ -300,7 +310,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               {carteira.map((c) => {
                 const pct = patrimonioTotal > 0 ? (Number(c.saldoAtual) / patrimonioTotal) * 100 : 0;
-                const color = TIPO_COLOR[c.tipo] ?? 'text-zinc-400';
+                const color = TIPO_COLOR[c.tipo] ?? 'text-text-primary/60';
                 return (
                   <div key={c.id} className="bg-surface-low rounded-lg px-3 py-2.5 space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -308,9 +318,9 @@ export default function Dashboard() {
                         <span className={cn('text-[9px] font-bold uppercase tracking-widest shrink-0', color)}>
                           {TIPO_LABEL[c.tipo] ?? c.tipo}
                         </span>
-                        <span className="text-xs text-zinc-300 truncate font-medium">{c.nome}</span>
+                        <span className="text-xs text-text-primary/80 truncate font-medium">{c.nome}</span>
                       </div>
-                      <span className="text-xs font-bold text-white shrink-0 ml-2">R$ {brl(c.saldoAtual)}</span>
+                      <span className="text-xs font-bold text-text-primary shrink-0 ml-2">R$ {brl(c.saldoAtual)}</span>
                     </div>
                     <div className="h-1 w-full bg-surface-medium rounded-full overflow-hidden">
                       <div
@@ -318,7 +328,7 @@ export default function Dashboard() {
                         style={{ width: `${pct.toFixed(1)}%` }}
                       />
                     </div>
-                    <p className="text-[10px] text-zinc-600 text-right">{pct.toFixed(1)}% do total</p>
+                    <p className="text-[10px] text-text-primary/40 text-right">{pct.toFixed(1)}% do total</p>
                   </div>
                 );
               })}
@@ -333,7 +343,7 @@ export default function Dashboard() {
               { label: 'Lançamentos', path: '/contas', color: 'text-secondary' },
               { label: 'Cartões', path: '/cartoes', color: 'text-primary' },
               { label: 'Investimentos', path: '/investimentos', color: 'text-primary' },
-              { label: 'Parceiros', path: '/parceiros', color: 'text-zinc-300' },
+              { label: 'Parceiros', path: '/parceiros', color: 'text-text-primary/80' },
             ].map((item) => (
               <Link
                 key={item.path}

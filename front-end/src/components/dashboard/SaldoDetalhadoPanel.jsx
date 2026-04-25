@@ -13,7 +13,7 @@ function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
   const colorMap = {
     entrada:  'text-secondary border-secondary/20 bg-secondary/5',
     saida:    'text-error border-error/20 bg-error/5',
-    neutro:   'text-zinc-300 border-white/5 bg-surface',
+    neutro:   'text-text-primary/80 border-text-primary/5 bg-surface',
     positivo: 'text-primary border-primary/20 bg-primary/5',
     negativo: 'text-error border-error/20 bg-error/5',
   };
@@ -36,8 +36,8 @@ function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
 function Divider({ label }) {
   return (
     <div className="flex items-center gap-3 mt-6 mb-4">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">{label}</span>
-      <div className="flex-1 h-px bg-white/5" />
+      <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40">{label}</span>
+      <div className="flex-1 h-px bg-text-primary/5" />
     </div>
   );
 }
@@ -64,7 +64,7 @@ export default function SaldoDetalhadoPanel() {
 
   if (carregando) {
     return (
-      <div className="bg-surface-medium rounded-2xl p-6 border border-white/5 animate-pulse">
+      <div className="bg-surface-medium rounded-2xl p-6 border border-text-primary/5 animate-pulse">
         <div className="h-4 bg-surface-highest rounded w-1/3 mb-6" />
         <div className="space-y-3">
           {[1, 2, 3, 4].map(i => <div key={i} className="h-16 bg-surface-highest rounded-xl" />)}
@@ -88,18 +88,18 @@ export default function SaldoDetalhadoPanel() {
   const saldoLiquidoPositivo    = Number(dados.saldoLiquidoEmAberto) >= 0;
 
   return (
-    <div className="bg-surface-medium rounded-2xl p-6 border border-white/5 space-y-2">
+    <div className="bg-surface-medium rounded-2xl p-6 border border-text-primary/5 space-y-2">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h2 className="text-lg font-bold text-white tracking-tight">Posição Financeira</h2>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">
+          <h2 className="text-lg font-bold text-text-primary tracking-tight">Posição Financeira</h2>
+          <p className="text-[10px] text-text-primary/50 uppercase tracking-widest mt-0.5">
             Visão detalhada do saldo e projeções
           </p>
         </div>
         <button
           onClick={carregar}
-          className="p-2 rounded-xl text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
+          className="p-2 rounded-xl text-text-primary/50 hover:text-text-primary hover:bg-surface-highest transition-colors"
           title="Atualizar"
         >
           <RefreshCw className="w-4 h-4" />
@@ -112,10 +112,10 @@ export default function SaldoDetalhadoPanel() {
           <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">
             Saldo em Conta Hoje
           </p>
-          <p className="text-3xl font-bold text-white">
+          <p className="text-3xl font-bold text-text-primary">
             R$ {brl(dados.saldoContasCorrentes)}
           </p>
-          <p className="text-[10px] text-zinc-500 mt-1">
+          <p className="text-[10px] text-text-primary/50 mt-1">
             Soma de todas as contas correntes
           </p>
         </div>
@@ -177,7 +177,7 @@ export default function SaldoDetalhadoPanel() {
         'rounded-xl px-4 py-3 border flex items-center justify-between',
         saldoLiquidoPositivo ? 'bg-secondary/5 border-secondary/20' : 'bg-error/5 border-error/20'
       )}>
-        <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+        <span className="text-xs font-bold text-text-primary/60 uppercase tracking-widest">
           Saldo líquido em aberto
         </span>
         <span className={cn('text-lg font-bold', saldoLiquidoPositivo ? 'text-secondary' : 'text-error')}>
@@ -212,14 +212,14 @@ export default function SaldoDetalhadoPanel() {
           saldoPrevistoPositivo ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20'
         )}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">
               Saldo Previsto
             </span>
             <span className={cn('text-xl font-bold', saldoPrevistoPositivo ? 'text-primary' : 'text-error')}>
               R$ {brl(dados.saldoPrevisto)}
             </span>
           </div>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-[10px] text-text-primary/40">
             = Saldo hoje (R$ {brl(dados.saldoContasCorrentes)})
             + A receber (R$ {brl(dados.totalAReceber)})
             − A pagar (R$ {brl(dados.totalAPagar)})
@@ -228,17 +228,17 @@ export default function SaldoDetalhadoPanel() {
 
         <div className={cn(
           'rounded-xl p-4 border',
-          saldoComCartaoPositivo ? 'bg-surface border-white/5' : 'bg-error/10 border-error/30'
+          saldoComCartaoPositivo ? 'bg-surface border-text-primary/5' : 'bg-error/10 border-error/30'
         )}>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">
               Saldo Previsto com Cartão
             </span>
-            <span className={cn('text-xl font-bold', saldoComCartaoPositivo ? 'text-white' : 'text-error')}>
+            <span className={cn('text-xl font-bold', saldoComCartaoPositivo ? 'text-text-primary' : 'text-error')}>
               R$ {brl(dados.saldoPrevistoComCartao)}
             </span>
           </div>
-          <p className="text-[10px] text-zinc-600">
+          <p className="text-[10px] text-text-primary/40">
             = Saldo previsto (R$ {brl(dados.saldoPrevisto)})
             − Cartão aberto (R$ {brl(dados.totalLancamentosCartaoAberto)})
           </p>
@@ -247,11 +247,11 @@ export default function SaldoDetalhadoPanel() {
 
       {/* Patrimônio */}
       <Divider label="Investimentos" />
-      <div className="bg-surface border border-white/5 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+      <div className="bg-surface border border-text-primary/5 rounded-xl px-4 py-3 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">
           Patrimônio em Investimentos
         </span>
-        <span className="text-lg font-bold text-white">
+        <span className="text-lg font-bold text-text-primary">
           R$ {brl(dados.patrimonioInvestimentos)}
         </span>
       </div>

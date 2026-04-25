@@ -25,22 +25,22 @@ function ChatContent({ onClose }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-text-primary/5">
         <div>
-          <h3 className="text-sm font-bold text-white">C4 Assistant</h3>
-          <p className="text-[10px] text-zinc-500">Assistente financeiro</p>
+          <h3 className="text-sm font-bold text-text-primary">C4 Assistant</h3>
+          <p className="text-[10px] text-text-primary/50">Assistente financeiro</p>
         </div>
         <div className="flex gap-1">
           <button
             onClick={limparHistorico}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+            className="p-1.5 rounded-lg text-text-primary/50 hover:text-text-primary/80 hover:bg-surface-medium"
             title="Limpar conversa"
           >
             <Trash2 className="w-4 h-4" />
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+            className="p-1.5 rounded-lg text-text-primary/50 hover:text-text-primary/80 hover:bg-surface-medium"
           >
             <X className="w-4 h-4" />
           </button>
@@ -54,14 +54,14 @@ function ChatContent({ onClose }) {
               components={{
                 UserMessage: () => (
                   <MessagePrimitive.Root className="flex justify-end mb-2">
-                    <div className="bg-primary/20 text-white rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%] text-sm">
+                    <div className="bg-primary/20 text-text-primary rounded-2xl rounded-br-md px-4 py-2.5 max-w-[85%] text-sm">
                       <MessagePrimitive.Content />
                     </div>
                   </MessagePrimitive.Root>
                 ),
                 AssistantMessage: () => (
                   <MessagePrimitive.Root className="flex justify-start mb-2">
-                    <div className="bg-surface-medium text-zinc-200 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[85%] text-sm leading-relaxed">
+                    <div className="bg-surface-medium text-text-primary/80 rounded-2xl rounded-bl-md px-4 py-2.5 max-w-[85%] text-sm leading-relaxed">
                       <MessagePrimitive.Content
                         components={{ Text: MarkdownTextPrimitive }}
                       />
@@ -72,11 +72,11 @@ function ChatContent({ onClose }) {
             />
           </ThreadPrimitive.Viewport>
 
-          <div className="border-t border-white/5 p-3">
+          <div className="border-t border-text-primary/5 p-3">
             <ComposerPrimitive.Root className="flex gap-2">
               <ComposerPrimitive.Input
                 placeholder="Pergunte sobre suas finanças..."
-                className="flex-1 bg-surface border border-white/5 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-zinc-600"
+                className="flex-1 bg-surface border border-text-primary/5 rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-text-primary/40"
               />
               <ComposerPrimitive.Send className="bg-primary text-on-primary px-4 py-2.5 rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-30">
                 Enviar
@@ -114,7 +114,7 @@ export default function ChatSidebar() {
           <div
             className={cn(
               "fixed right-0 top-0 bottom-0 z-[70] w-full sm:w-[420px]",
-              "bg-surface-low border-l border-white/5 shadow-2xl",
+              "bg-surface-low border-l border-text-primary/5 shadow-2xl",
               "transform transition-transform duration-300",
               isOpen ? "translate-x-0" : "translate-x-full"
             )}

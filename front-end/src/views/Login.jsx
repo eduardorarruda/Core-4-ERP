@@ -34,20 +34,20 @@ export default function Login() {
           <div className="w-10 h-10 bg-primary flex items-center justify-center rounded-xl">
             <Layout className="w-6 h-6 text-on-primary" />
           </div>
-          <h1 className="text-xl font-bold tracking-tighter text-white">Core 4 ERP</h1>
+          <h1 className="text-xl font-bold tracking-tighter text-text-primary">Core 4 ERP</h1>
         </div>
 
         <div className="max-w-sm w-full mx-auto">
           <header className="mb-10">
-            <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Login</h2>
-            <p className="text-zinc-500 text-sm">Bem-vindo de volta ao Core 4 ERP.</p>
+            <h2 className="text-3xl font-bold tracking-tight text-text-primary mb-2">Login</h2>
+            <p className="text-text-primary/50 text-sm">Bem-vindo de volta ao Core 4 ERP.</p>
           </header>
 
           <form className="space-y-6" onSubmit={handleLogin}>
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-500" htmlFor="email">Email</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-text-primary/60" htmlFor="email">Email</label>
               <input
-                className="w-full bg-surface-low border border-white/5 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
+                className="w-full bg-surface-low border border-text-primary/5 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none placeholder:text-text-primary/40"
                 id="email"
                 placeholder="nome@empresa.com"
                 type="email"
@@ -58,9 +58,9 @@ export default function Login() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-zinc-500" htmlFor="password">Senha</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-text-primary/60" htmlFor="password">Senha</label>
               <input
-                className="w-full bg-surface-low border border-white/5 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
+                className="w-full bg-surface-low border border-text-primary/5 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none placeholder:text-text-primary/40"
                 id="password"
                 placeholder="••••••••"
                 type="password"
@@ -71,7 +71,7 @@ export default function Login() {
             </div>
 
             {erro && (
-              <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-2">
+              <p className="text-sm text-error bg-error/10 border border-error/20 rounded-lg px-4 py-2">
                 {erro}
               </p>
             )}
@@ -85,21 +85,21 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-8 pt-8 border-t border-white/5 text-center">
-            <p className="text-sm text-zinc-500">
+          <div className="mt-8 pt-8 border-t border-text-primary/5 text-center">
+            <p className="text-sm text-text-primary/50">
               Não tem uma conta?{' '}
               <a className="text-primary font-semibold hover:underline" href="/register">Cadastre-se</a>
             </p>
           </div>
         </div>
 
-        <footer className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-zinc-600">
+        <footer className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-text-primary/40">
           <span>© 2024 Core 4 ERP</span>
         </footer>
       </section>
 
       {/* Right Side: Hero Section */}
-      <section className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden bg-background">
+      <section className="hidden lg:flex flex-1 relative items-center justify-center overflow-hidden bg-surface">
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-gradient-to-br from-surface via-surface/95 to-primary/5 z-10"></div>
         </div>
@@ -118,7 +118,7 @@ export default function Login() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl xl:text-7xl font-bold tracking-tighter leading-[1.1] text-white mb-8"
+            className="text-5xl xl:text-7xl font-bold tracking-tighter leading-[1.1] text-text-primary mb-8"
           >
             A Arquiteta da Sua <span className="text-primary italic">Liberdade Financeira</span>
           </motion.h2>
@@ -129,20 +129,20 @@ export default function Login() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="space-y-6"
           >
-            <p className="text-lg xl:text-xl text-zinc-400 font-light max-w-lg leading-relaxed">
+            <p className="text-lg xl:text-xl text-text-primary/60 font-light max-w-lg leading-relaxed">
               Transforme dados complexos em decisões estratégicas com nossa interface modular.
             </p>
 
             <div className="grid grid-cols-2 gap-4 mt-12">
-              <div className="p-6 rounded-xl bg-surface-highest/40 backdrop-blur-md border border-white/5">
+              <div className="p-6 rounded-xl bg-surface-highest/40 backdrop-blur-md border border-text-primary/5">
                 <BarChart3 className="w-8 h-8 text-primary mb-2" />
-                <div className="text-sm font-bold uppercase tracking-widest text-white/60 mb-1">Crescimento</div>
-                <div className="text-2xl font-bold text-white">+24.8%</div>
+                <div className="text-sm font-bold uppercase tracking-widest text-text-primary/60 mb-1">Crescimento</div>
+                <div className="text-2xl font-bold text-text-primary">+24.8%</div>
               </div>
-              <div className="p-6 rounded-xl bg-surface-highest/40 backdrop-blur-md border border-white/5">
+              <div className="p-6 rounded-xl bg-surface-highest/40 backdrop-blur-md border border-text-primary/5">
                 <Wallet className="w-8 h-8 text-secondary mb-2" />
-                <div className="text-sm font-bold uppercase tracking-widest text-white/60 mb-1">Capital</div>
-                <div className="text-2xl font-bold text-white">R$ 4.2M</div>
+                <div className="text-sm font-bold uppercase tracking-widest text-text-primary/60 mb-1">Capital</div>
+                <div className="text-2xl font-bold text-text-primary">R$ 4.2M</div>
               </div>
             </div>
           </motion.div>

@@ -29,7 +29,7 @@ export default function Sidebar({ onClose }) {
   );
 
   return (
-    <aside className="group/sidebar h-screen sticky top-0 w-16 hover:w-56 transition-all duration-300 ease-in-out overflow-hidden bg-surface flex flex-col items-start py-8 gap-4 z-50 border-r border-white/5">
+    <aside className="group/sidebar h-screen sticky top-0 w-16 hover:w-56 transition-all duration-300 ease-in-out overflow-hidden bg-surface flex flex-col items-start py-8 gap-4 z-50 border-r border-text-primary/5">
       <NavLink
         to="/dashboard"
         className="px-4 mb-2 flex items-center gap-3 text-primary font-bold text-xl tracking-tighter cursor-pointer w-full"
@@ -49,8 +49,8 @@ export default function Sidebar({ onClose }) {
             className={({ isActive }) => cn(
               'w-full px-4 py-3 flex items-center gap-3 transition-all duration-200',
               isActive
-                ? 'text-white border-l-2 border-primary bg-gradient-to-r from-primary/10 to-transparent'
-                : 'text-zinc-400 hover:text-zinc-100'
+                ? 'text-text-primary border-l-2 border-primary bg-gradient-to-r from-primary/10 to-transparent'
+                : 'text-text-primary/60 hover:text-text-primary'
             )}
           >
             {({ isActive }) => (
@@ -67,7 +67,7 @@ export default function Sidebar({ onClose }) {
 
       <button
         onClick={logout}
-        className="px-4 py-2 flex items-center gap-3 text-zinc-400 hover:text-red-400 transition-colors w-full"
+        className="px-4 py-2 flex items-center gap-3 text-text-primary/60 hover:text-error transition-colors w-full"
         title="Sair"
       >
         <LogOut className="w-5 h-5 shrink-0" />

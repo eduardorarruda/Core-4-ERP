@@ -28,7 +28,7 @@ export default function ReportFilters({ config = [], values, onChange, open, onT
       <button
         type="button"
         onClick={onToggle}
-        className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-white transition-colors"
+        className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-text-primary/60 hover:text-text-primary transition-colors"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
         Filtros
@@ -41,7 +41,7 @@ export default function ReportFilters({ config = [], values, onChange, open, onT
       </button>
 
       {open && (
-        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-white/5">
+        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-text-primary/5">
           {config.map(f => {
             const opts = f.type === 'async-select' ? (asyncOptions[f.key] || []) : (f.options || []);
             return (

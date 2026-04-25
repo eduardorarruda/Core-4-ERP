@@ -163,13 +163,13 @@ export default function Cartoes() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <CreditCard className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold text-white">Cartões de Crédito</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Cartões de Crédito</h1>
       </div>
 
       {/* Formulário de novo cartão */}
       {!cartaoSel && (
-        <form onSubmit={criarCartao} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Novo Cartão</h2>
+        <form onSubmit={criarCartao} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">Novo Cartão</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[['Nome', 'nome', 'text'], ['Limite (R$)', 'limite', 'number'], ['Dia Fechamento', 'diaFechamento', 'number'], ['Dia Vencimento', 'diaVencimento', 'number']].map(([lbl, key, type]) => (
               <FormField key={key} label={lbl} error={errors[key]}>
@@ -193,17 +193,17 @@ export default function Cartoes() {
       {!cartaoSel && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {lista.map(c => (
-            <div key={c.id} onClick={() => abrirCartao(c)} className="bg-surface-low rounded-2xl p-6 border border-white/5 cursor-pointer hover:border-primary/30 transition-all space-y-3">
+            <div key={c.id} onClick={() => abrirCartao(c)} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 cursor-pointer hover:border-primary/30 transition-all space-y-3">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="font-bold text-white">{c.nome}</p>
-                  <p className="text-xs text-zinc-500">Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}</p>
-                  <p className="text-xs text-zinc-600">{c.contaCorrenteDescricao}</p>
+                  <p className="font-bold text-text-primary">{c.nome}</p>
+                  <p className="text-xs text-text-primary/50">Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}</p>
+                  <p className="text-xs text-text-primary/40">{c.contaCorrenteDescricao}</p>
                 </div>
-                <button onClick={ev => { ev.stopPropagation(); deletarCartao(c.id); }} className="text-zinc-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={ev => { ev.stopPropagation(); deletarCartao(c.id); }} className="text-text-primary/50 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
               </div>
               <div className="space-y-1">
-                <div className="flex justify-between text-xs text-zinc-500"><span>Limite</span><span>R$ {Number(c.limite).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between text-xs text-text-primary/50"><span>Limite</span><span>R$ {Number(c.limite).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                 <div className="w-full bg-surface rounded-full h-1.5">
                   <div className="bg-primary h-1.5 rounded-full" style={{ width: `${Math.min(100, (Number(c.limiteUsado) / Number(c.limite)) * 100)}%` }} />
                 </div>
@@ -214,7 +214,7 @@ export default function Cartoes() {
               </div>
             </div>
           ))}
-          {lista.length === 0 && <p className="text-zinc-500 col-span-3 text-center py-8">Nenhum cartão cadastrado</p>}
+          {lista.length === 0 && <p className="text-text-primary/50 col-span-3 text-center py-8">Nenhum cartão cadastrado</p>}
         </div>
       )}
 
@@ -222,14 +222,14 @@ export default function Cartoes() {
       {cartaoSel && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">{cartaoSel.nome}</h2>
-            <button onClick={() => setCartaoSel(null)} className="text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
+            <h2 className="text-xl font-bold text-text-primary">{cartaoSel.nome}</h2>
+            <button onClick={() => setCartaoSel(null)} className="text-text-primary/60 hover:text-text-primary"><X className="w-5 h-5" /></button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Novo lançamento */}
-            <form onSubmit={criarLancamento} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Novo Lançamento</h3>
+            <form onSubmit={criarLancamento} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">Novo Lançamento</h3>
               <div className="space-y-3">
                 {[['Descrição', 'descricao', 'text'], ['Valor (R$)', 'valor', 'number'], ['Data Compra', 'dataCompra', 'date'], ['Mês Fatura (1-12)', 'mesFatura', 'number'], ['Ano Fatura', 'anoFatura', 'number'], ['Nº Parcelas', 'quantidadeParcelas', 'number']].map(([lbl, key, type]) => (
                   <FormField key={key} label={lbl} error={errors[key]}>
@@ -248,8 +248,8 @@ export default function Cartoes() {
             </form>
 
             {/* Fechar fatura */}
-            <form onSubmit={fecharFatura} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Fechar Fatura</h3>
+            <form onSubmit={fecharFatura} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">Fechar Fatura</h3>
               <div className="space-y-3">
                 {[['Mês (1-12)', 'mes'], ['Ano', 'ano']].map(([lbl, key]) => (
                   <FormField key={key} label={lbl}>
@@ -257,17 +257,17 @@ export default function Cartoes() {
                   </FormField>
                 ))}
               </div>
-              <button type="submit" disabled={salvandoFatura} className="bg-orange-600 text-white font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm">
+              <button type="submit" disabled={salvandoFatura} className="bg-orange-600 text-text-primary font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm">
                 {salvandoFatura ? 'GRAVANDO...' : 'Fechar Fatura'}
               </button>
             </form>
           </div>
 
           {/* Lançamentos */}
-          <div className="bg-surface-low rounded-2xl border border-white/5 overflow-hidden">
+          <div className="bg-surface-low rounded-2xl border border-text-primary/5 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="border-b border-white/5">
-                <tr className="text-left text-zinc-500 text-xs uppercase tracking-widest">
+              <thead className="border-b border-text-primary/5">
+                <tr className="text-left text-text-primary/50 text-xs uppercase tracking-widest">
                   <th className="px-6 py-4">Descrição</th>
                   <th className="px-6 py-4">Valor</th>
                   <th className="px-6 py-4">Fatura</th>
@@ -278,7 +278,7 @@ export default function Cartoes() {
               <tbody>
                 {lancamentos.map(l => (
                   editLancId === l.id ? (
-                    <tr key={l.id} className="border-b border-white/5 bg-white/[0.03]">
+                    <tr key={l.id} className="border-b border-text-primary/5 bg-white/[0.03]">
                       <td colSpan={5} className="px-6 py-4">
                         <form onSubmit={salvarEdicao} className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <FormField label="Descrição">
@@ -306,7 +306,7 @@ export default function Cartoes() {
                             <button type="submit" disabled={salvandoEdit} className="bg-primary text-on-primary font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm">
                               {salvandoEdit ? 'SALVANDO...' : 'Salvar'}
                             </button>
-                            <button type="button" onClick={() => setEditLancId(null)} className="px-4 py-2 rounded-xl border border-white/10 text-zinc-400 hover:text-white text-sm">
+                            <button type="button" onClick={() => setEditLancId(null)} className="px-4 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary text-sm">
                               Cancelar
                             </button>
                           </div>
@@ -314,8 +314,8 @@ export default function Cartoes() {
                       </td>
                     </tr>
                   ) : (
-                    <tr key={l.id} className="border-b border-white/5 hover:bg-white/[0.02]">
-                      <td className="px-6 py-4 text-white">
+                    <tr key={l.id} className="border-b border-text-primary/5 hover:bg-white/[0.02]">
+                      <td className="px-6 py-4 text-text-primary">
                         {l.descricao}
                         {l.faturaFechada && (
                           <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
@@ -323,15 +323,15 @@ export default function Cartoes() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-white font-medium">R$ {Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="px-6 py-4 text-zinc-400">{String(l.mesFatura).padStart(2, '0')}/{l.anoFatura}</td>
-                      <td className="px-6 py-4 text-zinc-400">{l.numeroParcela}/{l.totalParcelas}</td>
+                      <td className="px-6 py-4 text-text-primary font-medium">R$ {Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-6 py-4 text-text-primary/60">{String(l.mesFatura).padStart(2, '0')}/{l.anoFatura}</td>
+                      <td className="px-6 py-4 text-text-primary/60">{l.numeroParcela}/{l.totalParcelas}</td>
                       <td className="px-6 py-4 flex gap-2">
                         <button
                           onClick={() => iniciarEdicao(l)}
                           disabled={l.faturaFechada}
                           title={l.faturaFechada ? 'Fatura fechada' : 'Editar'}
-                          className="text-zinc-500 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-text-primary/50 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           <Pencil className="w-4 h-4" />
                         </button>
@@ -339,7 +339,7 @@ export default function Cartoes() {
                           onClick={() => deletarLancamento(l.id)}
                           disabled={l.faturaFechada}
                           title={l.faturaFechada ? 'Fatura fechada' : 'Excluir'}
-                          className="text-zinc-500 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                          className="text-text-primary/50 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -347,7 +347,7 @@ export default function Cartoes() {
                     </tr>
                   )
                 ))}
-                {lancamentos.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">Nenhum lançamento</td></tr>}
+                {lancamentos.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-text-primary/50">Nenhum lançamento</td></tr>}
               </tbody>
             </table>
           </div>

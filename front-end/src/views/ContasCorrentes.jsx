@@ -94,21 +94,21 @@ export default function ContasCorrentes() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Landmark className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold text-white">Contas Correntes</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Contas Correntes</h1>
         </div>
-        <button onClick={() => setShowTransf(v => !v)} className="flex items-center gap-2 border border-white/10 text-zinc-300 px-4 py-2 rounded-xl hover:bg-white/5 text-sm">
+        <button onClick={() => setShowTransf(v => !v)} className="flex items-center gap-2 border border-text-primary/10 text-text-primary/80 px-4 py-2 rounded-xl hover:bg-surface-medium text-sm">
           <ArrowRightLeft className="w-4 h-4" /> Transferir
         </button>
       </div>
 
       <div className="bg-primary/10 border border-primary/20 rounded-2xl px-6 py-4">
         <p className="text-xs uppercase tracking-widest text-primary font-bold mb-1">Saldo Total</p>
-        <p className="text-3xl font-bold text-white">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+        <p className="text-3xl font-bold text-text-primary">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
       </div>
 
       {showTransf && (
-        <form onSubmit={transferir} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">Transferência</h2>
+        <form onSubmit={transferir} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">Transferência</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField label="Origem">
               <select className={inputCls} value={transf.contaOrigemId} onChange={e => setTransf(f => ({ ...f, contaOrigemId: e.target.value }))} required>
@@ -132,8 +132,8 @@ export default function ContasCorrentes() {
         </form>
       )}
 
-      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editId ? 'Editar' : 'Nova'} Conta</h2>
+      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-4">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">{editId ? 'Editar' : 'Nova'} Conta</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField label="Número da Conta" required error={errors.numeroConta}>
             <input className={inputCls} value={form.numeroConta} onChange={set('numeroConta')} required placeholder="Ex: 12345-6" />
@@ -152,27 +152,27 @@ export default function ContasCorrentes() {
           <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
             <Plus className="w-4 h-4" />{salvando ? 'GRAVANDO...' : editId ? 'Salvar' : 'Criar'}
           </button>
-          {editId && <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-white/10 text-zinc-400 hover:text-white">Cancelar</button>}
+          {editId && <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary">Cancelar</button>}
         </div>
       </form>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {lista.map(c => (
-          <div key={c.id} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-2">
+          <div key={c.id} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-2">
             <div className="flex justify-between items-start">
               <div>
-                <p className="font-bold text-white">{c.descricao}</p>
-                <p className="text-xs text-zinc-500">Conta: {c.numeroConta} · Ag: {c.agencia}</p>
+                <p className="font-bold text-text-primary">{c.descricao}</p>
+                <p className="text-xs text-text-primary/50">Conta: {c.numeroConta} · Ag: {c.agencia}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => editar(c)} className="text-zinc-500 hover:text-primary"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => deletar(c.id)} className="text-zinc-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => editar(c)} className="text-text-primary/50 hover:text-primary"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => deletar(c.id)} className="text-text-primary/50 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
-            <p className="text-2xl font-bold text-white">R$ {Number(c.saldo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+            <p className="text-2xl font-bold text-text-primary">R$ {Number(c.saldo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
           </div>
         ))}
-        {lista.length === 0 && <p className="text-zinc-500 col-span-3 text-center py-8">Nenhuma conta cadastrada</p>}
+        {lista.length === 0 && <p className="text-text-primary/50 col-span-3 text-center py-8">Nenhuma conta cadastrada</p>}
       </div>
 
       {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
