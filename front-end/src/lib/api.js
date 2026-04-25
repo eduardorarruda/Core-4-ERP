@@ -2,12 +2,15 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 function clearAuth() {
   localStorage.removeItem('usuario');
+  sessionStorage.removeItem('access_token');
 }
 
 async function request(path, options = {}) {
   const { skipAuthRedirect, ...fetchOptions } = options;
+  const token = sessionStorage.getItem('access_token');
   const headers = {
     'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...fetchOptions.headers,
   };
 
@@ -34,11 +37,16 @@ async function request(path, options = {}) {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
-  login: (email, senha) =>
-    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true }),
+  login: async (email, senha) => {
+    const result = await request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true });
+    if (result?.accessToken) sessionStorage.setItem('access_token', result.accessToken);
+    return result?.usuario ?? result;
+  },
 
-  logout: () =>
-    request('/api/auth/logout', { method: 'POST' }),
+  logout: async () => {
+    try { await request('/api/auth/logout', { method: 'POST' }); } catch {}
+    sessionStorage.removeItem('access_token');
+  },
 
   registrar: (nome, email, senha, telefone) =>
     request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone }), skipAuthRedirect: true }),
@@ -169,7 +177,11 @@ function relatorioQs(inicio, fim, params = {}) {
 }
 
 async function downloadRelatorio(path) {
-  const res = await fetch(`${BASE_URL}${path}`, { credentials: 'include' });
+  const token = sessionStorage.getItem('access_token');
+  const res = await fetch(`${BASE_URL}${path}`, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (res.status === 401) {
     clearAuth();
     window.location.href = '/login';
