@@ -69,8 +69,8 @@ public class AuthController {
     private static String jwtCookie(String value, long maxAgeSeconds) {
         return ResponseCookie.from("access_token", value)
                 .httpOnly(true)
-                .secure(false)
-                .sameSite("Lax")
+                .secure(true)
+                .sameSite("None")
                 .path("/")
                 .maxAge(maxAgeSeconds)
                 .build()
