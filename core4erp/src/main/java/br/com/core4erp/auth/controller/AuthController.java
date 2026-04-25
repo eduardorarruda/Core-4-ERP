@@ -2,6 +2,7 @@ package br.com.core4erp.auth.controller;
 
 import br.com.core4erp.auth.dto.AtualizarPerfilRequestDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
+import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.auth.service.AuthService;
@@ -39,10 +40,10 @@ public class AuthController {
 
     @Operation(summary = "Autenticar e receber JWT via cookie HttpOnly")
     @PostMapping("/login")
-    public ResponseEntity<MeResponseDto> login(@Valid @RequestBody LoginRequestDto request, HttpServletResponse response) {
+    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto request, HttpServletResponse response) {
         AuthService.LoginResult result = authService.login(request);
         response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie(result.token(), tokenExpiration / 1000));
-        return ResponseEntity.ok(result.usuario());
+        return ResponseEntity.ok(new LoginResponseDto(result.token(), result.usuario()));
     }
 
     @Operation(summary = "Encerrar sessão e remover cookie JWT")
