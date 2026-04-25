@@ -138,4 +138,58 @@ export const investimentos = {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboard = {
   resumo: () => request('/api/dashboard'),
+  saldoDetalhado: () => request('/api/dashboard/saldo-detalhado'),
+};
+
+// ── Chat IA ───────────────────────────────────────────────────────────────────
+export const chat = {
+  enviar: (mensagem) =>
+    request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }),
+  limparHistorico: () =>
+    request('/api/chat/historico', { method: 'DELETE' }),
+};
+
+// ── Relatórios (download binário) ─────────────────────────────────────────────
+function relatorioQs(inicio, fim, params = {}) {
+  const entries = { inicio, fim, ...params };
+  const filtered = Object.fromEntries(
+    Object.entries(entries).filter(([, v]) => v !== null && v !== undefined && v !== '')
+  );
+  return new URLSearchParams(filtered).toString();
+}
+
+async function downloadRelatorio(path) {
+  const res = await fetch(`${BASE_URL}${path}`, { credentials: 'include' });
+  if (res.status === 401) {
+    clearAuth();
+    window.location.href = '/login';
+    throw new Error('Sessão expirada');
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.mensagem || `Erro ${res.status}`);
+  }
+  return res.blob();
+}
+
+export const relatorios = {
+  // ── Downloads Excel (.xlsx) ───────────────────────────────────────────────
+  posicaoFinanceira: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/posicao-financeira?${relatorioQs(inicio, fim, p)}`),
+  fluxoCaixa:    (inicio, fim, p) => downloadRelatorio(`/api/relatorios/fluxo-caixa?${relatorioQs(inicio, fim, p)}`),
+  contasAbertas: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/contas-abertas?${relatorioQs(inicio, fim, p)}`),
+  extrato:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/extrato?${relatorioQs(inicio, fim, p)}`),
+  dre:           (inicio, fim, p) => downloadRelatorio(`/api/relatorios/dre?${relatorioQs(inicio, fim, p)}`),
+  investimentos: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/investimentos?${relatorioQs(inicio, fim, p)}`),
+  cartoes:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/cartoes?${relatorioQs(inicio, fim, p)}`),
+
+  // ── Dados JSON (visualização online e PDF) ────────────────────────────────
+  dados: {
+    posicaoFinanceira: (inicio, fim, p) => request(`/api/relatorios/posicao-financeira/dados?${relatorioQs(inicio, fim, p)}`),
+    fluxoCaixa:    (inicio, fim, p) => request(`/api/relatorios/fluxo-caixa/dados?${relatorioQs(inicio, fim, p)}`),
+    contasAbertas: (inicio, fim, p) => request(`/api/relatorios/contas-abertas/dados?${relatorioQs(inicio, fim, p)}`),
+    extrato:       (inicio, fim, p) => request(`/api/relatorios/extrato/dados?${relatorioQs(inicio, fim, p)}`),
+    dre:           (inicio, fim, p) => request(`/api/relatorios/dre/dados?${relatorioQs(inicio, fim, p)}`),
+    investimentos: (inicio, fim, p) => request(`/api/relatorios/investimentos/dados?${relatorioQs(inicio, fim, p)}`),
+    cartoes:       (inicio, fim, p) => request(`/api/relatorios/cartoes/dados?${relatorioQs(inicio, fim, p)}`),
+  },
 };

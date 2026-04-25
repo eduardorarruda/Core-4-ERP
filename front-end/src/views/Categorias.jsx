@@ -92,11 +92,11 @@ export default function Categorias() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Tag className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold text-white">Categorias</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Categorias</h1>
       </div>
 
-      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-white/5 space-y-6">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">{editId ? 'Editar' : 'Nova'} Categoria</h2>
+      <form onSubmit={salvar} className="bg-surface-low rounded-2xl p-6 border border-text-primary/5 space-y-6">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/60">{editId ? 'Editar' : 'Nova'} Categoria</h2>
 
         <div className="space-y-1 max-w-sm">
           <label className={labelCls}>Descrição *</label>
@@ -115,7 +115,7 @@ export default function Categorias() {
                 className={`p-3 rounded-xl border transition-all ${
                   form.icone === nome
                     ? 'bg-primary/20 border-primary text-primary'
-                    : 'bg-surface border-white/5 text-zinc-500 hover:border-white/20 hover:text-zinc-300'
+                    : 'bg-surface border-text-primary/5 text-text-primary/50 hover:border-text-primary/20 hover:text-text-primary/80'
                 }`}
               >
                 <Icone className="w-5 h-5 mx-auto" />
@@ -123,7 +123,7 @@ export default function Categorias() {
             ))}
           </div>
           {form.icone && (
-            <p className="text-xs text-zinc-500">Selecionado: <span className="text-primary font-medium">{form.icone}</span></p>
+            <p className="text-xs text-text-primary/50">Selecionado: <span className="text-primary font-medium">{form.icone}</span></p>
           )}
         </div>
 
@@ -131,7 +131,7 @@ export default function Categorias() {
           <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
             <Plus className="w-4 h-4" />{salvando ? 'GRAVANDO...' : editId ? 'Salvar' : 'Criar'}
           </button>
-          {editId && <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-white/10 text-zinc-400 hover:text-white">Cancelar</button>}
+          {editId && <button type="button" onClick={() => { setForm(empty); setEditId(null); }} className="px-6 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary">Cancelar</button>}
         </div>
       </form>
 
@@ -140,19 +140,19 @@ export default function Categorias() {
           const entry = ICONES.find(i => i.nome === c.icone);
           const Icone = entry ? entry.componente : Tag;
           return (
-            <div key={c.id} className="bg-surface-low rounded-2xl p-4 border border-white/5 flex items-center gap-3">
+            <div key={c.id} className="bg-surface-low rounded-2xl p-4 border border-text-primary/5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Icone className="w-5 h-5 text-primary" />
               </div>
-              <span className="font-medium text-white flex-1 text-sm">{c.descricao}</span>
+              <span className="font-medium text-text-primary flex-1 text-sm">{c.descricao}</span>
               <div className="flex gap-1">
-                <button onClick={() => editar(c)} className="text-zinc-500 hover:text-primary p-1"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => deletar(c.id)} className="text-zinc-500 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button onClick={() => editar(c)} className="text-text-primary/50 hover:text-primary p-1"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => deletar(c.id)} className="text-text-primary/50 hover:text-red-400 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             </div>
           );
         })}
-        {lista.length === 0 && <p className="text-zinc-500 col-span-4 text-center py-8">Nenhuma categoria cadastrada</p>}
+        {lista.length === 0 && <p className="text-text-primary/50 col-span-4 text-center py-8">Nenhuma categoria cadastrada</p>}
       </div>
 
       {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}

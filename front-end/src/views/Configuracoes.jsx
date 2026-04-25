@@ -59,36 +59,36 @@ export default function Configuracoes() {
     }
   };
 
-  const inputClass = 'w-full bg-surface-low border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none text-sm';
-  const labelClass = 'block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1.5';
+  const inputClass = 'w-full bg-surface-low border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none text-sm';
+  const labelClass = 'block text-xs font-bold uppercase tracking-widest text-text-primary/50 mb-1.5';
 
   return (
     <div className="max-w-xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Configurações da Conta</h1>
-        <p className="text-zinc-500 text-sm mt-1">Gerencie seu perfil e credenciais de acesso.</p>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Configurações da Conta</h1>
+        <p className="text-text-primary/50 text-sm mt-1">Gerencie seu perfil e credenciais de acesso.</p>
       </div>
 
-      <form onSubmit={handleSalvar} className="space-y-6 bg-surface-medium rounded-2xl p-6 border border-white/5">
+      <form onSubmit={handleSalvar} className="space-y-6 bg-surface-medium rounded-2xl p-6 border border-text-primary/5">
         {/* Avatar */}
         <div className="flex items-center gap-5">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/10 hover:border-primary/60 transition-colors group bg-surface-highest flex items-center justify-center shrink-0"
+            className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-text-primary/10 hover:border-primary/60 transition-colors group bg-surface-highest flex items-center justify-center shrink-0"
           >
             {form.fotoPerfil ? (
               <img src={form.fotoPerfil} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-xl font-bold text-white select-none">{getInitials(form.nome)}</span>
+              <span className="text-xl font-bold text-text-primary select-none">{getInitials(form.nome)}</span>
             )}
             <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Camera className="w-5 h-5 text-white" />
+              <Camera className="w-5 h-5 text-text-primary" />
             </span>
           </button>
           <div>
-            <p className="text-sm font-semibold text-white">{form.nome || '—'}</p>
-            <p className="text-xs text-zinc-500 mt-0.5">{form.email}</p>
+            <p className="text-sm font-semibold text-text-primary">{form.nome || '—'}</p>
+            <p className="text-xs text-text-primary/50 mt-0.5">{form.email}</p>
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
@@ -100,13 +100,13 @@ export default function Configuracoes() {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFoto} />
         </div>
 
-        <hr className="border-white/5" />
+        <hr className="border-text-primary/5" />
 
         {/* Dados */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <User className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Dados Pessoais</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">Dados Pessoais</span>
           </div>
 
           <div>
@@ -126,15 +126,15 @@ export default function Configuracoes() {
           </div>
         </div>
 
-        <hr className="border-white/5" />
+        <hr className="border-text-primary/5" />
 
         {/* Senha */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <Lock className="w-4 h-4 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Alterar Senha</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">Alterar Senha</span>
           </div>
-          <p className="text-xs text-zinc-600">Deixe em branco para manter a senha atual.</p>
+          <p className="text-xs text-text-primary/40">Deixe em branco para manter a senha atual.</p>
 
           <div>
             <label className={labelClass}>Nova Senha</label>

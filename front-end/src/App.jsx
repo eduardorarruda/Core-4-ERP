@@ -16,6 +16,7 @@ import Cartoes from './views/Cartoes';
 import Investimentos from './views/Investimentos';
 import Notificacoes from './views/Notificacoes';
 import Configuracoes from './views/Configuracoes';
+import ChatSidebar from './components/chat/ChatSidebar';
 import { getUsuario } from './lib/api';
 import { cn } from './lib/utils';
 
@@ -58,6 +59,7 @@ function ProtectedLayout({ children }) {
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>
+      <ChatSidebar />
     </div>
   );
 }

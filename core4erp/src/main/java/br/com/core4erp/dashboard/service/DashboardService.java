@@ -1,16 +1,20 @@
 package br.com.core4erp.dashboard.service;
 
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
+import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.conta.repository.ContaBaixadaRepository;
 import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto.DespesaPorCategoriaDto;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto.FluxoMensalDto;
+import br.com.core4erp.dashboard.dto.SaldoDetalhadoResponseDto;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.investimento.repository.ContaInvestimentoRepository;
+import br.com.core4erp.investimento.repository.TransacaoInvestimentoRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,19 +36,28 @@ public class DashboardService {
     private final ContaInvestimentoRepository investimentoRepo;
     private final CartaoCreditoRepository cartaoRepo;
     private final LancamentoCartaoRepository lancamentoRepo;
+    private final ContaBaixadaRepository baixadaRepo;
+    private final TransacaoInvestimentoRepository transacaoInvRepo;
+    private final FaturaCartaoRepository faturaCartaoRepo;
 
     public DashboardService(SecurityContextUtils securityCtx,
                             ContaCorrenteRepository contaCorrenteRepo,
                             ContaRepository contaRepo,
                             ContaInvestimentoRepository investimentoRepo,
                             CartaoCreditoRepository cartaoRepo,
-                            LancamentoCartaoRepository lancamentoRepo) {
+                            LancamentoCartaoRepository lancamentoRepo,
+                            ContaBaixadaRepository baixadaRepo,
+                            TransacaoInvestimentoRepository transacaoInvRepo,
+                            FaturaCartaoRepository faturaCartaoRepo) {
         this.securityCtx = securityCtx;
         this.contaCorrenteRepo = contaCorrenteRepo;
         this.contaRepo = contaRepo;
         this.investimentoRepo = investimentoRepo;
         this.cartaoRepo = cartaoRepo;
         this.lancamentoRepo = lancamentoRepo;
+        this.baixadaRepo = baixadaRepo;
+        this.transacaoInvRepo = transacaoInvRepo;
+        this.faturaCartaoRepo = faturaCartaoRepo;
     }
 
     /**
@@ -111,5 +124,33 @@ public class DashboardService {
                 limiteTotal, limiteUsado,
                 fluxoMensal, despesas,
                 vencendoHoje, atrasadas);
+    }
+
+    @Transactional(readOnly = true)
+    public SaldoDetalhadoResponseDto getSaldoDetalhado() {
+        Long uid = securityCtx.getUsuarioId();
+        List<StatusConta> pendentes = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
+
+        BigDecimal saldoCC       = contaCorrenteRepo.sumSaldoByUsuarioId(uid);
+        BigDecimal totalPago     = baixadaRepo.sumTotalPagoByUsuario(uid);
+        BigDecimal totalReceb    = baixadaRepo.sumTotalRecebidoByUsuario(uid);
+        BigDecimal totalAport    = transacaoInvRepo.sumTotalAportadoByUsuario(uid);
+        BigDecimal totalRes      = transacaoInvRepo.sumTotalResgatadoByUsuario(uid);
+        BigDecimal aPagar        = contaRepo.sumByTipoAndStatus(uid, TipoConta.PAGAR, pendentes);
+        BigDecimal aReceber      = contaRepo.sumByTipoAndStatus(uid, TipoConta.RECEBER, pendentes);
+        BigDecimal emAberto      = aReceber.subtract(aPagar);
+        BigDecimal cartaoAberto  = lancamentoRepo.sumLancamentosEmFaturasAbertasByUsuario(uid);
+        BigDecimal faturasPend   = faturaCartaoRepo.sumFaturasFechadasPendentesByUsuario(uid);
+        BigDecimal patrimonio    = investimentoRepo.sumSaldoAtualByUsuarioId(uid);
+        BigDecimal saldoPrevisto = saldoCC.add(emAberto);
+
+        return new SaldoDetalhadoResponseDto(
+                saldoCC,
+                totalPago, totalReceb,
+                totalAport, totalRes,
+                aPagar, aReceber, emAberto,
+                cartaoAberto, faturasPend,
+                saldoPrevisto, saldoPrevisto.subtract(cartaoAberto),
+                patrimonio);
     }
 }
