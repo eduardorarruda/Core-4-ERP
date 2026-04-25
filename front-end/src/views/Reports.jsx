@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard } from 'lucide-react';
+import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard, Wallet } from 'lucide-react';
 import { relatorios, categorias, parceiros, cartoes, contasCorrentes, investimentos } from '../lib/api';
 import Toast from '../components/ui/Toast';
 import ReportCard from '../components/reports/ReportCard';
@@ -42,6 +42,15 @@ const TIPO_TRANSACAO_OPTS = [
 
 // ── Definição dos cards ───────────────────────────────────────────────────────
 const REPORT_CARDS = [
+  {
+    id: 'R00',
+    title: 'Posição Financeira Completa',
+    description: 'Detalhamento de entradas, saídas, aportes, resgates e projeções por período.',
+    icon: Wallet,
+    onGetData: relatorios.dados.posicaoFinanceira,
+    onDownloadXlsx: relatorios.posicaoFinanceira,
+    filterConfig: [],
+  },
   {
     id: 'R01',
     title: 'Fluxo de Caixa Realizado',
