@@ -200,6 +200,28 @@ public class RelatorioController {
         return xlsxResponse(resource, "posicao-financeira", inicio, fim);
     }
 
+    // ── Assinaturas ─────────────────────────────────────────────────────────
+
+    @Operation(summary = "Dados JSON de Assinaturas Recorrentes")
+    @GetMapping("/assinaturas/dados")
+    public ResponseEntity<RelatorioResponseDto> assinaturasDados(
+            @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
+        return ResponseEntity.ok(relatorioService.getDadosAssinaturas(ativas));
+    }
+
+    @Operation(summary = "Download XLSX de Assinaturas Recorrentes")
+    @GetMapping("/assinaturas")
+    public ResponseEntity<Resource> assinaturasExcel(
+            @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
+        RelatorioResponseDto dados = relatorioService.getDadosAssinaturas(ativas);
+        Resource resource = relatorioService.gerarExcel(dados, "Assinaturas Recorrentes", null, null);
+        String filename = "assinaturas.xlsx";
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(XLSX_TYPE))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .body(resource);
+    }
+
     // ── Helper ───────────────────────────────────────────────────────────────
 
     private ResponseEntity<Resource> xlsxResponse(Resource resource, String nome, LocalDate inicio, LocalDate fim) {

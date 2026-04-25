@@ -4,10 +4,10 @@ import {
   AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts';
-import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon, Repeat } from 'lucide-react';
 import BentoCard from '../components/ui/BentoCard';
 import SaldoDetalhadoPanel from '../components/dashboard/SaldoDetalhadoPanel';
-import { dashboard, investimentos } from '../lib/api';
+import { dashboard, investimentos, assinaturas as assinaturasApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { ThemeContext } from '../context/ThemeContext';
 
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
   const [carteira, setCarteira] = useState([]);
+  const [assinaturasLista, setAssinaturasLista] = useState([]);
 
   useEffect(() => {
     dashboard.resumo()
@@ -29,6 +30,9 @@ export default function Dashboard() {
       .finally(() => setCarregando(false));
     investimentos.listar()
       .then(setCarteira)
+      .catch(() => {});
+    assinaturasApi.listar()
+      .then(setAssinaturasLista)
       .catch(() => {});
   }, []);
 
@@ -78,6 +82,16 @@ export default function Dashboard() {
   const resultado6m     = totalEntradas6m - totalSaidas6m;
 
   const patrimonioTotal = carteira.reduce((s, c) => s + Number(c.saldoAtual ?? 0), 0);
+
+  const assinaturasAtivas = assinaturasLista.filter(a => a.ativa);
+  const totalMensalAssin = assinaturasAtivas.reduce((s, a) => s + Number(a.valor), 0);
+  const assinPorCat = assinaturasAtivas.reduce((acc, a) => {
+    acc[a.categoriaDescricao] = (acc[a.categoriaDescricao] || 0) + Number(a.valor);
+    return acc;
+  }, {});
+  const pieAssinaturas = Object.entries(assinPorCat).map(([name, value], i) => ({
+    name, value, color: COLORS[i % COLORS.length],
+  }));
 
   const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
   const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
@@ -334,6 +348,62 @@ export default function Dashboard() {
               })}
             </div>
           )}
+        </BentoCard>
+
+        {/* Assinaturas Recorrentes */}
+        <BentoCard
+          className="col-span-12 lg:col-span-4"
+          title="Assinaturas Recorrentes"
+          headerAction={
+            <Link to="/assinaturas" className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
+              Gerenciar →
+            </Link>
+          }
+        >
+          <div className="bg-error/10 border border-error/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4 mt-2">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-error mb-0.5">Custo Mensal</p>
+              <p className="text-2xl font-bold text-text-primary">R$ {brl(totalMensalAssin)}</p>
+              <p className="text-[10px] text-text-primary/50 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
+            </div>
+            <Repeat className="w-8 h-8 text-error opacity-40" />
+          </div>
+
+          {pieAssinaturas.length > 0 && (
+            <ResponsiveContainer width="100%" height={160}>
+              <PieChart>
+                <Pie
+                  data={pieAssinaturas}
+                  cx="50%" cy="50%"
+                  innerRadius={40} outerRadius={65}
+                  paddingAngle={4} dataKey="value" stroke="none"
+                >
+                  {pieAssinaturas.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+
+          <div className="space-y-2 mt-2">
+            {assinaturasAtivas.slice(0, 4).map(a => (
+              <div key={a.id} className="flex items-center justify-between bg-surface-low rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-text-primary truncate">{a.descricao}</p>
+                  <p className="text-[10px] text-text-primary/50">dia {a.diaVencimento}</p>
+                </div>
+                <span className="text-xs font-bold text-error shrink-0 ml-2">R$ {brl(a.valor)}</span>
+              </div>
+            ))}
+            {assinaturasAtivas.length > 4 && (
+              <p className="text-[10px] text-text-primary/40 text-center">+{assinaturasAtivas.length - 4} assinatura(s)</p>
+            )}
+            {assinaturasAtivas.length === 0 && (
+              <p className="text-sm text-text-primary/50 text-center py-4">Nenhuma assinatura ativa</p>
+            )}
+          </div>
         </BentoCard>
 
         {/* Acesso Rápido */}

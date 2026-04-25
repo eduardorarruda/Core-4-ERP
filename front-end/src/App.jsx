@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import Dashboard from './views/Dashboard';
-import Reconciliation from './views/Reconciliation';
+import Assinaturas from './views/Assinaturas';
+import Calendario from './views/Calendario';
 import Categorias from './views/Categorias';
 import Reports from './views/Reports';
 import Audit from './views/Audit';
@@ -72,7 +73,8 @@ export default function App() {
         <Route path="/register" element={<Register />} />
 
         <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
-        <Route path="/reconciliation"   element={<ProtectedLayout><Reconciliation /></ProtectedLayout>} />
+        <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
+        <Route path="/calendario"       element={<ProtectedLayout><Calendario /></ProtectedLayout>} />
         <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
         <Route path="/audit"            element={<ProtectedLayout><AdminRoute><Audit /></AdminRoute></ProtectedLayout>} />
         <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
