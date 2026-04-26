@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
@@ -71,6 +72,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDto> handleAuthentication(AuthenticationException e) {
         return ResponseEntity.status(401).body(new ErrorResponseDto(
                 "CREDENCIAIS_INVALIDAS", e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponseDto> handleResponseStatus(ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatusCode()).body(new ErrorResponseDto(
+                "ERRO_HTTP", e.getReason() != null ? e.getReason() : e.getMessage(), LocalDateTime.now()
         ));
     }
 

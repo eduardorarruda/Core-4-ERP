@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
-  LogOut, Tag, Repeat, CalendarDays, Settings
+  LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -25,6 +25,7 @@ const NAV_GROUPS = [
       { id: 'cartoes',          icon: CreditCard,  label: 'Cartões',          path: '/cartoes' },
       { id: 'investimentos',    icon: TrendingUp,  label: 'Investimentos',    path: '/investimentos' },
       { id: 'assinaturas',      icon: Repeat,      label: 'Assinaturas',      path: '/assinaturas' },
+      { id: 'conciliacao',      icon: GitMerge,    label: 'Conciliação',      path: '/conciliacao' },
     ],
   },
   {
