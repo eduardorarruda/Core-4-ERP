@@ -167,6 +167,35 @@ export const chat = {
     request('/api/chat/historico', { method: 'DELETE' }),
 };
 
+// ── Conciliação Bancária ──────────────────────────────────────────────────────
+export const conciliacao = {
+  upload: (arquivo, contaCorrenteId) => {
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    const token = sessionStorage.getItem('access_token');
+    const qs = contaCorrenteId ? `?contaCorrenteId=${contaCorrenteId}` : '';
+    return fetch(`${BASE_URL}/api/conciliacao/upload${qs}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+      body: formData,
+    }).then(async (res) => {
+      if (res.status === 401) { clearAuth(); window.location.href = '/login'; throw new Error('Sessão expirada'); }
+      if (!res.ok) { const b = await res.json().catch(() => ({ mensagem: res.statusText })); throw new Error(b.mensagem || `Erro ${res.status}`); }
+      return res.json();
+    });
+  },
+  listar: () => request('/api/conciliacao'),
+  buscar: (id) => request(`/api/conciliacao/${id}`),
+  vincularItem: (id, itemId, dto) => request(`/api/conciliacao/${id}/itens/${itemId}/vincular`, { method: 'PUT', body: JSON.stringify(dto) }),
+  criarContaItem: (id, itemId, dto) => request(`/api/conciliacao/${id}/itens/${itemId}/nova-conta`, { method: 'POST', body: JSON.stringify(dto) }),
+  ignorarItem: (id, itemId) => request(`/api/conciliacao/${id}/itens/${itemId}/ignorar`, { method: 'PUT' }),
+  desvincularItem: (id, itemId) => request(`/api/conciliacao/${id}/itens/${itemId}/desvincular`, { method: 'PUT' }),
+  finalizar: (id, dto) => request(`/api/conciliacao/${id}/finalizar`, { method: 'POST', body: JSON.stringify(dto ?? {}) }),
+  cancelar: (id) => request(`/api/conciliacao/${id}`, { method: 'DELETE' }),
+  relatorio: (id) => request(`/api/conciliacao/${id}/relatorio`),
+};
+
 // ── Relatórios (download binário) ─────────────────────────────────────────────
 function relatorioQs(inicio, fim, params = {}) {
   const entries = { inicio, fim, ...params };

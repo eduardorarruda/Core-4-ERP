@@ -13,6 +13,9 @@ import { getUsuario } from './lib/api';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
 
+const Conciliacao         = lazy(() => import('./views/Conciliacao'));
+const ConciliacaoHistorico = lazy(() => import('./views/ConciliacaoHistorico'));
+const ConciliacaoRelatorio = lazy(() => import('./views/ConciliacaoRelatorio'));
 const Assinaturas     = lazy(() => import('./views/Assinaturas'));
 const Calendario      = lazy(() => import('./views/Calendario'));
 const Categorias      = lazy(() => import('./views/Categorias'));
@@ -126,6 +129,9 @@ export default function App() {
             <Route path="/register" element={<Register />} />
 
             <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
+            <Route path="/conciliacao"            element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
+            <Route path="/conciliacao/historico"  element={<ProtectedLayout><ConciliacaoHistorico /></ProtectedLayout>} />
+            <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><ConciliacaoRelatorio /></ProtectedLayout>} />
             <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
             <Route path="/calendario"       element={<ProtectedLayout><Calendario /></ProtectedLayout>} />
             <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />

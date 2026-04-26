@@ -109,7 +109,7 @@ export default function Register() {
         </div>
 
         <footer className="text-[10px] uppercase tracking-widest font-bold text-text-primary/40">
-          © 2024 Core 4 ERP
+          © 2026 Core 4 ERP
         </footer>
       </section>
 
