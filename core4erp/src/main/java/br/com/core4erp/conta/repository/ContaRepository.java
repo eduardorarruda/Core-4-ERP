@@ -89,6 +89,19 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
                                     @Param("statuses") Collection<StatusConta> statuses,
                                     @Param("data") LocalDate data);
 
+    // ── Conciliação: candidatas por valor próximo ─────────────────────────────
+
+    @Query("""
+        SELECT c FROM Conta c
+        WHERE c.usuario.id = :uid
+          AND c.status IN :statuses
+          AND ABS(c.valorOriginal - :valor) <= :tolerancia
+        """)
+    List<Conta> findCandidatasParaConciliacao(@Param("uid") Long uid,
+                                              @Param("statuses") Collection<StatusConta> statuses,
+                                              @Param("valor") BigDecimal valor,
+                                              @Param("tolerancia") BigDecimal tolerancia);
+
     // ── Projection interfaces ─────────────────────────────────────────────────
 
     interface FluxoMensalProjection {

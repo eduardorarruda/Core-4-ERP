@@ -14,6 +14,8 @@ public interface ContaCorrenteRepository extends JpaRepository<ContaCorrente, Lo
     Optional<ContaCorrente> findByIdAndUsuarioId(Long id, Long usuarioId);
     boolean existsByNumeroContaAndUsuarioId(String numeroConta, Long usuarioId);
 
+    Optional<ContaCorrente> findByNumeroContaAndUsuarioId(String numeroConta, Long usuarioId);
+
     @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM ContaCorrente c WHERE c.usuario.id = :uid")
     BigDecimal sumSaldoByUsuarioId(@Param("uid") Long uid);
 }
