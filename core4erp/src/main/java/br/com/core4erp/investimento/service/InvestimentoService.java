@@ -113,6 +113,7 @@ public class InvestimentoService {
             }
             case RESGATE -> conta.setSaldoAtual(conta.getSaldoAtual().subtract(dto.valor()));
             case RENDIMENTO -> conta.setSaldoAtual(conta.getSaldoAtual().add(dto.valor()));
+            default -> throw new IllegalArgumentException("Tipo de transação desconhecido: " + tipo);
         }
 
         contaRepo.save(conta);

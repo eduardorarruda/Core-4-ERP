@@ -17,6 +17,9 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @Tag(name = "Autenticação", description = "Registro, login e perfil do usuário")
 @RestController
@@ -65,6 +68,20 @@ public class AuthController {
             @Valid @RequestBody AtualizarPerfilRequestDto dto,
             Authentication authentication) {
         return ResponseEntity.ok(authService.atualizarPerfil(authentication.getName(), dto));
+    }
+
+    @Operation(summary = "Atualizar foto de perfil via multipart")
+    @PostMapping("/foto")
+    public ResponseEntity<MeResponseDto> uploadFoto(
+            @RequestParam("foto") MultipartFile foto,
+            Authentication authentication) throws IOException {
+        if (foto.isEmpty()) throw new IllegalArgumentException("Arquivo não pode estar vazio");
+        String contentType = foto.getContentType();
+        if (contentType == null || !contentType.startsWith("image/"))
+            throw new IllegalArgumentException("Formato de arquivo não suportado. Use PNG, JPEG ou WebP.");
+        if (foto.getSize() > 1_500_000)
+            throw new IllegalArgumentException("Foto excede o tamanho máximo de 1.5 MB");
+        return ResponseEntity.ok(authService.atualizarFotoPerfil(authentication.getName(), foto.getBytes(), contentType));
     }
 
     private static String jwtCookie(String value, long maxAgeSeconds) {

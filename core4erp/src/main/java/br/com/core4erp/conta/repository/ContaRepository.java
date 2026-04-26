@@ -6,6 +6,7 @@ import br.com.core4erp.enums.TipoConta;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,7 +16,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface ContaRepository extends JpaRepository<Conta, Long> {
+public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecificationExecutor<Conta> {
 
     Page<Conta> findAllByUsuarioId(Long usuarioId, Pageable pageable);
 
@@ -88,6 +89,10 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
     Long countByStatusAndDataBefore(@Param("uid") Long uid,
                                     @Param("statuses") Collection<StatusConta> statuses,
                                     @Param("data") LocalDate data);
+
+    // ── Relatório: contas por período ────────────────────────────────────────
+
+    List<Conta> findAllByUsuarioIdAndDataVencimentoBetween(Long usuarioId, LocalDate inicio, LocalDate fim);
 
     // ── Conciliação: candidatas por valor próximo ─────────────────────────────
 

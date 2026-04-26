@@ -43,7 +43,24 @@ export default function Dashboard() {
     }).finally(() => setCarregando(false));
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setCarregando(true);
+    Promise.all([
+      dashboard.resumo().catch(() => null),
+      investimentos.listar().catch(() => []),
+      assinaturasApi.listar().catch(() => []),
+    ]).then(([d, inv, assin]) => {
+      if (cancelled) return;
+      if (d) setDados(d);
+      setCarteira(inv ?? []);
+      setAssinaturasLista(assin ?? []);
+      setLastUpdate(new Date());
+    }).finally(() => {
+      if (!cancelled) setCarregando(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const isDark = theme === 'dark';
   const COLORS = isDark ? COLORS_DARK : COLORS_LIGHT;
@@ -299,8 +316,8 @@ export default function Dashboard() {
             <ResponsiveContainer width={192} height={192}>
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {pieData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
@@ -312,8 +329,8 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 w-full mt-8">
-            {pieData.map((entry, index) => (
-              <div key={index} className="flex items-center gap-2">
+            {pieData.map((entry) => (
+              <div key={entry.name} className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                 <span className="text-[10px] text-text-primary/60 uppercase font-bold truncate">{entry.name}</span>
               </div>
@@ -396,7 +413,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={160}>
               <PieChart>
                 <Pie data={pieAssinaturas} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value" stroke="none">
-                  {pieAssinaturas.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  {pieAssinaturas.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
               </PieChart>

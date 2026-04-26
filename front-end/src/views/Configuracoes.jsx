@@ -19,6 +19,7 @@ function getInitials(nome) {
 export default function Configuracoes() {
   const toast = useToast();
   const [form, setForm] = useState({ email: '', nome: '', novaSenha: '', confirmarSenha: '', fotoPerfil: null });
+  const [fotoFile, setFotoFile] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [activeTab, setActiveTab] = useState('Perfil');
@@ -35,6 +36,7 @@ export default function Configuracoes() {
 
   const processFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
+    setFotoFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setForm((f) => ({ ...f, fotoPerfil: ev.target.result }));
     reader.readAsDataURL(file);
@@ -56,9 +58,13 @@ export default function Configuracoes() {
     }
     setSalvando(true);
     try {
-      const dto = { nome: form.nome, novaSenha: form.novaSenha || null, fotoPerfil: form.fotoPerfil || null };
+      if (fotoFile) {
+        await auth.uploadFoto(fotoFile);
+        setFotoFile(null);
+      }
+      const dto = { nome: form.nome, novaSenha: form.novaSenha || null };
       const atualizado = await auth.atualizarPerfil(dto);
-      localStorage.setItem('usuario', JSON.stringify(atualizado));
+      sessionStorage.setItem('usuario', JSON.stringify(atualizado));
       setForm((f) => ({ ...f, novaSenha: '', confirmarSenha: '' }));
       setSavedOk(true);
       toast.success('Perfil atualizado com sucesso!');
@@ -170,8 +176,8 @@ export default function Configuracoes() {
               <PasswordInput
                 value={form.novaSenha}
                 onChange={set('novaSenha')}
-                placeholder="Mínimo 6 caracteres"
-                minLength={form.novaSenha ? 6 : undefined}
+                placeholder="Mín. 8 chars — maiúscula, minúscula e número"
+                minLength={form.novaSenha ? 8 : undefined}
               />
             </div>
             <div>

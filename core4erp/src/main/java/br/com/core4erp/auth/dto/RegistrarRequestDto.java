@@ -14,8 +14,8 @@ public record RegistrarRequestDto(
 
         @NotBlank(message = "Senha é obrigatória")
         @Pattern(
-                regexp = "^(?=.*[A-Za-z])(?=.*\\d).{6,}$",
-                message = "Senha deve ter mínimo 6 caracteres, incluindo letra e número"
+                regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$",
+                message = "Senha deve ter mínimo 8 caracteres, incluindo maiúscula, minúscula e número"
         )
         String senha,
 

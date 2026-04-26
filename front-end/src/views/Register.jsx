@@ -25,7 +25,7 @@ export default function Register() {
       const telefone = form.telefone ? Number(form.telefone.replace(/\D/g, '')) : null;
       await auth.registrar(form.nome, form.email, form.senha, telefone);
       const usuario = await auth.login(form.email, form.senha);
-      localStorage.setItem('usuario', JSON.stringify(usuario));
+      sessionStorage.setItem('usuario', JSON.stringify(usuario));
       navigate('/dashboard');
     } catch (err) {
       setErro(err.message || 'Erro ao criar conta');

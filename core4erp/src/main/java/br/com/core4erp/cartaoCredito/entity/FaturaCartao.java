@@ -5,9 +5,11 @@ import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.enums.StatusFatura;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+@EqualsAndHashCode(of = "id", callSuper = false)
 @Getter
 @Setter
 @Entity
