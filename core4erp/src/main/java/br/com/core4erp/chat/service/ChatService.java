@@ -6,6 +6,8 @@ import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -20,8 +22,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class ChatService {
@@ -36,9 +39,13 @@ public class ChatService {
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
 
-    // Memória in-memory por email do usuário.
-    // Em produção, substituir por Redis com TTL.
-    private final Map<String, List<Message>> memoriaConversas = new ConcurrentHashMap<>();
+    private static final Pattern DOWNLOAD_URL_PATTERN =
+            Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
+
+    private final Cache<String, List<Message>> memoriaConversas = Caffeine.newBuilder()
+            .expireAfterAccess(2, TimeUnit.HOURS)
+            .maximumSize(1000)
+            .build();
 
     private static final int MAX_HISTORICO = 20;
 
@@ -62,8 +69,7 @@ public class ChatService {
         String email = securityCtx.getEmail();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
 
-        List<Message> historico = memoriaConversas
-                .computeIfAbsent(email, k -> new ArrayList<>());
+        List<Message> historico = memoriaConversas.get(email, k -> new ArrayList<>());
 
         historico.add(new UserMessage(sanitizer.sanitize(request.mensagem())));
 
@@ -78,7 +84,9 @@ public class ChatService {
                 .call()
                 .chatResponse();
 
-        String respostaTexto = response.getResult().getOutput().getText();
+        String respostaTexto = (response.getResult() != null && response.getResult().getOutput() != null)
+                ? response.getResult().getOutput().getText()
+                : "";
 
         log.info("[CHAT-USAGE] user={} usage={}", email, response.getMetadata().getUsage());
 
@@ -95,8 +103,7 @@ public class ChatService {
         String email = securityCtx.getEmail();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
 
-        List<Message> historico = memoriaConversas
-                .computeIfAbsent(email, k -> new ArrayList<>());
+        List<Message> historico = memoriaConversas.get(email, k -> new ArrayList<>());
         historico.add(new UserMessage(sanitizer.sanitize(request.mensagem())));
 
         List<Message> allMessages = new ArrayList<>();
@@ -128,7 +135,7 @@ public class ChatService {
     }
 
     public void limparHistorico() {
-        memoriaConversas.remove(securityCtx.getEmail());
+        memoriaConversas.invalidate(securityCtx.getEmail());
     }
 
     private void podarHistorico(List<Message> historico) {
@@ -138,13 +145,8 @@ public class ChatService {
     }
 
     private String extrairDownloadUrl(String resposta) {
-        if (resposta != null && resposta.contains("/api/chat/relatorios/")) {
-            int inicio = resposta.indexOf("/api/chat/relatorios/");
-            int fim = resposta.indexOf(".xlsx", inicio);
-            if (fim > inicio) {
-                return resposta.substring(inicio, fim + 5);
-            }
-        }
-        return null;
+        if (resposta == null) return null;
+        Matcher m = DOWNLOAD_URL_PATTERN.matcher(resposta);
+        return m.find() ? m.group() : null;
     }
 }

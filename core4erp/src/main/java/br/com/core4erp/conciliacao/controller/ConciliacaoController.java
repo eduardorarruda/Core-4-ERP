@@ -90,7 +90,7 @@ public class ConciliacaoController {
     @PostMapping("/{id}/finalizar")
     public ResponseEntity<ConciliacaoResponseDto> finalizar(
             @PathVariable Long id,
-            @RequestBody(required = false) FinalizarConciliacaoRequestDto dto) {
+            @Valid @RequestBody(required = false) FinalizarConciliacaoRequestDto dto) {
         return ResponseEntity.ok(service.finalizar(id, dto));
     }
 

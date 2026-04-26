@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUsuario, auth } from '../lib/api';
+import { getUsuario, auth, clearAuth } from '../lib/api';
 
 export function useAuth() {
   const navigate = useNavigate();
@@ -8,7 +8,7 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try { await auth.logout(); } catch {}
-    localStorage.removeItem('usuario');
+    clearAuth();
     navigate('/login');
   }, [navigate]);
 

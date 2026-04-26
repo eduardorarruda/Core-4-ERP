@@ -43,7 +43,7 @@ function PageSkeleton() {
 }
 
 function isAuthenticated() {
-  return Boolean(localStorage.getItem('usuario'));
+  return Boolean(sessionStorage.getItem('usuario'));
 }
 
 function AdminRoute({ children }) {

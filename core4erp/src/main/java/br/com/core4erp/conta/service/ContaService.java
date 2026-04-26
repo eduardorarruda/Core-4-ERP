@@ -1,7 +1,6 @@
 package br.com.core4erp.conta.service;
 
-import br.com.core4erp.cartaoCredito.entity.FaturaCartao;
-import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
+import br.com.core4erp.cartaoCredito.service.FaturaCartaoService;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
@@ -12,11 +11,11 @@ import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.entity.ContaBaixada;
 import br.com.core4erp.conta.repository.ContaBaixadaRepository;
 import br.com.core4erp.conta.repository.ContaRepository;
+import br.com.core4erp.conta.repository.ContaSpec;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.enums.StatusConta;
-import br.com.core4erp.enums.StatusFatura;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
@@ -24,6 +23,7 @@ import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +43,7 @@ public class ContaService {
     private final ParceiroRepository parceiroRepository;
     private final ContaCorrenteService contaCorrenteService;
     private final ContaCorrenteRepository contaCorrenteRepository;
-    private final FaturaCartaoRepository faturaCartaoRepository;
+    private final FaturaCartaoService faturaCartaoService;
     private final SecurityContextUtils securityCtx;
 
     public ContaService(ContaRepository contaRepository,
@@ -52,7 +52,7 @@ public class ContaService {
                         ParceiroRepository parceiroRepository,
                         ContaCorrenteService contaCorrenteService,
                         ContaCorrenteRepository contaCorrenteRepository,
-                        FaturaCartaoRepository faturaCartaoRepository,
+                        FaturaCartaoService faturaCartaoService,
                         SecurityContextUtils securityCtx) {
         this.contaRepository = contaRepository;
         this.baixadaRepository = baixadaRepository;
@@ -60,7 +60,7 @@ public class ContaService {
         this.parceiroRepository = parceiroRepository;
         this.contaCorrenteService = contaCorrenteService;
         this.contaCorrenteRepository = contaCorrenteRepository;
-        this.faturaCartaoRepository = faturaCartaoRepository;
+        this.faturaCartaoService = faturaCartaoService;
         this.securityCtx = securityCtx;
     }
 
@@ -74,6 +74,28 @@ public class ContaService {
     public Page<ContaResponseDto> listarPorTipo(TipoConta tipo, Pageable pageable) {
         return contaRepository.findAllByUsuarioIdAndTipo(securityCtx.getUsuarioId(), tipo, pageable)
                 .map(ContaResponseDto::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ContaResponseDto> listarComFiltros(
+            TipoConta tipo, StatusConta status, String numeroDocumento,
+            LocalDate vencimentoInicio, LocalDate vencimentoFim,
+            Long parceiroId, BigDecimal valorMin, BigDecimal valorMax,
+            Long categoriaId, Pageable pageable) {
+
+        Specification<Conta> spec = ContaSpec.usuarioId(securityCtx.getUsuarioId());
+        if (tipo != null)               spec = spec.and(ContaSpec.tipo(tipo));
+        if (status != null)             spec = spec.and(ContaSpec.status(status));
+        if (numeroDocumento != null && !numeroDocumento.isBlank())
+                                        spec = spec.and(ContaSpec.numeroDocumentoContains(numeroDocumento));
+        if (vencimentoInicio != null)   spec = spec.and(ContaSpec.vencimentoApartirDe(vencimentoInicio));
+        if (vencimentoFim != null)      spec = spec.and(ContaSpec.vencimentoAte(vencimentoFim));
+        if (parceiroId != null)         spec = spec.and(ContaSpec.parceiroId(parceiroId));
+        if (valorMin != null)           spec = spec.and(ContaSpec.valorMinimo(valorMin));
+        if (valorMax != null)           spec = spec.and(ContaSpec.valorMaximo(valorMax));
+        if (categoriaId != null)        spec = spec.and(ContaSpec.categoriaId(categoriaId));
+
+        return contaRepository.findAll(spec, pageable).map(ContaResponseDto::from);
     }
 
     @Transactional(readOnly = true)
@@ -110,7 +132,7 @@ public class ContaService {
 
         BigDecimal ac = dto.acrescimo() != null ? dto.acrescimo() : BigDecimal.ZERO;
         BigDecimal desc = dto.desconto() != null ? dto.desconto() : BigDecimal.ZERO;
-        BigDecimal valorLiquido = valorPorParcela.add(ac).subtract(desc);
+        BigDecimal valorLiquido = valorPorParcela.add(ac).subtract(desc).setScale(2, RoundingMode.HALF_UP);
 
         String grupo = parcelas > 1 ? UUID.randomUUID().toString() : null;
         List<Conta> criadas = new ArrayList<>();
@@ -169,12 +191,7 @@ public class ContaService {
         if (baixadaRepository.existsByContaId(id)) {
             throw new IllegalStateException("Não é possível excluir uma conta já baixada");
         }
-        // RN2: se esta conta foi gerada pelo fechamento de uma fatura, reabrir a fatura
-        faturaCartaoRepository.findByContaId(id).ifPresent(fatura -> {
-            fatura.setStatus(StatusFatura.ABERTA);
-            fatura.setConta(null);
-            faturaCartaoRepository.save(fatura);
-        });
+        faturaCartaoService.reabrirEDesvincular(id);
         contaRepository.delete(conta);
     }
 
@@ -200,7 +217,8 @@ public class ContaService {
         BigDecimal acrescimo = nullSafe(dto.acrescimo());
         BigDecimal desconto = nullSafe(dto.desconto());
         BigDecimal valorFinal = conta.getValorOriginal()
-                .add(juros).add(multa).add(acrescimo).subtract(desconto);
+                .add(juros).add(multa).add(acrescimo).subtract(desconto)
+                .setScale(2, RoundingMode.HALF_UP);
 
         ContaBaixada baixada = new ContaBaixada();
         baixada.setConta(conta);
@@ -251,11 +269,7 @@ public class ContaService {
         conta.setStatus(StatusConta.PENDENTE);
         ContaResponseDto result = ContaResponseDto.from(contaRepository.save(conta));
 
-        // RN2: se esta conta era de uma fatura, reabrir a fatura
-        faturaCartaoRepository.findByContaId(id).ifPresent(fatura -> {
-            fatura.setStatus(StatusFatura.ABERTA);
-            faturaCartaoRepository.save(fatura);
-        });
+        faturaCartaoService.reabrir(id);
 
         return result;
     }

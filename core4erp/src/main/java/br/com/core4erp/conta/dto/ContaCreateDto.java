@@ -5,12 +5,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record ContaCreateDto(
         @NotBlank(message = "Descrição é obrigatória")
+        @Size(max = 255, message = "Descrição deve ter no máximo 255 caracteres")
         String descricao,
 
         @NotNull(message = "Valor é obrigatório")
@@ -35,6 +37,7 @@ public record ContaCreateDto(
 
         Boolean dividirValor,
 
+        @Size(max = 50)
         String numeroDocumento,
 
         BigDecimal acrescimo,

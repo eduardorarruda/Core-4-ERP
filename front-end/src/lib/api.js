@@ -1,24 +1,34 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
-function clearAuth() {
-  localStorage.removeItem('usuario');
-  sessionStorage.removeItem('access_token');
+export function clearAuth() {
+  sessionStorage.removeItem('usuario');
 }
 
 async function request(path, options = {}) {
-  const { skipAuthRedirect, ...fetchOptions } = options;
-  const token = sessionStorage.getItem('access_token');
+  const { skipAuthRedirect, timeout = 30000, ...fetchOptions } = options;
+  const isFormData = fetchOptions.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...fetchOptions.headers,
   };
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...fetchOptions,
-    headers,
-    credentials: 'include',
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...fetchOptions,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Tempo limite da requisição esgotado');
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (res.status === 401 && !skipAuthRedirect) {
     clearAuth();
@@ -39,13 +49,12 @@ async function request(path, options = {}) {
 export const auth = {
   login: async (email, senha) => {
     const result = await request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true });
-    if (result?.accessToken) sessionStorage.setItem('access_token', result.accessToken);
     return result?.usuario ?? result;
   },
 
   logout: async () => {
     try { await request('/api/auth/logout', { method: 'POST' }); } catch {}
-    sessionStorage.removeItem('access_token');
+    clearAuth();
   },
 
   registrar: (nome, email, senha, telefone) =>
@@ -55,10 +64,16 @@ export const auth = {
 
   atualizarPerfil: (dto) =>
     request('/api/auth/perfil', { method: 'PUT', body: JSON.stringify(dto) }),
+
+  uploadFoto: (file) => {
+    const formData = new FormData();
+    formData.append('foto', file);
+    return request('/api/auth/foto', { method: 'POST', body: formData });
+  },
 };
 
 export function getUsuario() {
-  return JSON.parse(localStorage.getItem('usuario') || 'null');
+  return JSON.parse(sessionStorage.getItem('usuario') || 'null');
 }
 
 // ── Categorias ────────────────────────────────────────────────────────────────
@@ -172,18 +187,8 @@ export const conciliacao = {
   upload: (arquivo, contaCorrenteId) => {
     const formData = new FormData();
     formData.append('arquivo', arquivo);
-    const token = sessionStorage.getItem('access_token');
     const qs = contaCorrenteId ? `?contaCorrenteId=${contaCorrenteId}` : '';
-    return fetch(`${BASE_URL}/api/conciliacao/upload${qs}`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-      body: formData,
-    }).then(async (res) => {
-      if (res.status === 401) { clearAuth(); window.location.href = '/login'; throw new Error('Sessão expirada'); }
-      if (!res.ok) { const b = await res.json().catch(() => ({ mensagem: res.statusText })); throw new Error(b.mensagem || `Erro ${res.status}`); }
-      return res.json();
-    });
+    return request(`/api/conciliacao/upload${qs}`, { method: 'POST', body: formData, timeout: 60000 });
   },
   listar: () => request('/api/conciliacao'),
   buscar: (id) => request(`/api/conciliacao/${id}`),
@@ -206,10 +211,8 @@ function relatorioQs(inicio, fim, params = {}) {
 }
 
 async function downloadRelatorio(path) {
-  const token = sessionStorage.getItem('access_token');
   const res = await fetch(`${BASE_URL}${path}`, {
     credentials: 'include',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (res.status === 401) {
     clearAuth();
