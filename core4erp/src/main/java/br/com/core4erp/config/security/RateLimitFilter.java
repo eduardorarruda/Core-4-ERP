@@ -22,6 +22,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Bucket> chatBuckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Bucket> uploadBuckets = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper;
 
     public RateLimitFilter(ObjectMapper objectMapper) {
@@ -33,7 +34,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return !path.equals("/api/auth/login")
                 && !path.equals("/api/auth/registrar")
-                && !path.startsWith("/api/chat");
+                && !path.startsWith("/api/chat")
+                && !path.equals("/api/conciliacao/upload");
     }
 
     @Override
@@ -42,7 +44,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String ip = resolveClientIp(request);
         String path = request.getServletPath();
         boolean isChat = path.startsWith("/api/chat");
-        Bucket bucket = isChat ? resolveChatBucket(ip) : resolveBucket(ip);
+        boolean isUpload = path.equals("/api/conciliacao/upload");
+        Bucket bucket = isChat ? resolveChatBucket(ip)
+                : isUpload ? resolveUploadBucket(ip)
+                : resolveBucket(ip);
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
@@ -51,6 +56,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             String msg = isChat
                     ? "Limite de mensagens atingido. Aguarde 1 minuto."
+                    : isUpload
+                    ? "Limite de uploads atingido. Aguarde 1 hora."
                     : "Muitas tentativas. Aguarde 1 minuto.";
             objectMapper.writeValue(response.getWriter(), Map.of("erro", msg));
         }
@@ -72,6 +79,16 @@ public class RateLimitFilter extends OncePerRequestFilter {
                         .addLimit(Bandwidth.builder()
                                 .capacity(30)
                                 .refillIntervally(30, Duration.ofMinutes(1))
+                                .build())
+                        .build());
+    }
+
+    private Bucket resolveUploadBucket(String ip) {
+        return uploadBuckets.computeIfAbsent(ip, k ->
+                Bucket.builder()
+                        .addLimit(Bandwidth.builder()
+                                .capacity(10)
+                                .refillIntervally(10, Duration.ofHours(1))
                                 .build())
                         .build());
     }
