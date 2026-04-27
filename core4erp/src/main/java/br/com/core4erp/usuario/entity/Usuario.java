@@ -2,9 +2,13 @@ package br.com.core4erp.usuario.entity;
 
 import br.com.core4erp.config.auditing.Auditable;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
+@EqualsAndHashCode(of = "id", callSuper = false)
 @Getter
 @Setter
 @Entity
@@ -31,4 +35,10 @@ public class Usuario extends Auditable {
 
     @Column(columnDefinition = "TEXT")
     private String fotoPerfil;
+
+    @Column(name = "login_attempts", nullable = false)
+    private int loginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 }

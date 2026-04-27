@@ -9,7 +9,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -46,11 +45,7 @@ public class RelatorioExcelService {
 
     public String gerarRelatorioDespesas(LocalDate inicio, LocalDate fim) {
         Long uid = securityCtx.getUsuarioId();
-        var contas = contaRepository.findAllByUsuarioId(uid,
-                PageRequest.of(0, 10000)).getContent().stream()
-                .filter(c -> !c.getDataVencimento().isBefore(inicio)
-                          && !c.getDataVencimento().isAfter(fim))
-                .toList();
+        var contas = contaRepository.findAllByUsuarioIdAndDataVencimentoBetween(uid, inicio, fim);
 
         String fileName = UUID.randomUUID() + ".xlsx";
         Path filePath = Path.of(relatoriosDir, fileName);

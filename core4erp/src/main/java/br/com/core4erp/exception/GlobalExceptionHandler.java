@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -68,6 +69,13 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(LockedException.class)
+    public ResponseEntity<ErrorResponseDto> handleLocked(LockedException e) {
+        return ResponseEntity.status(423).body(new ErrorResponseDto(
+                "CONTA_BLOQUEADA", e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ErrorResponseDto> handleAuthentication(AuthenticationException e) {
         return ResponseEntity.status(401).body(new ErrorResponseDto(
@@ -84,7 +92,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDto> handleGeneral(Exception e) {
-        log.error("[ERRO_INTERNO] Exceção não tratada:", e);
+        log.error("[ERRO_INTERNO] Exceção não tratada — {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         return ResponseEntity.status(500).body(new ErrorResponseDto(
                 "ERRO_INTERNO", "Erro interno do servidor", LocalDateTime.now()
         ));

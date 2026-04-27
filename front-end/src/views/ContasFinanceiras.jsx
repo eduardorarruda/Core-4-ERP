@@ -14,7 +14,7 @@ const STATUS_VARIANT = { PENDENTE: 'warning', ATRASADO: 'error', PAGO: 'success'
 
 const emptyForm = { descricao: '', valorOriginal: '', dataVencimento: '', tipo: 'PAGAR', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: false, numeroDocumento: '', acrescimo: '', desconto: '' };
 const emptyBaixa = { contaCorrenteId: '', dataPagamento: '', juros: 0, multa: 0, acrescimo: 0, desconto: 0 };
-const emptyFiltros = { tipo: '', numeroDocumento: '', vencimentoInicio: '', vencimentoFim: '', parceiroId: '', valorMin: '', valorMax: '', categoriaId: '' };
+const emptyFiltros = { tipo: '', status: '', numeroDocumento: '', vencimentoInicio: '', vencimentoFim: '', parceiroId: '', valorMin: '', valorMax: '', categoriaId: '' };
 
 const COLUMNS = [
   { key: 'descricao', label: 'Descrição', render: (v, row) => (
@@ -69,16 +69,16 @@ export default function ContasFinanceiras() {
     try {
       const p = {};
       if (f.tipo) p.tipo = f.tipo;
+      if (f.status) p.status = f.status;
+      if (f.numeroDocumento.trim()) p.numeroDocumento = f.numeroDocumento.trim();
+      if (f.vencimentoInicio) p.vencimentoInicio = f.vencimentoInicio;
+      if (f.vencimentoFim) p.vencimentoFim = f.vencimentoFim;
+      if (f.parceiroId) p.parceiroId = f.parceiroId;
+      if (f.valorMin) p.valorMin = f.valorMin;
+      if (f.valorMax) p.valorMax = f.valorMax;
+      if (f.categoriaId) p.categoriaId = f.categoriaId;
       const res = await api.listar(p);
-      let lista = res.content || [];
-      if (f.numeroDocumento.trim()) lista = lista.filter((c) => c.numeroDocumento?.toLowerCase().includes(f.numeroDocumento.trim().toLowerCase()));
-      if (f.vencimentoInicio) lista = lista.filter((c) => c.dataVencimento >= f.vencimentoInicio);
-      if (f.vencimentoFim) lista = lista.filter((c) => c.dataVencimento <= f.vencimentoFim);
-      if (f.parceiroId) lista = lista.filter((c) => String(c.parceiroId) === String(f.parceiroId));
-      if (f.valorMin) lista = lista.filter((c) => Number(c.valorOriginal) >= Number(f.valorMin));
-      if (f.valorMax) lista = lista.filter((c) => Number(c.valorOriginal) <= Number(f.valorMax));
-      if (f.categoriaId) lista = lista.filter((c) => String(c.categoriaId) === String(f.categoriaId));
-      setContas(lista);
+      setContas(res.content || []);
     } catch (e) {
       toast.error(e.message);
     } finally {

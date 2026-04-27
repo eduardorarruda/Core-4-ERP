@@ -64,11 +64,17 @@ public class LancamentoTools {
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
         log.info("[CHAT-AUDIT] user={} tool=registrarConta descricao={} valor={} tipo={}",
                 securityCtx.getEmail(), descricao, valorOriginal, tipo);
+        TipoConta tipoConta;
+        try {
+            tipoConta = TipoConta.valueOf(tipo.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Tipo de conta inválido: '" + tipo + "'. Use PAGAR ou RECEBER.");
+        }
         ContaCreateDto dto = new ContaCreateDto(
                 descricao,
                 valorOriginal,
                 dataVencimento,
-                TipoConta.valueOf(tipo),
+                tipoConta,
                 categoriaId,
                 parceiroId,
                 quantidadeParcelas != null ? quantidadeParcelas : 1,
@@ -159,8 +165,14 @@ public class LancamentoTools {
             @ToolParam(description = "ID da conta corrente para débito (apenas para APORTE). Opcional") Long contaCorrenteOrigemId) {
         log.info("[CHAT-AUDIT] user={} tool=registrarTransacaoInvestimento contaId={} tipo={} valor={}",
                 securityCtx.getEmail(), contaInvestimentoId, tipoTransacao, valor);
+        TipoTransacaoInvestimento tipoEnum;
+        try {
+            tipoEnum = TipoTransacaoInvestimento.valueOf(tipoTransacao.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Tipo de transação inválido: '" + tipoTransacao + "'. Use APORTE, RESGATE ou RENDIMENTO.");
+        }
         TransacaoInvestimentoRequestDto dto = new TransacaoInvestimentoRequestDto(
-                TipoTransacaoInvestimento.valueOf(tipoTransacao),
+                tipoEnum,
                 valor,
                 dataTransacao,
                 contaCorrenteOrigemId

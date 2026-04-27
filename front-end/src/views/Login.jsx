@@ -28,7 +28,7 @@ export default function Login() {
     setCarregando(true);
     try {
       const usuario = await auth.login(email, senha);
-      localStorage.setItem('usuario', JSON.stringify(usuario));
+      sessionStorage.setItem('usuario', JSON.stringify(usuario));
       navigate('/dashboard');
     } catch (err) {
       setErro(err.message || 'Credenciais inválidas');
@@ -140,7 +140,7 @@ export default function Login() {
         </div>
 
         <footer className="flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-text-primary/30">
-          <span>© 2025 Core 4 ERP</span>
+          <span>© 2026 Core 4 ERP</span>
         </footer>
       </section>
 

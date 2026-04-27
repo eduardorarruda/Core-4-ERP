@@ -1,2 +1,4 @@
 .env
 front-end/.env
+front-end/node_modules
+Skill/
