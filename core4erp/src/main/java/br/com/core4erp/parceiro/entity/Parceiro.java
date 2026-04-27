@@ -4,9 +4,11 @@ import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.enums.TipoParceiro;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+@EqualsAndHashCode(of = "id", callSuper = false)
 @Getter
 @Setter
 @Entity

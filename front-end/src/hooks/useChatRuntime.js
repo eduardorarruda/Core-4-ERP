@@ -1,4 +1,6 @@
 import { useLocalRuntime } from "@assistant-ui/react";
+import { clearAuth } from "../lib/api";
+
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
@@ -22,7 +24,7 @@ const core4ChatAdapter = {
       });
 
       if (response.status === 401) {
-        localStorage.removeItem("usuario");
+        clearAuth();
         window.location.href = "/login";
         return;
       }

@@ -94,9 +94,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        // Trusted proxy header — use only when behind a known reverse proxy.
+        // Disabled by default to prevent IP spoofing in direct deployments.
+        // Enable by setting TRUSTED_PROXY=true and deploying behind a proxy.
+        String trustedProxy = System.getenv("TRUSTED_PROXY");
+        if ("true".equalsIgnoreCase(trustedProxy)) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                return forwarded.split(",")[0].trim();
+            }
         }
         return request.getRemoteAddr();
     }

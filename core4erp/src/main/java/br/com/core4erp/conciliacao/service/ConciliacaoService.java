@@ -119,6 +119,16 @@ public class ConciliacaoService {
         if (arquivo.getSize() > 5 * 1024 * 1024) {
             throw new IllegalArgumentException("Arquivo excede o tamanho máximo de 5 MB");
         }
+        String contentType = arquivo.getContentType();
+        if (contentType != null && !contentType.isBlank()) {
+            boolean tipoPermitido = contentType.startsWith("text/") ||
+                    contentType.equals("application/x-ofx") ||
+                    contentType.equals("application/vnd.intu.qbo") ||
+                    contentType.equals("application/octet-stream");
+            if (!tipoPermitido) {
+                throw new IllegalArgumentException("Tipo de arquivo não permitido: " + contentType);
+            }
+        }
 
         OfxDadosDto ofxDados;
         try {

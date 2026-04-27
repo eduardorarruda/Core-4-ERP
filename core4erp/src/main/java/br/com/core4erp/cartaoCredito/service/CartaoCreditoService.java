@@ -77,10 +77,14 @@ public class CartaoCreditoService {
         List<Long> ids = page.getContent().stream().map(CartaoCredito::getId).toList();
         Map<Long, BigDecimal> limitesUsados = new HashMap<>();
         lancamentoRepo.sumValorByCartaoIdsAndPeriod(
-                ids,
+                ids, uid,
                 inicio.getMonthValue(), inicio.getYear(),
                 fim.getMonthValue(), fim.getYear()
-        ).forEach(row -> limitesUsados.put((Long) row[0], (BigDecimal) row[1]));
+        ).forEach(row -> {
+            Long cartaoId = ((Number) row[0]).longValue();
+            BigDecimal soma = row[1] instanceof BigDecimal bd ? bd : new BigDecimal(row[1].toString());
+            limitesUsados.put(cartaoId, soma);
+        });
 
         return page.map(c -> CartaoCreditoResponseDto.from(c,
                 limitesUsados.getOrDefault(c.getId(), BigDecimal.ZERO)));

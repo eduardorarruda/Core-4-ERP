@@ -10,8 +10,7 @@ import { MessageCircle, X, Trash2, Send } from "lucide-react";
 import { useChatRuntime } from "../../hooks/useChatRuntime";
 import { DownloadToolUI } from "./RelatorioToolUI";
 import { cn } from "../../lib/utils";
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+import { chat } from "../../lib/api";
 
 const SUGGESTIONS = [
   "Ver saldo atual",
@@ -39,7 +38,7 @@ function ChatContent({ onClose }) {
 
   async function limparHistorico() {
     try {
-      await fetch(`${BASE_URL}/api/chat/historico`, { method: "DELETE", credentials: "include" });
+      await chat.limparHistorico();
     } catch {}
   }
 
