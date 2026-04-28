@@ -99,6 +99,7 @@ export default function ContasFinanceiras() {
     if (!form.valorOriginal || parseFloat(form.valorOriginal) <= 0) errs.valorOriginal = 'Maior que zero';
     if (!form.dataVencimento) errs.dataVencimento = 'Obrigatório';
     if (!form.categoriaId) errs.categoriaId = 'Obrigatório';
+    if (!form.parceiroId) errs.parceiroId = 'Obrigatório';
     if (Number(form.quantidadeParcelas) < 1) errs.quantidadeParcelas = 'Mínimo 1';
     if (valorLiquido <= 0) errs.valorOriginal = 'Valor líquido inválido';
     return errs;
@@ -186,7 +187,13 @@ export default function ContasFinanceiras() {
             </button>
           )}
           {(row.status === 'PAGO' || row.status === 'RECEBIDO') && (
-            <button onClick={() => estornar(row.id)} aria-label="Estornar quitação" title="Estornar" className="p-1.5 text-text-primary/40 hover:text-amber-400 transition-colors rounded-lg hover:bg-amber-400/10">
+            <button
+              onClick={() => !row.conciliada && estornar(row.id)}
+              aria-label="Estornar quitação"
+              title={row.conciliada ? 'Conta conciliada — estorno bloqueado' : 'Estornar'}
+              disabled={row.conciliada}
+              className={`p-1.5 transition-colors rounded-lg ${row.conciliada ? 'text-text-primary/20 cursor-not-allowed' : 'text-text-primary/40 hover:text-amber-400 hover:bg-amber-400/10'}`}
+            >
               <RotateCcw className="w-4 h-4" />
             </button>
           )}
@@ -315,9 +322,9 @@ export default function ContasFinanceiras() {
                   {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
                 </select>
               </FormField>
-              <FormField label={form.tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'}>
+              <FormField label={form.tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'} required error={errors.parceiroId}>
                 <select className={`${inputCls} appearance-none`} value={form.parceiroId} onChange={(e) => setF('parceiroId')(e.target.value)}>
-                  <option value="">— Opcional —</option>
+                  <option value="">— Selecionar —</option>
                   {parsFiltered.map((p) => <option key={p.id} value={p.id}>{p.razaoSocial}{p.nomeFantasia ? ` (${p.nomeFantasia})` : ''}</option>)}
                 </select>
               </FormField>

@@ -13,7 +13,9 @@ public record AssinaturaResponseDto(
         Long categoriaId,
         String categoriaDescricao,
         Long parceiroId,
-        String parceiroNome
+        String parceiroNome,
+        Long cartaoCreditoId,
+        String cartaoCreditoNome
 ) {
     public static AssinaturaResponseDto from(Assinatura a) {
         return new AssinaturaResponseDto(
@@ -25,7 +27,9 @@ public record AssinaturaResponseDto(
                 a.getCategoria().getId(),
                 a.getCategoria().getDescricao(),
                 a.getParceiro() != null ? a.getParceiro().getId() : null,
-                a.getParceiro() != null ? a.getParceiro().getNomeFantasia() : null
+                a.getParceiro() != null ? a.getParceiro().getNomeFantasia() : null,
+                a.getCartaoCredito() != null ? a.getCartaoCredito().getId() : null,
+                a.getCartaoCredito() != null ? a.getCartaoCredito().getNome() : null
         );
     }
 }

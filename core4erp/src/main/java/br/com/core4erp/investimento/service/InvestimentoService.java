@@ -6,6 +6,8 @@ import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.investimento.dto.*;
 import br.com.core4erp.investimento.entity.ContaInvestimento;
+import br.com.core4erp.exception.BusinessException;
+import br.com.core4erp.investimento.entity.TipoInvestimentoCustom;
 import br.com.core4erp.investimento.entity.TransacaoInvestimento;
 import br.com.core4erp.investimento.repository.ContaInvestimentoRepository;
 import br.com.core4erp.investimento.repository.TransacaoInvestimentoRepository;
@@ -22,15 +24,18 @@ public class InvestimentoService {
     private final ContaInvestimentoRepository contaRepo;
     private final TransacaoInvestimentoRepository transacaoRepo;
     private final ContaCorrenteService contaCorrenteService;
+    private final TipoInvestimentoService tipoService;
     private final SecurityContextUtils securityCtx;
 
     public InvestimentoService(ContaInvestimentoRepository contaRepo,
                                TransacaoInvestimentoRepository transacaoRepo,
                                ContaCorrenteService contaCorrenteService,
+                               TipoInvestimentoService tipoService,
                                SecurityContextUtils securityCtx) {
         this.contaRepo = contaRepo;
         this.transacaoRepo = transacaoRepo;
         this.contaCorrenteService = contaCorrenteService;
+        this.tipoService = tipoService;
         this.securityCtx = securityCtx;
     }
 
@@ -49,9 +54,10 @@ public class InvestimentoService {
 
     @Transactional
     public ContaInvestimentoResponseDto criar(ContaInvestimentoRequestDto dto) {
+        TipoInvestimentoCustom tipo = tipoService.findOwned(dto.tipoId());
         ContaInvestimento c = new ContaInvestimento();
         c.setNome(dto.nome());
-        c.setTipo(dto.tipo());
+        c.setTipoInvestimento(tipo);
         c.setSaldoAtual(BigDecimal.ZERO);
         c.setUsuario(securityCtx.getUsuario());
         return ContaInvestimentoResponseDto.from(contaRepo.save(c));
@@ -59,9 +65,10 @@ public class InvestimentoService {
 
     @Transactional
     public ContaInvestimentoResponseDto atualizar(Long id, ContaInvestimentoRequestDto dto) {
+        TipoInvestimentoCustom tipo = tipoService.findOwned(dto.tipoId());
         ContaInvestimento c = findOwnedConta(id);
         c.setNome(dto.nome());
-        c.setTipo(dto.tipo());
+        c.setTipoInvestimento(tipo);
         return ContaInvestimentoResponseDto.from(contaRepo.save(c));
     }
 
@@ -105,8 +112,11 @@ public class InvestimentoService {
                 conta.setSaldoAtual(conta.getSaldoAtual().add(dto.valor()));
                 if (dto.contaCorrenteOrigemId() != null) {
                     ContaCorrente cc = contaCorrenteService.findOwned(dto.contaCorrenteOrigemId());
-                    if (cc.getSaldo().compareTo(dto.valor()) < 0)
-                        throw new IllegalStateException("Saldo insuficiente na conta corrente");
+                    if (cc.getSaldo().compareTo(dto.valor()) < 0
+                            && !Boolean.TRUE.equals(cc.getPermitirSaldoNegativo())) {
+                        throw new BusinessException("SALDO_INSUFICIENTE",
+                                "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
+                    }
                     cc.setSaldo(cc.getSaldo().subtract(dto.valor()));
                     t.setContaCorrenteOrigem(cc);
                 }

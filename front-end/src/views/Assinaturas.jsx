@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Repeat, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
-import { assinaturas as api, categorias as catApi, parceiros as parApi } from '../lib/api';
+import { assinaturas as api, categorias as catApi, parceiros as parApi, cartoes as cartoesApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls, labelCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
@@ -10,13 +10,14 @@ import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
 
-const emptyForm = { descricao: '', valor: '', diaVencimento: '', categoriaId: '', parceiroId: '', ativa: true };
+const emptyForm = { descricao: '', valor: '', diaVencimento: '', categoriaId: '', parceiroId: '', cartaoCreditoId: '', ativa: true };
 
 export default function Assinaturas() {
   const toast = useToast();
   const [lista, setLista] = useState([]);
   const [cats, setCats] = useState([]);
   const [pars, setPars] = useState([]);
+  const [cartoes, setCartoes] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [salvando, setSalvando] = useState(false);
@@ -27,6 +28,7 @@ export default function Assinaturas() {
   useEffect(() => {
     catApi.listar().then(setCats).catch(() => {});
     parApi.listar().then((data) => setPars(data.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'))).catch(() => {});
+    cartoesApi.listar().then(setCartoes).catch(() => {});
     carregar();
   }, []);
 
@@ -43,6 +45,7 @@ export default function Assinaturas() {
     if (!form.valor || Number(form.valor) <= 0) e.valor = 'Deve ser maior que zero';
     if (!form.diaVencimento || Number(form.diaVencimento) < 1 || Number(form.diaVencimento) > 31) e.diaVencimento = 'Entre 1 e 31';
     if (!form.categoriaId) e.categoriaId = 'Obrigatório';
+    if (!form.parceiroId) e.parceiroId = 'Obrigatório';
     return e;
   }
 
@@ -60,6 +63,7 @@ export default function Assinaturas() {
         ativa: form.ativa,
         categoriaId: Number(form.categoriaId),
         parceiroId: form.parceiroId ? Number(form.parceiroId) : null,
+        cartaoCreditoId: form.cartaoCreditoId ? Number(form.cartaoCreditoId) : null,
       };
       if (editingId) {
         await api.atualizar(editingId, dto);
@@ -80,7 +84,7 @@ export default function Assinaturas() {
   }
 
   function editar(a) {
-    setForm({ descricao: a.descricao, valor: String(a.valor), diaVencimento: String(a.diaVencimento), categoriaId: String(a.categoriaId), parceiroId: a.parceiroId ? String(a.parceiroId) : '', ativa: a.ativa });
+    setForm({ descricao: a.descricao, valor: String(a.valor), diaVencimento: String(a.diaVencimento), categoriaId: String(a.categoriaId), parceiroId: a.parceiroId ? String(a.parceiroId) : '', cartaoCreditoId: a.cartaoCreditoId ? String(a.cartaoCreditoId) : '', ativa: a.ativa });
     setEditingId(a.id);
     setErrors({});
     setShowForm(true);
@@ -191,10 +195,16 @@ export default function Assinaturas() {
                 {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
               </select>
             </FormField>
-            <FormField label="Parceiro / Fornecedor">
+            <FormField label="Parceiro / Fornecedor" required error={errors.parceiroId}>
               <select className={`${inputCls} appearance-none`} value={form.parceiroId} onChange={(e) => setF('parceiroId')(e.target.value)}>
-                <option value="">— Nenhum —</option>
+                <option value="">— Selecionar —</option>
                 {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Cartão de Crédito">
+              <select className={`${inputCls} appearance-none`} value={form.cartaoCreditoId} onChange={(e) => setF('cartaoCreditoId')(e.target.value)}>
+                <option value="">— Débito em conta —</option>
+                {cartoes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </select>
             </FormField>
             <FormField label="Status">
@@ -268,8 +278,13 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
 
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-[10px] text-text-primary/40 uppercase tracking-wider">Vence dia</p>
+          <p className="text-[10px] text-text-primary/40 uppercase tracking-wider">
+            {a.cartaoCreditoNome ? 'Cobrança dia' : 'Vence dia'}
+          </p>
           <p className="text-lg font-bold text-text-primary font-display">{a.diaVencimento}</p>
+          {a.cartaoCreditoNome && (
+            <p className="text-[10px] text-primary/70 mt-0.5">{a.cartaoCreditoNome}</p>
+          )}
         </div>
         <div className="text-right">
           <p className="text-[10px] text-text-primary/40 uppercase tracking-wider">Por mês</p>
@@ -279,9 +294,14 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
       </div>
 
       <div className="flex items-center justify-between">
-        <Badge variant={a.ativa ? 'success' : 'neutral'} dot={a.ativa}>
-          {a.ativa ? 'Ativa' : 'Inativa'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={a.ativa ? 'success' : 'neutral'} dot={a.ativa}>
+            {a.ativa ? 'Ativa' : 'Inativa'}
+          </Badge>
+          {a.cartaoCreditoNome && (
+            <Badge variant="info">Cartão</Badge>
+          )}
+        </div>
         <span className="text-[10px] text-text-primary/40">{a.categoriaDescricao}</span>
       </div>
     </div>

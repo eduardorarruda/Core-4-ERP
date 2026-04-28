@@ -10,9 +10,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 
@@ -52,6 +54,7 @@ public class RelatorioController {
             @RequestParam(required = false) Long categoriaId,
             @RequestParam(required = false) Long parceiroId) {
         RelatorioResponseDto dados = relatorioService.getDadosFluxoCaixa(inicio, fim, tipo, categoriaId, parceiroId);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Fluxo de Caixa", inicio, fim);
         return xlsxResponse(resource, "fluxo-caixa", inicio, fim);
     }
@@ -80,6 +83,7 @@ public class RelatorioController {
             @RequestParam(required = false) Long categoriaId,
             @RequestParam(required = false) Long parceiroId) {
         RelatorioResponseDto dados = relatorioService.getDadosContasAbertas(inicio, fim, tipo, status, categoriaId, parceiroId);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Contas Abertas", inicio, fim);
         return xlsxResponse(resource, "contas-abertas", inicio, fim);
     }
@@ -106,6 +110,7 @@ public class RelatorioController {
             @RequestParam(required = false) Long contaCorrenteId,
             @RequestParam(required = false) Long categoriaId) {
         RelatorioResponseDto dados = relatorioService.getDadosExtrato(inicio, fim, tipo, contaCorrenteId, categoriaId);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Extrato", inicio, fim);
         return xlsxResponse(resource, "extrato", inicio, fim);
     }
@@ -128,6 +133,7 @@ public class RelatorioController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
             @RequestParam(required = false) TipoConta tipo) {
         RelatorioResponseDto dados = relatorioService.getDadosDre(inicio, fim, tipo);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "DRE", inicio, fim);
         return xlsxResponse(resource, "dre", inicio, fim);
     }
@@ -152,6 +158,7 @@ public class RelatorioController {
             @RequestParam(required = false) TipoTransacaoInvestimento tipoTransacao,
             @RequestParam(required = false) Long contaInvestimentoId) {
         RelatorioResponseDto dados = relatorioService.getDadosInvestimentos(inicio, fim, tipoTransacao, contaInvestimentoId);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Investimentos", inicio, fim);
         return xlsxResponse(resource, "investimentos", inicio, fim);
     }
@@ -176,6 +183,7 @@ public class RelatorioController {
             @RequestParam(required = false) Long cartaoId,
             @RequestParam(required = false) Long categoriaId) {
         RelatorioResponseDto dados = relatorioService.getDadosCartoes(inicio, fim, cartaoId, categoriaId);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Cartões de Crédito", inicio, fim);
         return xlsxResponse(resource, "cartoes", inicio, fim);
     }
@@ -196,6 +204,7 @@ public class RelatorioController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
         RelatorioResponseDto dados = relatorioService.getDadosPosicaoFinanceira(inicio, fim);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Posição Financeira Completa", inicio, fim);
         return xlsxResponse(resource, "posicao-financeira", inicio, fim);
     }
@@ -214,6 +223,7 @@ public class RelatorioController {
     public ResponseEntity<Resource> assinaturasExcel(
             @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
         RelatorioResponseDto dados = relatorioService.getDadosAssinaturas(ativas);
+        if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Assinaturas Recorrentes", null, null);
         String filename = "assinaturas.xlsx";
         return ResponseEntity.ok()

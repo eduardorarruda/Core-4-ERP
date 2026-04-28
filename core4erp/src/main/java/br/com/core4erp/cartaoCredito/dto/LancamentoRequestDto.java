@@ -1,6 +1,9 @@
 package br.com.core4erp.cartaoCredito.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,15 +19,11 @@ public record LancamentoRequestDto(
         @NotNull(message = "Data da compra é obrigatória")
         LocalDate dataCompra,
 
-        @NotNull(message = "Mês da fatura é obrigatório")
-        @Min(1) @Max(12)
-        Integer mesFatura,
-
-        @NotNull(message = "Ano da fatura é obrigatório")
-        Integer anoFatura,
-
         @NotNull(message = "Categoria é obrigatória")
         Long categoriaId,
+
+        @NotNull(message = "Parceiro é obrigatório")
+        Long parceiroId,
 
         /** Número de parcelas (>= 1). */
         @PositiveOrZero
