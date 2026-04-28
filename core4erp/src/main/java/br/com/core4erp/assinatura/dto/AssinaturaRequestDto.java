@@ -10,5 +10,6 @@ public record AssinaturaRequestDto(
         @NotNull @Min(1) @Max(31) Integer diaVencimento,
         Boolean ativa,
         @NotNull Long categoriaId,
-        Long parceiroId
+        @NotNull Long parceiroId,
+        Long cartaoCreditoId
 ) {}

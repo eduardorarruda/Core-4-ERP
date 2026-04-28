@@ -20,6 +20,8 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
 
     boolean existsByCartaoCreditoId(Long cartaoId);
 
+    boolean existsByAssinaturaIdAndMesFaturaAndAnoFatura(Long assinaturaId, Integer mes, Integer ano);
+
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
            "WHERE l.cartaoCredito.id = :cartaoId AND l.anoFatura = :ano AND l.mesFatura = :mes")
     BigDecimal sumValorByCartaoAndFatura(@Param("cartaoId") Long cartaoId,

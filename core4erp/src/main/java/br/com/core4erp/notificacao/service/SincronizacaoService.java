@@ -2,6 +2,7 @@ package br.com.core4erp.notificacao.service;
 
 import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
+import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.enums.StatusConta;
@@ -10,6 +11,7 @@ import br.com.core4erp.notificacao.entity.Notificacao;
 import br.com.core4erp.notificacao.repository.NotificacaoRepository;
 import br.com.core4erp.usuario.entity.Usuario;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,15 +26,18 @@ public class SincronizacaoService {
     private final UsuarioRepository usuarioRepository;
     private final ContaRepository contaRepository;
     private final CartaoCreditoRepository cartaoRepository;
+    private final CartaoCreditoService cartaoCreditoService;
     private final NotificacaoRepository notificacaoRepository;
 
     public SincronizacaoService(UsuarioRepository usuarioRepository,
                                 ContaRepository contaRepository,
                                 CartaoCreditoRepository cartaoRepository,
+                                CartaoCreditoService cartaoCreditoService,
                                 NotificacaoRepository notificacaoRepository) {
         this.usuarioRepository = usuarioRepository;
         this.contaRepository = contaRepository;
         this.cartaoRepository = cartaoRepository;
+        this.cartaoCreditoService = cartaoCreditoService;
         this.notificacaoRepository = notificacaoRepository;
     }
 
@@ -43,6 +48,7 @@ public class SincronizacaoService {
      */
     @Transactional
     public void sincronizar(Long usuarioId) {
+        cartaoCreditoService.gerarLancamentosAssinaturas(usuarioId);
         sincronizarContasVencidas(usuarioId);
         sincronizarFaturasCartao(usuarioId);
     }
@@ -51,6 +57,12 @@ public class SincronizacaoService {
     @Transactional
     public void sincronizarTodos() {
         usuarioRepository.findAll().forEach(u -> sincronizar(u.getId()));
+    }
+
+    /** Gera lançamentos de assinaturas para todos os usuários às 7h diariamente. */
+    @Scheduled(cron = "0 0 7 * * *")
+    public void gerarAssinaturasScheduled() {
+        usuarioRepository.findAll().forEach(u -> cartaoCreditoService.gerarLancamentosAssinaturas(u.getId()));
     }
 
     // ── Regra 1 ──────────────────────────────────────────────────────────────

@@ -282,6 +282,19 @@ public class ConciliacaoService {
     }
 
     @Transactional
+    public ConciliacaoItemResponseDto desfazerIgnorarItem(Long conciliacaoId, Long itemId) {
+        Conciliacao c = findOwned(conciliacaoId);
+        assertPendente(c);
+
+        ConciliacaoItem item = findItem(itemId, conciliacaoId);
+        if (item.getStatusItem() != StatusItemConciliacao.IGNORADO) {
+            throw new IllegalStateException("Item não está ignorado");
+        }
+        item.setStatusItem(StatusItemConciliacao.NAO_IDENTIFICADO);
+        return ConciliacaoItemResponseDto.from(itemRepository.save(item));
+    }
+
+    @Transactional
     public ConciliacaoItemResponseDto desvincularItem(Long conciliacaoId, Long itemId) {
         Conciliacao c = findOwned(conciliacaoId);
         assertPendente(c);
@@ -313,6 +326,9 @@ public class ConciliacaoService {
 
             try {
                 contaService.baixar(item.getConta().getId(), baixaDto);
+                Conta contaBaixada2 = item.getConta();
+                contaBaixada2.setConciliada(true);
+                contaRepository.save(contaBaixada2);
                 ContaBaixada baixada = contaBaixadaRepository.findByContaId(item.getConta().getId()).orElse(null);
                 item.setContaBaixada(baixada);
                 item.setStatusItem(StatusItemConciliacao.BAIXADO);

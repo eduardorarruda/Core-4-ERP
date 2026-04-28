@@ -1,5 +1,6 @@
 package br.com.core4erp.assinatura.entity;
 
+import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.config.auditing.Auditable;
 import br.com.core4erp.parceiro.entity.Parceiro;
@@ -35,6 +36,10 @@ public class Assinatura extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "categoria_id", nullable = false)
     private Categoria categoria;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cartao_credito_id")
+    private CartaoCredito cartaoCredito;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parceiro_id")

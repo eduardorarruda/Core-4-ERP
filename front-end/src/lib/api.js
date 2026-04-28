@@ -156,6 +156,12 @@ export const investimentos = {
     listar: (contaId) => request(`/api/investimentos/${contaId}/transacoes`),
     registrar: (contaId, dto) => request(`/api/investimentos/${contaId}/transacoes`, { method: 'POST', body: JSON.stringify(dto) }),
   },
+  tipos: {
+    listar: () => request('/api/investimentos/tipos'),
+    criar: (dto) => request('/api/investimentos/tipos', { method: 'POST', body: JSON.stringify(dto) }),
+    atualizar: (id, dto) => request(`/api/investimentos/tipos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+    deletar: (id) => request(`/api/investimentos/tipos/${id}`, { method: 'DELETE' }),
+  },
 };
 
 // ── Assinaturas ───────────────────────────────────────────────────────────────

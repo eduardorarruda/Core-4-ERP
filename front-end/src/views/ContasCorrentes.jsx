@@ -8,7 +8,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 
-const empty = { numeroConta: '', agencia: '', descricao: '', saldo: '' };
+const empty = { numeroConta: '', agencia: '', descricao: '', saldo: '', dataSaldoInicial: '', permitirSaldoNegativo: false };
 
 export default function ContasCorrentes() {
   const toast = useToast();
@@ -35,6 +35,7 @@ export default function ContasCorrentes() {
     if (!form.agencia.trim()) errs.agencia = 'Agência é obrigatória';
     if (!form.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
     if (form.saldo === '' || isNaN(parseFloat(form.saldo))) errs.saldo = 'Saldo deve ser um número válido';
+    if (!form.dataSaldoInicial) errs.dataSaldoInicial = 'Data do saldo inicial é obrigatória';
     return errs;
   }
 
@@ -94,7 +95,7 @@ export default function ContasCorrentes() {
   }
 
   function editar(c) {
-    setForm({ numeroConta: c.numeroConta, agencia: c.agencia, descricao: c.descricao, saldo: String(c.saldo) });
+    setForm({ numeroConta: c.numeroConta, agencia: c.agencia, descricao: c.descricao, saldo: String(c.saldo), dataSaldoInicial: c.dataSaldoInicial || '', permitirSaldoNegativo: !!c.permitirSaldoNegativo });
     setEditId(c.id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -176,7 +177,19 @@ export default function ContasCorrentes() {
           <FormField label="Saldo Inicial (R$)" required error={errors.saldo}>
             <input type="number" step="0.01" className={inputCls} value={form.saldo} onChange={set('saldo')} required placeholder="0,00" />
           </FormField>
+          <FormField label="Data do Saldo Inicial" required error={errors.dataSaldoInicial}>
+            <input type="date" className={inputCls} value={form.dataSaldoInicial} onChange={set('dataSaldoInicial')} required />
+          </FormField>
         </div>
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.permitirSaldoNegativo}
+            onChange={(e) => setForm((f) => ({ ...f, permitirSaldoNegativo: e.target.checked }))}
+            className="w-4 h-4 accent-primary"
+          />
+          <span className="text-sm text-text-primary">Permitir saldo negativo nesta conta</span>
+        </label>
         <div className="flex gap-3">
           <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
             {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -220,6 +233,12 @@ export default function ContasCorrentes() {
                 </div>
               </div>
               <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(c.saldo)}</p>
+              {c.dataSaldoInicial && (
+                <p className="text-xs text-text-primary/40">Saldo desde: {c.dataSaldoInicial}</p>
+              )}
+              {c.permitirSaldoNegativo && (
+                <span className="inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-500">Saldo negativo permitido</span>
+              )}
             </div>
           ))}
         </div>

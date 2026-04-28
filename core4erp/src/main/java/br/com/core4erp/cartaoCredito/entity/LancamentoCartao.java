@@ -1,7 +1,9 @@
 package br.com.core4erp.cartaoCredito.entity;
 
+import br.com.core4erp.assinatura.entity.Assinatura;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -43,6 +45,14 @@ public class LancamentoCartao extends Auditable {
     private Integer numeroParcela = 1;
 
     private Integer totalParcelas = 1;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assinatura_id")
+    private Assinatura assinatura;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parceiro_id")
+    private Parceiro parceiro;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cartao_credito_id", nullable = false)
