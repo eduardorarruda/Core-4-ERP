@@ -24,7 +24,8 @@ public record ContaResponseDto(
         String categoriaDescricao,
         String categoriaIcone,
         Long parceiroId,
-        String parceiroNome
+        String parceiroNome,
+        Boolean conciliada
 ) {
     public static ContaResponseDto from(Conta c) {
         return new ContaResponseDto(
@@ -34,7 +35,8 @@ public record ContaResponseDto(
                 c.getGrupoParcelamento(), c.getNumeroParcela(), c.getTotalParcelas(),
                 c.getCategoria().getId(), c.getCategoria().getDescricao(), c.getCategoria().getIcone(),
                 c.getParceiro() != null ? c.getParceiro().getId() : null,
-                c.getParceiro() != null ? c.getParceiro().getRazaoSocial() : null
+                c.getParceiro() != null ? c.getParceiro().getRazaoSocial() : null,
+                Boolean.TRUE.equals(c.getConciliada())
         );
     }
 }

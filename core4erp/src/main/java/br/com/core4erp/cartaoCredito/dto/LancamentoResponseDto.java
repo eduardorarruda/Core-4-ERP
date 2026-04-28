@@ -17,7 +17,10 @@ public record LancamentoResponseDto(
         Integer totalParcelas,
         Long categoriaId,
         String categoriaDescricao,
-        boolean faturaFechada
+        boolean faturaFechada,
+        Long assinaturaId,
+        Long parceiroId,
+        String parceiroNome
 ) {
     public static LancamentoResponseDto from(LancamentoCartao l, boolean faturaFechada) {
         return new LancamentoResponseDto(
@@ -25,7 +28,11 @@ public record LancamentoResponseDto(
                 l.getMesFatura(), l.getAnoFatura(),
                 l.getGrupoParcelamento(), l.getNumeroParcela(), l.getTotalParcelas(),
                 l.getCategoria().getId(), l.getCategoria().getDescricao(),
-                faturaFechada
+                faturaFechada,
+                l.getAssinatura() != null ? l.getAssinatura().getId() : null,
+                l.getParceiro() != null ? l.getParceiro().getId() : null,
+                l.getParceiro() != null ? (l.getParceiro().getNomeFantasia() != null
+                        ? l.getParceiro().getNomeFantasia() : l.getParceiro().getRazaoSocial()) : null
         );
     }
 }

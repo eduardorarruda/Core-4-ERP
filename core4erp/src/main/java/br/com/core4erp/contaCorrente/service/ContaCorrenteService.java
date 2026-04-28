@@ -92,5 +92,7 @@ public class ContaCorrenteService {
         c.setAgencia(dto.agencia());
         c.setDescricao(dto.descricao());
         c.setSaldo(dto.saldo());
+        c.setDataSaldoInicial(dto.dataSaldoInicial());
+        c.setPermitirSaldoNegativo(Boolean.TRUE.equals(dto.permitirSaldoNegativo()));
     }
 }

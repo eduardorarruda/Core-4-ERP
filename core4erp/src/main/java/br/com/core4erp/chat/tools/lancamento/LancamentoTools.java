@@ -88,15 +88,14 @@ public class LancamentoTools {
     @Tool(description = """
             Registra um lançamento em cartão de crédito. Suporta parcelamento.
             Use consultarCartoes para obter o cartaoId e consultarCategorias
-            para o categoriaId. CONFIRME os dados antes de executar.
+            para o categoriaId. A fatura é calculada automaticamente com base
+            na data da compra e no dia de fechamento do cartão. CONFIRME os dados antes de executar.
             """)
     public List<LancamentoResponseDto> registrarLancamentoCartao(
             @ToolParam(description = "ID do cartão de crédito. Use consultarCartoes para descobrir") Long cartaoId,
             @ToolParam(description = "Descrição da compra") String descricao,
             @ToolParam(description = "Valor da compra em reais") BigDecimal valor,
             @ToolParam(description = "Data da compra no formato YYYY-MM-DD") LocalDate dataCompra,
-            @ToolParam(description = "Mês da fatura (1-12)") Integer mesFatura,
-            @ToolParam(description = "Ano da fatura. Ex: 2026") Integer anoFatura,
             @ToolParam(description = "ID da categoria") Long categoriaId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
         log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={}",
@@ -105,9 +104,8 @@ public class LancamentoTools {
                 descricao,
                 valor,
                 dataCompra,
-                mesFatura,
-                anoFatura,
                 categoriaId,
+                null,
                 quantidadeParcelas != null ? quantidadeParcelas : 1,
                 true
         );

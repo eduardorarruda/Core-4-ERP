@@ -25,8 +25,12 @@ public class ContaInvestimento extends Auditable {
     private String nome;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private TipoInvestimento tipo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tipo_investimento_id")
+    private TipoInvestimentoCustom tipoInvestimento;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal saldoAtual = BigDecimal.ZERO;

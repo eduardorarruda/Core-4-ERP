@@ -1,5 +1,7 @@
 package br.com.core4erp.cartaoCredito.service;
 
+import br.com.core4erp.assinatura.entity.Assinatura;
+import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.dto.*;
 import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
 import br.com.core4erp.cartaoCredito.entity.FaturaCartao;
@@ -15,9 +17,12 @@ import br.com.core4erp.conta.dto.ContaResponseDto;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
+import br.com.core4erp.parceiro.entity.Parceiro;
+import br.com.core4erp.parceiro.repository.ParceiroRepository;
 import br.com.core4erp.enums.StatusFatura;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.usuario.entity.Usuario;
+import br.com.core4erp.usuario.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +49,9 @@ public class CartaoCreditoService {
     private final LancamentoCartaoRepository lancamentoRepo;
     private final FaturaCartaoRepository faturaRepo;
     private final CategoriaRepository categoriaRepo;
+    private final AssinaturaRepository assinaturaRepo;
+    private final UsuarioRepository usuarioRepo;
+    private final ParceiroRepository parceiroRepo;
     private final ContaCorrenteService contaCorrenteService;
     private final ContaService contaService;
     private final SecurityContextUtils securityCtx;
@@ -52,6 +60,9 @@ public class CartaoCreditoService {
                                 LancamentoCartaoRepository lancamentoRepo,
                                 FaturaCartaoRepository faturaRepo,
                                 CategoriaRepository categoriaRepo,
+                                AssinaturaRepository assinaturaRepo,
+                                UsuarioRepository usuarioRepo,
+                                ParceiroRepository parceiroRepo,
                                 ContaCorrenteService contaCorrenteService,
                                 ContaService contaService,
                                 SecurityContextUtils securityCtx) {
@@ -59,6 +70,9 @@ public class CartaoCreditoService {
         this.lancamentoRepo = lancamentoRepo;
         this.faturaRepo = faturaRepo;
         this.categoriaRepo = categoriaRepo;
+        this.assinaturaRepo = assinaturaRepo;
+        this.usuarioRepo = usuarioRepo;
+        this.parceiroRepo = parceiroRepo;
         this.contaCorrenteService = contaCorrenteService;
         this.contaService = contaService;
         this.securityCtx = securityCtx;
@@ -153,6 +167,8 @@ public class CartaoCreditoService {
 
         Categoria categoria = categoriaRepo.findByIdAndUsuarioId(dto.categoriaId(), uid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
+        Parceiro parceiro = parceiroRepo.findByIdAndUsuarioId(dto.parceiroId(), uid)
+                .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
 
         int parcelas = (dto.quantidadeParcelas() == null || dto.quantidadeParcelas() < 1) ? 1 : dto.quantidadeParcelas();
         boolean dividir = Boolean.TRUE.equals(dto.dividirValor());
@@ -163,9 +179,10 @@ public class CartaoCreditoService {
         String grupo = parcelas > 1 ? UUID.randomUUID().toString() : null;
         Usuario usuario = securityCtx.getUsuario();
         List<LancamentoCartao> criados = new ArrayList<>();
+        YearMonth faturaBase = calcularFatura(dto.dataCompra(), cartao.getDiaFechamento());
 
         for (int i = 0; i < parcelas; i++) {
-            YearMonth ym = YearMonth.of(dto.anoFatura(), dto.mesFatura()).plusMonths(i);
+            YearMonth ym = faturaBase.plusMonths(i);
             LancamentoCartao l = new LancamentoCartao();
             l.setDescricao(dto.descricao());
             l.setValor(valorParcela);
@@ -177,6 +194,7 @@ public class CartaoCreditoService {
             l.setTotalParcelas(parcelas);
             l.setCartaoCredito(cartao);
             l.setCategoria(categoria);
+            l.setParceiro(parceiro);
             l.setUsuario(usuario);
             criados.add(lancamentoRepo.save(l));
         }
@@ -186,17 +204,25 @@ public class CartaoCreditoService {
 
     @Transactional
     public LancamentoResponseDto atualizarLancamento(Long cartaoId, Long lancamentoId, LancamentoRequestDto dto) {
+        CartaoCredito cartao = findOwnedCartao(cartaoId);
         LancamentoCartao l = findOwnedLancamento(cartaoId, lancamentoId);
         verificarFaturaAberta(cartaoId, l.getMesFatura(), l.getAnoFatura());
+        YearMonth novaFatura = calcularFatura(dto.dataCompra(), cartao.getDiaFechamento());
+        if (novaFatura.getMonthValue() != l.getMesFatura() || novaFatura.getYear() != l.getAnoFatura()) {
+            verificarFaturaAberta(cartaoId, novaFatura.getMonthValue(), novaFatura.getYear());
+        }
         Long uid = securityCtx.getUsuarioId();
         Categoria cat = categoriaRepo.findByIdAndUsuarioId(dto.categoriaId(), uid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
+        Parceiro par = parceiroRepo.findByIdAndUsuarioId(dto.parceiroId(), uid)
+                .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         l.setDescricao(dto.descricao());
         l.setValor(dto.valor());
         l.setDataCompra(dto.dataCompra());
-        l.setMesFatura(dto.mesFatura());
-        l.setAnoFatura(dto.anoFatura());
+        l.setMesFatura(novaFatura.getMonthValue());
+        l.setAnoFatura(novaFatura.getYear());
         l.setCategoria(cat);
+        l.setParceiro(par);
         return LancamentoResponseDto.from(lancamentoRepo.save(l), false);
     }
 
@@ -285,6 +311,54 @@ public class CartaoCreditoService {
         c.setDiaFechamento(dto.diaFechamento());
         c.setDiaVencimento(dto.diaVencimento());
         c.setContaCorrente(contaCorrenteService.findOwned(dto.contaCorrenteId()));
+    }
+
+    /**
+     * Gera lançamentos mensais para assinaturas vinculadas a cartão de crédito.
+     * Idempotente: o índice único (assinatura_id, mes_fatura, ano_fatura) impede duplicatas.
+     * Chamado pelo scheduler e pelo endpoint de sincronização.
+     */
+    @Transactional
+    public void gerarLancamentosAssinaturas(Long usuarioId) {
+        LocalDate hoje = LocalDate.now();
+        List<Assinatura> assinaturas = assinaturaRepo
+                .findAllByUsuarioIdAndAtivaAndCartaoCreditoIsNotNull(usuarioId, true);
+
+        for (Assinatura assinatura : assinaturas) {
+            CartaoCredito cartao = assinatura.getCartaoCredito();
+            int diaCobranca = Math.min(assinatura.getDiaVencimento(), hoje.lengthOfMonth());
+            LocalDate dataCobranca = hoje.withDayOfMonth(diaCobranca);
+            YearMonth fatura = calcularFatura(dataCobranca, cartao.getDiaFechamento());
+
+            if (lancamentoRepo.existsByAssinaturaIdAndMesFaturaAndAnoFatura(
+                    assinatura.getId(), fatura.getMonthValue(), fatura.getYear())) continue;
+
+            LancamentoCartao l = new LancamentoCartao();
+            l.setDescricao(assinatura.getDescricao());
+            l.setValor(assinatura.getValor());
+            l.setDataCompra(dataCobranca);
+            l.setMesFatura(fatura.getMonthValue());
+            l.setAnoFatura(fatura.getYear());
+            l.setNumeroParcela(1);
+            l.setTotalParcelas(1);
+            l.setCartaoCredito(cartao);
+            l.setCategoria(assinatura.getCategoria());
+            l.setParceiro(assinatura.getParceiro());
+            l.setAssinatura(assinatura);
+            l.setUsuario(usuarioRepo.getReferenceById(usuarioId));
+            lancamentoRepo.save(l);
+        }
+    }
+
+    /**
+     * Retorna o YearMonth da fatura à qual a compra pertence.
+     * Se o dia da compra >= diaFechamento, a compra cai na fatura do mês seguinte.
+     */
+    private YearMonth calcularFatura(LocalDate dataCompra, int diaFechamento) {
+        YearMonth mesCompra = YearMonth.from(dataCompra);
+        return dataCompra.getDayOfMonth() >= diaFechamento
+                ? mesCompra.plusMonths(1)
+                : mesCompra;
     }
 
     private void verificarFaturaAberta(Long cartaoId, Integer mes, Integer ano) {

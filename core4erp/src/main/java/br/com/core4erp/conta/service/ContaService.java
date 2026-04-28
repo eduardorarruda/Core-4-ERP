@@ -17,6 +17,7 @@ import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
+import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
 import br.com.core4erp.usuario.entity.Usuario;
@@ -163,8 +164,9 @@ public class ContaService {
     public ContaResponseDto atualizar(Long id, ContaCreateDto dto) {
         Conta conta = findOwned(id);
 
-        if (conta.getStatus() != StatusConta.PENDENTE && conta.getStatus() != StatusConta.ATRASADO) {
-            throw new IllegalStateException("Só é possível editar contas com status PENDENTE ou ATRASADO");
+        if (Boolean.TRUE.equals(conta.getConciliada())) {
+            throw new BusinessException("CONTA_CONCILIADA",
+                    "Não é possível editar uma conta conciliada via extrato bancário");
         }
 
         Long usuarioId = securityCtx.getUsuarioId();
@@ -234,6 +236,12 @@ public class ContaService {
 
         // Atualiza saldo da conta corrente
         BigDecimal delta = conta.getTipo() == TipoConta.PAGAR ? valorFinal.negate() : valorFinal;
+        if (conta.getTipo() == TipoConta.PAGAR
+                && contaCorrente.getSaldo().compareTo(valorFinal) < 0
+                && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
+            throw new BusinessException("SALDO_INSUFICIENTE",
+                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
+        }
         contaCorrente.setSaldo(contaCorrente.getSaldo().add(delta));
         contaCorrenteRepository.save(contaCorrente);
 
@@ -251,6 +259,9 @@ public class ContaService {
 
         if (conta.getStatus() != StatusConta.PAGO && conta.getStatus() != StatusConta.RECEBIDO) {
             throw new IllegalStateException("Conta não está baixada");
+        }
+        if (Boolean.TRUE.equals(conta.getConciliada())) {
+            throw new IllegalStateException("Não é possível estornar uma conta conciliada via extrato bancário");
         }
 
         ContaBaixada baixada = baixadaRepository.findByContaId(id)
