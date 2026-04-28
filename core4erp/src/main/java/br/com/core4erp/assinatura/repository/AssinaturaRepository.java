@@ -17,6 +17,8 @@ public interface AssinaturaRepository extends JpaRepository<Assinatura, Long> {
 
     List<Assinatura> findAllByUsuarioIdAndAtiva(Long usuarioId, boolean ativa);
 
+    List<Assinatura> findAllByUsuarioIdAndAtivaAndCartaoCreditoIsNotNull(Long usuarioId, boolean ativa);
+
     @Query("SELECT COALESCE(SUM(a.valor), 0) FROM Assinatura a WHERE a.usuario.id = :uid AND a.ativa = true")
     BigDecimal sumValorAtivasByUsuarioId(@Param("uid") Long uid);
 }

@@ -4,6 +4,7 @@ import br.com.core4erp.assinatura.dto.AssinaturaRequestDto;
 import br.com.core4erp.assinatura.dto.AssinaturaResponseDto;
 import br.com.core4erp.assinatura.entity.Assinatura;
 import br.com.core4erp.assinatura.repository.AssinaturaRepository;
+import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
@@ -19,15 +20,18 @@ public class AssinaturaService {
     private final AssinaturaRepository assinaturaRepository;
     private final CategoriaRepository categoriaRepository;
     private final ParceiroRepository parceiroRepository;
+    private final CartaoCreditoRepository cartaoCreditoRepository;
     private final SecurityContextUtils securityCtx;
 
     public AssinaturaService(AssinaturaRepository assinaturaRepository,
                              CategoriaRepository categoriaRepository,
                              ParceiroRepository parceiroRepository,
+                             CartaoCreditoRepository cartaoCreditoRepository,
                              SecurityContextUtils securityCtx) {
         this.assinaturaRepository = assinaturaRepository;
         this.categoriaRepository = categoriaRepository;
         this.parceiroRepository = parceiroRepository;
+        this.cartaoCreditoRepository = cartaoCreditoRepository;
         this.securityCtx = securityCtx;
     }
 
@@ -59,6 +63,10 @@ public class AssinaturaService {
             assinatura.setParceiro(parceiroRepository.findByIdAndUsuarioId(dto.parceiroId(), uid)
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado: " + dto.parceiroId())));
         }
+        if (dto.cartaoCreditoId() != null) {
+            assinatura.setCartaoCredito(cartaoCreditoRepository.findByIdAndUsuarioId(dto.cartaoCreditoId(), uid)
+                    .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado: " + dto.cartaoCreditoId())));
+        }
         assinatura.setUsuario(securityCtx.getUsuario());
         return AssinaturaResponseDto.from(assinaturaRepository.save(assinatura));
     }
@@ -78,6 +86,12 @@ public class AssinaturaService {
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado: " + dto.parceiroId())));
         } else {
             assinatura.setParceiro(null);
+        }
+        if (dto.cartaoCreditoId() != null) {
+            assinatura.setCartaoCredito(cartaoCreditoRepository.findByIdAndUsuarioId(dto.cartaoCreditoId(), uid)
+                    .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado: " + dto.cartaoCreditoId())));
+        } else {
+            assinatura.setCartaoCredito(null);
         }
         return AssinaturaResponseDto.from(assinaturaRepository.save(assinatura));
     }

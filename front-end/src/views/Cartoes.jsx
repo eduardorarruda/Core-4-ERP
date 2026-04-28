@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2 } from 'lucide-react';
-import { cartoes as api, contasCorrentes as ccApi, categorias as catApi } from '../lib/api';
+import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat } from 'lucide-react';
+import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
@@ -10,7 +10,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 
-const emptyLancForm = { descricao: '', valor: '', dataCompra: '', mesFatura: '', anoFatura: '', categoriaId: '', quantidadeParcelas: 1 };
+const emptyLancForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: true };
 
 const GRADIENTS = [
   'from-violet-600 to-indigo-700',
@@ -29,12 +29,13 @@ export default function Cartoes() {
   const [lista, setLista] = useState([]);
   const [ccs, setCcs] = useState([]);
   const [cats, setCats] = useState([]);
+  const [pars, setPars] = useState([]);
   const [form, setForm] = useState({ nome: '', limite: '', diaFechamento: '', diaVencimento: '', contaCorrenteId: '' });
   const [cartaoSel, setCartaoSel] = useState(null);
   const [lancamentos, setLancamentos] = useState([]);
   const [lancForm, setLancForm] = useState(emptyLancForm);
   const [editLancId, setEditLancId] = useState(null);
-  const [editForm, setEditForm] = useState({ descricao: '', valor: '', dataCompra: '', mesFatura: '', anoFatura: '', categoriaId: '' });
+  const [editForm, setEditForm] = useState({ descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '' });
   const [fechForm, setFechForm] = useState({ mes: '', ano: '' });
   const [salvando, setSalvando] = useState(false);
   const [salvandoLanc, setSalvandoLanc] = useState(false);
@@ -47,8 +48,8 @@ export default function Cartoes() {
   const [filterAno, setFilterAno] = useState('');
 
   useEffect(() => {
-    Promise.all([api.listar(), ccApi.listar(), catApi.listar()])
-      .then(([l, cs, ca]) => { setLista(l); setCcs(cs); setCats(ca); })
+    Promise.all([api.listar(), ccApi.listar(), catApi.listar(), parApi.listar()])
+      .then(([l, cs, ca, ps]) => { setLista(l); setCcs(cs); setCats(ca); setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS')); })
       .catch((e) => toast.error(e.message));
   }, []);
 
@@ -75,10 +76,8 @@ export default function Cartoes() {
     if (!lancForm.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
     if (!lancForm.valor || parseFloat(lancForm.valor) <= 0) errs.valor = 'Valor deve ser maior que zero';
     if (!lancForm.dataCompra) errs.dataCompra = 'Data é obrigatória';
-    const mes = Number(lancForm.mesFatura);
-    if (!mes || mes < 1 || mes > 12) errs.mesFatura = 'Mês deve ser entre 1 e 12';
-    if (!lancForm.anoFatura || Number(lancForm.anoFatura) < 2000) errs.anoFatura = 'Ano inválido';
     if (!lancForm.categoriaId) errs.categoriaId = 'Selecione uma categoria';
+    if (!lancForm.parceiroId) errs.parceiroId = 'Selecione um parceiro';
     const parc = Number(lancForm.quantidadeParcelas);
     if (!parc || parc < 1) errs.quantidadeParcelas = 'Mínimo 1 parcela';
     return errs;
@@ -135,7 +134,7 @@ export default function Cartoes() {
     setErrors({});
     setSalvandoLanc(true);
     try {
-      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), mesFatura: Number(lancForm.mesFatura), anoFatura: Number(lancForm.anoFatura), categoriaId: Number(lancForm.categoriaId), quantidadeParcelas: Number(lancForm.quantidadeParcelas) });
+      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor });
       await recarregarLancamentos();
       setLancForm(emptyLancForm);
       toast.success('Lançamento criado!');
@@ -148,7 +147,7 @@ export default function Cartoes() {
 
   function iniciarEdicao(l) {
     setEditLancId(l.id);
-    setEditForm({ descricao: l.descricao, valor: String(l.valor), dataCompra: l.dataCompra, mesFatura: String(l.mesFatura), anoFatura: String(l.anoFatura), categoriaId: String(l.categoriaId) });
+    setEditForm({ descricao: l.descricao, valor: String(l.valor), dataCompra: l.dataCompra, categoriaId: String(l.categoriaId), parceiroId: l.parceiroId ? String(l.parceiroId) : '' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -156,7 +155,7 @@ export default function Cartoes() {
     e.preventDefault();
     setSalvandoEdit(true);
     try {
-      await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), mesFatura: Number(editForm.mesFatura), anoFatura: Number(editForm.anoFatura), categoriaId: Number(editForm.categoriaId) });
+      await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), categoriaId: Number(editForm.categoriaId), parceiroId: Number(editForm.parceiroId) });
       await recarregarLancamentos();
       setEditLancId(null);
       toast.success('Lançamento atualizado!');
@@ -213,6 +212,11 @@ export default function Cartoes() {
       render: (v, row) => (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-text-primary font-medium">{v}</span>
+          {row.assinaturaId && (
+            <Badge variant="info">
+              <span className="flex items-center gap-1"><Repeat className="w-2.5 h-2.5" /> Assinatura</span>
+            </Badge>
+          )}
           {row.faturaFechada && (
             <Badge variant="warning">
               <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" /> Fechada</span>
@@ -398,16 +402,16 @@ export default function Cartoes() {
                   <FormField label="Data Compra">
                     <input type="date" className={inputCls} value={editForm.dataCompra} onChange={(e) => setEditForm((f) => ({ ...f, dataCompra: e.target.value }))} required />
                   </FormField>
-                  <FormField label="Mês Fatura">
-                    <input type="number" min="1" max="12" className={inputCls} value={editForm.mesFatura} onChange={(e) => setEditForm((f) => ({ ...f, mesFatura: e.target.value }))} required />
-                  </FormField>
-                  <FormField label="Ano Fatura">
-                    <input type="number" className={inputCls} value={editForm.anoFatura} onChange={(e) => setEditForm((f) => ({ ...f, anoFatura: e.target.value }))} required />
-                  </FormField>
                   <FormField label="Categoria">
                     <select className={`${inputCls} appearance-none`} value={editForm.categoriaId} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
                       <option value="">Selecione</option>
                       {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                    </select>
+                  </FormField>
+                  <FormField label="Parceiro / Fornecedor" required>
+                    <select className={`${inputCls} appearance-none`} value={editForm.parceiroId} onChange={(e) => setEditForm((f) => ({ ...f, parceiroId: e.target.value }))}>
+                      <option value="">— Selecionar —</option>
+                      {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
                     </select>
                   </FormField>
                 </div>
@@ -437,21 +441,25 @@ export default function Cartoes() {
               <FormField label="Data Compra" error={errors.dataCompra}>
                 <input type="date" className={inputCls} value={lancForm.dataCompra} onChange={(e) => setLancForm((f) => ({ ...f, dataCompra: e.target.value }))} required />
               </FormField>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label="Mês Fatura (1-12)" error={errors.mesFatura}>
-                  <input type="number" min="1" max="12" className={inputCls} value={lancForm.mesFatura} onChange={(e) => setLancForm((f) => ({ ...f, mesFatura: e.target.value }))} required />
-                </FormField>
-                <FormField label="Ano Fatura" error={errors.anoFatura}>
-                  <input type="number" className={inputCls} value={lancForm.anoFatura} onChange={(e) => setLancForm((f) => ({ ...f, anoFatura: e.target.value }))} required />
-                </FormField>
-              </div>
               <FormField label="Nº Parcelas" error={errors.quantidadeParcelas}>
                 <input type="number" min="1" className={inputCls} value={lancForm.quantidadeParcelas} onChange={(e) => setLancForm((f) => ({ ...f, quantidadeParcelas: e.target.value }))} required />
               </FormField>
+              {Number(lancForm.quantidadeParcelas) > 1 && (
+                <label className="flex items-center gap-2 text-sm text-text-primary/70 cursor-pointer">
+                  <input type="checkbox" checked={lancForm.dividirValor} onChange={(e) => setLancForm((f) => ({ ...f, dividirValor: e.target.checked }))} className="w-4 h-4 accent-primary" />
+                  Dividir valor entre parcelas
+                </label>
+              )}
               <FormField label="Categoria" required error={errors.categoriaId}>
                 <select className={`${inputCls} appearance-none`} value={lancForm.categoriaId} onChange={(e) => setLancForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
                   <option value="">Selecione</option>
                   {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                </select>
+              </FormField>
+              <FormField label="Parceiro / Fornecedor" required error={errors.parceiroId}>
+                <select className={`${inputCls} appearance-none`} value={lancForm.parceiroId} onChange={(e) => setLancForm((f) => ({ ...f, parceiroId: e.target.value }))}>
+                  <option value="">— Selecionar —</option>
+                  {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
                 </select>
               </FormField>
               <button type="submit" disabled={salvandoLanc} className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2">

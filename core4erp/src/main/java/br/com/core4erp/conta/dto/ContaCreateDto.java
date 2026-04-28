@@ -28,6 +28,7 @@ public record ContaCreateDto(
         @NotNull(message = "Categoria é obrigatória")
         Long categoriaId,
 
+        @NotNull(message = "Parceiro é obrigatório")
         Long parceiroId,
 
         @PositiveOrZero

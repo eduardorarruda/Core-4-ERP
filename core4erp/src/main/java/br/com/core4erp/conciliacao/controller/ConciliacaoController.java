@@ -78,6 +78,14 @@ public class ConciliacaoController {
         return ResponseEntity.ok(service.ignorarItem(id, itemId));
     }
 
+    @Operation(summary = "Desfazer ignorar — volta item IGNORADO para NAO_IDENTIFICADO")
+    @PatchMapping("/{id}/itens/{itemId}/desfazer-ignorar")
+    public ResponseEntity<ConciliacaoItemResponseDto> desfazerIgnorar(
+            @PathVariable Long id,
+            @PathVariable Long itemId) {
+        return ResponseEntity.ok(service.desfazerIgnorarItem(id, itemId));
+    }
+
     @Operation(summary = "Desvincular item (voltar a NAO_IDENTIFICADO)")
     @PutMapping("/{id}/itens/{itemId}/desvincular")
     public ResponseEntity<ConciliacaoItemResponseDto> desvincular(

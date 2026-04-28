@@ -55,6 +55,13 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponseDto> handleBusiness(BusinessException e) {
+        return ResponseEntity.status(422).body(new ErrorResponseDto(
+                e.getCode(), e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponseDto> handleIllegalArgument(IllegalArgumentException e) {
         return ResponseEntity.status(400).body(new ErrorResponseDto(

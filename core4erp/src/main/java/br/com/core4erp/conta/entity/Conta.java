@@ -54,6 +54,9 @@ public class Conta extends Auditable {
     private String grupoParcelamento;
 
     @Column(nullable = false)
+    private Boolean conciliada = false;
+
+    @Column(nullable = false)
     private Integer numeroParcela = 1;
 
     @Column(nullable = false)
