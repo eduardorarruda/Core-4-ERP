@@ -1,0 +1,56 @@
+groups:
+  - name: core4erp_alerts
+    rules:
+      - alert: AltaLatenciaHTTP
+        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 2
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 de latência acima de 2s"
+          description: "A latência P95 está em {{ $value }}s nos últimos 5 minutos."
+
+      - alert: AltoCpuJVM
+        expr: process_cpu_usage > 0.8
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU do processo JVM acima de 80%"
+          description: "CPU em {{ $value | humanizePercentage }} por mais de 2 minutos."
+
+      - alert: MemoriaHeapCritica
+        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.9
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Heap JVM acima de 90%"
+          description: "Heap em {{ $value | humanizePercentage }} de uso."
+
+      - alert: PoolConexoesEsgotado
+        expr: hikaricp_connections_pending > 5
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mais de 5 requests aguardando conexão ao banco"
+          description: "{{ $value }} requests aguardando no pool HikariCP."
+
+      - alert: TaxaErrosAlta
+        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taxa de erros 5xx acima de 10%"
+          description: "Taxa de erros: {{ $value }} req/s com status 5xx."
+
+      - alert: ChatIAComErros
+        expr: rate(chat_erros_total[5m]) > 0.05
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Chat IA com taxa de erros elevada"
+          description: "Erros no chat IA: {{ $value }} err/s."

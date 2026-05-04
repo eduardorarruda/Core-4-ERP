@@ -44,8 +44,11 @@ public class SecurityConfig {
                                                                 "/api/auth/logout",
                                                                 "/v3/api-docs/**",
                                                                 "/swagger-ui/**",
-                                                                "/swagger-ui.html")
+                                                                "/swagger-ui.html",
+                                                                "/actuator/health")
                                                 .permitAll()
+                                                // Actuator protegido — scrape do Prometheus usa token ADMIN
+                                                .requestMatchers("/actuator/**").hasRole("ADMIN")
                                                 .anyRequest().authenticated())
                                 .headers(headers -> headers
                                                 .contentTypeOptions(Customizer.withDefaults())

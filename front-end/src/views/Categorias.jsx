@@ -36,7 +36,7 @@ const ICONES = [
   { nome: 'Wallet', componente: Wallet },
 ];
 
-export function IconeCategoria({ nome, className = 'w-5 h-5' }) {
+function IconeCategoria({ nome, className = 'w-5 h-5' }) {
   const entry = ICONES.find((i) => i.nome === nome);
   if (!entry) return <Tag className={className} />;
   const Icone = entry.componente;
