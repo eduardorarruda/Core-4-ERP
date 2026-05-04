@@ -3,6 +3,9 @@ package br.com.core4erp.chat.tools.relatorio;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.repository.ContaRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -25,6 +28,8 @@ public class RelatorioExcelService {
 
     private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
+    private final Counter totalRelatoriosGerados;
+    private final Timer tempoGeracaoRelatorio;
 
     @Value("${chat.relatorios.dir}")
     private String relatoriosDir;
@@ -33,9 +38,18 @@ public class RelatorioExcelService {
     private int ttlMinutes;
 
     public RelatorioExcelService(ContaRepository contaRepository,
-                                 SecurityContextUtils securityCtx) {
+                                 SecurityContextUtils securityCtx,
+                                 MeterRegistry registry) {
         this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
+        this.totalRelatoriosGerados = Counter.builder("erp.relatorio.gerado")
+                .description("Total de relatórios Excel gerados")
+                .tag("tipo", "despesas")
+                .register(registry);
+        this.tempoGeracaoRelatorio = Timer.builder("erp.relatorio.geracao.duracao")
+                .description("Tempo de geração do relatório Excel")
+                .publishPercentiles(0.5, 0.95)
+                .register(registry);
     }
 
     @PostConstruct
@@ -44,6 +58,7 @@ public class RelatorioExcelService {
     }
 
     public String gerarRelatorioDespesas(LocalDate inicio, LocalDate fim) {
+        Timer.Sample sample = Timer.start();
         Long uid = securityCtx.getUsuarioId();
         var contas = contaRepository.findAllByUsuarioIdAndDataVencimentoBetween(uid, inicio, fim);
 
@@ -89,8 +104,11 @@ public class RelatorioExcelService {
             wb.write(out);
         } catch (IOException e) {
             throw new RuntimeException("Erro ao gerar relatório Excel", e);
+        } finally {
+            sample.stop(tempoGeracaoRelatorio);
         }
 
+        totalRelatoriosGerados.increment();
         return fileName;
     }
 

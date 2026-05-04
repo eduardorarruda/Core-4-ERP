@@ -2,10 +2,12 @@ package br.com.core4erp.chat.service;
 
 import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
+import br.com.core4erp.chat.metrics.ChatMetrics;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import io.micrometer.core.instrument.Timer;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
@@ -38,6 +40,7 @@ public class ChatService {
     private final ConsultaTools consultaTools;
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
+    private final ChatMetrics chatMetrics;
 
     private static final Pattern DOWNLOAD_URL_PATTERN =
             Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
@@ -55,7 +58,8 @@ public class ChatService {
                        ChatInputSanitizer sanitizer,
                        ConsultaTools consultaTools,
                        LancamentoTools lancamentoTools,
-                       RelatorioTools relatorioTools) {
+                       RelatorioTools relatorioTools,
+                       ChatMetrics chatMetrics) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
         this.securityCtx = securityCtx;
@@ -63,9 +67,13 @@ public class ChatService {
         this.consultaTools = consultaTools;
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
+        this.chatMetrics = chatMetrics;
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
+        chatMetrics.registrarMensagem();
+        Timer.Sample timer = chatMetrics.iniciarTimer();
+
         String email = securityCtx.getEmail();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
 
@@ -78,27 +86,37 @@ public class ChatService {
         allMessages.add(new SystemMessage(systemPrompt));
         allMessages.addAll(historico);
 
-        ChatResponse response = chatClient.prompt()
-                .messages(allMessages)
-                .tools(consultaTools, lancamentoTools, relatorioTools)
-                .call()
-                .chatResponse();
+        try {
+            ChatResponse response = chatClient.prompt()
+                    .messages(allMessages)
+                    .tools(consultaTools, lancamentoTools, relatorioTools)
+                    .call()
+                    .chatResponse();
 
-        String respostaTexto = (response.getResult() != null && response.getResult().getOutput() != null)
-                ? response.getResult().getOutput().getText()
-                : "";
+            String respostaTexto = (response.getResult() != null && response.getResult().getOutput() != null)
+                    ? response.getResult().getOutput().getText()
+                    : "";
 
-        log.info("[CHAT-USAGE] user={} usage={}", email, response.getMetadata().getUsage());
+            log.info("[CHAT-USAGE] user={} usage={}", email, response.getMetadata().getUsage());
 
-        historico.add(new AssistantMessage(respostaTexto));
-        podarHistorico(historico);
+            historico.add(new AssistantMessage(respostaTexto));
+            podarHistorico(historico);
 
-        String downloadUrl = extrairDownloadUrl(respostaTexto);
+            String downloadUrl = extrairDownloadUrl(respostaTexto);
 
-        return new ChatResponseDto(respostaTexto, downloadUrl, List.of());
+            return new ChatResponseDto(respostaTexto, downloadUrl, List.of());
+        } catch (Exception e) {
+            chatMetrics.registrarErro();
+            throw e;
+        } finally {
+            chatMetrics.finalizarTimer(timer);
+        }
     }
 
     public void processarStream(ChatRequestDto request, SseEmitter emitter) {
+        chatMetrics.registrarMensagem();
+        chatMetrics.incrementarSessoes();
+
         // Capture security context on the servlet thread before async hand-off
         String email = securityCtx.getEmail();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
@@ -128,9 +146,14 @@ public class ChatService {
                 .doOnComplete(() -> {
                     historico.add(new AssistantMessage(fullResponse.toString()));
                     podarHistorico(historico);
+                    chatMetrics.decrementarSessoes();
                     emitter.complete();
                 })
-                .doOnError(emitter::completeWithError)
+                .doOnError(err -> {
+                    chatMetrics.registrarErro();
+                    chatMetrics.decrementarSessoes();
+                    emitter.completeWithError(err);
+                })
                 .subscribe();
     }
 
