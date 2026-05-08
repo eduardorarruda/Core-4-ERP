@@ -47,50 +47,51 @@ public class RateLimitFilter extends OncePerRequestFilter {
         boolean isUpload = path.equals("/api/conciliacao/upload");
         Bucket bucket = isChat ? resolveChatBucket(ip)
                 : isUpload ? resolveUploadBucket(ip)
-                : resolveBucket(ip);
+                        : resolveBucket(ip);
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
         } else {
+            String origin = request.getHeader("Origin");
+            if (origin != null) {
+                response.setHeader("Access-Control-Allow-Origin", origin);
+                response.setHeader("Access-Control-Allow-Credentials", "true");
+                response.setHeader("Vary", "Origin");
+            }
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            String msg = isChat
-                    ? "Limite de mensagens atingido. Aguarde 1 minuto."
-                    : isUpload
-                    ? "Limite de uploads atingido. Aguarde 1 hora."
-                    : "Muitas tentativas. Aguarde 1 minuto.";
+            String msg = isChat ? "Limite de mensagens atingido. Aguarde 1 minuto."
+                    : isUpload ? "Limite de uploads atingido. Aguarde 1 hora."
+                            : "Muitas tentativas. Aguarde 1 minuto.";
             objectMapper.writeValue(response.getWriter(), Map.of("erro", msg));
         }
     }
 
     private Bucket resolveBucket(String ip) {
-        return buckets.computeIfAbsent(ip, k ->
-                Bucket.builder()
-                        .addLimit(Bandwidth.builder()
-                                .capacity(10)
-                                .refillIntervally(10, Duration.ofMinutes(1))
-                                .build())
-                        .build());
+        return buckets.computeIfAbsent(ip, k -> Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(10)
+                        .refillIntervally(10, Duration.ofMinutes(1))
+                        .build())
+                .build());
     }
 
     private Bucket resolveChatBucket(String ip) {
-        return chatBuckets.computeIfAbsent(ip, k ->
-                Bucket.builder()
-                        .addLimit(Bandwidth.builder()
-                                .capacity(30)
-                                .refillIntervally(30, Duration.ofMinutes(1))
-                                .build())
-                        .build());
+        return chatBuckets.computeIfAbsent(ip, k -> Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(30)
+                        .refillIntervally(30, Duration.ofMinutes(1))
+                        .build())
+                .build());
     }
 
     private Bucket resolveUploadBucket(String ip) {
-        return uploadBuckets.computeIfAbsent(ip, k ->
-                Bucket.builder()
-                        .addLimit(Bandwidth.builder()
-                                .capacity(10)
-                                .refillIntervally(10, Duration.ofHours(1))
-                                .build())
-                        .build());
+        return uploadBuckets.computeIfAbsent(ip, k -> Bucket.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(10)
+                        .refillIntervally(10, Duration.ofHours(1))
+                        .build())
+                .build());
     }
 
     private String resolveClientIp(HttpServletRequest request) {
