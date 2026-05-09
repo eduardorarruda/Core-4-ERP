@@ -1,10 +1,12 @@
 package br.com.core4erp.config.security;
 
+import br.com.core4erp.utils.RequestUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -30,28 +32,48 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
+        try {
+            populateMdc(request);
 
-        String token = extractToken(request);
-        if (token == null || !jwtService.isTokenValid(token)) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        String email = jwtService.extractEmail(token);
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            try {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities()
-                );
-                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(auth);
-            } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ignored) {
-                // Stale JWT — user no longer exists; proceed unauthenticated
+            String token = extractToken(request);
+            if (token == null || !jwtService.isTokenValid(token)) {
+                chain.doFilter(request, response);
+                return;
             }
-        }
 
-        chain.doFilter(request, response);
+            String email = jwtService.extractEmail(token);
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                try {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities()
+                    );
+                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    MDC.put("userId", email);
+                    // Persiste no request attribute para que o PerformanceMetricsFilter
+                    // (filtro externo) possa ler após o MDC ser limpo pelo finally abaixo.
+                    request.setAttribute("userId", email);
+                } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ignored) {
+                    // Stale JWT — user no longer exists; proceed unauthenticated
+                }
+            }
+
+            chain.doFilter(request, response);
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void populateMdc(HttpServletRequest request) {
+        // Reutiliza o requestId gerado pelo PerformanceMetricsFilter (filtro externo) se disponível,
+        // garantindo que todos os logs da requisição compartilhem o mesmo ID.
+        if (MDC.get("requestId") == null) {
+            MDC.put("requestId", RequestUtils.resolveRequestId(request));
+        }
+        MDC.put("ipAddress", RequestUtils.resolveClientIp(request));
+        MDC.put("httpMethod", request.getMethod());
+        MDC.put("endpoint", request.getRequestURI());
     }
 
     private String extractToken(HttpServletRequest request) {
