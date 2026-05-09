@@ -24,7 +24,9 @@ import java.util.stream.Collectors;
 public class LogQueueConsumer {
 
     private static final int BATCH_SIZE = 50;
-    private static final List<String> MDC_RESERVED = List.of("requestId", "userId", "ipAddress");
+    private static final List<String> MDC_RESERVED = List.of(
+            "requestId", "userId", "ipAddress", "httpMethod", "endpoint"
+    );
 
     private final LogPersistenceService logService;
     private final ObjectMapper objectMapper;
@@ -33,10 +35,12 @@ public class LogQueueConsumer {
     public void drainQueue() {
         List<ILoggingEvent> batch = new ArrayList<>(BATCH_SIZE);
         DatabaseLogAppender.getQueue().drainTo(batch, BATCH_SIZE);
+        if (batch.isEmpty()) return;
 
-        for (ILoggingEvent event : batch) {
-            logService.salvarLog(mapToEntity(event));
-        }
+        List<LogGeral> entities = batch.stream()
+                .map(this::mapToEntity)
+                .collect(Collectors.toList());
+        logService.salvarLogs(entities);
     }
 
     private LogGeral mapToEntity(ILoggingEvent event) {
