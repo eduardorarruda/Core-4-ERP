@@ -1,23 +1,8 @@
 services:
-  nginx-proxy:
-    image: nginx:alpine
-    container_name: nginx-proxy
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/proxy.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - frontend
-      - grafana
-      - backend
-    networks:
-      - app-network
-    restart: unless-stopped
-
   backend:
     build: ./core4erp
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     environment:
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
@@ -29,16 +14,6 @@ services:
       TOKEN_EXPIRATION: ${TOKEN_EXPIRATION:-604800000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  frontend:
-    build: ./front-end
-    expose:
-      - "80"
-    depends_on:
-      - backend
     networks:
       - app-network
     restart: unless-stopped
@@ -64,8 +39,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     environment:

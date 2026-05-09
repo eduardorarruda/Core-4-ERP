@@ -45,7 +45,8 @@ public class SecurityConfig {
                                                                 "/v3/api-docs/**",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
-                                                                "/actuator/health")
+                                                                "/actuator/health",
+                                                                "/actuator/prometheus")
                                                 .permitAll()
                                                 // Actuator protegido — scrape do Prometheus usa token ADMIN
                                                 .requestMatchers("/actuator/**").hasRole("ADMIN")
