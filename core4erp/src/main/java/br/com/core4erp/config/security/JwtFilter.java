@@ -1,5 +1,6 @@
 package br.com.core4erp.config.security;
 
+import br.com.core4erp.utils.RequestUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -15,7 +16,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.UUID;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
@@ -51,6 +51,9 @@ public class JwtFilter extends OncePerRequestFilter {
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     MDC.put("userId", email);
+                    // Persiste no request attribute para que o PerformanceMetricsFilter
+                    // (filtro externo) possa ler após o MDC ser limpo pelo finally abaixo.
+                    request.setAttribute("userId", email);
                 } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ignored) {
                     // Stale JWT — user no longer exists; proceed unauthenticated
                 }
@@ -63,22 +66,14 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private void populateMdc(HttpServletRequest request) {
-        String requestId = request.getHeader("X-Request-ID");
-        if (requestId == null || requestId.isBlank()) {
-            requestId = UUID.randomUUID().toString().substring(0, 8);
+        // Reutiliza o requestId gerado pelo PerformanceMetricsFilter (filtro externo) se disponível,
+        // garantindo que todos os logs da requisição compartilhem o mesmo ID.
+        if (MDC.get("requestId") == null) {
+            MDC.put("requestId", RequestUtils.resolveRequestId(request));
         }
-        MDC.put("requestId", requestId);
-        MDC.put("ipAddress", resolveClientIp(request));
+        MDC.put("ipAddress", RequestUtils.resolveClientIp(request));
         MDC.put("httpMethod", request.getMethod());
         MDC.put("endpoint", request.getRequestURI());
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private String extractToken(HttpServletRequest request) {

@@ -39,6 +39,22 @@ import java.util.Properties;
 )
 public class PrimaryJpaConfig {
 
+    // Lista canônica de pacotes do datasource primário — usada no entityManagerFactory abaixo.
+    // A anotação @EnableJpaRepositories não aceita constantes de array, então as duas listas
+    // devem ser mantidas em sincronia manualmente ao adicionar novos módulos.
+    private static final String[] PRIMARY_PACKAGES = {
+            "br.com.core4erp.assinatura",
+            "br.com.core4erp.cartaoCredito",
+            "br.com.core4erp.categoria",
+            "br.com.core4erp.conciliacao",
+            "br.com.core4erp.conta",
+            "br.com.core4erp.contaCorrente",
+            "br.com.core4erp.investimento",
+            "br.com.core4erp.notificacao",
+            "br.com.core4erp.parceiro",
+            "br.com.core4erp.usuario"
+    };
+
     @Value("${spring.datasource.url}")
     private String url;
 
@@ -48,6 +64,18 @@ public class PrimaryJpaConfig {
     @Value("${spring.datasource.password}")
     private String password;
 
+    @Value("${spring.datasource.hikari.maximum-pool-size:3}")
+    private int maxPoolSize;
+
+    @Value("${spring.datasource.hikari.minimum-idle:1}")
+    private int minIdle;
+
+    @Value("${spring.datasource.hikari.connection-timeout:60000}")
+    private long connectionTimeout;
+
+    @Value("${spring.datasource.hikari.initialization-fail-timeout:120000}")
+    private long initializationFailTimeout;
+
     @Primary
     @Bean("dataSource")
     DataSource dataSource() {
@@ -56,10 +84,10 @@ public class PrimaryJpaConfig {
         ds.setUsername(username);
         ds.setPassword(password);
         ds.setDriverClassName("org.postgresql.Driver");
-        ds.setMaximumPoolSize(3);
-        ds.setMinimumIdle(1);
-        ds.setConnectionTimeout(60000);
-        ds.setInitializationFailTimeout(120000);
+        ds.setMaximumPoolSize(maxPoolSize);
+        ds.setMinimumIdle(minIdle);
+        ds.setConnectionTimeout(connectionTimeout);
+        ds.setInitializationFailTimeout(initializationFailTimeout);
         ds.setPoolName("primary-pool");
         return ds;
     }
@@ -93,18 +121,7 @@ public class PrimaryJpaConfig {
         LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
         factory.setDataSource(dataSource);
         factory.setJpaVendorAdapter(adapter);
-        factory.setPackagesToScan(
-                "br.com.core4erp.assinatura",
-                "br.com.core4erp.cartaoCredito",
-                "br.com.core4erp.categoria",
-                "br.com.core4erp.conciliacao",
-                "br.com.core4erp.conta",
-                "br.com.core4erp.contaCorrente",
-                "br.com.core4erp.investimento",
-                "br.com.core4erp.notificacao",
-                "br.com.core4erp.parceiro",
-                "br.com.core4erp.usuario"
-        );
+        factory.setPackagesToScan(PRIMARY_PACKAGES);
 
         Properties props = new Properties();
         props.setProperty("hibernate.hbm2ddl.auto", "validate");

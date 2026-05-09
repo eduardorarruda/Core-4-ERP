@@ -9,6 +9,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class LogPersistenceService {
@@ -22,17 +24,19 @@ public class LogPersistenceService {
         try {
             performanceRepo.save(entry);
         } catch (Exception ex) {
+            // System.err intencional: usar SLF4J aqui criaria loop infinito (logger → DatabaseLogAppender → este método)
             System.err.println("[LogPersistenceService] Falha ao salvar metrica de performance: " + ex.getMessage());
         }
     }
 
     @Async("logExecutor")
     @Transactional("logPerTransactionManager")
-    public void salvarLog(LogGeral entry) {
+    public void salvarLogs(List<LogGeral> entries) {
         try {
-            logGeralRepo.save(entry);
+            logGeralRepo.saveAll(entries);
         } catch (Exception ex) {
-            System.err.println("[LogPersistenceService] Falha ao salvar log geral: " + ex.getMessage());
+            // System.err intencional: usar SLF4J aqui criaria loop infinito (logger → DatabaseLogAppender → este método)
+            System.err.println("[LogPersistenceService] Falha ao salvar batch de logs: " + ex.getMessage());
         }
     }
 }

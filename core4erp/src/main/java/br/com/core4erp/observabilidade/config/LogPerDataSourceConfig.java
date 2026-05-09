@@ -72,6 +72,14 @@ public class LogPerDataSourceConfig {
         return flyway;
     }
 
+    /**
+     * Workaround para ambientes que receberam um BASELINE errado (version='1') na primeira execução
+     * antes de V1__create_tb_log_performance.sql existir. Sem essa remoção, o Flyway considera V1
+     * como já aplicado e pula a criação das tabelas, causando falha na inicialização do JPA.
+     *
+     * Pode ser removido após confirmar que todos os bancos de log foram migrados corretamente
+     * (i.e., tb_log_performance existe em todos os ambientes).
+     */
     private void removeErroneousBaseline(DataSource dataSource) {
         String checkTable = "SELECT 1 FROM information_schema.tables WHERE table_name = 'tb_log_performance'";
         String deleteBaseline = "DELETE FROM flyway_log_schema_history WHERE version = '1' AND type = 'BASELINE'";
