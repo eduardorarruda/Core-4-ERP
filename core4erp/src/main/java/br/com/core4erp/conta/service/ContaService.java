@@ -200,7 +200,7 @@ public class ContaService {
      * Registra o pagamento/recebimento de uma conta: cria um registro {@link br.com.core4erp.conta.entity.ContaBaixada},
      * aplica juros/multa/acréscimo/desconto ao valor original e ajusta o saldo da conta corrente informada.
      */
-    @Transactional
+    @Transactional(noRollbackFor = {BusinessException.class, IllegalStateException.class, jakarta.persistence.EntityNotFoundException.class})
     public ContaResponseDto baixar(Long id, BaixaRequestDto dto) {
         Conta conta = findOwned(id);
 
@@ -221,6 +221,15 @@ public class ContaService {
                 .add(juros).add(multa).add(acrescimo).subtract(desconto)
                 .setScale(2, RoundingMode.HALF_UP);
 
+        // Verificar saldo antes de qualquer escrita para não marcar a transação como rollback-only
+        BigDecimal delta = conta.getTipo() == TipoConta.PAGAR ? valorFinal.negate() : valorFinal;
+        if (conta.getTipo() == TipoConta.PAGAR
+                && contaCorrente.getSaldo().compareTo(valorFinal) < 0
+                && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
+            throw new BusinessException("SALDO_INSUFICIENTE",
+                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
+        }
+
         ContaBaixada baixada = new ContaBaixada();
         baixada.setConta(conta);
         baixada.setContaCorrente(contaCorrente);
@@ -233,14 +242,6 @@ public class ContaService {
         baixada.setUsuario(securityCtx.getUsuario());
         baixadaRepository.save(baixada);
 
-        // Atualiza saldo da conta corrente
-        BigDecimal delta = conta.getTipo() == TipoConta.PAGAR ? valorFinal.negate() : valorFinal;
-        if (conta.getTipo() == TipoConta.PAGAR
-                && contaCorrente.getSaldo().compareTo(valorFinal) < 0
-                && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
-            throw new BusinessException("SALDO_INSUFICIENTE",
-                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
-        }
         contaCorrente.setSaldo(contaCorrente.getSaldo().add(delta));
         contaCorrenteRepository.save(contaCorrente);
 

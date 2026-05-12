@@ -104,7 +104,7 @@ export default function Login() {
     orb3: { position: 'absolute', width: 340, height: 340, borderRadius: '50%', background: '#FF9D6E', filter: 'blur(80px)', opacity: .10, top: '40%', left: '35%', willChange: 'transform' },
     bgSpot: { position: 'absolute', inset: 0, background: 'radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(110,255,192,.14), transparent 60%)', transition: 'background .12s' },
     bgScan: { position: 'absolute', inset: 0, background: 'repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.012) 3px 4px)', mixBlendMode: 'overlay' },
-    formPane: { position: 'relative', zIndex: 1, width: '100%', maxWidth: 520, minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '32px 48px', background: 'rgba(12,12,12,.6)', backdropFilter: 'blur(4px)', borderRight: '1px solid rgba(255,255,255,.05)' },
+    formPane: { position: 'relative', zIndex: 1, width: '100%', maxWidth: 520, minHeight: '100vh', background: 'rgba(12,12,12,.6)', backdropFilter: 'blur(4px)', borderRight: '1px solid rgba(255,255,255,.05)' },
     formWrap: { maxWidth: 380, width: '100%', margin: '0 auto' },
     greetingChip: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', fontSize: 12, color: 'rgba(250,250,250,.6)', marginBottom: 20 },
     submitBtn: { width: '100%', padding: '15px 24px', borderRadius: 14, background: '#6EFFC0', color: '#003824', fontSize: 15, fontWeight: 700, fontFamily: "'Sora', sans-serif", border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'opacity .15s, transform .1s', position: 'relative', overflow: 'hidden', marginTop: 20 },
@@ -150,7 +150,7 @@ export default function Login() {
           <div style={S.bgScan} />
         </div>
 
-        <section style={S.formPane}>
+        <section style={S.formPane} className="flex flex-col justify-start lg:justify-between px-6 py-8 lg:px-12 gap-8 lg:gap-0">
           <BrandMark />
 
           <div style={S.formWrap}>
