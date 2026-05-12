@@ -354,7 +354,6 @@ export default function Login() {
   // ── Recuperação de senha ──
   const [view, setView] = useState('login'); // 'login' | 'forgot-email' | 'forgot-sent'
   const [resetEmail, setResetEmail] = useState('');
-  const [resetTokenDemo, setResetTokenDemo] = useState('');
   const [resetErro, setResetErro] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const spotRef = useRef(null);
@@ -392,7 +391,6 @@ export default function Login() {
     setView('login');
     setResetErro('');
     setResetEmail('');
-    setResetTokenDemo('');
   }
 
   const handleEsqueciSenha = async (e) => {
@@ -404,8 +402,7 @@ export default function Login() {
     setResetErro('');
     setResetLoading(true);
     try {
-      const res = await auth.esqueciSenha(resetEmail);
-      setResetTokenDemo(res.tokenDemo || '');
+      await auth.esqueciSenha(resetEmail);
       setView('forgot-sent');
     } catch (err) {
       setResetErro(err.message);
@@ -724,34 +721,15 @@ export default function Login() {
                 </div>
 
                 <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#fafafa', marginBottom: 8 }}>
-                  {resetTokenDemo ? 'Modo demonstração' : 'Verifique seu e-mail'}
+                  Verifique seu e-mail
                 </h1>
 
-                {/* Produção: email enviado */}
-                {!resetTokenDemo && (
-                  <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.7, marginBottom: 28 }}>
-                    Enviamos um link de recuperação para{' '}
-                    <strong style={{ color: '#fafafa' }}>{resetEmail}</strong>.<br />
-                    Clique no link do e-mail para criar sua nova senha.<br />
-                    <span style={{ fontSize: 12, color: 'rgba(250,250,250,.3)' }}>O link expira em 60 minutos.</span>
-                  </p>
-                )}
-
-                {/* Demo: sem SMTP configurado */}
-                {resetTokenDemo && (
-                  <>
-                    <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.7, marginBottom: 16 }}>
-                      Sem SMTP configurado, o link de recuperação não foi enviado por e-mail.<br />
-                      Clique no botão abaixo para redefinir sua senha diretamente.
-                    </p>
-                    <a
-                      href={`/redefinir-senha?token=${resetTokenDemo}`}
-                      style={{ ...S.submitBtn, textDecoration: 'none', marginTop: 0 }}
-                    >
-                      Redefinir minha senha
-                    </a>
-                  </>
-                )}
+                <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.7, marginBottom: 28 }}>
+                  Enviamos um link de recuperação para{' '}
+                  <strong style={{ color: '#fafafa' }}>{resetEmail}</strong>.<br />
+                  Clique no link do e-mail para criar sua nova senha.<br />
+                  <span style={{ fontSize: 12, color: 'rgba(250,250,250,.3)' }}>O link expira em 60 minutos.</span>
+                </p>
 
                 <button
                   type="button"
