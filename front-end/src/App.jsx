@@ -5,6 +5,7 @@ import TopNav from './components/layout/TopNav';
 import Dashboard from './views/Dashboard';
 import Login from './views/Login';
 import Register from './views/Register';
+import RedefinirSenha from './views/RedefinirSenha';
 import ChatSidebar from './components/chat/ChatSidebar';
 import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
@@ -125,8 +126,9 @@ export default function App() {
           </a>
 
           <Routes>
-            <Route path="/login"    element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/login"           element={<Login />} />
+            <Route path="/register"        element={<Register />} />
+            <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
             <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
             <Route path="/conciliacao"            element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
