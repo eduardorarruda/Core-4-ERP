@@ -28,7 +28,8 @@ public class Usuario extends Auditable {
     @Column(name = "senha_hash", nullable = false)
     private String senhaHash;
 
-    private Long telefone;
+    @Column(length = 20)
+    private String telefone;
 
     @Column(nullable = false, length = 50)
     private String role = "ROLE_USER";

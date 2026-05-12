@@ -6,9 +6,10 @@ import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
+import { MESES_COMPLETOS } from '../lib/constants';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MESES = MESES_COMPLETOS;
 
 const STATUS_VARIANT = {
   PENDENTE: 'warning',

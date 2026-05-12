@@ -1,11 +1,17 @@
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+export function setUsuario(u) {
+  sessionStorage.setItem('usuario', JSON.stringify(u));
+  window.dispatchEvent(new CustomEvent('auth-change'));
+}
+
 export function clearAuth() {
   sessionStorage.removeItem('usuario');
+  window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 async function request(path, options = {}) {
-  const { skipAuthRedirect, timeout = 30000, ...fetchOptions } = options;
+  const { skipAuthRedirect, timeout = 30000, blob: expectBlob = false, ...fetchOptions } = options;
   const isFormData = fetchOptions.body instanceof FormData;
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
@@ -42,7 +48,7 @@ async function request(path, options = {}) {
   }
 
   if (res.status === 204) return null;
-  return res.json();
+  return expectBlob ? res.blob() : res.json();
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -222,20 +228,8 @@ function relatorioQs(inicio, fim, params = {}) {
   return new URLSearchParams(filtered).toString();
 }
 
-async function downloadRelatorio(path) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-  });
-  if (res.status === 401) {
-    clearAuth();
-    window.location.href = '/login';
-    throw new Error('Sessão expirada');
-  }
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.mensagem || `Erro ${res.status}`);
-  }
-  return res.blob();
+function downloadRelatorio(path) {
+  return request(path, { blob: true });
 }
 
 export const relatorios = {

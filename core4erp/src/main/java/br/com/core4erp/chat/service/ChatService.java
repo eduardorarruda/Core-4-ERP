@@ -18,6 +18,7 @@ import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -45,12 +46,8 @@ public class ChatService {
     private static final Pattern DOWNLOAD_URL_PATTERN =
             Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
 
-    private final Cache<String, List<Message>> memoriaConversas = Caffeine.newBuilder()
-            .expireAfterAccess(2, TimeUnit.HOURS)
-            .maximumSize(1000)
-            .build();
-
-    private static final int MAX_HISTORICO = 20;
+    private final Cache<String, List<Message>> memoriaConversas;
+    private final int maxHistorico;
 
     public ChatService(ChatClient.Builder chatClientBuilder,
                        SystemPromptBuilder promptBuilder,
@@ -59,7 +56,10 @@ public class ChatService {
                        ConsultaTools consultaTools,
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
-                       ChatMetrics chatMetrics) {
+                       ChatMetrics chatMetrics,
+                       @Value("${chat.cache.ttl-hours:2}") int cacheTtlHours,
+                       @Value("${chat.cache.max-size:1000}") long cacheMaxSize,
+                       @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
         this.securityCtx = securityCtx;
@@ -68,6 +68,11 @@ public class ChatService {
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
         this.chatMetrics = chatMetrics;
+        this.maxHistorico = maxHistorico;
+        this.memoriaConversas = Caffeine.newBuilder()
+                .expireAfterAccess(cacheTtlHours, TimeUnit.HOURS)
+                .maximumSize(cacheMaxSize)
+                .build();
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
@@ -162,8 +167,8 @@ public class ChatService {
     }
 
     private void podarHistorico(List<Message> historico) {
-        while (historico.size() > MAX_HISTORICO) {
-            historico.remove(0);
+        if (historico.size() > maxHistorico) {
+            historico.subList(0, historico.size() - maxHistorico).clear();
         }
     }
 
