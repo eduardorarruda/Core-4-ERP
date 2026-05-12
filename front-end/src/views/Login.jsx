@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { auth } from '../lib/api';
-import { FloatingInput } from '../components/ui/FormField';
+import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
 
 /* ── Helpers ── */
 function greetingFor(h) {
