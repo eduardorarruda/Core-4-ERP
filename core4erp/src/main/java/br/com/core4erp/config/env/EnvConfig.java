@@ -13,7 +13,8 @@ public class EnvConfig {
 
         for (String key : new String[]{"DB_URL", "DB_USERNAME", "DB_PASSWORD",
                 "DB_URL_LOG_PER", "DB_USERNAME_LOG_PER", "DB_PASSWORD_LOG_PER",
-                "SECRET_KEY", "CORS_ORIGINS", "TOKEN_EXPIRATION", "GEMINI_API_KEY"}) {
+                "SECRET_KEY", "CORS_ORIGINS", "TOKEN_EXPIRATION", "GEMINI_API_KEY",
+                "MAIL_HOST", "MAIL_PORT", "MAIL_USERNAME", "MAIL_PASSWORD", "MAIL_FROM"}) {
             String value = dotenv.get(key);
             if (value != null) {
                 System.setProperty(key, value);

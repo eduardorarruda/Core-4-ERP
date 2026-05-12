@@ -1,9 +1,12 @@
 package br.com.core4erp.auth.controller;
 
 import br.com.core4erp.auth.dto.AtualizarPerfilRequestDto;
+import br.com.core4erp.auth.dto.EsqueciSenhaRequestDto;
+import br.com.core4erp.auth.dto.EsqueciSenhaResponseDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
+import br.com.core4erp.auth.dto.RedefinirSenhaRequestDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -60,6 +63,19 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<MeResponseDto> me(Authentication authentication) {
         return ResponseEntity.ok(authService.me(authentication.getName()));
+    }
+
+    @Operation(summary = "Solicitar recuperação de senha — gera token e envia por e-mail")
+    @PostMapping("/esqueci-senha")
+    public ResponseEntity<EsqueciSenhaResponseDto> esqueciSenha(@Valid @RequestBody EsqueciSenhaRequestDto request) {
+        return ResponseEntity.ok(authService.gerarTokenReset(request));
+    }
+
+    @Operation(summary = "Redefinir senha usando o token recebido por e-mail")
+    @PostMapping("/redefinir-senha")
+    public ResponseEntity<Void> redefinirSenha(@Valid @RequestBody RedefinirSenhaRequestDto request) {
+        authService.redefinirSenha(request);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Atualizar nome, foto e senha do usuário autenticado")
