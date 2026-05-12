@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
+      allowedHosts: ['core4erp.codes', '.core4erp.codes'],
       proxy: {
         '/api': {
           target: backendUrl,
