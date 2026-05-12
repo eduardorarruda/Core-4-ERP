@@ -205,6 +205,15 @@ export default function ContasFinanceiras() {
     },
   ];
 
+  /* Summary por status */
+  const countByStatus = contas.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; }, {});
+  const statusChips = [
+    { label: 'Pendentes', key: 'PENDENTE', color: '#FFD37A', bg: 'rgba(255,211,122,.1)', border: 'rgba(255,211,122,.2)' },
+    { label: 'Atrasadas', key: 'ATRASADO', color: '#FFB4AB', bg: 'rgba(255,180,171,.1)', border: 'rgba(255,180,171,.2)', pulse: true },
+    { label: 'Pagas',     key: 'PAGO',     color: '#6EFFC0', bg: 'rgba(110,255,192,.1)', border: 'rgba(110,255,192,.2)' },
+    { label: 'Recebidas', key: 'RECEBIDO', color: '#ACC7FF', bg: 'rgba(172,199,255,.1)', border: 'rgba(172,199,255,.2)' },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -213,7 +222,8 @@ export default function ContasFinanceiras() {
         actions={
           <button
             onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all font-mono"
+            style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}
           >
             <Plus className="w-4 h-4" />
             Nova Conta
@@ -221,15 +231,46 @@ export default function ContasFinanceiras() {
         }
       />
 
+      {/* Status summary chips */}
+      {!loading && contas.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {statusChips.map((s) => {
+            const count = countByStatus[s.key] || 0;
+            if (!count) return null;
+            return (
+              <button
+                key={s.key}
+                onClick={() => { const novo = { ...filtros, status: filtros.status === s.key ? '' : s.key }; setFiltros(novo); carregar(novo); }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest font-mono transition-all hover:scale-105"
+                style={{
+                  background: filtros.status === s.key ? s.color : s.bg,
+                  color: filtros.status === s.key ? '#003824' : s.color,
+                  border: `1px solid ${s.border}`,
+                }}
+              >
+                {s.pulse && count > 0 && <span className="w-1.5 h-1.5 rounded-full animate-pulse-dot" style={{ background: s.color }} />}
+                {count} {s.label}
+              </button>
+            );
+          })}
+          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest font-mono text-text-primary/40" style={{ border: '1px solid rgba(250,250,250,.08)' }}>
+            {contas.length} total
+          </span>
+        </div>
+      )}
+
       {/* Filtros */}
-      <div className="bg-surface-medium border border-text-primary/5 rounded-2xl overflow-hidden">
+      <div
+        className="rounded-[18px] overflow-hidden"
+        style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
+      >
         <button
           type="button"
           onClick={() => setShowFiltros((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-highest/30 transition-colors"
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-medium/30 transition-colors"
         >
-          <span className="text-sm font-bold uppercase tracking-widest text-text-primary/50 flex items-center gap-2">
-            <Filter className="w-4 h-4" /> Filtros
+          <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 font-mono flex items-center gap-2">
+            <Filter className="w-3.5 h-3.5" /> Filtros avançados
           </span>
           <ChevronDown className={cn('w-4 h-4 text-text-primary/40 transition-transform duration-200', showFiltros && 'rotate-180')} />
         </button>
@@ -238,7 +279,15 @@ export default function ContasFinanceiras() {
           <div className="px-6 pb-6 space-y-4 border-t border-text-primary/5">
             <div className="flex flex-wrap items-center gap-2 pt-4">
               {['', 'PAGAR', 'RECEBER'].map((t) => (
-                <button key={t} onClick={() => setTipo(t)} className={cn('px-4 py-1.5 rounded-lg text-sm font-medium transition-all', filtros.tipo === t ? 'bg-primary text-on-primary' : 'border border-text-primary/10 text-text-primary/60 hover:text-text-primary')}>
+                <button
+                  key={t}
+                  onClick={() => setTipo(t)}
+                  className="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest font-mono transition-all"
+                  style={filtros.tipo === t
+                    ? { background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }
+                    : { border: '1px solid rgba(250,250,250,.1)', color: 'rgba(250,250,250,.5)' }
+                  }
+                >
                   {t || 'Todos'}
                 </button>
               ))}
@@ -270,11 +319,11 @@ export default function ContasFinanceiras() {
               </FormField>
             </div>
             <div className="flex gap-3">
-              <button type="button" onClick={aplicarFiltros} className="bg-primary text-on-primary font-bold px-6 py-2 rounded-xl hover:opacity-90 flex items-center gap-2">
-                <Filter className="w-4 h-4" /> Filtrar
+              <button type="button" onClick={aplicarFiltros} className="font-bold px-5 py-2 rounded-xl flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono" style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}>
+                <Filter className="w-3.5 h-3.5" /> Filtrar
               </button>
-              <button type="button" onClick={limparFiltros} className="px-6 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary flex items-center gap-2">
-                <RotateCcw className="w-4 h-4" /> Limpar
+              <button type="button" onClick={limparFiltros} className="px-5 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono transition-colors">
+                <RotateCcw className="w-3.5 h-3.5" /> Limpar
               </button>
             </div>
           </div>

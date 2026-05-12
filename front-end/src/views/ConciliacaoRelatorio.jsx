@@ -153,42 +153,48 @@ export default function ConciliacaoRelatorio() {
       />
 
       {/* Cabeçalho detalhado */}
-      <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+      <div className="rounded-[18px] p-6" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-5">
+          {[
+            { label: 'Banco', value: rel.bancoId || '—' },
+            { label: 'Agência', value: rel.agencia || '—' },
+            { label: 'Período OFX', value: rel.dataInicioOfx ? `${formatDate(rel.dataInicioOfx)} – ${formatDate(rel.dataFimOfx)}` : '—' },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <p className="text-[10px] text-text-primary/30 uppercase tracking-widest font-mono mb-1">{label}</p>
+              <p className="font-bold text-text-primary font-mono">{value}</p>
+            </div>
+          ))}
           <div>
-            <p className="text-text-primary/40 text-xs uppercase tracking-widest">Banco</p>
-            <p className="font-bold text-text-primary">{rel.bancoId || '—'}</p>
-          </div>
-          <div>
-            <p className="text-text-primary/40 text-xs uppercase tracking-widest">Agência</p>
-            <p className="font-bold text-text-primary">{rel.agencia || '—'}</p>
-          </div>
-          <div>
-            <p className="text-text-primary/40 text-xs uppercase tracking-widest">Período OFX</p>
-            <p className="font-bold text-text-primary">
-              {rel.dataInicioOfx ? `${formatDate(rel.dataInicioOfx)} – ${formatDate(rel.dataFimOfx)}` : '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-text-primary/40 text-xs uppercase tracking-widest">Status</p>
+            <p className="text-[10px] text-text-primary/30 uppercase tracking-widest font-mono mb-1">Status</p>
             <Badge variant={STATUS_CONCILIACAO_VARIANT[rel.status] ?? 'neutral'} size="md">{rel.status}</Badge>
           </div>
           {rel.observacao && (
             <div className="col-span-2 md:col-span-4">
-              <p className="text-text-primary/40 text-xs uppercase tracking-widest">Observação</p>
-              <p className="text-text-primary">{rel.observacao}</p>
+              <p className="text-[10px] text-text-primary/30 uppercase tracking-widest font-mono mb-1">Observação</p>
+              <p className="text-text-primary text-sm">{rel.observacao}</p>
             </div>
           )}
         </div>
 
         {/* Resumo numérico */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {STATS.map((s) => (
-            <div key={s.label} className="bg-surface rounded-xl p-3 text-center">
-              <p className={`text-2xl font-bold font-display ${s.color}`}>{s.value ?? 0}</p>
-              <p className="text-xs text-text-primary/40 uppercase tracking-widest mt-0.5">{s.label}</p>
-            </div>
-          ))}
+          {STATS.map((s) => {
+            const colorMap = {
+              'text-primary': { bg: 'rgba(110,255,192,.07)', border: 'rgba(110,255,192,.2)', val: '#6EFFC0' },
+              'text-secondary': { bg: 'rgba(172,199,255,.07)', border: 'rgba(172,199,255,.2)', val: '#ACC7FF' },
+              'text-error': { bg: 'rgba(255,180,171,.07)', border: 'rgba(255,180,171,.2)', val: '#FFB4AB' },
+              'text-text-primary': { bg: 'rgba(255,255,255,.04)', border: 'rgba(250,250,250,.08)', val: null },
+              'text-text-primary/40': { bg: 'rgba(255,255,255,.02)', border: 'rgba(250,250,250,.05)', val: null },
+            };
+            const scheme = colorMap[s.color] ?? colorMap['text-text-primary'];
+            return (
+              <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: scheme.bg, border: `1px solid ${scheme.border}` }}>
+                <p className={`text-2xl font-bold font-mono ${s.color}`} style={scheme.val ? { color: scheme.val } : {}}>{s.value ?? 0}</p>
+                <p className="text-[10px] text-text-primary/30 uppercase tracking-widest font-mono mt-1">{s.label}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
