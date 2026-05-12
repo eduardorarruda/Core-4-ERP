@@ -14,6 +14,12 @@ services:
       TOKEN_EXPIRATION: ${TOKEN_EXPIRATION:-604800000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@core4erp.com}
     networks:
       - app-network
     restart: unless-stopped
