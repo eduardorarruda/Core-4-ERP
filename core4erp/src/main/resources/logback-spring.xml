@@ -9,19 +9,10 @@
         </encoder>
     </appender>
 
-    <appender name="DATABASE" class="br.com.core4erp.observabilidade.logging.DatabaseLogAppender">
-        <!-- Captura apenas INFO+ em producao para evitar volume excessivo no banco de log -->
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
-        </filter>
-    </appender>
-
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="DATABASE"/>
     </root>
 
-    <!-- Reduz verbosidade de pacotes de infraestrutura no banco de log -->
     <logger name="org.hibernate" level="WARN" additivity="false">
         <appender-ref ref="CONSOLE"/>
     </logger>
