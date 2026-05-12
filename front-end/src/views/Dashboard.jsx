@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useContext, useMemo } from 'react';
+import React, { useEffect, useState, useContext, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, ReferenceLine,
 } from 'recharts';
-import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon, Repeat, RefreshCw } from 'lucide-react';
+import { AlertTriangle, TrendingUp, TrendingDown, PieChart as PieIcon, Repeat, RefreshCw, Landmark, Wallet, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import BentoCard from '../components/ui/BentoCard';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
@@ -13,6 +13,25 @@ import { dashboard, investimentos, assinaturas as assinaturasApi } from '../lib/
 import { brl } from '../lib/formatters';
 import { cn } from '../lib/utils';
 import { ThemeContext } from '../context/ThemeContext';
+
+/* ── AnimatedKPI: contador eased para KPI cards ── */
+function AnimatedKPI({ to, prefix = 'R$ ', suffix = '' }) {
+  const [v, setV] = useState(0);
+  const rafRef = useRef(null);
+  useEffect(() => {
+    let start;
+    const step = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min(1, (ts - start) / 1400);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setV(eased * to);
+      if (p < 1) rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [to]);
+  return <span>{prefix}{v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{suffix}</span>;
+}
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const COLORS_DARK = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD8A8', '#D8A8FF', '#A8FFD8'];
@@ -125,6 +144,42 @@ export default function Dashboard() {
 
   const tooltipStyle = { backgroundColor: tooltipBg, border: 'none', borderRadius: '8px', fontSize: '12px', color: tooltipTextColor };
 
+  /* KPI data */
+  const kpis = [
+    {
+      label: 'Saldo em Contas',
+      value: saldo,
+      chip: saldo >= 0 ? '▲ Positivo' : '▼ Negativo',
+      chipOk: saldo >= 0,
+      icon: Landmark,
+      color: 'primary',
+    },
+    {
+      label: 'Receitas do Mês',
+      value: receitasMes,
+      chip: '▲ Entradas',
+      chipOk: true,
+      icon: ArrowUpCircle,
+      color: 'primary',
+    },
+    {
+      label: 'Despesas do Mês',
+      value: despesasMes,
+      chip: '▼ Saídas',
+      chipOk: false,
+      icon: ArrowDownCircle,
+      color: 'error',
+    },
+    {
+      label: 'Patrimônio Investido',
+      value: patrimonioTotal,
+      chip: '▲ Carteira',
+      chipOk: true,
+      icon: Wallet,
+      color: 'secondary',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -146,6 +201,50 @@ export default function Dashboard() {
           </div>
         }
       />
+
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {kpis.map((kpi, i) => (
+          <div
+            key={kpi.label}
+            className={`anim-in d${i + 1} rounded-[18px] p-5 flex flex-col gap-3 relative overflow-hidden`}
+            style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(250,250,250,0.08)',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2)',
+            }}
+          >
+            <div
+              className="absolute -right-3 -top-3 opacity-[0.06]"
+              aria-hidden
+            >
+              <kpi.icon className="w-20 h-20" />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 font-mono">
+                {kpi.label}
+              </span>
+              <span style={{
+                fontSize: 9, fontWeight: 700,
+                padding: '2px 7px', borderRadius: 4,
+                background: kpi.chipOk ? 'rgba(110,255,192,.12)' : 'rgba(255,180,171,.12)',
+                color: kpi.chipOk ? '#6EFFC0' : '#FFB4AB',
+                fontFamily: 'monospace', letterSpacing: '.05em',
+              }}>
+                {carregando ? '···' : kpi.chip}
+              </span>
+            </div>
+            <p className={`text-2xl font-bold font-display text-${kpi.color} leading-none`}>
+              {carregando ? (
+                <span className="inline-block w-32 h-7 rounded-lg bg-surface-highest animate-pulse" />
+              ) : (
+                <AnimatedKPI to={kpi.value} />
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
 
       {/* Alertas */}
       {(vencendoHoje > 0 || atrasadas > 0) && (

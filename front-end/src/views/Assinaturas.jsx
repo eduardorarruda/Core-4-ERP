@@ -138,18 +138,22 @@ export default function Assinaturas() {
 
       {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 mb-1">Ativas</p>
-          <p className="text-2xl font-bold text-text-primary font-display">{ativas.length}</p>
-        </div>
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 mb-1">Custo Mensal</p>
-          <p className="text-2xl font-bold text-primary font-display">R$ {brl(totalMensal)}</p>
-        </div>
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-4">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 mb-1">Custo Anual</p>
-          <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(totalMensal * 12)}</p>
-        </div>
+        {[
+          { label: 'Assinaturas Ativas', value: ativas.length, prefix: '', suffix: '', color: '#6EFFC0', bg: 'rgba(110,255,192,.07)', border: 'rgba(110,255,192,.2)' },
+          { label: 'Custo Mensal',       value: totalMensal,   prefix: 'R$ ', suffix: '', color: '#FFB4AB', bg: 'rgba(255,180,171,.07)', border: 'rgba(255,180,171,.2)' },
+          { label: 'Custo Anual',        value: totalMensal * 12, prefix: 'R$ ', suffix: '', color: '#FFD37A', bg: 'rgba(255,211,122,.07)', border: 'rgba(255,211,122,.2)' },
+        ].map((s, i) => (
+          <div
+            key={s.label}
+            className={`anim-in d${i + 1} rounded-[18px] px-5 py-4`}
+            style={{ background: s.bg, border: `1px solid ${s.border}`, backdropFilter: 'blur(8px)' }}
+          >
+            <p className="text-[9px] font-bold uppercase tracking-widest font-mono mb-2" style={{ color: s.color }}>{s.label}</p>
+            <p className="text-2xl font-bold font-display" style={{ color: s.color }}>
+              {s.prefix}{typeof s.value === 'number' && s.prefix ? s.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : s.value}{s.suffix}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* Formulário */}

@@ -62,6 +62,12 @@ export const auth = {
 
   me: () => request('/api/auth/me'),
 
+  esqueciSenha: (email) =>
+    request('/api/auth/esqueci-senha', { method: 'POST', body: JSON.stringify({ email }), skipAuthRedirect: true }),
+
+  redefinirSenha: (token, novaSenha) =>
+    request('/api/auth/redefinir-senha', { method: 'POST', body: JSON.stringify({ token, novaSenha }), skipAuthRedirect: true }),
+
   atualizarPerfil: (dto) =>
     request('/api/auth/perfil', { method: 'PUT', body: JSON.stringify(dto) }),
 
