@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { auth } from '../lib/api';
-import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
+import { FloatingInput } from '../components/ui/FormField';
 
 /* ── Helpers ── */
 function greetingFor(h) {
@@ -352,12 +352,9 @@ export default function Login() {
   const [now, setNow] = useState(new Date());
 
   // ── Recuperação de senha ──
-  const [view, setView] = useState('login'); // 'login' | 'forgot-email' | 'forgot-token' | 'forgot-password' | 'forgot-done'
+  const [view, setView] = useState('login'); // 'login' | 'forgot-email' | 'forgot-sent'
   const [resetEmail, setResetEmail] = useState('');
-  const [resetTokenInput, setResetTokenInput] = useState('');
   const [resetTokenDemo, setResetTokenDemo] = useState('');
-  const [novaSenha, setNovaSenha] = useState('');
-  const [confirmaSenha, setConfirmaSenha] = useState('');
   const [resetErro, setResetErro] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const spotRef = useRef(null);
@@ -395,10 +392,7 @@ export default function Login() {
     setView('login');
     setResetErro('');
     setResetEmail('');
-    setResetTokenInput('');
     setResetTokenDemo('');
-    setNovaSenha('');
-    setConfirmaSenha('');
   }
 
   const handleEsqueciSenha = async (e) => {
@@ -412,31 +406,7 @@ export default function Login() {
     try {
       const res = await auth.esqueciSenha(resetEmail);
       setResetTokenDemo(res.tokenDemo || '');
-      setView('forgot-token');
-    } catch (err) {
-      setResetErro(err.message);
-    } finally {
-      setResetLoading(false);
-    }
-  };
-
-  const handleVerificarToken = (e) => {
-    e.preventDefault();
-    if (!resetTokenInput.trim()) { setResetErro('Informe o código recebido.'); return; }
-    setResetErro('');
-    setView('forgot-password');
-  };
-
-  const handleRedefinirSenha = async (e) => {
-    e.preventDefault();
-    if (novaSenha.length < 8) { setResetErro('A senha deve ter no mínimo 8 caracteres.'); return; }
-    if (novaSenha !== confirmaSenha) { setResetErro('As senhas não coincidem.'); return; }
-    setResetErro('');
-    setResetLoading(true);
-    try {
-      await auth.redefinirSenha(resetTokenInput, novaSenha);
-      setView('forgot-done');
-      setTimeout(voltarParaLogin, 3500);
+      setView('forgot-sent');
     } catch (err) {
       setResetErro(err.message);
     } finally {
@@ -741,160 +711,55 @@ export default function Login() {
               </div>
             )}
 
-            {/* ── VIEW: Esqueci a senha — Passo 2: Código ─────────── */}
-            {view === 'forgot-token' && (
+            {/* ── VIEW: Esqueci a senha — Email enviado ────────────── */}
+            {view === 'forgot-sent' && (
               <div className="anim-in">
-                <button type="button" onClick={() => setView('forgot-email')} style={{ background: 'none', border: 'none', color: 'rgba(250,250,250,.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 28, padding: 0 }}>
+                <button type="button" onClick={voltarParaLogin} style={{ background: 'none', border: 'none', color: 'rgba(250,250,250,.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 28, padding: 0 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
-                  Voltar
-                </button>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', background: 'rgba(172,199,255,.1)', border: '1px solid rgba(172,199,255,.2)', marginBottom: 20 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ACC7FF" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-                </div>
-
-                <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#fafafa', marginBottom: 8 }}>
-                  Verifique seu código
-                </h1>
-                <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', marginBottom: 16, lineHeight: 1.6 }}>
-                  Insira o código enviado para <strong style={{ color: '#fafafa' }}>{resetEmail}</strong>.
-                </p>
-
-                {/* Banner demo — visível apenas quando o backend retorna o token (sem SMTP) */}
-                {resetTokenDemo && (
-                  <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(255,211,122,.06)', border: '1px solid rgba(255,211,122,.2)', marginBottom: 16 }}>
-                    <p style={{ fontSize: 11, color: '#FFD37A', fontFamily: 'monospace', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 6 }}>⚠ Modo demonstração — sem SMTP configurado</p>
-                    <p style={{ fontSize: 11, color: 'rgba(250,250,250,.5)', marginBottom: 8, lineHeight: 1.5 }}>
-                      Em produção este código seria enviado por e-mail. Para fins de demonstração, ele está exibido aqui:
-                    </p>
-                    <div
-                      style={{ fontFamily: 'monospace', fontSize: 13, color: '#FFD37A', letterSpacing: '.12em', cursor: 'pointer', wordBreak: 'break-all' }}
-                      onClick={() => setResetTokenInput(resetTokenDemo)}
-                      title="Clique para preencher automaticamente"
-                    >
-                      {resetTokenDemo}
-                    </div>
-                    <p style={{ fontSize: 10, color: 'rgba(250,250,250,.3)', marginTop: 6, fontFamily: 'monospace' }}>Clique no código para preencher automaticamente · Expira em 60 min</p>
-                  </div>
-                )}
-
-                <form onSubmit={handleVerificarToken}>
-                  <FloatingInput
-                    id="reset-token"
-                    label="Código de verificação"
-                    type="text"
-                    value={resetTokenInput}
-                    onChange={(e) => setResetTokenInput(e.target.value)}
-                    autoComplete="one-time-code"
-                    required
-                  />
-
-                  {resetErro && (
-                    <div style={{ ...S.errBanner, marginBottom: 12 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
-                      {resetErro}
-                    </div>
-                  )}
-
-                  <button type="submit" style={{ ...S.submitBtn, marginTop: 8 }}>
-                    Verificar código
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* ── VIEW: Esqueci a senha — Passo 3: Nova senha ──────── */}
-            {view === 'forgot-password' && (
-              <div className="anim-in">
-                <button type="button" onClick={() => setView('forgot-token')} style={{ background: 'none', border: 'none', color: 'rgba(250,250,250,.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 28, padding: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
-                  Voltar
+                  Voltar ao login
                 </button>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)', marginBottom: 20 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6EFFC0" strokeWidth="1.8"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6EFFC0" strokeWidth="1.8"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
                 </div>
 
                 <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#fafafa', marginBottom: 8 }}>
-                  Nova senha
+                  {resetTokenDemo ? 'Modo demonstração' : 'Verifique seu e-mail'}
                 </h1>
-                <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', marginBottom: 28, lineHeight: 1.6 }}>
-                  Escolha uma senha forte com no mínimo 8 caracteres.
-                </p>
 
-                <form onSubmit={handleRedefinirSenha}>
-                  <FloatingPasswordInput
-                    id="nova-senha"
-                    label="Nova senha"
-                    value={novaSenha}
-                    onChange={(e) => setNovaSenha(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                  />
+                {/* Produção: email enviado */}
+                {!resetTokenDemo && (
+                  <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.7, marginBottom: 28 }}>
+                    Enviamos um link de recuperação para{' '}
+                    <strong style={{ color: '#fafafa' }}>{resetEmail}</strong>.<br />
+                    Clique no link do e-mail para criar sua nova senha.<br />
+                    <span style={{ fontSize: 12, color: 'rgba(250,250,250,.3)' }}>O link expira em 60 minutos.</span>
+                  </p>
+                )}
 
-                  <FloatingPasswordInput
-                    id="confirma-senha"
-                    label="Confirmar nova senha"
-                    value={confirmaSenha}
-                    onChange={(e) => setConfirmaSenha(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                  />
+                {/* Demo: sem SMTP configurado */}
+                {resetTokenDemo && (
+                  <>
+                    <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.7, marginBottom: 16 }}>
+                      Sem SMTP configurado, o link de recuperação não foi enviado por e-mail.<br />
+                      Clique no botão abaixo para redefinir sua senha diretamente.
+                    </p>
+                    <a
+                      href={`/redefinir-senha?token=${resetTokenDemo}`}
+                      style={{ ...S.submitBtn, textDecoration: 'none', marginTop: 0 }}
+                    >
+                      Redefinir minha senha
+                    </a>
+                  </>
+                )}
 
-                  {/* Indicador de força da senha */}
-                  {novaSenha.length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                      {[
-                        { label: 'Mínimo 8 caracteres', ok: novaSenha.length >= 8 },
-                        { label: 'Letras maiúsculas e minúsculas', ok: /[a-z]/.test(novaSenha) && /[A-Z]/.test(novaSenha) },
-                        { label: 'Número ou símbolo', ok: /[\d\W]/.test(novaSenha) },
-                      ].map(({ label, ok }) => (
-                        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: ok ? '#6EFFC0' : 'rgba(250,250,250,.35)', marginBottom: 4 }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            {ok ? <path d="M20 6 9 17l-5-5" /> : <path d="M18 6 6 18M6 6l12 12" />}
-                          </svg>
-                          {label}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {resetErro && (
-                    <div style={{ ...S.errBanner, marginBottom: 12 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
-                      {resetErro}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={resetLoading || novaSenha !== confirmaSenha || novaSenha.length < 8}
-                    style={{ ...S.submitBtn, marginTop: 8, opacity: (resetLoading || novaSenha !== confirmaSenha || novaSenha.length < 8) ? .5 : 1 }}
-                  >
-                    {resetLoading
-                      ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />Salvando…</>
-                      : 'Redefinir senha'
-                    }
-                  </button>
-                </form>
-              </div>
-            )}
-
-            {/* ── VIEW: Esqueci a senha — Sucesso ─────────────────── */}
-            {view === 'forgot-done' && (
-              <div className="anim-in" style={{ textAlign: 'center', paddingTop: 40 }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#6EFFC0', color: '#003824', display: 'grid', placeItems: 'center', margin: '0 auto 24px', boxShadow: '0 0 60px rgba(110,255,192,.4)', animation: 'scaleSpring 600ms cubic-bezier(.34,1.56,.64,1) both' }}>
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                </div>
-                <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 24, fontWeight: 700, color: '#fafafa', marginBottom: 10 }}>
-                  Senha redefinida!
-                </h2>
-                <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.6 }}>
-                  Sua senha foi alterada com sucesso.<br />
-                  Redirecionando para o login…
-                </p>
+                <button
+                  type="button"
+                  onClick={voltarParaLogin}
+                  style={{ width: '100%', marginTop: 12, padding: '12px', borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', fontSize: 13, cursor: 'pointer' }}
+                >
+                  Voltar ao login
+                </button>
               </div>
             )}
 
