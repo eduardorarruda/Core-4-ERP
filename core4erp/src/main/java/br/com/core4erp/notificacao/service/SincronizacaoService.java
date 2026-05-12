@@ -56,13 +56,13 @@ public class SincronizacaoService {
     /** Sincroniza todos os usuários (chamada administrativa). */
     @Transactional
     public void sincronizarTodos() {
-        usuarioRepository.findAll().forEach(u -> sincronizar(u.getId()));
+        usuarioRepository.findAllIds().forEach(this::sincronizar);
     }
 
     /** Gera lançamentos de assinaturas para todos os usuários às 7h diariamente. */
     @Scheduled(cron = "0 0 7 * * *")
     public void gerarAssinaturasScheduled() {
-        usuarioRepository.findAll().forEach(u -> cartaoCreditoService.gerarLancamentosAssinaturas(u.getId()));
+        usuarioRepository.findAllIds().forEach(cartaoCreditoService::gerarLancamentosAssinaturas);
     }
 
     // ── Regra 1 ──────────────────────────────────────────────────────────────

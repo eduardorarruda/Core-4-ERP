@@ -9,6 +9,8 @@ import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RedefinirSenhaRequestDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.auth.service.AuthService;
+import br.com.core4erp.auth.service.PasswordResetService;
+import br.com.core4erp.auth.service.ProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,12 +32,18 @@ import java.io.IOException;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
+    private final ProfileService profileService;
 
     @Value("${jwt.expiration}")
     private long tokenExpiration;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService,
+                          PasswordResetService passwordResetService,
+                          ProfileService profileService) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
+        this.profileService = profileService;
     }
 
     @Operation(summary = "Registrar novo usuário")
@@ -49,7 +57,7 @@ public class AuthController {
     public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto request, HttpServletResponse response) {
         AuthService.LoginResult result = authService.login(request);
         response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie(result.token(), tokenExpiration / 1000));
-        return ResponseEntity.ok(new LoginResponseDto(result.token(), result.usuario()));
+        return ResponseEntity.ok(new LoginResponseDto(result.usuario()));
     }
 
     @Operation(summary = "Encerrar sessão e remover cookie JWT")
@@ -68,13 +76,13 @@ public class AuthController {
     @Operation(summary = "Solicitar recuperação de senha — gera token e envia por e-mail")
     @PostMapping("/esqueci-senha")
     public ResponseEntity<EsqueciSenhaResponseDto> esqueciSenha(@Valid @RequestBody EsqueciSenhaRequestDto request) {
-        return ResponseEntity.ok(authService.gerarTokenReset(request));
+        return ResponseEntity.ok(passwordResetService.gerarTokenReset(request));
     }
 
     @Operation(summary = "Redefinir senha usando o token recebido por e-mail")
     @PostMapping("/redefinir-senha")
     public ResponseEntity<Void> redefinirSenha(@Valid @RequestBody RedefinirSenhaRequestDto request) {
-        authService.redefinirSenha(request);
+        passwordResetService.redefinirSenha(request);
         return ResponseEntity.noContent().build();
     }
 
@@ -83,7 +91,7 @@ public class AuthController {
     public ResponseEntity<MeResponseDto> atualizarPerfil(
             @Valid @RequestBody AtualizarPerfilRequestDto dto,
             Authentication authentication) {
-        return ResponseEntity.ok(authService.atualizarPerfil(authentication.getName(), dto));
+        return ResponseEntity.ok(profileService.atualizarPerfil(authentication.getName(), dto));
     }
 
     @Operation(summary = "Atualizar foto de perfil via multipart")
@@ -97,7 +105,7 @@ public class AuthController {
             throw new IllegalArgumentException("Formato de arquivo não suportado. Use PNG, JPEG ou WebP.");
         if (foto.getSize() > 1_500_000)
             throw new IllegalArgumentException("Foto excede o tamanho máximo de 1.5 MB");
-        return ResponseEntity.ok(authService.atualizarFotoPerfil(authentication.getName(), foto.getBytes(), contentType));
+        return ResponseEntity.ok(profileService.atualizarFotoPerfil(authentication.getName(), foto.getBytes(), contentType));
     }
 
     private static String jwtCookie(String value, long maxAgeSeconds) {

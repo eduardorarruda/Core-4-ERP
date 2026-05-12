@@ -19,5 +19,6 @@ public record RegistrarRequestDto(
         )
         String senha,
 
-        Long telefone
+        @Pattern(regexp = "^[+]?[0-9 \\-()]{0,20}$", message = "Telefone inválido")
+        String telefone
 ) {}
