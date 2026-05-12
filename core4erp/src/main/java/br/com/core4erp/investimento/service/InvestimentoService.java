@@ -121,7 +121,13 @@ public class InvestimentoService {
                     t.setContaCorrenteOrigem(cc);
                 }
             }
-            case RESGATE -> conta.setSaldoAtual(conta.getSaldoAtual().subtract(dto.valor()));
+            case RESGATE -> {
+                if (conta.getSaldoAtual().compareTo(dto.valor()) < 0) {
+                    throw new BusinessException("SALDO_INSUFICIENTE",
+                            "Saldo insuficiente para resgate. Saldo atual: R$ " + conta.getSaldoAtual());
+                }
+                conta.setSaldoAtual(conta.getSaldoAtual().subtract(dto.valor()));
+            }
             case RENDIMENTO -> conta.setSaldoAtual(conta.getSaldoAtual().add(dto.valor()));
             default -> throw new IllegalArgumentException("Tipo de transação desconhecido: " + tipo);
         }
