@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import br.com.core4erp.utils.ParcelamentoHelper;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -39,7 +41,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -170,13 +171,11 @@ public class CartaoCreditoService {
         Parceiro parceiro = parceiroRepo.findByIdAndUsuarioId(dto.parceiroId(), uid)
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
 
-        int parcelas = (dto.quantidadeParcelas() == null || dto.quantidadeParcelas() < 1) ? 1 : dto.quantidadeParcelas();
+        int parcelas = ParcelamentoHelper.normalizarParcelas(dto.quantidadeParcelas());
         boolean dividir = Boolean.TRUE.equals(dto.dividirValor());
-        BigDecimal valorParcela = dividir && parcelas > 1
-                ? dto.valor().divide(BigDecimal.valueOf(parcelas), 2, RoundingMode.HALF_UP)
-                : dto.valor();
+        BigDecimal valorParcela = ParcelamentoHelper.calcularValorPorParcela(dto.valor(), parcelas, dividir);
 
-        String grupo = parcelas > 1 ? UUID.randomUUID().toString() : null;
+        String grupo = ParcelamentoHelper.gerarGrupoParcelamento(parcelas);
         Usuario usuario = securityCtx.getUsuario();
         List<LancamentoCartao> criados = new ArrayList<>();
         YearMonth faturaBase = calcularFatura(dto.dataCompra(), cartao.getDiaFechamento());
@@ -196,10 +195,10 @@ public class CartaoCreditoService {
             l.setCategoria(categoria);
             l.setParceiro(parceiro);
             l.setUsuario(usuario);
-            criados.add(lancamentoRepo.save(l));
+            criados.add(l);
         }
 
-        return criados.stream().map(l -> LancamentoResponseDto.from(l, false)).toList();
+        return lancamentoRepo.saveAll(criados).stream().map(l -> LancamentoResponseDto.from(l, false)).toList();
     }
 
     @Transactional
@@ -236,12 +235,6 @@ public class CartaoCreditoService {
     // ── Fechamento de fatura ──────────────────────────────────────────────────
 
     @Transactional
-    /**
-     * Fecha a fatura de um mês/ano: soma todos os lançamentos do período, gera uma
-     * {@link br.com.core4erp.conta.entity.Conta} a pagar com vencimento no dia configurado no cartão
-     * e marca a fatura como {@code FECHADA}. Lança {@link IllegalStateException} se já fechada ou
-     * se não houver lançamentos.
-     */
     public ContaResponseDto fecharFatura(Long cartaoId, FechamentoFaturaRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
         Long uid = securityCtx.getUsuarioId();

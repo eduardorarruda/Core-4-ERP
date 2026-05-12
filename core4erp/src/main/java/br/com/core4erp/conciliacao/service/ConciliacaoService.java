@@ -1,6 +1,5 @@
 package br.com.core4erp.conciliacao.service;
 
-import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.conciliacao.dto.*;
 import br.com.core4erp.conciliacao.entity.Conciliacao;
 import br.com.core4erp.conciliacao.entity.ConciliacaoItem;
@@ -17,11 +16,12 @@ import br.com.core4erp.conta.repository.ContaBaixadaRepository;
 import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
+import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.enums.StatusConta;
-import br.com.core4erp.parceiro.repository.ParceiroRepository;
-import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,15 +29,13 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.text.Normalizer;
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class ConciliacaoService {
 
+    private static final Logger log = LoggerFactory.getLogger(ConciliacaoService.class);
     private static final int SCORE_MINIMO = 50;
     private static final BigDecimal TOLERANCIA_VALOR = new BigDecimal("10");
 
@@ -46,10 +44,9 @@ public class ConciliacaoService {
     private final ContaRepository contaRepository;
     private final ContaBaixadaRepository contaBaixadaRepository;
     private final ContaCorrenteRepository contaCorrenteRepository;
-    private final CategoriaRepository categoriaRepository;
-    private final ParceiroRepository parceiroRepository;
     private final ContaService contaService;
     private final OfxParserService ofxParserService;
+    private final ConciliacaoScoreService scoreService;
     private final SecurityContextUtils securityCtx;
 
     public ConciliacaoService(ConciliacaoRepository conciliacaoRepository,
@@ -57,20 +54,18 @@ public class ConciliacaoService {
                                ContaRepository contaRepository,
                                ContaBaixadaRepository contaBaixadaRepository,
                                ContaCorrenteRepository contaCorrenteRepository,
-                               CategoriaRepository categoriaRepository,
-                               ParceiroRepository parceiroRepository,
                                ContaService contaService,
                                OfxParserService ofxParserService,
+                               ConciliacaoScoreService scoreService,
                                SecurityContextUtils securityCtx) {
         this.conciliacaoRepository = conciliacaoRepository;
         this.itemRepository = itemRepository;
         this.contaRepository = contaRepository;
         this.contaBaixadaRepository = contaBaixadaRepository;
         this.contaCorrenteRepository = contaCorrenteRepository;
-        this.categoriaRepository = categoriaRepository;
-        this.parceiroRepository = parceiroRepository;
         this.contaService = contaService;
         this.ofxParserService = ofxParserService;
+        this.scoreService = scoreService;
         this.securityCtx = securityCtx;
     }
 
@@ -193,7 +188,7 @@ public class ConciliacaoService {
             Conta melhor = null;
             int melhorScore = 0;
             for (Conta candidata : candidatas) {
-                int score = calcularScore(ofxTrn, candidata);
+                int score = scoreService.calcular(ofxTrn, candidata);
                 if (score > melhorScore) {
                     melhorScore = score;
                     melhor = candidata;
@@ -246,9 +241,6 @@ public class ConciliacaoService {
 
         ConciliacaoItem item = findItem(itemId, conciliacaoId);
         Long usuarioId = securityCtx.getUsuarioId();
-
-        var categoria = categoriaRepository.findByIdAndUsuarioId(dto.categoriaId(), usuarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
 
         var contaCreateDto = new ContaCreateDto(
                 dto.descricao(),
@@ -334,7 +326,12 @@ public class ConciliacaoService {
                 item.setStatusItem(StatusItemConciliacao.BAIXADO);
                 itemRepository.save(item);
                 baixados++;
+            } catch (BusinessException e) {
+                log.warn("Baixa ignorada na conciliação {}, item {}: [{}] {}", id, item.getId(), e.getCode(), e.getMessage());
+                item.setStatusItem(StatusItemConciliacao.IGNORADO);
+                itemRepository.save(item);
             } catch (IllegalStateException e) {
+                log.warn("Baixa ignorada na conciliação {}, item {}: {}", id, item.getId(), e.getMessage());
                 item.setStatusItem(StatusItemConciliacao.IGNORADO);
                 itemRepository.save(item);
             }
@@ -359,72 +356,6 @@ public class ConciliacaoService {
         assertPendente(c);
         c.setStatus(StatusConciliacao.CANCELADA);
         conciliacaoRepository.save(c);
-    }
-
-    // ── Score algorithm ───────────────────────────────────────────────────────
-
-    private int calcularScore(OfxTransacaoDto ofxTrn, Conta conta) {
-        int score = 0;
-        BigDecimal valorOfx = ofxTrn.getValor().abs();
-        BigDecimal valorConta = conta.getValorOriginal().abs();
-
-        if (valorOfx.compareTo(valorConta) == 0) {
-            score += 40;
-        } else if (valorOfx.subtract(valorConta).abs().compareTo(new BigDecimal("0.05")) <= 0) {
-            score += 20;
-        }
-
-        if (ofxTrn.getData() != null && conta.getDataVencimento() != null) {
-            long dias = Math.abs(ChronoUnit.DAYS.between(ofxTrn.getData(), conta.getDataVencimento()));
-            if (dias == 0) score += 30;
-            else if (dias <= 3) score += 15;
-        }
-
-        if (ofxTrn.getMemo() != null && conta.getDescricao() != null) {
-            double sim = calcularJaccard(normalizar(ofxTrn.getMemo()), normalizar(conta.getDescricao()));
-            if (sim >= 0.6) score += 20;
-            else if (sim >= 0.3) score += 10;
-        }
-
-        if (conta.getParceiro() != null && ofxTrn.getMemo() != null) {
-            String nomeParc = conta.getParceiro().getNomeFantasia() != null
-                    ? conta.getParceiro().getNomeFantasia()
-                    : conta.getParceiro().getRazaoSocial();
-            if (nomeParc != null && !nomeParc.isBlank()) {
-                String prefixo = normalizar(nomeParc);
-                prefixo = prefixo.substring(0, Math.min(5, prefixo.length()));
-                if (!prefixo.isBlank() && normalizar(ofxTrn.getMemo()).contains(prefixo)) {
-                    score += 10;
-                }
-            }
-        }
-
-        return score;
-    }
-
-    private double calcularJaccard(String a, String b) {
-        Set<String> bg_a = bigramas(a);
-        Set<String> bg_b = bigramas(b);
-        if (bg_a.isEmpty() || bg_b.isEmpty()) return 0;
-        Set<String> intersecao = new HashSet<>(bg_a);
-        intersecao.retainAll(bg_b);
-        Set<String> uniao = new HashSet<>(bg_a);
-        uniao.addAll(bg_b);
-        return (double) intersecao.size() / uniao.size();
-    }
-
-    private Set<String> bigramas(String s) {
-        Set<String> bg = new HashSet<>();
-        for (int i = 0; i < s.length() - 1; i++) bg.add(s.substring(i, i + 2));
-        return bg;
-    }
-
-    private String normalizar(String s) {
-        return Normalizer.normalize(s, Normalizer.Form.NFD)
-                .replaceAll("[^\\p{ASCII}]", "")
-                .toLowerCase()
-                .replaceAll("[^a-z0-9]", " ")
-                .trim();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

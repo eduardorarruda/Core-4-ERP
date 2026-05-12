@@ -1,27 +1,53 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: core4erp-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-core4erp}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${POSTGRES_DB:-core4erp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./core4erp
     ports:
       - "8080:8080"
     environment:
-      DB_URL: ${DB_URL}
+      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/core4erp}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_URL_LOG_PER: ${DB_URL_LOG_PER:-${DB_URL}}
-      DB_USERNAME_LOG_PER: ${DB_USERNAME_LOG_PER:-${DB_USERNAME}}
-      DB_PASSWORD_LOG_PER: ${DB_PASSWORD_LOG_PER:-${DB_PASSWORD}}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-3}
       SECRET_KEY: ${SECRET_KEY}
       TOKEN_EXPIRATION: ${TOKEN_EXPIRATION:-604800000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_FROM: ${MAIL_FROM}
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   prometheus:
     image: prom/prometheus:latest
@@ -36,30 +62,43 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=30d'
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=https://grafana.core4erp.codes
+      - GF_SERVER_ROOT_URL=${GRAFANA_URL:-http://localhost:3001}
       - GF_SERVER_SERVE_FROM_SUB_PATH=false
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
 volumes:
+  postgres_data:
   prometheus_data:
   grafana_data:
 
