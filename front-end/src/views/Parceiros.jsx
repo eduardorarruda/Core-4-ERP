@@ -181,18 +181,21 @@ export default function Parceiros() {
 
       {/* Form com abas */}
       {showForm && (
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-5 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-display">
+        <div className="rounded-[18px] p-6 space-y-5 animate-scale-in" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">
             {editId ? 'Editar' : 'Novo'} Parceiro
           </h2>
 
-          <div className="flex gap-1 bg-surface p-1 rounded-xl">
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(0,0,0,.2)' }}>
             {TABS_FORM.map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={cn('flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all', activeTab === tab ? 'bg-surface-medium text-text-primary shadow-sm' : 'text-text-primary/40 hover:text-text-primary')}
+                className={cn('flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all font-mono')}
+                style={activeTab === tab
+                  ? { background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }
+                  : { color: 'rgba(255,255,255,.4)' }}
               >
                 {tab}
               </button>

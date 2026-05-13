@@ -28,12 +28,13 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.com.core4erp.utils.ParcelamentoHelper;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Service
 public class ContaService {
@@ -123,19 +124,17 @@ public class ContaService {
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         }
 
-        int parcelas = (dto.quantidadeParcelas() == null || dto.quantidadeParcelas() < 1) ? 1 : dto.quantidadeParcelas();
-        int intervalo = (dto.intervaloMeses() == null || dto.intervaloMeses() < 1) ? 1 : dto.intervaloMeses();
+        int parcelas = ParcelamentoHelper.normalizarParcelas(dto.quantidadeParcelas());
+        int intervalo = ParcelamentoHelper.normalizarIntervalo(dto.intervaloMeses());
         boolean dividir = Boolean.TRUE.equals(dto.dividirValor());
 
-        BigDecimal valorPorParcela = dividir && parcelas > 1
-                ? dto.valorOriginal().divide(BigDecimal.valueOf(parcelas), 2, RoundingMode.HALF_UP)
-                : dto.valorOriginal();
+        BigDecimal valorPorParcela = ParcelamentoHelper.calcularValorPorParcela(dto.valorOriginal(), parcelas, dividir);
 
         BigDecimal ac = dto.acrescimo() != null ? dto.acrescimo() : BigDecimal.ZERO;
         BigDecimal desc = dto.desconto() != null ? dto.desconto() : BigDecimal.ZERO;
         BigDecimal valorLiquido = valorPorParcela.add(ac).subtract(desc).setScale(2, RoundingMode.HALF_UP);
 
-        String grupo = parcelas > 1 ? UUID.randomUUID().toString() : null;
+        String grupo = ParcelamentoHelper.gerarGrupoParcelamento(parcelas);
         List<Conta> criadas = new ArrayList<>();
 
         for (int i = 0; i < parcelas; i++) {
@@ -154,10 +153,10 @@ public class ContaService {
             conta.setCategoria(categoria);
             conta.setParceiro(parceiro);
             conta.setUsuario(usuario);
-            criadas.add(contaRepository.save(conta));
+            criadas.add(conta);
         }
 
-        return criadas.stream().map(ContaResponseDto::from).toList();
+        return contaRepository.saveAll(criadas).stream().map(ContaResponseDto::from).toList();
     }
 
     @Transactional
@@ -201,7 +200,7 @@ public class ContaService {
      * Registra o pagamento/recebimento de uma conta: cria um registro {@link br.com.core4erp.conta.entity.ContaBaixada},
      * aplica juros/multa/acréscimo/desconto ao valor original e ajusta o saldo da conta corrente informada.
      */
-    @Transactional
+    @Transactional(noRollbackFor = {BusinessException.class, IllegalStateException.class, jakarta.persistence.EntityNotFoundException.class})
     public ContaResponseDto baixar(Long id, BaixaRequestDto dto) {
         Conta conta = findOwned(id);
 
@@ -222,6 +221,15 @@ public class ContaService {
                 .add(juros).add(multa).add(acrescimo).subtract(desconto)
                 .setScale(2, RoundingMode.HALF_UP);
 
+        // Verificar saldo antes de qualquer escrita para não marcar a transação como rollback-only
+        BigDecimal delta = conta.getTipo() == TipoConta.PAGAR ? valorFinal.negate() : valorFinal;
+        if (conta.getTipo() == TipoConta.PAGAR
+                && contaCorrente.getSaldo().compareTo(valorFinal) < 0
+                && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
+            throw new BusinessException("SALDO_INSUFICIENTE",
+                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
+        }
+
         ContaBaixada baixada = new ContaBaixada();
         baixada.setConta(conta);
         baixada.setContaCorrente(contaCorrente);
@@ -234,14 +242,6 @@ public class ContaService {
         baixada.setUsuario(securityCtx.getUsuario());
         baixadaRepository.save(baixada);
 
-        // Atualiza saldo da conta corrente
-        BigDecimal delta = conta.getTipo() == TipoConta.PAGAR ? valorFinal.negate() : valorFinal;
-        if (conta.getTipo() == TipoConta.PAGAR
-                && contaCorrente.getSaldo().compareTo(valorFinal) < 0
-                && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
-            throw new BusinessException("SALDO_INSUFICIENTE",
-                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
-        }
         contaCorrente.setSaldo(contaCorrente.getSaldo().add(delta));
         contaCorrenteRepository.save(contaCorrente);
 

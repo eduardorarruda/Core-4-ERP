@@ -120,12 +120,24 @@ export default function ContasCorrentes() {
       />
 
       {/* Saldo total */}
-      <div className="bg-primary/10 border border-primary/20 rounded-2xl px-6 py-4 flex items-center justify-between">
+      <div
+        className="rounded-[18px] px-6 py-5 flex items-center justify-between anim-in d1"
+        style={{
+          background: 'rgba(110,255,192,.07)',
+          border: '1px solid rgba(110,255,192,.2)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 1px 3px rgba(0,0,0,.25), 0 4px 16px rgba(110,255,192,.06)',
+        }}
+      >
         <div>
-          <p className="text-xs uppercase tracking-widest text-primary font-bold mb-1">Saldo Total</p>
-          <p className="text-3xl font-bold text-text-primary font-display">R$ {brl(total)}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="live-dot" style={{ width: 5, height: 5 }} />
+            <p className="text-[10px] uppercase tracking-widest text-primary font-bold font-mono">Saldo Consolidado — Todas as Contas</p>
+          </div>
+          <p className="text-3xl font-bold text-primary font-display">R$ {brl(total)}</p>
+          <p className="text-[10px] text-text-primary/35 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} cadastrada{lista.length !== 1 ? 's' : ''}</p>
         </div>
-        <Landmark className="w-10 h-10 text-primary opacity-30" />
+        <Landmark className="w-12 h-12 text-primary opacity-20" />
       </div>
 
       {/* Transferência */}
@@ -208,39 +220,73 @@ export default function ContasCorrentes() {
         <EmptyState icon={Landmark} title="Nenhuma conta cadastrada" description="Adicione suas contas bancárias para controlar seus saldos." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {lista.map((c) => (
-            <div key={c.id} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-5 space-y-3 hover:border-text-primary/10 hover:shadow-elevated transition-all">
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-text-primary">{c.descricao}</p>
-                  <p className="text-xs text-text-primary/50 mt-0.5">Conta: {c.numeroConta} · Ag: {c.agencia}</p>
+          {lista.map((c, i) => {
+            const pos = Number(c.saldo) >= 0;
+            return (
+              <div
+                key={c.id}
+                className={`anim-in d${Math.min(i + 1, 6)} rounded-[18px] p-5 flex flex-col gap-3 transition-all hover:scale-[1.01]`}
+                style={{
+                  background: 'rgba(255,255,255,.025)',
+                  border: `1px solid ${pos ? 'rgba(110,255,192,.15)' : 'rgba(255,180,171,.15)'}`,
+                  backdropFilter: 'blur(8px)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2)',
+                }}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="min-w-0">
+                    <p className="font-bold text-text-primary font-display truncate">{c.descricao}</p>
+                    <p className="text-[10px] text-text-primary/40 mt-0.5 font-mono">
+                      Ag. {c.agencia} · Cc. {c.numeroConta}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 shrink-0 ml-2">
+                    <button
+                      onClick={() => editar(c)}
+                      aria-label="Editar conta"
+                      className="p-1.5 text-text-primary/30 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deletar(c.id)}
+                      aria-label="Excluir conta"
+                      className="p-1.5 text-text-primary/30 hover:text-error rounded-lg hover:bg-error/10 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => editar(c)}
-                    aria-label="Editar conta"
-                    className="p-1.5 text-text-primary/40 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => deletar(c.id)}
-                    aria-label="Excluir conta"
-                    className="p-1.5 text-text-primary/40 hover:text-error rounded-lg hover:bg-error/10 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                {/* Saldo destaque */}
+                <div
+                  className="rounded-xl px-4 py-3"
+                  style={{
+                    background: pos ? 'rgba(110,255,192,.07)' : 'rgba(255,180,171,.07)',
+                    border: `1px solid ${pos ? 'rgba(110,255,192,.15)' : 'rgba(255,180,171,.15)'}`,
+                  }}
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-widest font-mono mb-1" style={{ color: pos ? '#6EFFC0' : '#FFB4AB' }}>
+                    Saldo Atual
+                  </p>
+                  <p className="text-2xl font-bold font-display" style={{ color: pos ? '#6EFFC0' : '#FFB4AB' }}>
+                    R$ {brl(c.saldo)}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  {c.dataSaldoInicial && (
+                    <p className="text-[10px] text-text-primary/35 font-mono">Desde {c.dataSaldoInicial}</p>
+                  )}
+                  {c.permitirSaldoNegativo && (
+                    <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full font-mono" style={{ background: 'rgba(255,211,122,.1)', color: '#FFD37A', border: '1px solid rgba(255,211,122,.2)' }}>
+                      Saldo neg. permitido
+                    </span>
+                  )}
                 </div>
               </div>
-              <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(c.saldo)}</p>
-              {c.dataSaldoInicial && (
-                <p className="text-xs text-text-primary/40">Saldo desde: {c.dataSaldoInicial}</p>
-              )}
-              {c.permitirSaldoNegativo && (
-                <span className="inline-block text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-500">Saldo negativo permitido</span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

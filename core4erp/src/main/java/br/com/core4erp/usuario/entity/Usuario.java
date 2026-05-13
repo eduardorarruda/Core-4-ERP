@@ -28,7 +28,8 @@ public class Usuario extends Auditable {
     @Column(name = "senha_hash", nullable = false)
     private String senhaHash;
 
-    private Long telefone;
+    @Column(length = 20)
+    private String telefone;
 
     @Column(nullable = false, length = 50)
     private String role = "ROLE_USER";
@@ -41,4 +42,10 @@ public class Usuario extends Auditable {
 
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
+
+    @Column(name = "reset_token", unique = true, length = 64)
+    private String resetToken;
+
+    @Column(name = "reset_token_expiry")
+    private LocalDateTime resetTokenExpiry;
 }

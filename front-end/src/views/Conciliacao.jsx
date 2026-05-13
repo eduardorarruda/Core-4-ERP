@@ -153,7 +153,7 @@ export default function Conciliacao() {
 
       {/* ── Passo 1: Upload ──────────────────────────────── */}
       {!sessao && (
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4">
+        <div className="rounded-[18px] p-6 space-y-4" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">1. Selecione o arquivo OFX</h2>
           <OfxUploadZone onFile={setArquivo} />
 
@@ -196,7 +196,7 @@ export default function Conciliacao() {
       {sessao && (
         <div className="space-y-4">
           {/* Cabeçalho da sessão */}
-          <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6">
+          <div className="rounded-[18px] p-6" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-bold text-text-primary">

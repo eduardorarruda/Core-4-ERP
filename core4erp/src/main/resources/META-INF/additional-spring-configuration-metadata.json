@@ -1,0 +1,44 @@
+{
+  "properties": [
+    {
+      "name": "chat.cache.ttl-hours",
+      "type": "java.lang.Integer",
+      "description": "TTL em horas para entradas do cache de conversa do Chat IA.",
+      "defaultValue": 2
+    },
+    {
+      "name": "chat.cache.max-size",
+      "type": "java.lang.Long",
+      "description": "Número máximo de sessões simultâneas no cache de conversa do Chat IA.",
+      "defaultValue": 1000
+    },
+    {
+      "name": "chat.historico.max-mensagens",
+      "type": "java.lang.Integer",
+      "description": "Número máximo de mensagens mantidas no histórico de conversa por sessão.",
+      "defaultValue": 20
+    },
+    {
+      "name": "chat.memory.max-messages",
+      "type": "java.lang.Integer",
+      "description": "Alias legado para o limite de mensagens no histórico (preferir chat.historico.max-mensagens).",
+      "defaultValue": 20
+    },
+    {
+      "name": "chat.relatorios.dir",
+      "type": "java.lang.String",
+      "description": "Diretório temporário onde relatórios Excel gerados pelo Chat IA são armazenados."
+    },
+    {
+      "name": "chat.relatorios.ttl-minutes",
+      "type": "java.lang.Integer",
+      "description": "Tempo em minutos antes de um relatório Excel gerado pelo Chat IA ser removido do disco.",
+      "defaultValue": 60
+    },
+    {
+      "name": "cors.allowed-origins",
+      "type": "java.lang.String",
+      "description": "Origens CORS permitidas, separadas por vírgula."
+    }
+  ]
+}

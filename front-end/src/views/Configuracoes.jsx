@@ -6,8 +6,8 @@ import PageHeader from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/FormField';
 import { cn } from '../lib/utils';
 
-const inputCls = 'w-full bg-surface border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary transition-all outline-none text-sm font-body placeholder:text-text-primary/30';
-const labelCls = 'block text-xs font-bold uppercase tracking-widest text-text-primary/50 mb-1.5 font-body';
+const inputCls = 'w-full bg-surface-low border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none text-sm font-body placeholder:text-text-primary/30';
+const labelCls = 'block text-[10px] font-bold uppercase tracking-widest text-text-primary/50 mb-1.5 font-mono';
 
 const TABS = ['Perfil', 'Segurança'];
 
@@ -81,31 +81,46 @@ export default function Configuracoes() {
       <PageHeader title="Configurações" subtitle="Gerencie seu perfil e credenciais de acesso" />
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-surface-medium p-1 rounded-xl border border-text-primary/5">
+      <div
+        className="flex gap-1 p-1 rounded-xl border border-text-primary/8"
+        style={{ background: 'rgba(255,255,255,.03)' }}
+      >
         {TABS.map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-all',
+              'flex-1 px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all font-mono',
               activeTab === tab
-                ? 'bg-surface text-text-primary shadow-sm'
+                ? 'text-on-primary shadow-sm'
                 : 'text-text-primary/50 hover:text-text-primary'
             )}
+            style={activeTab === tab ? {
+              background: 'linear-gradient(135deg, #6EFFC0, #2bdb96)',
+              color: '#003824',
+            } : {}}
           >
             {tab}
           </button>
         ))}
       </div>
 
-      <form onSubmit={handleSalvar} className="space-y-6 bg-surface-medium rounded-2xl p-6 border border-text-primary/5 animate-fade-in">
+      <form
+        onSubmit={handleSalvar}
+        className="space-y-6 rounded-[18px] p-6 border border-text-primary/8 anim-in"
+        style={{
+          background: 'rgba(255,255,255,.025)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2)',
+        }}
+      >
         {activeTab === 'Perfil' && (
           <>
-            {/* Avatar com drag-and-drop */}
+            {/* Avatar */}
             <div
               className={cn(
                 'flex items-center gap-5 p-4 rounded-xl border-2 border-dashed transition-colors',
-                dragging ? 'border-primary/40 bg-primary/5' : 'border-text-primary/10'
+                dragging ? 'border-primary/50 bg-primary/5' : 'border-text-primary/10 hover:border-text-primary/20'
               )}
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
@@ -115,43 +130,51 @@ export default function Configuracoes() {
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 aria-label="Alterar foto de perfil"
-                className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-text-primary/10 hover:border-primary/60 transition-colors group bg-surface-highest flex items-center justify-center shrink-0"
+                className="relative w-20 h-20 rounded-full overflow-hidden transition-all group shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg,rgba(110,255,192,.3),rgba(110,255,192,.1))',
+                  border: '2px solid rgba(110,255,192,.3)',
+                }}
               >
                 {form.fotoPerfil ? (
                   <img src={form.fotoPerfil} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-xl font-bold text-text-primary select-none font-display">
+                  <span className="text-xl font-bold text-primary select-none font-display flex items-center justify-center w-full h-full">
                     {getInitials(form.nome)}
                   </span>
                 )}
-                <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <span className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
                   <Camera className="w-5 h-5 text-white" />
                 </span>
               </button>
-              <div>
-                <p className="text-sm font-semibold text-text-primary">{form.nome || '—'}</p>
-                <p className="text-xs text-text-primary/40 mt-0.5">{form.email}</p>
-                <p className="text-xs text-text-primary/30 mt-1">Clique ou arraste uma imagem</p>
-                <button type="button" onClick={() => fileRef.current?.click()} className="text-xs text-primary hover:underline mt-1">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-text-primary font-display">{form.nome || '—'}</p>
+                <p className="text-[10px] text-text-primary/40 mt-0.5 font-mono truncate">{form.email}</p>
+                <p className="text-[10px] text-text-primary/30 mt-2">Clique ou arraste uma imagem PNG/JPG</p>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="text-[10px] text-primary hover:underline mt-1 font-mono uppercase tracking-widest"
+                >
                   Alterar foto
                 </button>
               </div>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFoto} />
             </div>
 
-            <hr className="border-text-primary/5" />
+            <div className="h-px bg-text-primary/5" />
 
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4 text-primary" />
-                <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Dados Pessoais</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 font-mono">Dados Pessoais</span>
               </div>
               <div>
                 <label className={labelCls}>Email</label>
                 <input className={cn(inputCls, 'opacity-50 cursor-not-allowed')} value={form.email} readOnly />
               </div>
               <div>
-                <label className={labelCls}>Nome</label>
+                <label className={labelCls}>Nome Completo</label>
                 <input
                   className={inputCls}
                   value={form.nome}
@@ -168,9 +191,9 @@ export default function Configuracoes() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Alterar Senha</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 font-mono">Alterar Senha</span>
             </div>
-            <p className="text-xs text-text-primary/40">Deixe em branco para manter a senha atual.</p>
+            <p className="text-xs text-text-primary/40 font-body">Deixe em branco para manter a senha atual.</p>
             <div>
               <label className={labelCls}>Nova Senha</label>
               <PasswordInput
@@ -194,17 +217,19 @@ export default function Configuracoes() {
         <button
           type="submit"
           disabled={salvando}
-          className={cn(
-            'w-full font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2',
-            savedOk
-              ? 'bg-primary text-on-primary'
-              : 'bg-primary hover:opacity-90 text-on-primary disabled:opacity-50'
-          )}
+          className="w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 font-display text-sm"
+          style={{
+            background: savedOk
+              ? 'linear-gradient(135deg,#6EFFC0,#2bdb96)'
+              : 'linear-gradient(135deg,#6EFFC0,#2bdb96)',
+            color: '#003824',
+            opacity: salvando ? 0.7 : 1,
+          }}
         >
           {salvando ? (
             <><Loader2 className="w-4 h-4 animate-spin" /> Gravando...</>
           ) : savedOk ? (
-            <><Check className="w-4 h-4" /> Salvo!</>
+            <><Check className="w-4 h-4" /> Salvo com sucesso!</>
           ) : (
             'Salvar Alterações'
           )}
