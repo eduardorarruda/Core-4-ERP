@@ -3,16 +3,16 @@ import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export const inputCls =
-  'w-full bg-surface border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary outline-none focus:ring-1 focus:ring-primary text-sm transition-all placeholder:text-text-primary/30 font-body';
+  'w-full bg-surface-low border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary outline-none focus:ring-1 focus:ring-primary text-sm transition-all placeholder:text-text-primary/30 font-body';
 
 export const inputSmCls =
-  'w-full bg-surface border border-text-primary/10 rounded-xl px-4 py-2 text-text-primary outline-none focus:ring-1 focus:ring-primary text-sm transition-all placeholder:text-text-primary/30 font-body';
+  'w-full bg-surface-low border border-text-primary/10 rounded-xl px-4 py-2 text-text-primary outline-none focus:ring-1 focus:ring-primary text-sm transition-all placeholder:text-text-primary/30 font-body';
 
 export const labelCls =
   'text-xs font-bold uppercase tracking-widest text-text-primary/60 font-body';
 
 export const inputErrorCls =
-  'w-full bg-surface border border-error/40 rounded-xl px-4 py-3 text-text-primary outline-none focus:ring-1 focus:ring-error text-sm transition-all placeholder:text-text-primary/30 font-body';
+  'w-full bg-surface-low border border-error/40 rounded-xl px-4 py-3 text-text-primary outline-none focus:ring-1 focus:ring-error text-sm transition-all placeholder:text-text-primary/30 font-body';
 
 export function FormLabel({ children, required, htmlFor }) {
   return (
@@ -51,6 +51,63 @@ export function PasswordInput({ error, className, ...props }) {
         {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
       </button>
       {error && <p className="text-error text-xs mt-1">{error}</p>}
+    </div>
+  );
+}
+
+/* ── Floating label inputs (alinhados ao design system) ── */
+
+export function FloatingInput({ id, label, value, onChange, type = 'text', error, className, validIcon, ...rest }) {
+  return (
+    <div className={cn('field-float', error && 'has-error', className)}>
+      <input
+        id={id}
+        type={type}
+        placeholder=" "
+        value={value}
+        onChange={onChange}
+        {...rest}
+      />
+      <label htmlFor={id}>{label}</label>
+      {validIcon && <span className="field-icon valid">{validIcon}</span>}
+      {error && (
+        <span style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 4, display: 'block', paddingLeft: 4 }}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function FloatingPasswordInput({ id, label, value, onChange, error, className, ...rest }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className={cn('field-float', error && 'has-error', className)}>
+      <input
+        id={id}
+        type={show ? 'text' : 'password'}
+        placeholder=" "
+        value={value}
+        onChange={onChange}
+        style={{ paddingRight: 44 }}
+        {...rest}
+      />
+      <label htmlFor={id}>{label}</label>
+      <button
+        type="button"
+        tabIndex={-1}
+        className="field-icon"
+        onClick={() => setShow((v) => !v)}
+        aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}
+        style={{ right: 14, top: '50%', transform: 'translateY(-50%)', position: 'absolute' }}
+      >
+        {show ? <EyeOff width={16} height={16} /> : <Eye width={16} height={16} />}
+      </button>
+      {error && (
+        <span style={{ fontSize: 11, color: 'var(--color-error)', marginTop: 4, display: 'block', paddingLeft: 4 }}>
+          {error}
+        </span>
+      )}
     </div>
   );
 }

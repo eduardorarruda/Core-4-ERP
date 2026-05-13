@@ -103,7 +103,11 @@ export default function Categorias() {
     <div className="space-y-6">
       <PageHeader title="Categorias" subtitle="Organização dos seus lançamentos" />
 
-      <form onSubmit={salvar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-5 animate-fade-in">
+      <form
+        onSubmit={salvar}
+        className="rounded-[18px] p-6 space-y-5 anim-in"
+        style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}
+      >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
             {editId ? 'Editar' : 'Nova'} Categoria
@@ -175,31 +179,27 @@ export default function Categorias() {
         <EmptyState icon={Tag} title="Nenhuma categoria" description="Crie categorias para organizar seus lançamentos financeiros." />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {lista.map((c) => {
-            const entry = ICONES.find((i) => i.nome === c.icone);
+          {lista.map((c, i) => {
+            const entry = ICONES.find((ic) => ic.nome === c.icone);
             const Icone = entry ? entry.componente : Tag;
             return (
               <div
                 key={c.id}
-                className="bg-surface-medium border border-text-primary/5 rounded-2xl p-4 flex items-center gap-3 hover:border-text-primary/10 hover:scale-[1.02] transition-all cursor-default"
+                className={`anim-in d${Math.min(i + 1, 6)} flex items-center gap-3 p-4 rounded-[14px] transition-all hover:scale-[1.02] cursor-default`}
+                style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
               >
-                <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/10 flex items-center justify-center shrink-0">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)' }}
+                >
                   <Icone className="w-5 h-5 text-primary" />
                 </div>
-                <span className="font-medium text-text-primary flex-1 text-sm truncate">{c.descricao}</span>
+                <span className="font-bold text-text-primary flex-1 text-sm truncate font-display">{c.descricao}</span>
                 <div className="flex gap-1 shrink-0">
-                  <button
-                    onClick={() => editar(c)}
-                    aria-label={`Editar categoria ${c.descricao}`}
-                    className="text-text-primary/40 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors"
-                  >
+                  <button onClick={() => editar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => deletar(c.id)}
-                    aria-label={`Excluir categoria ${c.descricao}`}
-                    className="text-text-primary/40 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors"
-                  >
+                  <button onClick={() => deletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

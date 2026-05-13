@@ -1,6 +1,5 @@
 package br.com.core4erp.auth.service;
 
-import br.com.core4erp.auth.dto.AtualizarPerfilRequestDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Base64;
 
 @Service
 public class AuthService {
@@ -87,29 +85,6 @@ public class AuthService {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
         return toMeResponse(usuario);
-    }
-
-    @Transactional
-    public MeResponseDto atualizarPerfil(String email, AtualizarPerfilRequestDto dto) {
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
-        usuario.setNome(dto.nome());
-        if (dto.novaSenha() != null && !dto.novaSenha().isBlank()) {
-            usuario.setSenhaHash(passwordEncoder.encode(dto.novaSenha()));
-        }
-        if (dto.fotoPerfil() != null) {
-            usuario.setFotoPerfil(dto.fotoPerfil());
-        }
-        return toMeResponse(usuarioRepository.save(usuario));
-    }
-
-    @Transactional
-    public MeResponseDto atualizarFotoPerfil(String email, byte[] bytes, String contentType) {
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
-        String base64 = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
-        usuario.setFotoPerfil(base64);
-        return toMeResponse(usuarioRepository.save(usuario));
     }
 
     private MeResponseDto toMeResponse(Usuario u) {

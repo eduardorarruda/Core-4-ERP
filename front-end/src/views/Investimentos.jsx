@@ -142,12 +142,19 @@ export default function Investimentos() {
     <div className="space-y-6">
       <PageHeader title="Investimentos" subtitle="Carteira de investimentos e transações" />
 
-      <div className="bg-primary/10 border border-primary/20 rounded-2xl px-6 py-4 flex items-center justify-between">
+      <div
+        className="rounded-[18px] px-6 py-5 flex items-center justify-between anim-in d1"
+        style={{ background: 'rgba(172,199,255,.07)', border: '1px solid rgba(172,199,255,.2)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.25),0 4px 16px rgba(172,199,255,.06)' }}
+      >
         <div>
-          <p className="text-xs uppercase tracking-widest text-primary font-bold mb-1">Patrimônio Total</p>
-          <p className="text-3xl font-bold text-text-primary font-display">R$ {brl(totalSaldo)}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="live-dot" style={{ width: 5, height: 5 }} />
+            <p className="text-[10px] uppercase tracking-widest font-bold font-mono text-secondary">Patrimônio Investido — Todas as Contas</p>
+          </div>
+          <p className="text-3xl font-bold text-secondary font-display">R$ {brl(totalSaldo)}</p>
+          <p className="text-[10px] text-text-primary/35 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} de investimento</p>
         </div>
-        <TrendingUp className="w-10 h-10 text-primary opacity-30" />
+        <TrendingUp className="w-12 h-12 text-secondary opacity-20" />
       </div>
 
       {/* Seção: Gerenciar Tipos de Investimento */}

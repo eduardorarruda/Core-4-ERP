@@ -1,9 +1,11 @@
 package br.com.core4erp.config.env;
 
 import io.github.cdimascio.dotenv.Dotenv;
-import org.springframework.context.annotation.Configuration;
 
-@Configuration
+/**
+ * Carrega variáveis do arquivo .env para System.setProperty antes do contexto Spring inicializar.
+ * Instanciado explicitamente em Core4erpApplication.main() via new EnvConfig().
+ */
 public class EnvConfig {
     static {
         Dotenv dotenv = Dotenv.configure()
@@ -11,13 +13,10 @@ public class EnvConfig {
                 .ignoreIfMissing()
                 .load();
 
-        for (String key : new String[]{"DB_URL", "DB_USERNAME", "DB_PASSWORD",
-                "DB_URL_LOG_PER", "DB_USERNAME_LOG_PER", "DB_PASSWORD_LOG_PER",
-                "SECRET_KEY", "CORS_ORIGINS", "TOKEN_EXPIRATION", "GEMINI_API_KEY"}) {
-            String value = dotenv.get(key);
-            if (value != null) {
-                System.setProperty(key, value);
+        dotenv.entries().forEach(entry -> {
+            if (System.getProperty(entry.getKey()) == null) {
+                System.setProperty(entry.getKey(), entry.getValue());
             }
-        }
+        });
     }
 }

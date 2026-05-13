@@ -60,6 +60,9 @@ dependencies {
 	implementation platform('org.springframework.ai:spring-ai-bom:1.1.4')
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
 
+	// Email
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
 	// In-memory cache with TTL (chat history)
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 

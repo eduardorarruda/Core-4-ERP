@@ -2,16 +2,19 @@ import React, { lazy, Suspense, useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
-import Dashboard from './views/Dashboard';
-import Login from './views/Login';
-import Register from './views/Register';
 import ChatSidebar from './components/chat/ChatSidebar';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
 import { ToastContainer } from './components/ui/Toast';
 import { getUsuario } from './lib/api';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
+
+const Dashboard         = lazy(() => import('./views/Dashboard'));
+const Login             = lazy(() => import('./views/Login'));
+const Register          = lazy(() => import('./views/Register'));
+const RedefinirSenha    = lazy(() => import('./views/RedefinirSenha'));
 
 const Conciliacao         = lazy(() => import('./views/Conciliacao'));
 const ConciliacaoHistorico = lazy(() => import('./views/ConciliacaoHistorico'));
@@ -124,9 +127,12 @@ export default function App() {
             Ir para o conteúdo
           </a>
 
+          <ErrorBoundary>
+          <Suspense fallback={<PageSkeleton />}>
           <Routes>
-            <Route path="/login"    element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/login"           element={<Login />} />
+            <Route path="/register"        element={<Register />} />
+            <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
             <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
             <Route path="/conciliacao"            element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
@@ -148,6 +154,8 @@ export default function App() {
             <Route path="/"  element={<Navigate to="/dashboard" replace />} />
             <Route path="*"  element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          </Suspense>
+          </ErrorBoundary>
         </ConfirmProvider>
       </ToastProvider>
     </BrowserRouter>

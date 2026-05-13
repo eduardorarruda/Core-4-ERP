@@ -1,14 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
   --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  --color-surface: #131313;
-  --color-surface-low: #1C1B1B;
-  --color-surface-medium: #2A2A2A;
+  /* Surface levels — alinhados ao design system */
+  --color-surface:         #0c0c0c;
+  --color-surface-low:     #131313;
+  --color-surface-medium:  #1C1B1B;
+  --color-surface-high:    #2A2A2A;
   --color-surface-highest: #353534;
 
   --color-primary: #6EFFC0;
@@ -28,8 +31,8 @@
   --radius-xl: 0.75rem;
   --radius-card: 1rem;
 
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.12), 0 8px 32px rgba(0,0,0,0.08);
-  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.15), 0 16px 48px rgba(0,0,0,0.1);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.2);
+  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.25), 0 16px 48px rgba(0,0,0,0.2);
   --shadow-primary: 0 4px 24px rgba(110,255,192,0.15);
 
   --transition-base: 200ms cubic-bezier(0.4,0,0.2,1);
@@ -51,7 +54,8 @@
     --color-surface: #F4F4F5;
     --color-surface-low: #FFFFFF;
     --color-surface-medium: #E4E4E7;
-    --color-surface-highest: #D4D4D8;
+    --color-surface-high: #D4D4D8;
+    --color-surface-highest: #A1A1AA;
 
     --color-primary: #059669;
     --color-on-primary: #FFFFFF;
@@ -99,6 +103,11 @@
     font-family: var(--font-body);
   }
 
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* ── Animações ── */
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: none; }
@@ -139,6 +148,28 @@
     30% { transform: translateY(-4px); opacity: 1; }
   }
 
+  /* Design system animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  @keyframes drawCheck {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes scaleSpring {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes orbFloat {
+    0%, 100% { transform: translateY(0px) scale(1); }
+    50%       { transform: translateY(-20px) scale(1.04); }
+  }
+
+  /* Utility animation classes */
   .animate-fade-in-up { animation: fadeInUp var(--transition-base) both; }
   .animate-fade-in { animation: fadeIn var(--transition-base) both; }
   .animate-slide-in-right { animation: slideInRight var(--transition-base) both; }
@@ -154,6 +185,18 @@
   .animate-shake { animation: shake 0.4s ease-in-out; }
   .animate-typing { animation: typing 1.2s ease-in-out infinite; }
 
+  /* Design system stagger classes */
+  .anim-in { animation: fadeUp 500ms cubic-bezier(.4,0,.2,1) both; }
+  .d1 { animation-delay: 50ms; }
+  .d2 { animation-delay: 120ms; }
+  .d3 { animation-delay: 200ms; }
+  .d4 { animation-delay: 280ms; }
+  .d5 { animation-delay: 360ms; }
+  .d6 { animation-delay: 440ms; }
+
+  /* Ticker animation */
+  .ticker-scroll { animation: ticker 40s linear infinite; }
+
   .shimmer-bg {
     background: linear-gradient(90deg, transparent 0%, var(--color-surface-highest) 50%, transparent 100%);
     background-size: 200% 100%;
@@ -168,9 +211,97 @@
   }
 }
 
+/* ── Shared components ── */
 .glass-panel {
   background: color-mix(in srgb, var(--color-surface-medium) 60%, transparent);
   backdrop-filter: blur(12px);
+}
+
+/* Live dot indicator */
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary);
+  animation: pulseDot 1.6s ease-in-out infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Floating label inputs */
+.field-float {
+  position: relative;
+}
+.field-float input,
+.field-float textarea {
+  display: block;
+  width: 100%;
+  padding: 22px 16px 10px;
+  background: var(--color-surface-low);
+  border: 1px solid rgba(250,250,250,.1);
+  border-radius: 14px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+.field-float input:focus,
+.field-float textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(110,255,192,.12);
+}
+.field-float label {
+  position: absolute;
+  left: 16px;
+  top: 8px;
+  font-size: 11px;
+  color: rgba(250,250,250,.4);
+  font-family: var(--font-body);
+  pointer-events: none;
+  transition: color 200ms;
+}
+.field-float input:focus ~ label,
+.field-float textarea:focus ~ label {
+  color: var(--color-primary);
+}
+.field-float.has-error input {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(255,180,171,.08);
+}
+.field-float.has-error label {
+  color: var(--color-error);
+}
+.field-float .field-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(250,250,250,.4);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+.field-float .field-icon.valid { color: var(--color-primary); }
+
+/* Light mode adjustments for floating fields */
+html:not(.dark) .field-float input,
+html:not(.dark) .field-float textarea {
+  background: #fff;
+  border-color: rgba(0,0,0,.12);
+  color: #18181B;
+}
+html:not(.dark) .field-float label {
+  color: rgba(0,0,0,.45);
+}
+html:not(.dark) .field-float input:focus,
+html:not(.dark) .field-float textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(5,150,105,.12);
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }

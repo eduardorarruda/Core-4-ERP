@@ -1,6 +1,8 @@
 package br.com.core4erp.config.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
@@ -15,18 +17,30 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Bucket> chatBuckets = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Bucket> uploadBuckets = new ConcurrentHashMap<>();
+    private final Cache<String, Bucket> buckets;
+    private final Cache<String, Bucket> chatBuckets;
+    private final Cache<String, Bucket> uploadBuckets;
     private final ObjectMapper objectMapper;
 
     public RateLimitFilter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.buckets = Caffeine.newBuilder()
+                .expireAfterAccess(10, TimeUnit.MINUTES)
+                .maximumSize(5_000)
+                .build();
+        this.chatBuckets = Caffeine.newBuilder()
+                .expireAfterAccess(10, TimeUnit.MINUTES)
+                .maximumSize(5_000)
+                .build();
+        this.uploadBuckets = Caffeine.newBuilder()
+                .expireAfterAccess(2, TimeUnit.HOURS)
+                .maximumSize(5_000)
+                .build();
     }
 
     @Override
@@ -68,7 +82,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private Bucket resolveBucket(String ip) {
-        return buckets.computeIfAbsent(ip, k -> Bucket.builder()
+        return buckets.get(ip, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(10)
                         .refillIntervally(10, Duration.ofMinutes(1))
@@ -77,7 +91,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private Bucket resolveChatBucket(String ip) {
-        return chatBuckets.computeIfAbsent(ip, k -> Bucket.builder()
+        return chatBuckets.get(ip, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(30)
                         .refillIntervally(30, Duration.ofMinutes(1))
@@ -86,7 +100,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private Bucket resolveUploadBucket(String ip) {
-        return uploadBuckets.computeIfAbsent(ip, k -> Bucket.builder()
+        return uploadBuckets.get(ip, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(10)
                         .refillIntervally(10, Duration.ofHours(1))

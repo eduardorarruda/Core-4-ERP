@@ -276,8 +276,8 @@ export default function Cartoes() {
 
       {/* Form novo cartão */}
       {!cartaoSel && showForm && (
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Novo Cartão</h2>
+        <div className="rounded-[18px] p-6 space-y-4 animate-scale-in" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Cartão</h2>
           <form onSubmit={criarCartao}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <FormField label="Nome" required error={errors.nome}>
@@ -371,17 +371,21 @@ export default function Cartoes() {
       {/* Detalhe do cartão selecionado */}
       {cartaoSel && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between">
+          <div className="rounded-[18px] p-5 flex items-center justify-between" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
             <div>
-              <h2 className="text-xl font-bold text-text-primary font-display">{cartaoSel.nome}</h2>
-              <p className="text-sm text-text-primary/50 mt-0.5">
-                Limite R$ {brl(cartaoSel.limite)} · Usado R$ {brl(cartaoSel.limiteUsado)} · Livre R$ {brl(cartaoSel.limiteLivre)}
+              <div className="flex items-center gap-2">
+                <span className="live-dot" style={{ width: 5, height: 5 }} />
+                <h2 className="text-lg font-bold text-text-primary font-display">{cartaoSel.nome}</h2>
+              </div>
+              <p className="text-[10px] text-text-primary/40 font-mono uppercase tracking-widest mt-1">
+                Limite <span className="text-text-primary/70">R$ {brl(cartaoSel.limite)}</span> · Usado <span className="text-error/80">R$ {brl(cartaoSel.limiteUsado)}</span> · Livre <span className="text-primary/80">R$ {brl(cartaoSel.limiteLivre)}</span>
               </p>
             </div>
             <button
               onClick={() => { setCartaoSel(null); setEditLancId(null); }}
               aria-label="Fechar cartão"
-              className="p-2 text-text-primary/50 hover:text-text-primary hover:bg-surface-medium rounded-lg transition-colors"
+              className="p-2 text-text-primary/40 hover:text-text-primary rounded-lg transition-colors"
+              style={{ background: 'rgba(255,255,255,.04)' }}
             >
               <X className="w-5 h-5" />
             </button>
@@ -389,8 +393,8 @@ export default function Cartoes() {
 
           {/* Formulário de edição inline */}
           {editLancId && (
-            <div className="bg-surface-medium border border-primary/20 rounded-2xl p-6 space-y-4 animate-scale-in">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-primary/70">Editar Lançamento</h3>
+            <div className="rounded-[18px] p-6 space-y-4 animate-scale-in" style={{ background: 'rgba(110,255,192,.04)', border: '1px solid rgba(110,255,192,.2)', backdropFilter: 'blur(8px)' }}>
+              <h3 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: '#6EFFC0' }}>Editar Lançamento</h3>
               <form onSubmit={salvarEdicao}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                   <FormField label="Descrição">
@@ -430,8 +434,8 @@ export default function Cartoes() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Novo lançamento */}
-            <form onSubmit={criarLancamento} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Novo Lançamento</h3>
+            <form onSubmit={criarLancamento} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Lançamento</h3>
               <FormField label="Descrição" error={errors.descricao}>
                 <input className={inputCls} value={lancForm.descricao} onChange={(e) => setLancForm((f) => ({ ...f, descricao: e.target.value }))} required />
               </FormField>
@@ -469,15 +473,15 @@ export default function Cartoes() {
             </form>
 
             {/* Fechar fatura */}
-            <form onSubmit={fecharFatura} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-3">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Fechar Fatura</h3>
+            <form onSubmit={fecharFatura} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,211,122,.04)', border: '1px solid rgba(255,211,122,.2)', backdropFilter: 'blur(8px)' }}>
+              <h3 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: '#FFD37A' }}>Fechar Fatura</h3>
               <FormField label="Mês (1-12)">
                 <input type="number" min="1" max="12" className={inputCls} value={fechForm.mes} onChange={(e) => setFechForm((f) => ({ ...f, mes: e.target.value }))} required />
               </FormField>
               <FormField label="Ano">
                 <input type="number" className={inputCls} value={fechForm.ano} onChange={(e) => setFechForm((f) => ({ ...f, ano: e.target.value }))} required />
               </FormField>
-              <button type="submit" disabled={salvandoFatura} className="bg-amber-500 text-white font-bold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2">
+              <button type="submit" disabled={salvandoFatura} className="font-bold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2" style={{ background: 'rgba(255,211,122,.2)', color: '#FFD37A', border: '1px solid rgba(255,211,122,.3)' }}>
                 {salvandoFatura ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
                 {salvandoFatura ? 'Fechando...' : 'Fechar Fatura'}
               </button>

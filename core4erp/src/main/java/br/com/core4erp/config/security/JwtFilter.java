@@ -51,9 +51,6 @@ public class JwtFilter extends OncePerRequestFilter {
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     MDC.put("userId", email);
-                    // Persiste no request attribute para que o PerformanceMetricsFilter
-                    // (filtro externo) possa ler após o MDC ser limpo pelo finally abaixo.
-                    request.setAttribute("userId", email);
                 } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ignored) {
                     // Stale JWT — user no longer exists; proceed unauthenticated
                 }
@@ -66,8 +63,6 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private void populateMdc(HttpServletRequest request) {
-        // Reutiliza o requestId gerado pelo PerformanceMetricsFilter (filtro externo) se disponível,
-        // garantindo que todos os logs da requisição compartilhem o mesmo ID.
         if (MDC.get("requestId") == null) {
             MDC.put("requestId", RequestUtils.resolveRequestId(request));
         }
