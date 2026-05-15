@@ -69,11 +69,11 @@ export default function ConciliacaoHistorico() {
       label: 'Ações',
       render: (id, row) => (
         <button
-          onClick={() => navigate(row.status === 'PENDENTE' ? `/conciliacao` : `/conciliacao/${id}/relatorio`)}
+          onClick={() => navigate(row.status === 'PENDENTE' ? `/conciliacao/${id}` : `/conciliacao/${id}/relatorio`)}
           className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
         >
           <FileSearch className="w-3.5 h-3.5" />
-          {row.status === 'PENDENTE' ? 'Continuar' : 'Ver relatório'}
+          {row.status === 'PENDENTE' ? 'Retomar' : 'Ver relatório'}
         </button>
       ),
     },
