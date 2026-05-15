@@ -25,5 +25,6 @@ public record CriarContaParaConciliacaoRequestDto(
         @NotNull(message = "Categoria é obrigatória")
         Long categoriaId,
 
+        @NotNull(message = "Parceiro é obrigatório")
         Long parceiroId
 ) {}

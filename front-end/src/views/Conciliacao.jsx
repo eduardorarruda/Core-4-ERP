@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { GitMerge, Upload, Loader2, AlertTriangle, CheckCircle2, History } from 'lucide-react';
 import { conciliacao as api, contasCorrentes as ccApi } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
@@ -34,10 +34,12 @@ export default function Conciliacao() {
   const toast = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
+  const { id: sessionId } = useParams();
 
   // ── Passo 1: Upload
   const [arquivo, setArquivo] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [loadingSessao, setLoadingSessao] = useState(false);
 
   // ── Passo 2: Conta corrente não encontrada
   const [mostrarSelecaoCC, setMostrarSelecaoCC] = useState(false);
@@ -50,6 +52,17 @@ export default function Conciliacao() {
   const [filtroAtivo, setFiltroAtivo] = useState('Todos');
   const [finalizando, setFinalizando] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    let ignore = false;
+    setLoadingSessao(true);
+    api.buscar(sessionId)
+      .then((resultado) => { if (!ignore) setSessao(resultado); })
+      .catch((e) => { if (!ignore) toast.error(e.message); })
+      .finally(() => { if (!ignore) setLoadingSessao(false); });
+    return () => { ignore = true; };
+  }, [sessionId]);
 
   async function enviarArquivo(contaCorrenteId) {
     if (!arquivo) { toast.error('Selecione um arquivo .ofx'); return; }
@@ -151,8 +164,26 @@ export default function Conciliacao() {
         }
       />
 
-      {/* ── Passo 1: Upload ──────────────────────────────── */}
-      {!sessao && (
+      {/* ── Passo 1a: Carregando sessão existente ────────── */}
+      {!sessao && loadingSessao && (
+        <div className="flex items-center justify-center py-20 gap-3 text-text-primary/40">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Carregando sessão...</span>
+        </div>
+      )}
+
+      {/* ── Passo 1a (erro): sessão não carregou ─────────── */}
+      {!sessao && !loadingSessao && sessionId && (
+        <p className="text-center text-sm text-text-primary/40 py-20">
+          Sessão não encontrada.{' '}
+          <button onClick={() => navigate('/conciliacao/historico')} className="text-primary hover:underline font-bold">
+            Ver histórico
+          </button>
+        </p>
+      )}
+
+      {/* ── Passo 1b: Upload (nova sessão) ───────────────── */}
+      {!sessao && !sessionId && (
         <div className="rounded-[18px] p-6 space-y-4" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">1. Selecione o arquivo OFX</h2>
           <OfxUploadZone onFile={setArquivo} />

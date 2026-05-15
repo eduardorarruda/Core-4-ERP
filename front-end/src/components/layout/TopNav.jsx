@@ -47,9 +47,9 @@ function TickerBar() {
       </div>
       {/* Scroll track */}
       <div className="flex-1 overflow-hidden" style={{ WebkitMaskImage: 'linear-gradient(to right,transparent,#000 3%,#000 97%,transparent)', maskImage: 'linear-gradient(to right,transparent,#000 3%,#000 97%,transparent)' }}>
-        <div className="ticker-scroll flex items-center gap-8 h-7 whitespace-nowrap font-mono text-[10px] pl-6">
+        <div className="ticker-scroll flex items-center h-7 whitespace-nowrap font-mono text-[10px]">
           {all.map((t, i) => (
-            <span key={i} className="text-text-primary/50">
+            <span key={i} className="text-text-primary/50 pr-8 flex-shrink-0">
               <b className="text-text-primary/75">{t.sym}</b> {t.val}{' '}
               <span style={{ color: t.dir === 'up' ? 'var(--color-primary)' : 'var(--color-error)' }}>
                 {t.dir === 'up' ? '▲' : '▼'} {t.pct}
