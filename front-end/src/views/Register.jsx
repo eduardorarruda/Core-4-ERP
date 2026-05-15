@@ -40,6 +40,7 @@ export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ nome: '', email: '', senha: '', confirmarSenha: '', telefone: '' });
   const [erro, setErro] = useState('');
+  const [erroConfirmacao, setErroConfirmacao] = useState('');
   const [carregando, setCarregando] = useState(false);
   const o1Ref   = useRef(null);
   const o2Ref   = useRef(null);
@@ -68,8 +69,16 @@ export default function Register() {
   const handleRegistrar = async (e) => {
     e.preventDefault();
     setErro('');
-    if (form.senha !== form.confirmarSenha) { setErro('As senhas não coincidem'); return; }
-    if (form.senha.length < 6) { setErro('A senha deve ter no mínimo 6 caracteres'); return; }
+    setErroConfirmacao('');
+    if (form.senha !== form.confirmarSenha) {
+      setErroConfirmacao('Senha divergente da senha digitada anteriormente');
+      return;
+    }
+    const senhaRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!senhaRegex.test(form.senha)) {
+      setErro('A senha não atende aos requisitos mínimos de segurança');
+      return;
+    }
     setCarregando(true);
     try {
       const telefone = form.telefone ? Number(form.telefone.replace(/\D/g, '')) : null;
@@ -149,10 +158,27 @@ export default function Register() {
                 <FloatingInput id="telefone" label="Telefone (opcional)" type="tel" value={form.telefone} onChange={set('telefone')} autoComplete="tel" />
               </div>
               <div className="anim-in d5">
-                <FloatingPasswordInput id="senha" label="Senha (mín. 6 caracteres)" value={form.senha} onChange={set('senha')} autoComplete="new-password" required />
+                <FloatingPasswordInput id="senha" label="Senha" value={form.senha} onChange={set('senha')} autoComplete="new-password" required />
+                <ul style={{ margin: '6px 0 0 4px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {[
+                    { ok: form.senha.length >= 8,        text: 'Mínimo 8 caracteres' },
+                    { ok: /[A-Z]/.test(form.senha),       text: 'Pelo menos uma letra maiúscula' },
+                    { ok: /[a-z]/.test(form.senha),       text: 'Pelo menos uma letra minúscula' },
+                    { ok: /\d/.test(form.senha),           text: 'Pelo menos um número' },
+                  ].map(({ ok, text }) => (
+                    <li key={text} style={{ fontSize: 11, color: ok ? '#6EFFC0' : 'rgba(250,250,250,.35)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontSize: 10 }}>{ok ? '✓' : '○'}</span> {text}
+                    </li>
+                  ))}
+                </ul>
               </div>
               <div className="anim-in d6">
-                <FloatingPasswordInput id="confirmarSenha" label="Confirmar senha" value={form.confirmarSenha} onChange={set('confirmarSenha')} autoComplete="new-password" required />
+                <FloatingPasswordInput id="confirmarSenha" label="Confirmar senha" value={form.confirmarSenha} onChange={(e) => { set('confirmarSenha')(e); setErroConfirmacao(''); }} autoComplete="new-password" required />
+                {erroConfirmacao && (
+                  <span style={{ fontSize: 11, color: 'var(--color-error, #FFB4AB)', marginTop: 4, display: 'block', paddingLeft: 4 }}>
+                    {erroConfirmacao}
+                  </span>
+                )}
               </div>
 
               {erro && (
