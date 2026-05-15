@@ -349,7 +349,7 @@ export default function ContasFinanceiras() {
                 </button>
               ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 [&>*]:min-w-0">
               <FormField label="Nº Documento">
                 <input className={inputCls} value={filtros.numeroDocumento} onChange={(e) => setFiltros((f) => ({ ...f, numeroDocumento: e.target.value }))} placeholder="NF-001, Boleto..." />
               </FormField>
@@ -392,7 +392,7 @@ export default function ContasFinanceiras() {
         <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Nova Conta</h2>
           <form onSubmit={criar}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 [&>*]:min-w-0">
               {assinaturasAtivas.length > 0 && (
                 <FormField label="Preencher de Assinatura">
                   <select className={`${inputCls} appearance-none`} value="" onChange={(e) => {
@@ -477,7 +477,7 @@ export default function ContasFinanceiras() {
             <Pencil className="w-4 h-4" /> Editar Conta #{editId}
           </h2>
           <form onSubmit={salvarEdit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 [&>*]:min-w-0">
               <FormField label="Descrição" required error={editErrors.descricao}>
                 <input className={inputCls} value={editForm.descricao ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, descricao: e.target.value }))} required />
               </FormField>
@@ -525,7 +525,7 @@ export default function ContasFinanceiras() {
       {baixaId && (
         <form onSubmit={baixar} className="bg-surface-medium border border-primary/20 rounded-2xl p-6 space-y-4 animate-scale-in">
           <h2 className="text-sm font-bold uppercase tracking-widest text-primary">Baixar Conta #{baixaId}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 [&>*]:min-w-0">
             <FormField label="Conta Corrente" required>
               <select className={`${inputCls} appearance-none`} value={baixaForm.contaCorrenteId} onChange={(e) => setBaixaForm((f) => ({ ...f, contaCorrenteId: e.target.value }))} required>
                 <option value="">Selecione</option>

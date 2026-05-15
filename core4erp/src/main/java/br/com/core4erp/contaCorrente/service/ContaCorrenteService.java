@@ -8,6 +8,8 @@ import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -40,6 +42,7 @@ public class ContaCorrenteService {
         if (repository.existsByNumeroContaAndUsuarioId(dto.numeroConta(), usuarioId)) {
             throw new IllegalArgumentException("Número de conta já cadastrado");
         }
+        validarSaldo(dto);
         ContaCorrente conta = new ContaCorrente();
         preencherCampos(conta, dto);
         conta.setUsuario(securityCtx.getUsuario());
@@ -49,6 +52,7 @@ public class ContaCorrenteService {
     @Transactional
     public ContaCorrenteResponseDto atualizar(Long id, ContaCorrenteRequestDto dto) {
         ContaCorrente conta = findOwned(id);
+        validarSaldo(dto);
         preencherCampos(conta, dto);
         return ContaCorrenteResponseDto.from(repository.save(conta));
     }
@@ -85,6 +89,12 @@ public class ContaCorrenteService {
     public ContaCorrente findOwned(Long id) {
         return repository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
                 .orElseThrow(() -> new EntityNotFoundException("Conta corrente não encontrada: " + id));
+    }
+
+    private void validarSaldo(ContaCorrenteRequestDto dto) {
+        if (dto.saldo().compareTo(BigDecimal.ZERO) < 0 && !Boolean.TRUE.equals(dto.permitirSaldoNegativo())) {
+            throw new IllegalArgumentException("Saldo inicial negativo requer que 'Permitir saldo negativo' esteja ativo");
+        }
     }
 
     private void preencherCampos(ContaCorrente c, ContaCorrenteRequestDto dto) {

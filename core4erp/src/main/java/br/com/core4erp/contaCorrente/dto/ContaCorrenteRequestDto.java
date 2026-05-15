@@ -2,7 +2,6 @@ package br.com.core4erp.contaCorrente.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -22,7 +21,6 @@ public record ContaCorrenteRequestDto(
         String descricao,
 
         @NotNull(message = "Saldo inicial é obrigatório")
-        @PositiveOrZero(message = "Saldo não pode ser negativo")
         BigDecimal saldo,
 
         @NotNull(message = "Data do saldo inicial é obrigatória")

@@ -2,6 +2,7 @@ package br.com.core4erp.parceiro.service;
 
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
+import br.com.core4erp.utils.Utils;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
@@ -39,6 +40,7 @@ public class ParceiroService {
 
     @Transactional
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
+        validarCpfCnpj(dto.cpfCnpj());
         Parceiro parceiro = new Parceiro();
         preencherCampos(parceiro, dto);
         parceiro.setUsuario(securityCtx.getUsuario());
@@ -48,6 +50,7 @@ public class ParceiroService {
 
     @Transactional
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
+        validarCpfCnpj(dto.cpfCnpj());
         Parceiro parceiro = findOwned(id);
         preencherCampos(parceiro, dto);
         enrichCnpj(parceiro);
@@ -96,6 +99,18 @@ public class ParceiroService {
             if (p.getTelefone() == null) p.setTelefone(data.telefoneFormatado());
             if (p.getEmail() == null && data.email() != null) p.setEmail(data.email());
         });
+    }
+
+    private void validarCpfCnpj(String cpfCnpj) {
+        if (cpfCnpj == null || cpfCnpj.isBlank()) return;
+        String digits = cpfCnpj.replaceAll("[^\\d]", "");
+        if (digits.length() == 11) {
+            if (!Utils.isValidCPF(cpfCnpj)) throw new IllegalArgumentException("CPF inválido");
+        } else if (digits.length() == 14) {
+            if (!Utils.isValidCNPJ(cpfCnpj)) throw new IllegalArgumentException("CNPJ inválido");
+        } else {
+            throw new IllegalArgumentException("CPF deve ter 11 dígitos ou CNPJ deve ter 14 dígitos");
+        }
     }
 
     private Parceiro findOwned(Long id) {
