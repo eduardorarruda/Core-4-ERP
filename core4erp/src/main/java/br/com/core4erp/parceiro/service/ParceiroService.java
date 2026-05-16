@@ -40,9 +40,14 @@ public class ParceiroService {
 
     @Transactional
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
-        validarCpfCnpj(dto.cpfCnpj());
+        String docNormalizado = normalizarDocumento(dto.cpfCnpj());
+        validarCpfCnpj(docNormalizado);
+        Long usuarioId = securityCtx.getUsuarioId();
+        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndUsuarioId(docNormalizado, usuarioId)) {
+            throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
+        }
         Parceiro parceiro = new Parceiro();
-        preencherCampos(parceiro, dto);
+        preencherCampos(parceiro, dto, docNormalizado);
         parceiro.setUsuario(securityCtx.getUsuario());
         enrichCnpj(parceiro);
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
@@ -50,9 +55,14 @@ public class ParceiroService {
 
     @Transactional
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
-        validarCpfCnpj(dto.cpfCnpj());
+        String docNormalizado = normalizarDocumento(dto.cpfCnpj());
+        validarCpfCnpj(docNormalizado);
+        Long usuarioId = securityCtx.getUsuarioId();
+        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndUsuarioIdAndIdNot(docNormalizado, usuarioId, id)) {
+            throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
+        }
         Parceiro parceiro = findOwned(id);
-        preencherCampos(parceiro, dto);
+        preencherCampos(parceiro, dto, docNormalizado);
         enrichCnpj(parceiro);
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
     }
@@ -62,10 +72,10 @@ public class ParceiroService {
         parceiroRepository.delete(findOwned(id));
     }
 
-    private void preencherCampos(Parceiro p, ParceiroRequestDto dto) {
+    private void preencherCampos(Parceiro p, ParceiroRequestDto dto, String docNormalizado) {
         p.setRazaoSocial(dto.razaoSocial());
         p.setNomeFantasia(dto.nomeFantasia());
-        p.setCpfCnpj(dto.cpfCnpj());
+        p.setCpfCnpj(docNormalizado);
         p.setTipo(dto.tipo());
         p.setLogradouro(dto.logradouro());
         p.setNumero(dto.numero());
@@ -101,13 +111,17 @@ public class ParceiroService {
         });
     }
 
-    private void validarCpfCnpj(String cpfCnpj) {
-        if (cpfCnpj == null || cpfCnpj.isBlank()) return;
-        String digits = cpfCnpj.replaceAll("[^\\d]", "");
+    private String normalizarDocumento(String cpfCnpj) {
+        if (cpfCnpj == null || cpfCnpj.isBlank()) return null;
+        return cpfCnpj.replaceAll("[^\\d]", "");
+    }
+
+    private void validarCpfCnpj(String digits) {
+        if (digits == null || digits.isBlank()) return;
         if (digits.length() == 11) {
-            if (!Utils.isValidCPF(cpfCnpj)) throw new IllegalArgumentException("CPF inválido");
+            if (!Utils.isValidCPF(digits)) throw new IllegalArgumentException("CPF inválido");
         } else if (digits.length() == 14) {
-            if (!Utils.isValidCNPJ(cpfCnpj)) throw new IllegalArgumentException("CNPJ inválido");
+            if (!Utils.isValidCNPJ(digits)) throw new IllegalArgumentException("CNPJ inválido");
         } else {
             throw new IllegalArgumentException("CPF deve ter 11 dígitos ou CNPJ deve ter 14 dígitos");
         }
