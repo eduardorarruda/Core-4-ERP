@@ -115,6 +115,11 @@ export const contasCorrentes = {
   atualizar: (id, dto) => request(`/api/contas-correntes/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/contas-correntes/${id}`, { method: 'DELETE' }),
   transferir: (dto) => request('/api/contas-correntes/transferir', { method: 'POST', body: JSON.stringify(dto) }),
+  transferencias: {
+    listar: () => request('/api/contas-correntes/transferencias'),
+    atualizar: (id, dto) => request(`/api/contas-correntes/transferencias/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+    deletar: (id) => request(`/api/contas-correntes/transferencias/${id}`, { method: 'DELETE' }),
+  },
 };
 
 // ── Contas (Pagar / Receber) ──────────────────────────────────────────────────
