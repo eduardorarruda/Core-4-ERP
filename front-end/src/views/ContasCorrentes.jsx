@@ -15,7 +15,7 @@ export default function ContasCorrentes() {
   const [lista, setLista] = useState([]);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
-  const [transf, setTransf] = useState({ contaOrigemId: '', contaDestinoId: '', valor: '' });
+  const [transf, setTransf] = useState({ contaOrigemId: '', contaDestinoId: '', valor: '', dataTransferencia: '' });
   const [showTransf, setShowTransf] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvandoTransf, setSalvandoTransf] = useState(false);
@@ -82,8 +82,8 @@ export default function ContasCorrentes() {
     e.preventDefault();
     setSalvandoTransf(true);
     try {
-      await api.transferir({ contaOrigemId: Number(transf.contaOrigemId), contaDestinoId: Number(transf.contaDestinoId), valor: parseFloat(transf.valor) });
-      setTransf({ contaOrigemId: '', contaDestinoId: '', valor: '' });
+      await api.transferir({ contaOrigemId: Number(transf.contaOrigemId), contaDestinoId: Number(transf.contaDestinoId), valor: parseFloat(transf.valor), dataTransferencia: transf.dataTransferencia });
+      setTransf({ contaOrigemId: '', contaDestinoId: '', valor: '', dataTransferencia: '' });
       setShowTransf(false);
       toast.success('Transferência realizada!');
       await carregar();
@@ -144,7 +144,7 @@ export default function ContasCorrentes() {
       {showTransf && (
         <form onSubmit={transferir} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Transferência entre Contas</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <FormField label="Origem">
               <select className={`${inputCls} appearance-none`} value={transf.contaOrigemId} onChange={(e) => setTransf((f) => ({ ...f, contaOrigemId: e.target.value }))} required>
                 <option value="">Selecione</option>
@@ -159,6 +159,9 @@ export default function ContasCorrentes() {
             </FormField>
             <FormField label="Valor (R$)">
               <input type="number" step="0.01" min="0.01" className={inputCls} value={transf.valor} onChange={(e) => setTransf((f) => ({ ...f, valor: e.target.value }))} required />
+            </FormField>
+            <FormField label="Data da Transferência" required>
+              <input type="date" className={inputCls} value={transf.dataTransferencia} onChange={(e) => setTransf((f) => ({ ...f, dataTransferencia: e.target.value }))} required />
             </FormField>
           </div>
           <div className="flex gap-3">
