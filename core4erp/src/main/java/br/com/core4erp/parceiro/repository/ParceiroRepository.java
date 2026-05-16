@@ -12,4 +12,6 @@ public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
     List<Parceiro> findAllByUsuarioId(Long usuarioId);
     Page<Parceiro> findAllByUsuarioId(Long usuarioId, Pageable pageable);
     Optional<Parceiro> findByIdAndUsuarioId(Long id, Long usuarioId);
+    boolean existsByCpfCnpjAndUsuarioId(String cpfCnpj, Long usuarioId);
+    boolean existsByCpfCnpjAndUsuarioIdAndIdNot(String cpfCnpj, Long usuarioId, Long id);
 }
