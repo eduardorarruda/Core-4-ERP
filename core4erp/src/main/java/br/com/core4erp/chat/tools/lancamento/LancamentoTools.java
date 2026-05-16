@@ -115,14 +115,16 @@ public class LancamentoTools {
     @Tool(description = """
             Transfere um valor entre duas contas correntes do usuário.
             Use consultarContasCorrentes para obter os IDs das contas.
+            A data da transferência é obrigatória.
             """)
     public Map<String, String> transferirEntreContas(
             @ToolParam(description = "ID da conta corrente de origem") Long contaOrigemId,
             @ToolParam(description = "ID da conta corrente de destino") Long contaDestinoId,
-            @ToolParam(description = "Valor a transferir em reais") BigDecimal valor) {
-        log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={}",
-                securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor);
-        TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor);
+            @ToolParam(description = "Valor a transferir em reais") BigDecimal valor,
+            @ToolParam(description = "Data em que a transferência ocorreu no formato YYYY-MM-DD") LocalDate dataTransferencia) {
+        log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={} data={}",
+                securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
+        TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor, dataTransferencia);
         contaCorrenteService.transferir(dto);
         return Map.of("status", "Transferência realizada com sucesso");
     }

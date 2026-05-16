@@ -532,7 +532,7 @@ export default function ContasFinanceiras() {
                 {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
               </select>
             </FormField>
-            <FormField label="Data Pagamento" required>
+            <FormField label={contas.find((c) => c.id === baixaId)?.tipo === 'RECEBER' ? 'Data do Recebimento' : 'Data do Pagamento'} required>
               <input type="date" className={inputCls} value={baixaForm.dataPagamento} onChange={(e) => setBaixaForm((f) => ({ ...f, dataPagamento: e.target.value }))} required />
             </FormField>
             {[['Juros', 'juros'], ['Multa', 'multa'], ['Acréscimo', 'acrescimo'], ['Desconto', 'desconto']].map(([lbl, key]) => (
