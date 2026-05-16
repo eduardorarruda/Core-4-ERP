@@ -8,6 +8,7 @@ import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
 import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.dto.TransferenciaRequestDto;
+import br.com.core4erp.contaCorrente.dto.TransferenciaResponseDto;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
@@ -23,7 +24,6 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -117,7 +117,7 @@ public class LancamentoTools {
             Use consultarContasCorrentes para obter os IDs das contas.
             A data da transferência é obrigatória.
             """)
-    public Map<String, String> transferirEntreContas(
+    public TransferenciaResponseDto transferirEntreContas(
             @ToolParam(description = "ID da conta corrente de origem") Long contaOrigemId,
             @ToolParam(description = "ID da conta corrente de destino") Long contaDestinoId,
             @ToolParam(description = "Valor a transferir em reais") BigDecimal valor,
@@ -125,8 +125,7 @@ public class LancamentoTools {
         log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={} data={}",
                 securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
         TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor, dataTransferencia);
-        contaCorrenteService.transferir(dto);
-        return Map.of("status", "Transferência realizada com sucesso");
+        return contaCorrenteService.transferir(dto);
     }
 
     @Tool(description = """
