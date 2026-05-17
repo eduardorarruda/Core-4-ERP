@@ -1,9 +1,10 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useMatch } from 'react-router-dom';
 import {
   LayoutDashboard, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
-  LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge
+  LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -22,7 +23,7 @@ const NAV_GROUPS = [
       { id: 'categorias',       icon: Tag,         label: 'Categorias',       path: '/categorias' },
       { id: 'contas-correntes', icon: Landmark,    label: 'Contas Correntes', path: '/contas-correntes' },
       { id: 'contas',           icon: FileText,    label: 'Lançamentos',      path: '/contas' },
-      { id: 'cartoes',          icon: CreditCard,  label: 'Cartões',          path: '/cartoes' },
+      { id: 'cartoes-dropdown', type: 'DROPDOWN', icon: CreditCard, label: 'Cartões' },
       { id: 'investimentos',    icon: TrendingUp,  label: 'Investimentos',    path: '/investimentos' },
       { id: 'assinaturas',      icon: Repeat,      label: 'Assinaturas',      path: '/assinaturas' },
       { id: 'conciliacao',      icon: GitMerge,    label: 'Conciliação',      path: '/conciliacao' },
@@ -81,6 +82,55 @@ function BrandMark({ expanded }) {
   );
 }
 
+const CARTAO_SUB_ITEMS = [
+  { label: 'Dashboard',    path: '/cartoes/dashboard' },
+  { label: 'Lançamentos',  path: '/cartoes' },
+  { label: 'Conciliação',  path: '/cartoes/conciliacao' },
+];
+
+function CartaoDropdown({ onClose }) {
+  const [open, setOpen] = useState(false);
+  const isActive = useMatch('/cartoes/*');
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="Cartões"
+        className={cn(
+          'w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
+          isActive ? 'text-text-primary' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+        )}
+      >
+        <CreditCard className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
+        <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono flex-1 text-left">
+          Cartões
+        </span>
+        <ChevronRight className={cn('w-3.5 h-3.5 opacity-0 group-hover/sidebar:opacity-100 transition-all duration-200 shrink-0', open && 'rotate-90')} />
+      </button>
+      {open && (
+        <div className="pl-8 space-y-0.5 opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
+          {CARTAO_SUB_ITEMS.map((sub) => (
+            <NavLink
+              key={sub.path}
+              to={sub.path}
+              end={sub.path === '/cartoes'}
+              onClick={onClose}
+              title={sub.label}
+              className={({ isActive: a }) => cn(
+                'w-full px-3 py-2 flex items-center rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono',
+                a ? 'text-primary' : 'text-text-primary/40 hover:text-text-primary'
+              )}
+            >
+              {sub.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function Sidebar({ onClose }) {
   const { usuario, logout } = useAuth();
 
@@ -103,29 +153,33 @@ export default function Sidebar({ onClose }) {
                   {group.label}
                 </span>
               </div>
-              {visibleItems.map((item) => (
-                <NavLink
-                  key={item.id}
-                  to={item.path}
-                  onClick={onClose}
-                  title={item.label}
-                  className={({ isActive }) => cn(
-                    'w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200 relative',
-                    isActive
-                      ? 'text-text-primary bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary pl-[calc(0.75rem-2px)]'
-                      : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
-                  )}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
-                      <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono">
-                        {item.label}
-                      </span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
+              {visibleItems.map((item) =>
+                item.type === 'DROPDOWN'
+                  ? <CartaoDropdown key={item.id} onClose={onClose} />
+                  : (
+                    <NavLink
+                      key={item.id}
+                      to={item.path}
+                      onClick={onClose}
+                      title={item.label}
+                      className={({ isActive }) => cn(
+                        'w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200 relative',
+                        isActive
+                          ? 'text-text-primary bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary pl-[calc(0.75rem-2px)]'
+                          : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+                      )}
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <item.icon className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
+                          <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono">
+                            {item.label}
+                          </span>
+                        </>
+                      )}
+                    </NavLink>
+                  )
+              )}
             </React.Fragment>
           );
         })}
