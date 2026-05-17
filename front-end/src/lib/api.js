@@ -153,6 +153,7 @@ export const cartoes = {
     atualizar: (cartaoId, id, dto) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     deletar: (cartaoId, id) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'DELETE' }),
   },
+  dashboard: () => request('/api/cartoes/dashboard/resumo'),
 };
 
 // ── Notificações ──────────────────────────────────────────────────────────────
@@ -222,6 +223,26 @@ export const conciliacao = {
   finalizar: (id, dto) => request(`/api/conciliacao/${id}/finalizar`, { method: 'POST', body: JSON.stringify(dto ?? {}) }),
   cancelar: (id) => request(`/api/conciliacao/${id}`, { method: 'DELETE' }),
   relatorio: (id) => request(`/api/conciliacao/${id}/relatorio`),
+};
+
+// ── Conciliação de Cartão ─────────────────────────────────────────────────────
+export const conciliacaoCartao = {
+  upload: (arquivo, cartaoId) => {
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    const qs = cartaoId ? `?cartaoId=${cartaoId}` : '';
+    return request(`/api/cartoes/conciliacao/upload${qs}`, { method: 'POST', body: formData, timeout: 60000 });
+  },
+  listar: () => request('/api/cartoes/conciliacao'),
+  buscar: (id) => request(`/api/cartoes/conciliacao/${id}`),
+  vincularItem: (id, itemId, dto) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/vincular`, { method: 'PUT', body: JSON.stringify(dto) }),
+  criarLancamento: (id, itemId, dto) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/novo-lancamento`, { method: 'POST', body: JSON.stringify(dto) }),
+  ignorarItem: (id, itemId) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/ignorar`, { method: 'PUT' }),
+  desfazerIgnorar: (id, itemId) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/desfazer-ignorar`, { method: 'PATCH' }),
+  desvincularItem: (id, itemId) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/desvincular`, { method: 'PUT' }),
+  finalizar: (id, dto) => request(`/api/cartoes/conciliacao/${id}/finalizar`, { method: 'POST', body: JSON.stringify(dto ?? {}) }),
+  cancelar: (id) => request(`/api/cartoes/conciliacao/${id}`, { method: 'DELETE' }),
+  relatorio: (id) => request(`/api/cartoes/conciliacao/${id}/relatorio`),
 };
 
 // ── Relatórios (download binário) ─────────────────────────────────────────────

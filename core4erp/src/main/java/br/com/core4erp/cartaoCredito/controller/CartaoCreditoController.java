@@ -105,4 +105,12 @@ public class CartaoCreditoController {
             @Valid @RequestBody FechamentoFaturaRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.fecharFatura(id, dto));
     }
+
+    // ── Dashboard ─────────────────────────────────────────────────────────────
+
+    @Operation(summary = "Resumo de gastos por categoria para o dashboard de cartão (últimos 3 meses)")
+    @GetMapping("/dashboard/resumo")
+    public ResponseEntity<java.util.List<CartaoDashboardResumoDto>> dashboardResumo() {
+        return ResponseEntity.ok(service.dashboardResumo());
+    }
 }

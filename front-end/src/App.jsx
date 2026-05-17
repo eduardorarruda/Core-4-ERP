@@ -19,6 +19,10 @@ const RedefinirSenha    = lazy(() => import('./views/RedefinirSenha'));
 const Conciliacao         = lazy(() => import('./views/Conciliacao'));
 const ConciliacaoHistorico = lazy(() => import('./views/ConciliacaoHistorico'));
 const ConciliacaoRelatorio = lazy(() => import('./views/ConciliacaoRelatorio'));
+const ConciliacaoCartao         = lazy(() => import('./views/ConciliacaoCartao'));
+const ConciliacaoCartaoHistorico = lazy(() => import('./views/ConciliacaoCartaoHistorico'));
+const ConciliacaoCartaoRelatorio = lazy(() => import('./views/ConciliacaoCartaoRelatorio'));
+const CartaoDashboard   = lazy(() => import('./views/CartaoDashboard'));
 const Assinaturas     = lazy(() => import('./views/Assinaturas'));
 const Calendario      = lazy(() => import('./views/Calendario'));
 const Categorias      = lazy(() => import('./views/Categorias'));
@@ -147,7 +151,12 @@ export default function App() {
             <Route path="/categorias"       element={<ProtectedLayout><Categorias /></ProtectedLayout>} />
             <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
             <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
-            <Route path="/cartoes"          element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />
+            <Route path="/cartoes"                              element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />
+            <Route path="/cartoes/dashboard"                    element={<ProtectedLayout><CartaoDashboard /></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao"                  element={<ProtectedLayout><ConciliacaoCartao /></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/historico"        element={<ProtectedLayout><ConciliacaoCartaoHistorico /></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/:id"              element={<ProtectedLayout><ConciliacaoCartao /></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><ConciliacaoCartaoRelatorio /></ProtectedLayout>} />
             <Route path="/investimentos"    element={<ProtectedLayout><Investimentos /></ProtectedLayout>} />
             <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />

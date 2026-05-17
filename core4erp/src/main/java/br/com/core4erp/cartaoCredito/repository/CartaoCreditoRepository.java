@@ -19,4 +19,6 @@ public interface CartaoCreditoRepository extends JpaRepository<CartaoCredito, Lo
 
     @Query("SELECT COALESCE(SUM(c.limite), 0) FROM CartaoCredito c WHERE c.usuario.id = :uid")
     BigDecimal sumLimiteByUsuarioId(@Param("uid") Long uid);
+
+    Optional<CartaoCredito> findByAcctIdOfxAndUsuarioId(String acctIdOfx, Long usuarioId);
 }

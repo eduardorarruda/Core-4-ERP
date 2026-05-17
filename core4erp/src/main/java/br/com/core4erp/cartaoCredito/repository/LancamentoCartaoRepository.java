@@ -84,4 +84,30 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
         )
     """)
     BigDecimal sumLancamentosEmFaturasAbertasByUsuario(@Param("uid") Long uid);
+
+    @Query("""
+        SELECT l FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id = :cartaoId
+        AND l.usuario.id = :uid
+        AND l.dataCompra BETWEEN :dataMin AND :dataMax
+    """)
+    List<LancamentoCartao> findCandidatasParaConciliacao(@Param("cartaoId") Long cartaoId,
+                                                         @Param("uid") Long uid,
+                                                         @Param("dataMin") java.time.LocalDate dataMin,
+                                                         @Param("dataMax") java.time.LocalDate dataMax);
+
+    @Query("""
+        SELECT l.categoria.descricao, l.mesFatura, l.anoFatura, COALESCE(SUM(l.valor), 0)
+        FROM LancamentoCartao l
+        WHERE l.usuario.id = :uid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+        GROUP BY l.categoria.descricao, l.mesFatura, l.anoFatura
+        ORDER BY l.anoFatura, l.mesFatura, l.categoria.descricao
+    """)
+    List<Object[]> resumoDashboardPorCategoria(@Param("uid") Long uid,
+                                               @Param("mesInicio") Integer mesInicio,
+                                               @Param("anoInicio") Integer anoInicio,
+                                               @Param("mesFim") Integer mesFim,
+                                               @Param("anoFim") Integer anoFim);
 }

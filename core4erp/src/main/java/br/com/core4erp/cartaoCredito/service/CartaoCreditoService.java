@@ -363,6 +363,23 @@ public class CartaoCreditoService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<CartaoDashboardResumoDto> dashboardResumo() {
+        Long uid = securityCtx.getUsuarioId();
+        YearMonth fim = YearMonth.now();
+        YearMonth inicio = fim.minusMonths(2);
+        return lancamentoRepo.resumoDashboardPorCategoria(
+                uid,
+                inicio.getMonthValue(), inicio.getYear(),
+                fim.getMonthValue(), fim.getYear()
+        ).stream().map(row -> new CartaoDashboardResumoDto(
+                (String) row[0],
+                ((Number) row[1]).intValue(),
+                ((Number) row[2]).intValue(),
+                row[3] instanceof BigDecimal bd ? bd : new BigDecimal(row[3].toString())
+        )).toList();
+    }
+
     private CartaoCredito findOwnedCartao(Long id) {
         return cartaoRepo.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
                 .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado: " + id));
