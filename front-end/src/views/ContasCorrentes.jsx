@@ -1,39 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { Landmark, Plus, Pencil, Trash2, ArrowRightLeft, Loader2, History } from 'lucide-react';
+import { Landmark, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { contasCorrentes as api } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
-import { brl, formatDate } from '../lib/formatters';
+import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 
 const empty = { numeroConta: '', agencia: '', descricao: '', saldo: '', dataSaldoInicial: '', permitirSaldoNegativo: false };
-const emptyTransf = { contaOrigemId: '', contaDestinoId: '', valor: '', dataTransferencia: '' };
 
 export default function ContasCorrentes() {
   const toast = useToast();
   const [lista, setLista] = useState([]);
-  const [transferencias, setTransferencias] = useState([]);
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
-  const [transf, setTransf] = useState(emptyTransf);
-  const [editTransfId, setEditTransfId] = useState(null);
-  const [showTransf, setShowTransf] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [salvandoTransf, setSalvandoTransf] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { carregar(); carregarTransferencias(); }, []);
+  useEffect(() => { carregar(); }, []);
 
   async function carregar() {
     try { setLista(await api.listar()); }
-    catch (e) { toast.error(e.message); }
-  }
-
-  async function carregarTransferencias() {
-    try { setTransferencias(await api.transferencias.listar()); }
     catch (e) { toast.error(e.message); }
   }
 
@@ -86,71 +75,6 @@ export default function ContasCorrentes() {
     });
   }
 
-  async function salvarTransferencia(e) {
-    e.preventDefault();
-    setSalvandoTransf(true);
-    const dto = {
-      contaOrigemId: Number(transf.contaOrigemId),
-      contaDestinoId: Number(transf.contaDestinoId),
-      valor: parseFloat(transf.valor),
-      dataTransferencia: transf.dataTransferencia,
-    };
-    try {
-      if (editTransfId) {
-        await api.transferencias.atualizar(editTransfId, dto);
-        toast.success('Transferência atualizada!');
-      } else {
-        await api.transferir(dto);
-        toast.success('Transferência realizada!');
-      }
-      setTransf(emptyTransf);
-      setEditTransfId(null);
-      setShowTransf(false);
-      await Promise.all([carregar(), carregarTransferencias()]);
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvandoTransf(false);
-    }
-  }
-
-  function editarTransferencia(t) {
-    setTransf({
-      contaOrigemId: String(t.contaOrigemId),
-      contaDestinoId: String(t.contaDestinoId),
-      valor: String(t.valor),
-      dataTransferencia: t.dataTransferencia,
-    });
-    setEditTransfId(t.id);
-    setShowTransf(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function cancelarTransferencia() {
-    setTransf(emptyTransf);
-    setEditTransfId(null);
-    setShowTransf(false);
-  }
-
-  function deletarTransferencia(id) {
-    setConfirmAction({
-      title: 'Excluir transferência',
-      message: 'A transferência será removida e os saldos estornados. Deseja continuar?',
-      confirmLabel: 'Excluir',
-      variant: 'warning',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        try {
-          await api.transferencias.deletar(id);
-          await Promise.all([carregar(), carregarTransferencias()]);
-          toast.success('Transferência excluída e saldos estornados!');
-        } catch (e) {
-          toast.error(e.message);
-        }
-      },
-    });
-  }
-
   function editar(c) {
     setForm({ numeroConta: c.numeroConta, agencia: c.agencia, descricao: c.descricao, saldo: String(c.saldo), dataSaldoInicial: c.dataSaldoInicial || '', permitirSaldoNegativo: !!c.permitirSaldoNegativo });
     setEditId(c.id);
@@ -165,15 +89,6 @@ export default function ContasCorrentes() {
       <PageHeader
         title="Contas Correntes"
         subtitle="Gerencie suas contas bancárias"
-        actions={
-          <button
-            onClick={() => { setShowTransf((v) => !v); if (showTransf) cancelarTransferencia(); }}
-            className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors"
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-            Transferir
-          </button>
-        }
       />
 
       {/* Saldo total */}
@@ -196,44 +111,6 @@ export default function ContasCorrentes() {
         </div>
         <Landmark className="w-12 h-12 text-primary opacity-20" />
       </div>
-
-      {/* Formulário de transferência */}
-      {showTransf && (
-        <form onSubmit={salvarTransferencia} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
-            {editTransfId ? `Editar Transferência #${editTransfId}` : 'Transferência entre Contas'}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <FormField label="Origem">
-              <select className={`${inputCls} appearance-none`} value={transf.contaOrigemId} onChange={(e) => setTransf((f) => ({ ...f, contaOrigemId: e.target.value }))} required>
-                <option value="">Selecione</option>
-                {lista.map((c) => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Destino">
-              <select className={`${inputCls} appearance-none`} value={transf.contaDestinoId} onChange={(e) => setTransf((f) => ({ ...f, contaDestinoId: e.target.value }))} required>
-                <option value="">Selecione</option>
-                {lista.map((c) => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Valor (R$)">
-              <input type="number" step="0.01" min="0.01" className={inputCls} value={transf.valor} onChange={(e) => setTransf((f) => ({ ...f, valor: e.target.value }))} required />
-            </FormField>
-            <FormField label="Data da Transferência" required>
-              <input type="date" className={inputCls} value={transf.dataTransferencia} onChange={(e) => setTransf((f) => ({ ...f, dataTransferencia: e.target.value }))} required />
-            </FormField>
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={salvandoTransf} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-              {salvandoTransf ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
-              {salvandoTransf ? (editTransfId ? 'Salvando...' : 'Transferindo...') : (editTransfId ? 'Salvar' : 'Transferir')}
-            </button>
-            <button type="button" onClick={cancelarTransferencia} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
 
       {/* Formulário de conta */}
       <form onSubmit={salvar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4">
@@ -348,59 +225,6 @@ export default function ContasCorrentes() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Histórico de transferências */}
-      {transferencias.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-text-primary/40" />
-            <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">
-              Histórico de Transferências
-            </h2>
-          </div>
-          <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)' }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-text-primary/5">
-                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Data</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Origem</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Destino</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Valor</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {transferencias.map((t) => (
-                  <tr key={t.id} className="border-b border-text-primary/5 last:border-0 hover:bg-surface-medium/30 transition-colors">
-                    <td className="px-4 py-3 text-text-primary/60 font-mono text-xs">{formatDate(t.dataTransferencia)}</td>
-                    <td className="px-4 py-3 text-text-primary/80 font-medium">{t.contaOrigemDescricao}</td>
-                    <td className="px-4 py-3 text-text-primary/80 font-medium">{t.contaDestinoDescricao}</td>
-                    <td className="px-4 py-3 text-right font-bold text-primary font-mono">R$ {brl(t.valor)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 justify-end">
-                        <button
-                          onClick={() => editarTransferencia(t)}
-                          aria-label="Editar transferência"
-                          className="p-1.5 text-text-primary/30 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deletarTransferencia(t.id)}
-                          aria-label="Excluir transferência"
-                          className="p-1.5 text-text-primary/30 hover:text-error rounded-lg hover:bg-error/10 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 

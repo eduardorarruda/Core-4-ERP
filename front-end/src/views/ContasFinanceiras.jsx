@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown, Loader2, Pencil } from 'lucide-react';
+import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown, Loader2, Pencil, ArrowRightLeft, History } from 'lucide-react';
 import { contas as api, categorias as catApi, parceiros as parApi, contasCorrentes as ccApi, assinaturas as assinaturasApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
@@ -15,6 +15,7 @@ const STATUS_VARIANT = { PENDENTE: 'warning', ATRASADO: 'error', PAGO: 'success'
 const emptyForm = { descricao: '', valorOriginal: '', dataVencimento: '', tipo: 'PAGAR', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: false, numeroDocumento: '', acrescimo: '', desconto: '' };
 const emptyBaixa = { contaCorrenteId: '', dataPagamento: '', juros: 0, multa: 0, acrescimo: 0, desconto: 0 };
 const emptyFiltros = { tipo: '', status: '', numeroDocumento: '', vencimentoInicio: '', vencimentoFim: '', parceiroId: '', valorMin: '', valorMax: '', categoriaId: '' };
+const emptyTransf = { contaOrigemId: '', contaDestinoId: '', valor: '', dataTransferencia: '' };
 
 const COLUMNS = [
   { key: 'descricao', label: 'Descrição', render: (v, row) => (
@@ -52,6 +53,11 @@ export default function ContasFinanceiras() {
   const [loading, setLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
+  const [transferencias, setTransferencias] = useState([]);
+  const [transf, setTransf] = useState(emptyTransf);
+  const [editTransfId, setEditTransfId] = useState(null);
+  const [showTransf, setShowTransf] = useState(false);
+  const [salvandoTransf, setSalvandoTransf] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -59,11 +65,13 @@ export default function ContasFinanceiras() {
       parApi.listar().catch(() => []),
       ccApi.listar().catch(() => []),
       assinaturasApi.listarAtivas().catch(() => []),
-    ]).then(([c, p, cc, a]) => {
+      ccApi.transferencias.listar().catch(() => []),
+    ]).then(([c, p, cc, a, t]) => {
       setCats(c);
       setPars(p);
       setCcs(cc);
       setAssinaturasAtivas(a);
+      setTransferencias(t);
     });
     carregar(emptyFiltros);
   }, []);
@@ -154,6 +162,76 @@ export default function ContasFinanceiras() {
       },
     });
   }, [carregar]);
+
+  const carregarTransferencias = useCallback(async () => {
+    try { setTransferencias(await ccApi.transferencias.listar()); }
+    catch (e) { toast.error(e.message); }
+  }, []);
+
+  async function salvarTransferencia(e) {
+    e.preventDefault();
+    setSalvandoTransf(true);
+    const dto = {
+      contaOrigemId: Number(transf.contaOrigemId),
+      contaDestinoId: Number(transf.contaDestinoId),
+      valor: parseFloat(transf.valor),
+      dataTransferencia: transf.dataTransferencia,
+    };
+    try {
+      if (editTransfId) {
+        await ccApi.transferencias.atualizar(editTransfId, dto);
+        toast.success('Transferência atualizada!');
+      } else {
+        await ccApi.transferir(dto);
+        toast.success('Transferência realizada!');
+      }
+      setTransf(emptyTransf);
+      setEditTransfId(null);
+      setShowTransf(false);
+      await Promise.all([carregar(), carregarTransferencias()]);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setSalvandoTransf(false);
+    }
+  }
+
+  function editarTransferencia(t) {
+    setTransf({
+      contaOrigemId: String(t.contaOrigemId),
+      contaDestinoId: String(t.contaDestinoId),
+      valor: String(t.valor),
+      dataTransferencia: t.dataTransferencia,
+    });
+    setEditTransfId(t.id);
+    setShowTransf(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function cancelarTransferencia() {
+    setTransf(emptyTransf);
+    setEditTransfId(null);
+    setShowTransf(false);
+  }
+
+  const deletarTransferencia = useCallback((id) => {
+    setConfirmAction({
+      title: 'Excluir transferência',
+      message: 'A transferência será removida e os saldos estornados. Deseja continuar?',
+      confirmLabel: 'Excluir',
+      variant: 'warning',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        try {
+          await ccApi.transferencias.deletar(id);
+          await Promise.all([carregar(), carregarTransferencias()]);
+          toast.success('Transferência excluída e saldos estornados!');
+        } catch (e) {
+          toast.error(e.message);
+        }
+      },
+    });
+  }, [carregar, carregarTransferencias]);
 
   async function baixar(e) {
     e.preventDefault();
@@ -277,16 +355,63 @@ export default function ContasFinanceiras() {
         title="Lançamentos"
         subtitle="Contas a pagar e a receber"
         actions={
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all font-mono"
-            style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}
-          >
-            <Plus className="w-4 h-4" />
-            Nova Conta
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowTransf((v) => !v); if (showTransf) cancelarTransferencia(); }}
+              className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors font-mono"
+            >
+              <ArrowRightLeft className="w-4 h-4" />
+              Nova Transferência
+            </button>
+            <button
+              onClick={() => setShowForm((v) => !v)}
+              className="flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all font-mono"
+              style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}
+            >
+              <Plus className="w-4 h-4" />
+              Nova Conta
+            </button>
+          </div>
         }
       />
+
+      {/* Formulário de transferência */}
+      {showTransf && (
+        <form onSubmit={salvarTransferencia} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
+            {editTransfId ? `Editar Transferência #${editTransfId}` : 'Transferência entre Contas'}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <FormField label="Origem" required>
+              <select className={`${inputCls} appearance-none`} value={transf.contaOrigemId} onChange={(e) => setTransf((f) => ({ ...f, contaOrigemId: e.target.value }))} required>
+                <option value="">Selecione</option>
+                {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Destino" required>
+              <select className={`${inputCls} appearance-none`} value={transf.contaDestinoId} onChange={(e) => setTransf((f) => ({ ...f, contaDestinoId: e.target.value }))} required>
+                <option value="">Selecione</option>
+                {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Valor (R$)" required>
+              <input type="number" step="0.01" min="0.01" className={inputCls} value={transf.valor} onChange={(e) => setTransf((f) => ({ ...f, valor: e.target.value }))} required />
+            </FormField>
+            <FormField label="Data da Transferência" required>
+              <input type="date" className={inputCls} value={transf.dataTransferencia} onChange={(e) => setTransf((f) => ({ ...f, dataTransferencia: e.target.value }))} required />
+            </FormField>
+          </div>
+          <div className="flex gap-3">
+            <button type="submit" disabled={salvandoTransf} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+              {salvandoTransf ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
+              {salvandoTransf ? (editTransfId ? 'Salvando...' : 'Transferindo...') : (editTransfId ? 'Salvar' : 'Transferir')}
+            </button>
+            <button type="button" onClick={cancelarTransferencia} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Status summary chips */}
       {!loading && contas.length > 0 && (
@@ -560,6 +685,59 @@ export default function ContasFinanceiras() {
         loading={loading}
         aria-label="Lista de contas"
       />
+
+      {/* Histórico de transferências */}
+      {transferencias.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-text-primary/40" />
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">
+              Histórico de Transferências
+            </h2>
+          </div>
+          <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)' }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-text-primary/5">
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Data</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Origem</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Destino</th>
+                  <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Valor</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {transferencias.map((t) => (
+                  <tr key={t.id} className="border-b border-text-primary/5 last:border-0 hover:bg-surface-medium/30 transition-colors">
+                    <td className="px-4 py-3 text-text-primary/60 font-mono text-xs">{formatDate(t.dataTransferencia)}</td>
+                    <td className="px-4 py-3 text-text-primary/80 font-medium">{t.contaOrigemDescricao}</td>
+                    <td className="px-4 py-3 text-text-primary/80 font-medium">{t.contaDestinoDescricao}</td>
+                    <td className="px-4 py-3 text-right font-bold text-primary font-mono">R$ {brl(t.valor)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => editarTransferencia(t)}
+                          aria-label="Editar transferência"
+                          className="p-1.5 text-text-primary/30 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => deletarTransferencia(t.id)}
+                          aria-label="Excluir transferência"
+                          className="p-1.5 text-text-primary/30 hover:text-error rounded-lg hover:bg-error/10 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
     </div>
