@@ -118,6 +118,10 @@ public class ConciliacaoCartaoService {
         if (cartaoIdForcado != null) {
             cartao = cartaoRepo.findByIdAndUsuarioId(cartaoIdForcado, usuarioId)
                     .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado"));
+            if (cartao.getAcctIdOfx() == null && ofxDados.getNumeroConta() != null) {
+                cartao.setAcctIdOfx(ofxDados.getNumeroConta());
+                cartaoRepo.save(cartao);
+            }
         } else {
             String acctId = ofxDados.getNumeroConta();
             cartao = cartaoRepo.findByAcctIdOfxAndUsuarioId(acctId, usuarioId)
