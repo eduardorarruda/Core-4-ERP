@@ -1,3 +1,11 @@
 package br.com.core4erp.auth.dto;
 
-public record LoginResponseDto(MeResponseDto usuario) {}
+import br.com.core4erp.empresa.dto.EmpresaResumoDto;
+
+import java.util.List;
+
+public record LoginResponseDto(
+    MeResponseDto usuario,
+    List<EmpresaResumoDto> empresas,
+    Long empresaAtualId
+) {}

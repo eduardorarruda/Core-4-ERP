@@ -11,6 +11,7 @@ import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.auth.service.AuthService;
 import br.com.core4erp.auth.service.PasswordResetService;
 import br.com.core4erp.auth.service.ProfileService;
+import br.com.core4erp.empresa.dto.EmpresaResumoDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -57,7 +58,16 @@ public class AuthController {
     public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto request, HttpServletResponse response) {
         AuthService.LoginResult result = authService.login(request);
         response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie(result.token(), tokenExpiration / 1000));
-        return ResponseEntity.ok(new LoginResponseDto(result.usuario()));
+        Long empresaAtualId = result.empresas().isEmpty() ? null : result.empresas().get(0).id();
+        return ResponseEntity.ok(new LoginResponseDto(result.usuario(), result.empresas(), empresaAtualId));
+    }
+
+    @Operation(summary = "Trocar empresa ativa sem novo login")
+    @PostMapping("/trocar-empresa")
+    public ResponseEntity<EmpresaResumoDto> trocarEmpresa(
+            @RequestParam Long empresaId,
+            Authentication authentication) {
+        return ResponseEntity.ok(authService.trocarEmpresa(authentication.getName(), empresaId));
     }
 
     @Operation(summary = "Encerrar sessão e remover cookie JWT")
