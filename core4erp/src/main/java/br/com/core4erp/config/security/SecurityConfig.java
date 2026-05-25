@@ -1,5 +1,6 @@
 package br.com.core4erp.config.security;
 
+import br.com.core4erp.config.tenant.TenantFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,10 +20,12 @@ public class SecurityConfig {
 
         private final JwtFilter jwtFilter;
         private final RateLimitFilter rateLimitFilter;
+        private final TenantFilter tenantFilter;
 
-        public SecurityConfig(JwtFilter jwtFilter, RateLimitFilter rateLimitFilter) {
+        public SecurityConfig(JwtFilter jwtFilter, RateLimitFilter rateLimitFilter, TenantFilter tenantFilter) {
                 this.jwtFilter = jwtFilter;
                 this.rateLimitFilter = rateLimitFilter;
+                this.tenantFilter = tenantFilter;
         }
 
         @Bean
@@ -43,6 +46,8 @@ public class SecurityConfig {
                                                                 "/api/auth/login",
                                                                 "/api/auth/esqueci-senha",
                                                                 "/api/auth/redefinir-senha",
+                                                                "/api/auth/convite/**",
+                                                                "/api/auth/aceitar-convite",
                                                                 "/v3/api-docs/**",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",
@@ -61,7 +66,8 @@ public class SecurityConfig {
                                                                 .preload(false))
                                                 .cacheControl(Customizer.withDefaults()))
                                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                                .addFilterAfter(tenantFilter, JwtFilter.class);
 
                 return http.build();
         }

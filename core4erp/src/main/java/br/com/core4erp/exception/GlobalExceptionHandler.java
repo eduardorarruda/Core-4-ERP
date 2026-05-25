@@ -1,5 +1,6 @@
 package br.com.core4erp.exception;
 
+import br.com.core4erp.exception.AcessoNegadoException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +53,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDto> handleAccessDenied(AccessDeniedException e) {
         return ResponseEntity.status(403).body(new ErrorResponseDto(
                 "ACESSO_NEGADO", "Sem permissão para acessar este recurso", LocalDateTime.now()
+        ));
+    }
+
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<ErrorResponseDto> handleAcessoNegado(AcessoNegadoException e) {
+        log.warn("Acesso negado: {}", e.getMessage());
+        return ResponseEntity.status(403).body(new ErrorResponseDto(
+                "ACESSO_NEGADO", e.getMessage(), LocalDateTime.now()
         ));
     }
 
