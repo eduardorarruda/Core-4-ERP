@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { auth, setUsuario } from '../lib/api';
+import { auth, setLoginState } from '../lib/api';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
 import HeroPane, { BrandMark } from '../components/login/HeroPane';
 
@@ -84,8 +84,8 @@ export default function Login() {
     if (!emailValid) { setErro('Informe um email válido.'); return; }
     setCarregando(true);
     try {
-      const usuario = await auth.login(email, senha);
-      setUsuario(usuario);
+      const result = await auth.login(email, senha);
+      setLoginState(result);
       setSuccess(true);
       setTimeout(() => navigate('/dashboard'), 2400);
     } catch (err) {

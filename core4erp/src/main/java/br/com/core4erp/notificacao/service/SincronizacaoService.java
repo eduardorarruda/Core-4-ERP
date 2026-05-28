@@ -78,7 +78,7 @@ public class SincronizacaoService {
             boolean jaNotificado = notificacaoRepository
                     .existsByUsuarioIdAndTipoAndReferenciaId(uid, TipoNotificacao.VENCIMENTO, conta.getId());
             if (!jaNotificado) {
-                criarNotificacao(uid,
+                criarNotificacao(uid, conta.getEmpresaId(),
                         "Conta vencida: " + conta.getDescricao() + " (vencimento: " + conta.getDataVencimento() + ")",
                         TipoNotificacao.VENCIMENTO, conta.getId());
             }
@@ -102,7 +102,7 @@ public class SincronizacaoService {
                     .existsFaturaNotificacao(uid, cartao.getId(), inicioDoDia, fimDoDia);
 
             if (!jaNotificado) {
-                criarNotificacao(uid,
+                criarNotificacao(uid, cartao.getEmpresaId(),
                         "Fatura do cartão " + cartao.getNome() + " fecha hoje (" +
                         String.format("%02d/%d", mesAtual.getMonthValue(), mesAtual.getYear()) + ")",
                         TipoNotificacao.FATURA, cartao.getId());
@@ -112,7 +112,7 @@ public class SincronizacaoService {
 
     // ── Helper ───────────────────────────────────────────────────────────────
 
-    private void criarNotificacao(Long uid, String mensagem, TipoNotificacao tipo, Long referenciaId) {
+    private void criarNotificacao(Long uid, Long empresaId, String mensagem, TipoNotificacao tipo, Long referenciaId) {
         Usuario usuario = usuarioRepository.getReferenceById(uid);
         Notificacao n = new Notificacao();
         n.setMensagem(mensagem);
@@ -120,6 +120,9 @@ public class SincronizacaoService {
         n.setReferenciaId(referenciaId);
         n.setUsuario(usuario);
         n.setLida(false);
+        // empresa_id é NOT NULL; como rodamos fora do request scope (scheduler),
+        // não há TenantContext disponível — definimos explicitamente a partir da entidade origem.
+        if (empresaId != null) n.setEmpresaId(empresaId);
         notificacaoRepository.save(n);
     }
 }

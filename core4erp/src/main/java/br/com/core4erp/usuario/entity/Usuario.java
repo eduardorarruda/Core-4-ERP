@@ -48,4 +48,18 @@ public class Usuario extends Auditable {
 
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
+
+    @Column(name = "tipo_conta", nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    private TipoConta tipoConta = TipoConta.EMPRESA;
+
+    @Column(name = "admin_sistema", nullable = false)
+    private Boolean adminSistema = false;
+
+    @Column(name = "senha_provisoria", nullable = false)
+    private Boolean senhaProvisoria = false;
+
+    public enum TipoConta {
+        EMPRESA, PESSOA_FISICA
+    }
 }

@@ -8,6 +8,7 @@ import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RedefinirSenhaRequestDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
+import br.com.core4erp.auth.dto.TrocarSenhaRequestDto;
 import br.com.core4erp.auth.service.AuthService;
 import br.com.core4erp.auth.service.PasswordResetService;
 import br.com.core4erp.auth.service.ProfileService;
@@ -59,7 +60,8 @@ public class AuthController {
         AuthService.LoginResult result = authService.login(request);
         response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie(result.token(), tokenExpiration / 1000));
         Long empresaAtualId = result.empresas().isEmpty() ? null : result.empresas().get(0).id();
-        return ResponseEntity.ok(new LoginResponseDto(result.usuario(), result.empresas(), empresaAtualId));
+        return ResponseEntity.ok(new LoginResponseDto(
+            result.usuario(), result.empresas(), empresaAtualId, result.senhaProvisoria(), result.adminSistema()));
     }
 
     @Operation(summary = "Trocar empresa ativa sem novo login")
@@ -102,6 +104,13 @@ public class AuthController {
             @Valid @RequestBody AtualizarPerfilRequestDto dto,
             Authentication authentication) {
         return ResponseEntity.ok(profileService.atualizarPerfil(authentication.getName(), dto));
+    }
+
+    @Operation(summary = "Trocar senha do usuário autenticado")
+    @PatchMapping("/senha")
+    public ResponseEntity<Void> trocarSenha(@Valid @RequestBody TrocarSenhaRequestDto dto) {
+        authService.trocarSenha(dto);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Atualizar foto de perfil via multipart")

@@ -1,6 +1,6 @@
 package br.com.core4erp.investimento.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.enums.TipoInvestimento;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 @Setter
 @Entity
 @Table(name = "tb_conta_investimento")
-public class ContaInvestimento extends Auditable {
+public class ContaInvestimento extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

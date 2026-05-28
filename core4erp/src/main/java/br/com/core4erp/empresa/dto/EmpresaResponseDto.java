@@ -14,7 +14,7 @@ public record EmpresaResponseDto(
     public static EmpresaResponseDto from(Empresa e) {
         return new EmpresaResponseDto(
             e.getId(), e.getNome(), e.getCnpj(),
-            e.getEmailContato(), e.getTelefone(), e.getPlano(), e.getAtiva()
+            e.getEmailContato(), e.getTelefone(), e.getPlanoNome(), e.getAtiva()
         );
     }
 }

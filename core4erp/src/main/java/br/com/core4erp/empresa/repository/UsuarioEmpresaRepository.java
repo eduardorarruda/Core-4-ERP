@@ -25,4 +25,9 @@ public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa, 
     Page<UsuarioEmpresa> findByEmpresaIdAndAtivoTrue(Long empresaId, Pageable pageable);
 
     boolean existsByUsuarioIdAndEmpresaId(Long usuarioId, Long empresaId);
+
+    long countByEmpresaIdAndAtivoTrue(Long empresaId);
+
+    @EntityGraph(attributePaths = {"usuario", "perfil", "perfil.permissoes"})
+    Page<UsuarioEmpresa> findByEmpresaId(Long empresaId, Pageable pageable);
 }

@@ -66,7 +66,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponseDto> handleBusiness(BusinessException e) {
-        return ResponseEntity.status(422).body(new ErrorResponseDto(
+        int status = switch (e.getCode()) {
+            case "CONVITE_PENDENTE", "USUARIO_JA_MEMBRO" -> 409;
+            case "LIMITE_PLANO", "OPERACAO_INVALIDA", "CONVITE_EXPIRADO" -> 422;
+            case "PLANO_INATIVO", "SENHA_INCORRETA" -> 400;
+            default -> 422;
+        };
+        log.warn("Regra de negócio violada: {} — {}", e.getCode(), e.getMessage());
+        return ResponseEntity.status(status).body(new ErrorResponseDto(
                 e.getCode(), e.getMessage(), LocalDateTime.now()
         ));
     }

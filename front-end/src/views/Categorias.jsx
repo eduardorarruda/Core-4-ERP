@@ -12,6 +12,7 @@ import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
 
 const ICONES = [
   { nome: 'ShoppingCart', componente: ShoppingCart },
@@ -196,12 +197,16 @@ export default function Categorias() {
                 </div>
                 <span className="font-bold text-text-primary flex-1 text-sm truncate font-display">{c.descricao}</span>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => editar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => deletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <PermissaoGuard permissao="CATEGORIA_EDITAR">
+                    <button onClick={() => editar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </PermissaoGuard>
+                  <PermissaoGuard permissao="CATEGORIA_DELETAR">
+                    <button onClick={() => deletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </PermissaoGuard>
                 </div>
               </div>
             );

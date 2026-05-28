@@ -1,6 +1,6 @@
 package br.com.core4erp.cartaoCredito.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.enums.StatusFatura;
 import br.com.core4erp.usuario.entity.Usuario;
@@ -15,7 +15,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "tb_fatura_cartao",
         uniqueConstraints = @UniqueConstraint(columnNames = {"cartao_credito_id", "mes", "ano", "usuario_id"}))
-public class FaturaCartao extends Auditable {
+public class FaturaCartao extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -7,5 +7,7 @@ import java.util.List;
 public record LoginResponseDto(
     MeResponseDto usuario,
     List<EmpresaResumoDto> empresas,
-    Long empresaAtualId
+    Long empresaAtualId,
+    Boolean senhaProvisoria,
+    Boolean adminSistema
 ) {}

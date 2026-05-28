@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, TrendingUp, Loader2, Zap, BarChart3 } from 'lucide-react';
-import { auth } from '../lib/api';
+import { auth, setLoginState } from '../lib/api';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
 
 /* ── BrandMark (igual ao Login) ── */
@@ -38,7 +38,7 @@ const FEATURES = [
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ nome: '', email: '', senha: '', confirmarSenha: '', telefone: '' });
+  const [form, setForm] = useState({ nome: '', email: '', senha: '', confirmarSenha: '', telefone: '', tipoConta: 'EMPRESA', nomeEmpresa: '' });
   const [erro, setErro] = useState('');
   const [erroConfirmacao, setErroConfirmacao] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -81,10 +81,11 @@ export default function Register() {
     }
     setCarregando(true);
     try {
-      const telefone = form.telefone ? Number(form.telefone.replace(/\D/g, '')) : null;
-      await auth.registrar(form.nome, form.email, form.senha, telefone);
-      const usuario = await auth.login(form.email, form.senha);
-      sessionStorage.setItem('usuario', JSON.stringify(usuario));
+      const telefone = form.telefone ? form.telefone.replace(/\D/g, '') : null;
+      const nomeEmpresa = form.tipoConta === 'EMPRESA' ? form.nomeEmpresa || undefined : undefined;
+      await auth.registrar(form.nome, form.email, form.senha, telefone, form.tipoConta, nomeEmpresa);
+      const result = await auth.login(form.email, form.senha);
+      setLoginState(result);
       navigate('/dashboard');
     } catch (err) {
       setErro(err.message || 'Erro ao criar conta');
@@ -157,6 +158,22 @@ export default function Register() {
               <div className="anim-in d4">
                 <FloatingInput id="telefone" label="Telefone (opcional)" type="tel" value={form.telefone} onChange={set('telefone')} autoComplete="tel" />
               </div>
+              <div className="anim-in d4" style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: 'rgba(250,250,250,.4)', marginBottom: 8, fontFamily: "'DM Sans', sans-serif" }}>Tipo de conta</div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[{ value: 'EMPRESA', label: 'Empresa' }, { value: 'PESSOA_FISICA', label: 'Uso Pessoal' }].map(({ value, label }) => (
+                    <label key={value} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px', borderRadius: 14, border: `1px solid ${form.tipoConta === value ? '#6EFFC0' : 'rgba(250,250,250,.1)'}`, background: form.tipoConta === value ? 'rgba(110,255,192,.08)' : '#131313', cursor: 'pointer', fontSize: 13, color: form.tipoConta === value ? '#6EFFC0' : 'rgba(250,250,250,.6)', transition: 'all 200ms', fontFamily: "'DM Sans', sans-serif" }}>
+                      <input type="radio" name="tipoConta" value={value} checked={form.tipoConta === value} onChange={set('tipoConta')} style={{ display: 'none' }} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {form.tipoConta === 'EMPRESA' && (
+                <div className="anim-in d4">
+                  <FloatingInput id="nomeEmpresa" label="Nome da empresa" type="text" value={form.nomeEmpresa} onChange={set('nomeEmpresa')} />
+                </div>
+              )}
               <div className="anim-in d5">
                 <FloatingPasswordInput id="senha" label="Senha" value={form.senha} onChange={set('senha')} autoComplete="new-password" required />
                 <ul style={{ margin: '6px 0 0 4px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>

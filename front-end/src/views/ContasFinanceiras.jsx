@@ -9,6 +9,7 @@ import DataTable from '../components/ui/DataTable';
 import { brl, formatDate } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
 
 const STATUS_VARIANT = { PENDENTE: 'warning', ATRASADO: 'error', PAGO: 'success', RECEBIDO: 'info' };
 
@@ -356,21 +357,25 @@ export default function ContasFinanceiras() {
         subtitle="Contas a pagar e a receber"
         actions={
           <div className="flex gap-2">
-            <button
-              onClick={() => { setShowTransf((v) => !v); if (showTransf) cancelarTransferencia(); }}
-              className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors font-mono"
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              Nova Transferência
-            </button>
-            <button
-              onClick={() => setShowForm((v) => !v)}
-              className="flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all font-mono"
-              style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}
-            >
-              <Plus className="w-4 h-4" />
-              Nova Conta
-            </button>
+            <PermissaoGuard permissao="CONTA_CORRENTE_TRANSFERIR">
+              <button
+                onClick={() => { setShowTransf((v) => !v); if (showTransf) cancelarTransferencia(); }}
+                className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors font-mono"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                Nova Transferência
+              </button>
+            </PermissaoGuard>
+            <PermissaoGuard permissao="CONTA_CRIAR">
+              <button
+                onClick={() => setShowForm((v) => !v)}
+                className="flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all font-mono"
+                style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}
+              >
+                <Plus className="w-4 h-4" />
+                Nova Conta
+              </button>
+            </PermissaoGuard>
           </div>
         }
       />

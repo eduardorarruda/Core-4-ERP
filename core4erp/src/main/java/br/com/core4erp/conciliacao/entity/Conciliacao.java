@@ -1,7 +1,7 @@
 package br.com.core4erp.conciliacao.entity;
 
 import br.com.core4erp.conciliacao.enums.StatusConciliacao;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "tb_conciliacao")
-public class Conciliacao extends Auditable {
+public class Conciliacao extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

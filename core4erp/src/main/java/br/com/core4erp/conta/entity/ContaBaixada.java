@@ -1,6 +1,6 @@
 package br.com.core4erp.conta.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -16,7 +16,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_conta_baixada")
-public class ContaBaixada extends Auditable {
+public class ContaBaixada extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

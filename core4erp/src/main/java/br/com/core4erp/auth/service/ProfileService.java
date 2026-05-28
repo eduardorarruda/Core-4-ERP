@@ -49,6 +49,7 @@ public class ProfileService {
     }
 
     private MeResponseDto toMeResponse(Usuario u) {
-        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole(), u.getFotoPerfil());
+        String tipoConta = u.getTipoConta() != null ? u.getTipoConta().name() : null;
+        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole(), u.getFotoPerfil(), tipoConta);
     }
 }
