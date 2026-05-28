@@ -1,5 +1,6 @@
 package br.com.core4erp.auth.dto;
 
+import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -20,5 +21,9 @@ public record RegistrarRequestDto(
         String senha,
 
         @Pattern(regexp = "^[+]?[0-9 \\-()]{0,20}$", message = "Telefone inválido")
-        String telefone
+        String telefone,
+
+        Usuario.TipoConta tipoConta,
+
+        String nomeEmpresa
 ) {}

@@ -48,6 +48,7 @@ public class SecurityConfig {
                                                                 "/api/auth/redefinir-senha",
                                                                 "/api/auth/convite/**",
                                                                 "/api/auth/aceitar-convite",
+                                                                "/api/planos/ativos",
                                                                 "/v3/api-docs/**",
                                                                 "/swagger-ui/**",
                                                                 "/swagger-ui.html",

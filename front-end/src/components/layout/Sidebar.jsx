@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
   LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge,
-  ChevronRight,
+  ChevronRight, UserCog, Layers, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -40,7 +40,10 @@ const NAV_GROUPS = [
   {
     label: 'Admin',
     items: [
-      { id: 'audit', icon: Gavel, label: 'Auditoria', path: '/audit', adminOnly: true },
+      { id: 'audit',       icon: Gavel,    label: 'Auditoria',       path: '/audit',              adminOnly: true },
+      { id: 'operadores',  icon: UserCog,  label: 'Operadores',      path: '/empresa/operadores', empresaOnly: true },
+      { id: 'perfis',      icon: ShieldCheck, label: 'Perfis de Acesso', path: '/empresa/perfis',  adminOnly: true },
+      { id: 'adm-planos',  icon: Layers,   label: 'Gestão de Planos',path: '/admin/planos',       adminSistemaOnly: true },
     ],
   },
 ];
@@ -132,7 +135,7 @@ function CartaoDropdown({ onClose }) {
 }
 
 export default function Sidebar({ onClose }) {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, tipoConta, adminSistema } = useAuth();
 
   return (
     <aside className="group/sidebar h-screen sticky top-0 w-16 hover:w-56 transition-all duration-300 ease-in-out overflow-hidden bg-surface-low flex flex-col items-start py-6 gap-2 z-50 border-r border-text-primary/5">
@@ -142,9 +145,12 @@ export default function Sidebar({ onClose }) {
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 flex-1 w-full overflow-y-auto no-scrollbar px-2">
         {NAV_GROUPS.map((group) => {
-          const visibleItems = group.items.filter(
-            (item) => !item.adminOnly || usuario?.role === 'ROLE_ADMIN'
-          );
+          const visibleItems = group.items.filter((item) => {
+            if (item.adminOnly && usuario?.role !== 'ROLE_ADMIN') return false;
+            if (item.empresaOnly && tipoConta !== 'EMPRESA') return false;
+            if (item.adminSistemaOnly && !adminSistema) return false;
+            return true;
+          });
           if (!visibleItems.length) return null;
           return (
             <React.Fragment key={group.label}>

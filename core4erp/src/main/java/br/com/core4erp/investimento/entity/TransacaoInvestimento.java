@@ -1,6 +1,6 @@
 package br.com.core4erp.investimento.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.usuario.entity.Usuario;
@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_transacao_investimento")
-public class TransacaoInvestimento extends Auditable {
+public class TransacaoInvestimento extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

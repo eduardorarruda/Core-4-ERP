@@ -3,6 +3,9 @@ package br.com.core4erp.auth.service;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
+import br.com.core4erp.auth.dto.TrocarSenhaRequestDto;
+import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.config.rbac.PermissaoCalculadora;
 import br.com.core4erp.config.security.JwtService;
 import br.com.core4erp.empresa.dto.EmpresaResumoDto;
@@ -34,7 +37,7 @@ public class AuthService {
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final int LOCKOUT_MINUTES = 15;
 
-    public record LoginResult(String token, MeResponseDto usuario, List<EmpresaResumoDto> empresas) {}
+    public record LoginResult(String token, MeResponseDto usuario, List<EmpresaResumoDto> empresas, Boolean senhaProvisoria, Boolean adminSistema) {}
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -44,6 +47,7 @@ public class AuthService {
     private final PerfilAcessoRepository perfilAcessoRepository;
     private final EmpresaRepository empresaRepository;
     private final PermissaoCalculadora permissaoCalculadora;
+    private final TenantContext tenantContext;
 
     public AuthService(UsuarioRepository usuarioRepository,
                        PasswordEncoder passwordEncoder,
@@ -52,7 +56,8 @@ public class AuthService {
                        UsuarioEmpresaPermissaoRepository permissaoUsuarioRepository,
                        PerfilAcessoRepository perfilAcessoRepository,
                        EmpresaRepository empresaRepository,
-                       PermissaoCalculadora permissaoCalculadora) {
+                       PermissaoCalculadora permissaoCalculadora,
+                       TenantContext tenantContext) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -61,6 +66,7 @@ public class AuthService {
         this.perfilAcessoRepository = perfilAcessoRepository;
         this.empresaRepository = empresaRepository;
         this.permissaoCalculadora = permissaoCalculadora;
+        this.tenantContext = tenantContext;
     }
 
     @Transactional
@@ -69,17 +75,27 @@ public class AuthService {
             throw new IllegalArgumentException("Email já cadastrado");
         }
 
+        Usuario.TipoConta tipoConta = request.tipoConta() != null
+            ? request.tipoConta()
+            : Usuario.TipoConta.EMPRESA;
+
         Usuario usuario = new Usuario();
         usuario.setNome(request.nome());
         usuario.setEmail(request.email());
         usuario.setSenhaHash(passwordEncoder.encode(request.senha()));
         usuario.setTelefone(request.telefone());
-        usuario.setRole("ROLE_USER");
+        usuario.setRole(tipoConta == Usuario.TipoConta.EMPRESA ? "ROLE_ADMIN" : "ROLE_USER");
+        usuario.setTipoConta(tipoConta);
 
         usuario = usuarioRepository.save(usuario);
 
-        // Criar empresa pessoal para o novo usuário
-        criarEmpresaParaUsuario(usuario);
+        String nomeEmpresa = (tipoConta == Usuario.TipoConta.EMPRESA
+            && request.nomeEmpresa() != null
+            && !request.nomeEmpresa().isBlank())
+            ? request.nomeEmpresa()
+            : usuario.getNome();
+
+        criarEmpresaParaUsuario(usuario, nomeEmpresa);
 
         return toMeResponse(usuario);
     }
@@ -111,7 +127,9 @@ public class AuthService {
 
         String token = jwtService.generateToken(usuario.getEmail());
         List<EmpresaResumoDto> empresas = carregarEmpresasDoUsuario(usuario.getEmail());
-        return new LoginResult(token, toMeResponse(usuario), empresas);
+        return new LoginResult(token, toMeResponse(usuario), empresas,
+            Boolean.TRUE.equals(usuario.getSenhaProvisoria()),
+            Boolean.TRUE.equals(usuario.getAdminSistema()));
     }
 
     public MeResponseDto me(String email) {
@@ -135,6 +153,20 @@ public class AuthService {
         return new EmpresaResumoDto(empresaId, ue.getEmpresa().getNome(), ue.getPerfil().getNome(), efetivas);
     }
 
+    @Transactional
+    public void trocarSenha(TrocarSenhaRequestDto dto) {
+        Usuario usuario = usuarioRepository.findById(tenantContext.getUsuarioId())
+            .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+
+        if (!passwordEncoder.matches(dto.senhaAtual(), usuario.getSenhaHash())) {
+            throw new BusinessException("SENHA_INCORRETA", "Senha atual incorreta");
+        }
+
+        usuario.setSenhaHash(passwordEncoder.encode(dto.novaSenha()));
+        usuario.setSenhaProvisoria(false);
+        usuarioRepository.save(usuario);
+    }
+
     // ---- privados ----
 
     private List<EmpresaResumoDto> carregarEmpresasDoUsuario(String email) {
@@ -152,9 +184,9 @@ public class AuthService {
             .toList();
     }
 
-    private void criarEmpresaParaUsuario(Usuario usuario) {
+    private void criarEmpresaParaUsuario(Usuario usuario, String nomeEmpresa) {
         Empresa empresa = new Empresa();
-        empresa.setNome(usuario.getNome() != null ? usuario.getNome() : usuario.getEmail());
+        empresa.setNome(nomeEmpresa != null && !nomeEmpresa.isBlank() ? nomeEmpresa : usuario.getEmail());
         empresa.setEmailContato(usuario.getEmail());
         empresa = empresaRepository.save(empresa);
 
@@ -169,6 +201,7 @@ public class AuthService {
     }
 
     private MeResponseDto toMeResponse(Usuario u) {
-        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole(), u.getFotoPerfil());
+        String tipoConta = u.getTipoConta() != null ? u.getTipoConta().name() : null;
+        return new MeResponseDto(u.getId(), u.getNome(), u.getEmail(), u.getTelefone(), u.getRole(), u.getFotoPerfil(), tipoConta);
     }
 }

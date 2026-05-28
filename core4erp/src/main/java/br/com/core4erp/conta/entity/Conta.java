@@ -1,7 +1,7 @@
 package br.com.core4erp.conta.entity;
 
 import br.com.core4erp.categoria.entity.Categoria;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.parceiro.entity.Parceiro;
@@ -19,7 +19,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_conta")
-public class Conta extends Auditable {
+public class Conta extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

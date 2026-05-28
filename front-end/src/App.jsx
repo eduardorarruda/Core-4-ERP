@@ -1,5 +1,5 @@
-import React, { lazy, Suspense, useState, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense, useState, useCallback, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import ChatSidebar from './components/chat/ChatSidebar';
@@ -8,6 +8,7 @@ import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
 import { ToastContainer } from './components/ui/Toast';
 import { getUsuario } from './lib/api';
+import { useAuth } from './hooks/useAuth';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
 
@@ -36,6 +37,12 @@ const Investimentos   = lazy(() => import('./views/Investimentos'));
 const Notificacoes    = lazy(() => import('./views/Notificacoes'));
 const Configuracoes   = lazy(() => import('./views/Configuracoes'));
 const CommandPalette  = lazy(() => import('./components/ui/CommandPalette'));
+const VisualizacaoPlanos = lazy(() => import('./views/VisualizacaoPlanos'));
+const PagamentoMock      = lazy(() => import('./views/PagamentoMock'));
+const AceitarConvite     = lazy(() => import('./views/AceitarConvite'));
+const GestaoPlanos       = lazy(() => import('./views/GestaoPlanos'));
+const GestaoOperadores   = lazy(() => import('./views/GestaoOperadores'));
+const GestaoPerfis       = lazy(() => import('./views/GestaoPerfis'));
 
 function PageSkeleton() {
   return (
@@ -61,12 +68,43 @@ function AdminRoute({ children }) {
   return children;
 }
 
+function SenhaProvisoriaModal({ onConfirm, onDismiss }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center' }}>
+      <div style={{ background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 400, width: '90%', textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,193,7,.1)', border: '1px solid rgba(255,193,7,.2)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD37A" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 8 }}>Senha Provisória</h2>
+        <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.6, marginBottom: 24 }}>
+          Você está usando uma senha provisória. Recomendamos definir sua própria senha para maior segurança.
+        </p>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onDismiss} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', fontSize: 13, cursor: 'pointer' }}>
+            Mais tarde
+          </button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Sora', sans-serif" }}>
+            Trocar Senha
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [showSenhaModal, setShowSenhaModal] = useState(false);
+  const { senhaProvisoria } = useAuth();
+  const navigate = useNavigate();
 
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
+
+  useEffect(() => {
+    if (senhaProvisoria) setShowSenhaModal(true);
+  }, [senhaProvisoria]);
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -114,6 +152,13 @@ function ProtectedLayout({ children }) {
           <CommandPalette onClose={closeCmd} />
         </Suspense>
       )}
+
+      {showSenhaModal && (
+        <SenhaProvisoriaModal
+          onConfirm={() => { setShowSenhaModal(false); navigate('/configuracoes'); }}
+          onDismiss={() => setShowSenhaModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -134,9 +179,12 @@ export default function App() {
           <ErrorBoundary>
           <Suspense fallback={<PageSkeleton />}>
           <Routes>
-            <Route path="/login"           element={<Login />} />
-            <Route path="/register"        element={<Register />} />
-            <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+            <Route path="/login"              element={<Login />} />
+            <Route path="/register"           element={<Register />} />
+            <Route path="/redefinir-senha"    element={<RedefinirSenha />} />
+            <Route path="/planos"             element={<VisualizacaoPlanos />} />
+            <Route path="/pagamento"          element={<PagamentoMock />} />
+            <Route path="/aceitar-convite"    element={<AceitarConvite />} />
 
             <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
             <Route path="/conciliacao"              element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
@@ -160,6 +208,9 @@ export default function App() {
             <Route path="/investimentos"    element={<ProtectedLayout><Investimentos /></ProtectedLayout>} />
             <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
+            <Route path="/admin/planos"       element={<ProtectedLayout><GestaoPlanos /></ProtectedLayout>} />
+            <Route path="/empresa/operadores" element={<ProtectedLayout><GestaoOperadores /></ProtectedLayout>} />
+            <Route path="/empresa/perfis"     element={<ProtectedLayout><GestaoPerfis /></ProtectedLayout>} />
 
             <Route path="/"  element={<Navigate to="/dashboard" replace />} />
             <Route path="*"  element={<Navigate to="/dashboard" replace />} />

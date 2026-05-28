@@ -2,7 +2,7 @@ package br.com.core4erp.conciliacaoCartao.entity;
 
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
 import br.com.core4erp.conciliacaoCartao.enums.StatusItemConciliacaoCartao;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_conciliacao_cartao_item")
-public class ConciliacaoCartaoItem extends Auditable {
+public class ConciliacaoCartaoItem extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

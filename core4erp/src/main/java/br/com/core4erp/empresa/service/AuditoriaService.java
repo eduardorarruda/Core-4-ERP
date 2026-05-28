@@ -11,6 +11,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Set;
@@ -27,6 +29,7 @@ public class AuditoriaService {
     private final TenantContext tenantContext;
     private final ObjectMapper objectMapper;
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrar(String entidade, Long entidadeId, AcaoAuditoria acao,
                           Object valorAnterior, Object valorNovo) {
         Auditoria a = new Auditoria();

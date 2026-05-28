@@ -2,7 +2,7 @@ package br.com.core4erp.cartaoCredito.entity;
 
 import br.com.core4erp.assinatura.entity.Assinatura;
 import br.com.core4erp.categoria.entity.Categoria;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -18,7 +18,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_lancamento_cartao")
-public class LancamentoCartao extends Auditable {
+public class LancamentoCartao extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

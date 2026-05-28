@@ -69,7 +69,7 @@ public class EmpresaService {
         empresa.setCnpj(dto.cnpj());
         empresa.setEmailContato(dto.emailContato());
         empresa.setTelefone(dto.telefone());
-        if (dto.plano() != null) empresa.setPlano(dto.plano());
+        if (dto.plano() != null) empresa.setPlanoNome(dto.plano());
 
         empresa = empresaRepository.save(empresa);
 
@@ -93,7 +93,7 @@ public class EmpresaService {
         if (dto.cnpj() != null) empresa.setCnpj(dto.cnpj());
         if (dto.emailContato() != null) empresa.setEmailContato(dto.emailContato());
         if (dto.telefone() != null) empresa.setTelefone(dto.telefone());
-        if (dto.plano() != null) empresa.setPlano(dto.plano());
+        if (dto.plano() != null) empresa.setPlanoNome(dto.plano());
         return EmpresaResponseDto.from(empresaRepository.save(empresa));
     }
 

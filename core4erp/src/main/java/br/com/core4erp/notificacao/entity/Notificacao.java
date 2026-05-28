@@ -1,6 +1,6 @@
 package br.com.core4erp.notificacao.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.enums.TipoNotificacao;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_notif_usuario_tipo_ref", columnList = "usuario_id, tipo, referencia_id")
     }
 )
-public class Notificacao extends Auditable {
+public class Notificacao extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

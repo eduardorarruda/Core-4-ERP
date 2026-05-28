@@ -53,12 +53,6 @@ public class EmpresaController {
         return ResponseEntity.ok(empresaService.listarMembros(pageable));
     }
 
-    @PostMapping("/api/empresa/usuarios/convidar")
-    @Requer("USUARIO_CONVIDAR")
-    public ResponseEntity<MembroResponseDto> convidar(@Valid @RequestBody ConvidarMembroRequestDto dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(empresaService.convidarMembro(dto));
-    }
-
     @PutMapping("/api/empresa/usuarios/{usuarioId}/perfil")
     @Requer("USUARIO_EDITAR")
     public ResponseEntity<MembroResponseDto> alterarPerfil(

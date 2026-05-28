@@ -5,16 +5,31 @@ export function setUsuario(u) {
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
+export function setLoginState(result) {
+  sessionStorage.setItem('usuario', JSON.stringify(result?.usuario ?? result));
+  sessionStorage.setItem('loginState', JSON.stringify(result));
+  window.dispatchEvent(new CustomEvent('auth-change'));
+}
+
+export function getLoginState() {
+  return JSON.parse(sessionStorage.getItem('loginState') || 'null');
+}
+
 export function clearAuth() {
   sessionStorage.removeItem('usuario');
+  sessionStorage.removeItem('loginState');
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 async function request(path, options = {}) {
   const { skipAuthRedirect, timeout = 30000, blob: expectBlob = false, ...fetchOptions } = options;
   const isFormData = fetchOptions.body instanceof FormData;
+
+  // Envia o id da empresa atual em todo request para o TenantFilter resolver o contexto certo
+  const empresaAtualId = getLoginState()?.empresas?.[0]?.id;
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(empresaAtualId ? { 'X-Empresa-Id': String(empresaAtualId) } : {}),
     ...fetchOptions.headers,
   };
 
@@ -48,23 +63,30 @@ async function request(path, options = {}) {
   }
 
   if (res.status === 204) return null;
-  return expectBlob ? res.blob() : res.json();
+  if (expectBlob) return res.blob();
+
+  // Lê como texto primeiro para evitar SyntaxError em body vazio
+  const text = await res.text();
+  if (!text || !text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
-  login: async (email, senha) => {
-    const result = await request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true });
-    return result?.usuario ?? result;
-  },
+  login: (email, senha) =>
+    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true }),
 
   logout: async () => {
     try { await request('/api/auth/logout', { method: 'POST' }); } catch {}
     clearAuth();
   },
 
-  registrar: (nome, email, senha, telefone) =>
-    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone }), skipAuthRedirect: true }),
+  registrar: (nome, email, senha, telefone, tipoConta, nomeEmpresa) =>
+    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone, tipoConta, nomeEmpresa }), skipAuthRedirect: true }),
 
   me: () => request('/api/auth/me'),
 
@@ -87,6 +109,68 @@ export const auth = {
 export function getUsuario() {
   return JSON.parse(sessionStorage.getItem('usuario') || 'null');
 }
+
+// ── Planos ────────────────────────────────────────────────────────────────────
+export const planos = {
+  listarAtivos: () => request('/api/planos/ativos', { skipAuthRedirect: true }),
+  listarTodos: () => request('/api/planos'),
+  criar: (dto) => request('/api/planos', { method: 'POST', body: JSON.stringify(dto) }),
+  atualizar: (id, dto) => request(`/api/planos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  desativar: (id) => request(`/api/planos/${id}/desativar`, { method: 'PATCH' }),
+  reativar: (id) => request(`/api/planos/${id}/reativar`, { method: 'PATCH' }),
+};
+
+// ── Convites ──────────────────────────────────────────────────────────────────
+export const convites = {
+  convidar: (dto) => request('/api/empresa/usuarios/convidar', { method: 'POST', body: JSON.stringify(dto) }),
+  pendentes: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/empresa/convites/pendentes${qs ? `?${qs}` : ''}`);
+  },
+  reenviar: (id) => request(`/api/empresa/convites/${id}/reenviar`, { method: 'POST' }),
+  buscarPorToken: (token) => request(`/api/auth/convite/${token}`, { skipAuthRedirect: true }),
+  aceitar: (dto) => request('/api/auth/aceitar-convite', { method: 'POST', body: JSON.stringify(dto), skipAuthRedirect: true }),
+};
+
+// ── Operadores ────────────────────────────────────────────────────────────────
+export const operadores = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/empresa/operadores${qs ? `?${qs}` : ''}`);
+  },
+  alterarPerfil: (usuarioId, perfilId) =>
+    request(`/api/empresa/operadores/${usuarioId}/perfil`, { method: 'PUT', body: JSON.stringify({ perfilId }) }),
+  remover: (usuarioId) =>
+    request(`/api/empresa/operadores/${usuarioId}/remover`, { method: 'PATCH' }),
+};
+
+// ── Perfis de Acesso ──────────────────────────────────────────────────────────
+export const perfisAcesso = {
+  listar: () => request('/api/empresa/perfis'),
+  listarPermissoes: () => request('/api/empresa/permissoes'),
+  criar: (dto) => request('/api/empresa/perfis', { method: 'POST', body: JSON.stringify(dto) }),
+  atualizar: (id, dto) => request(`/api/empresa/perfis/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deletar: (id) => request(`/api/empresa/perfis/${id}`, { method: 'DELETE' }),
+};
+
+// ── Auditoria ─────────────────────────────────────────────────────────────────
+export const auditoria = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    ).toString();
+    return request(`/api/auditoria${qs ? `?${qs}` : ''}`);
+  },
+};
+
+// ── Pagamentos ────────────────────────────────────────────────────────────────
+export const pagamentos = {
+  pagar: (dto) => request('/api/pagamentos', { method: 'POST', body: JSON.stringify(dto) }),
+  historico: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/pagamentos/historico${qs ? `?${qs}` : ''}`);
+  },
+};
 
 // ── Categorias ────────────────────────────────────────────────────────────────
 export const categorias = {

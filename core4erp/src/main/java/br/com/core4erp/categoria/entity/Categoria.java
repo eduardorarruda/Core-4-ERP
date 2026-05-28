@@ -1,6 +1,6 @@
 package br.com.core4erp.categoria.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -12,7 +12,7 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(name = "tb_categoria")
-public class Categoria extends Auditable {
+public class Categoria extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

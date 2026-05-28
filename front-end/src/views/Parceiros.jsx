@@ -9,6 +9,7 @@ import DataTable from '../components/ui/DataTable';
 import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
 
 const TIPOS = ['CLIENTE', 'FORNECEDOR', 'AMBOS'];
 const TIPO_VARIANT = { CLIENTE: 'info', FORNECEDOR: 'warning', AMBOS: 'success' };
@@ -169,13 +170,15 @@ export default function Parceiros() {
         title="Parceiros"
         subtitle="Clientes e fornecedores"
         actions={
-          <button
-            onClick={() => { setForm(empty); setEditId(null); setErrors({}); setActiveTab('Dados Gerais'); setShowForm((v) => !v); }}
-            className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" />
-            Novo Parceiro
-          </button>
+          <PermissaoGuard permissao="PARCEIRO_CRIAR">
+            <button
+              onClick={() => { setForm(empty); setEditId(null); setErrors({}); setActiveTab('Dados Gerais'); setShowForm((v) => !v); }}
+              className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-4 h-4" />
+              Novo Parceiro
+            </button>
+          </PermissaoGuard>
         }
       />
 
