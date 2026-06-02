@@ -351,7 +351,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V34** (V33 já existe).
+- **Próxima migration disponível: V35** (V34 já existe).
 
 **Sequência de migrations:**
 ```
@@ -386,6 +386,7 @@ V30     add_calendario_e_cartao_conciliacao_permissions
 V31     add_relatorio_investimento_dashboard_permissions
 V32     add_empresa_id_to_perfil_acesso
 V33     add_empresa_id_to_tipo_investimento
+V34     add_audit_columns_to_tipo_investimento
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
