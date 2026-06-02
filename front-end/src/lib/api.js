@@ -12,7 +12,13 @@ export function setLoginState(result) {
 }
 
 export function getLoginState() {
-  return JSON.parse(sessionStorage.getItem('loginState') || 'null');
+  // CR-F6: tratar JSON corrompido sem quebrar a app
+  try {
+    return JSON.parse(sessionStorage.getItem('loginState') || 'null');
+  } catch {
+    sessionStorage.removeItem('loginState');
+    return null;
+  }
 }
 
 export function clearAuth() {
@@ -81,7 +87,12 @@ export const auth = {
     request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true }),
 
   logout: async () => {
-    try { await request('/api/auth/logout', { method: 'POST' }); } catch {}
+    // CR-F2: logar falha de logout — sessão do servidor pode permanecer ativa
+    try {
+      await request('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Falha ao invalidar sessão no servidor:', err);
+    }
     clearAuth();
   },
 

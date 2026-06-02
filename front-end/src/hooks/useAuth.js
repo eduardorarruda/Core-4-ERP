@@ -12,8 +12,9 @@ export function useAuth() {
     return () => window.removeEventListener('auth-change', sync);
   }, []);
 
+  // CR-F2: logout não silencia erro — sessão do servidor deve ser invalidada
   const logout = useCallback(async () => {
-    try { await auth.logout(); } catch {}
+    await auth.logout();
     clearAuth();
     navigate('/login');
   }, [navigate]);
@@ -21,12 +22,11 @@ export function useAuth() {
   // Permissões efetivas da empresa atual (primeira da lista ao fazer login)
   const permissoes = new Set(loginState?.empresas?.[0]?.permissoes ?? []);
 
+  // CR-F7: deps completas — permissoes incluída para evitar stale closure
   const temPermissao = useCallback((codigo) => {
-    // Admin sistema tem tudo
     if (loginState?.adminSistema) return true;
     return permissoes.has(codigo);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loginState]);
+  }, [loginState, permissoes]);
 
   return {
     usuario: loginState?.usuario ?? null,

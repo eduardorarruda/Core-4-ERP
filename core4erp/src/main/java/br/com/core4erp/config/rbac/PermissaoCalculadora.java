@@ -13,15 +13,15 @@ public class PermissaoCalculadora {
     public Set<String> calcular(Set<String> doPerfil, List<UsuarioEmpresaPermissao> diretas) {
         Set<String> efetivas = new HashSet<>(doPerfil);
 
-        diretas.stream()
-            .filter(p -> !p.getRevogada())
-            .map(p -> p.getPermissao().getCodigo())
-            .forEach(efetivas::add);
-
-        diretas.stream()
-            .filter(UsuarioEmpresaPermissao::getRevogada)
-            .map(p -> p.getPermissao().getCodigo())
-            .forEach(efetivas::remove);
+        // CR-B11: única passagem pela lista — add concessões, remove revogações
+        diretas.forEach(direta -> {
+            String codigo = direta.getPermissao().getCodigo();
+            if (Boolean.TRUE.equals(direta.getRevogada())) {
+                efetivas.remove(codigo);
+            } else {
+                efetivas.add(codigo);
+            }
+        });
 
         return efetivas;
     }
