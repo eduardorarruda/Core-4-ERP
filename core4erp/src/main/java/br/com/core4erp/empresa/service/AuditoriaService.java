@@ -42,7 +42,7 @@ public class AuditoriaService {
         a.setValorNovo(toJsonSanitizado(valorNovo));
         a.setIpAddress(MDC.get("ipAddress"));
         a.setRequestId(MDC.get("requestId"));
-        a.setTimestamp(LocalDateTime.now());
+        a.setDataHora(LocalDateTime.now());
         auditoriaRepository.save(a);
     }
 
