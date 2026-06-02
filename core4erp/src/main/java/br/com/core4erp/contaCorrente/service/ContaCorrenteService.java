@@ -1,6 +1,7 @@
 package br.com.core4erp.contaCorrente.service;
 
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteRequestDto;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteResponseDto;
 import br.com.core4erp.contaCorrente.dto.TransferenciaRequestDto;
@@ -23,18 +24,21 @@ public class ContaCorrenteService {
     private final ContaCorrenteRepository repository;
     private final TransferenciaRepository transferenciaRepository;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public ContaCorrenteService(ContaCorrenteRepository repository,
                                 TransferenciaRepository transferenciaRepository,
-                                SecurityContextUtils securityCtx) {
+                                SecurityContextUtils securityCtx,
+                                TenantContext tenantCtx) {
         this.repository = repository;
         this.transferenciaRepository = transferenciaRepository;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Transactional(readOnly = true)
     public List<ContaCorrenteResponseDto> listar() {
-        return repository.findAllByUsuarioId(securityCtx.getUsuarioId())
+        return repository.findAllByEmpresaId(tenantCtx.getEmpresaId())
                 .stream().map(ContaCorrenteResponseDto::from).toList();
     }
 
@@ -45,8 +49,8 @@ public class ContaCorrenteService {
 
     @Transactional
     public ContaCorrenteResponseDto criar(ContaCorrenteRequestDto dto) {
-        Long usuarioId = securityCtx.getUsuarioId();
-        if (repository.existsByNumeroContaAndUsuarioId(dto.numeroConta(), usuarioId)) {
+        Long empresaId = tenantCtx.getEmpresaId();
+        if (repository.existsByNumeroContaAndEmpresaId(dto.numeroConta(), empresaId)) {
             throw new IllegalArgumentException("Número de conta já cadastrado");
         }
         validarSaldo(dto);
@@ -71,15 +75,15 @@ public class ContaCorrenteService {
 
     @Transactional
     public TransferenciaResponseDto transferir(TransferenciaRequestDto dto) {
-        Long usuarioId = securityCtx.getUsuarioId();
+        Long empresaId = tenantCtx.getEmpresaId();
 
         if (dto.contaOrigemId().equals(dto.contaDestinoId())) {
             throw new IllegalArgumentException("Conta origem e destino não podem ser iguais");
         }
 
-        ContaCorrente origem = repository.findByIdAndUsuarioId(dto.contaOrigemId(), usuarioId)
+        ContaCorrente origem = repository.findByIdAndEmpresaId(dto.contaOrigemId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Conta origem não encontrada"));
-        ContaCorrente destino = repository.findByIdAndUsuarioId(dto.contaDestinoId(), usuarioId)
+        ContaCorrente destino = repository.findByIdAndEmpresaId(dto.contaDestinoId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Conta destino não encontrada"));
 
         if (!Boolean.TRUE.equals(origem.getPermitirSaldoNegativo())
@@ -105,14 +109,14 @@ public class ContaCorrenteService {
     @Transactional(readOnly = true)
     public List<TransferenciaResponseDto> listarTransferencias() {
         return transferenciaRepository
-                .findAllByUsuarioIdOrderByDataTransferenciaDesc(securityCtx.getUsuarioId())
+                .findAllByEmpresaIdOrderByDataTransferenciaDesc(tenantCtx.getEmpresaId())
                 .stream().map(TransferenciaResponseDto::from).toList();
     }
 
     @Transactional
     public TransferenciaResponseDto atualizarTransferencia(Long id, TransferenciaRequestDto dto) {
-        Long usuarioId = securityCtx.getUsuarioId();
-        Transferencia transferencia = transferenciaRepository.findByIdAndUsuarioId(id, usuarioId)
+        Long empresaId = tenantCtx.getEmpresaId();
+        Transferencia transferencia = transferenciaRepository.findByIdAndEmpresaId(id, empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Transferência não encontrada: " + id));
 
         if (dto.contaOrigemId().equals(dto.contaDestinoId())) {
@@ -128,9 +132,9 @@ public class ContaCorrenteService {
         repository.save(destinoAntigo);
 
         // Aplicar nova transferência
-        ContaCorrente novaOrigem = repository.findByIdAndUsuarioId(dto.contaOrigemId(), usuarioId)
+        ContaCorrente novaOrigem = repository.findByIdAndEmpresaId(dto.contaOrigemId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Conta origem não encontrada"));
-        ContaCorrente novoDestino = repository.findByIdAndUsuarioId(dto.contaDestinoId(), usuarioId)
+        ContaCorrente novoDestino = repository.findByIdAndEmpresaId(dto.contaDestinoId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Conta destino não encontrada"));
 
         if (!Boolean.TRUE.equals(novaOrigem.getPermitirSaldoNegativo())
@@ -153,8 +157,7 @@ public class ContaCorrenteService {
 
     @Transactional
     public void deletarTransferencia(Long id) {
-        Long usuarioId = securityCtx.getUsuarioId();
-        Transferencia transferencia = transferenciaRepository.findByIdAndUsuarioId(id, usuarioId)
+        Transferencia transferencia = transferenciaRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Transferência não encontrada: " + id));
 
         // Estornar saldos
@@ -169,7 +172,7 @@ public class ContaCorrenteService {
     }
 
     public ContaCorrente findOwned(Long id) {
-        return repository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return repository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conta corrente não encontrada: " + id));
     }
 

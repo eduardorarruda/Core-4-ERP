@@ -2,6 +2,7 @@ package br.com.core4erp.investimento.service;
 
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.investimento.dto.TipoInvestimentoRequestDto;
 import br.com.core4erp.investimento.dto.TipoInvestimentoResponseDto;
 import br.com.core4erp.investimento.entity.TipoInvestimentoCustom;
@@ -17,16 +18,20 @@ public class TipoInvestimentoService {
 
     private final TipoInvestimentoRepository tipoRepo;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
-    public TipoInvestimentoService(TipoInvestimentoRepository tipoRepo, SecurityContextUtils securityCtx) {
+    public TipoInvestimentoService(TipoInvestimentoRepository tipoRepo,
+                                   SecurityContextUtils securityCtx,
+                                   TenantContext tenantCtx) {
         this.tipoRepo = tipoRepo;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     @Transactional(readOnly = true)
     public List<TipoInvestimentoResponseDto> listar() {
-        return tipoRepo.findAllByUsuarioId(securityCtx.getUsuarioId())
+        return tipoRepo.findAllByEmpresaId(tenantCtx.getEmpresaId())
                 .stream().map(TipoInvestimentoResponseDto::from).toList();
     }
 
@@ -55,7 +60,7 @@ public class TipoInvestimentoService {
     }
 
     public TipoInvestimentoCustom findOwned(Long id) {
-        return tipoRepo.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return tipoRepo.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Tipo de investimento não encontrado: " + id));
     }
 }

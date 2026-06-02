@@ -12,8 +12,8 @@ public final class ContaSpec {
 
     private ContaSpec() {}
 
-    public static Specification<Conta> usuarioId(Long uid) {
-        return (r, q, cb) -> cb.equal(r.get("usuario").get("id"), uid);
+    public static Specification<Conta> empresaId(Long eid) {
+        return (r, q, cb) -> cb.equal(r.get("empresaId"), eid);
     }
 
     public static Specification<Conta> tipo(TipoConta tipo) {

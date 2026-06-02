@@ -12,21 +12,21 @@ import java.util.Optional;
 
 public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long> {
 
-    Optional<FaturaCartao> findByCartaoCreditoIdAndMesAndAnoAndUsuarioId(
-            Long cartaoCreditoId, Integer mes, Integer ano, Long usuarioId);
+    Optional<FaturaCartao> findByCartaoCreditoIdAndMesAndAnoAndEmpresaId(
+            Long cartaoCreditoId, Integer mes, Integer ano, Long empresaId);
 
-    List<FaturaCartao> findAllByCartaoCreditoIdAndUsuarioId(Long cartaoCreditoId, Long usuarioId);
+    List<FaturaCartao> findAllByCartaoCreditoIdAndEmpresaId(Long cartaoCreditoId, Long empresaId);
 
     Optional<FaturaCartao> findByContaId(Long contaId);
 
-    boolean existsByCartaoCreditoIdAndMesAndAnoAndUsuarioIdAndStatus(
-            Long cartaoCreditoId, Integer mes, Integer ano, Long usuarioId, StatusFatura status);
+    boolean existsByCartaoCreditoIdAndMesAndAnoAndEmpresaIdAndStatus(
+            Long cartaoCreditoId, Integer mes, Integer ano, Long empresaId, StatusFatura status);
 
     @Query("""
         SELECT COALESCE(SUM(c.valorOriginal), 0) FROM FaturaCartao f
         JOIN f.conta c
-        WHERE f.usuario.id = :uid AND f.status = 'FECHADA'
+        WHERE f.empresaId = :eid AND f.status = 'FECHADA'
         AND c.status IN ('PENDENTE', 'ATRASADO')
     """)
-    BigDecimal sumFaturasFechadasPendentesByUsuario(@Param("uid") Long uid);
+    BigDecimal sumFaturasFechadasPendentesByEmpresa(@Param("eid") Long eid);
 }

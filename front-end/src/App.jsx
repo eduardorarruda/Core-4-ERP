@@ -11,6 +11,7 @@ import { getUsuario } from './lib/api';
 import { useAuth } from './hooks/useAuth';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
+import { getFirstAccessibleRoute } from './lib/routeUtils';
 
 const Dashboard         = lazy(() => import('./views/Dashboard'));
 const Login             = lazy(() => import('./views/Login'));
@@ -60,10 +61,15 @@ function isAuthenticated() {
   return Boolean(sessionStorage.getItem('usuario'));
 }
 
+function NavigateToFirstAccessible() {
+  const { temPermissao } = useAuth();
+  return <Navigate to={getFirstAccessibleRoute(temPermissao)} replace />;
+}
+
 function AdminRoute({ children }) {
   const { adminSistema } = useAuth();
   if (!adminSistema) {
-    return <Navigate to="/dashboard" replace />;
+    return <NavigateToFirstAccessible />;
   }
   return children;
 }
@@ -71,7 +77,15 @@ function AdminRoute({ children }) {
 function PermissaoRoute({ permissao, children }) {
   const { temPermissao } = useAuth();
   if (!temPermissao(permissao)) {
-    return <Navigate to="/dashboard" replace />;
+    return <NavigateToFirstAccessible />;
+  }
+  return children;
+}
+
+function ContaEmpresaRoute({ children }) {
+  const { tipoConta } = useAuth();
+  if (tipoConta === 'PESSOA_FISICA') {
+    return <NavigateToFirstAccessible />;
   }
   return children;
 }
@@ -188,7 +202,7 @@ export default function App() {
             <Route path="/pagamento"          element={<PagamentoMock />} />
             <Route path="/aceitar-convite"    element={<AceitarConvite />} />
 
-            <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
+            <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><Dashboard /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/conciliacao"              element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
             <Route path="/conciliacao/historico"   element={<ProtectedLayout><ConciliacaoHistorico /></ProtectedLayout>} />
             <Route path="/conciliacao/:id"          element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
@@ -196,7 +210,7 @@ export default function App() {
             <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
             <Route path="/calendario"       element={<ProtectedLayout><PermissaoRoute permissao="CALENDARIO_VISUALIZAR"><Calendario /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
-            <Route path="/audit"            element={<ProtectedLayout><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/audit"            element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
             <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
             <Route path="/categorias"       element={<ProtectedLayout><PermissaoRoute permissao="CATEGORIA_VISUALIZAR"><Categorias /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
@@ -211,11 +225,11 @@ export default function App() {
             <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
             <Route path="/admin/planos"       element={<ProtectedLayout><AdminRoute><GestaoPlanos /></AdminRoute></ProtectedLayout>} />
-            <Route path="/empresa/operadores" element={<ProtectedLayout><PermissaoRoute permissao="USUARIO_VISUALIZAR"><GestaoOperadores /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/empresa/perfis"     element={<ProtectedLayout><PermissaoRoute permissao="CONFIGURACAO_EDITAR"><GestaoPerfis /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/empresa/operadores" element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="USUARIO_VISUALIZAR"><GestaoOperadores /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
+            <Route path="/empresa/perfis"     element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="CONFIGURACAO_EDITAR"><GestaoPerfis /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
 
-            <Route path="/"  element={<Navigate to="/dashboard" replace />} />
-            <Route path="*"  element={<Navigate to="/dashboard" replace />} />
+            <Route path="/"  element={<NavigateToFirstAccessible />} />
+            <Route path="*"  element={<NavigateToFirstAccessible />} />
           </Routes>
           </Suspense>
           </ErrorBoundary>

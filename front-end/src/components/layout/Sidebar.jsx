@@ -40,9 +40,9 @@ const NAV_GROUPS = [
   {
     label: 'Admin',
     items: [
-      { id: 'audit',       icon: Gavel,    label: 'Auditoria',       path: '/audit',              permissao: 'AUDITORIA_VISUALIZAR' },
-      { id: 'operadores',  icon: UserCog,  label: 'Operadores',      path: '/empresa/operadores', permissao: 'USUARIO_VISUALIZAR', empresaOnly: true },
-      { id: 'perfis',      icon: ShieldCheck, label: 'Perfis de Acesso', path: '/empresa/perfis', permissao: 'CONFIGURACAO_EDITAR' },
+      { id: 'audit',       icon: Gavel,    label: 'Auditoria',       path: '/audit',              permissao: 'AUDITORIA_VISUALIZAR', empresaOnly: true },
+      { id: 'operadores',  icon: UserCog,  label: 'Operadores',      path: '/empresa/operadores', permissao: 'USUARIO_VISUALIZAR',   empresaOnly: true },
+      { id: 'perfis',      icon: ShieldCheck, label: 'Perfis de Acesso', path: '/empresa/perfis', permissao: 'CONFIGURACAO_EDITAR',  empresaOnly: true },
       { id: 'adm-planos',  icon: Layers,   label: 'Gestão de Planos',path: '/admin/planos',       adminSistemaOnly: true },
     ],
   },
@@ -86,9 +86,9 @@ function BrandMark({ expanded }) {
 }
 
 const CARTAO_SUB_ITEMS = [
-  { label: 'Dashboard',    path: '/cartoes/dashboard',  permissao: 'CARTAO_VISUALIZAR' },
-  { label: 'Lançamentos',  path: '/cartoes',             permissao: 'CARTAO_LANCAR' },
-  { label: 'Conciliação',  path: '/cartoes/conciliacao', permissao: 'CARTAO_CONCILIACAO_VISUALIZAR' },
+  { label: 'Dashboard',   path: '/cartoes/dashboard',  permissao: 'CARTAO_VISUALIZAR',             icon: LayoutDashboard },
+  { label: 'Lançamentos', path: '/cartoes',             permissao: 'CARTAO_LANCAR',                 icon: FileText },
+  { label: 'Conciliação', path: '/cartoes/conciliacao', permissao: 'CARTAO_CONCILIACAO_VISUALIZAR', icon: GitMerge },
 ];
 
 function CartaoDropdown({ onClose, temPermissao }) {
@@ -124,11 +124,16 @@ function CartaoDropdown({ onClose, temPermissao }) {
               onClick={onClose}
               title={sub.label}
               className={({ isActive: a }) => cn(
-                'w-full px-3 py-2 flex items-center rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono',
+                'w-full px-3 py-2 flex items-center gap-2 rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono',
                 a ? 'text-primary' : 'text-text-primary/40 hover:text-text-primary'
               )}
             >
-              {sub.label}
+              {({ isActive: a }) => (
+                <>
+                  <sub.icon className={cn('w-4 h-4 shrink-0 transition-colors', a && 'text-primary')} />
+                  {sub.label}
+                </>
+              )}
             </NavLink>
           ))}
         </div>

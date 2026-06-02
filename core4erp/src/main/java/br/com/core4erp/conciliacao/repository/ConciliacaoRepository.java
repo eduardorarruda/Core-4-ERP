@@ -9,9 +9,9 @@ import java.util.Optional;
 
 public interface ConciliacaoRepository extends JpaRepository<Conciliacao, Long> {
 
-    List<Conciliacao> findAllByUsuarioIdOrderByDataConciliacaoDesc(Long usuarioId);
+    List<Conciliacao> findAllByEmpresaIdOrderByDataConciliacaoDesc(Long empresaId);
 
-    Optional<Conciliacao> findByIdAndUsuarioId(Long id, Long usuarioId);
+    Optional<Conciliacao> findByIdAndEmpresaId(Long id, Long empresaId);
 
-    boolean existsByIdAndUsuarioIdAndStatus(Long id, Long usuarioId, StatusConciliacao status);
+    boolean existsByIdAndEmpresaIdAndStatus(Long id, Long empresaId, StatusConciliacao status);
 }

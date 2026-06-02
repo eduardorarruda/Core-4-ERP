@@ -17,11 +17,15 @@ public class PerfilAcesso {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false, length = 50)
+    @Column(nullable = false, length = 50)
     private String nome;
 
     @Column(length = 200)
     private String descricao;
+
+    // NULL = perfil do sistema (global); NOT NULL = perfil customizado da empresa
+    @Column(name = "empresa_id")
+    private Long empresaId;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

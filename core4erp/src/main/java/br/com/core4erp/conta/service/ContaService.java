@@ -4,6 +4,7 @@ import br.com.core4erp.cartaoCredito.service.FaturaCartaoService;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
@@ -47,6 +48,7 @@ public class ContaService {
     private final ContaCorrenteRepository contaCorrenteRepository;
     private final FaturaCartaoService faturaCartaoService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public ContaService(ContaRepository contaRepository,
                         ContaBaixadaRepository baixadaRepository,
@@ -55,7 +57,8 @@ public class ContaService {
                         ContaCorrenteService contaCorrenteService,
                         ContaCorrenteRepository contaCorrenteRepository,
                         FaturaCartaoService faturaCartaoService,
-                        SecurityContextUtils securityCtx) {
+                        SecurityContextUtils securityCtx,
+                        TenantContext tenantCtx) {
         this.contaRepository = contaRepository;
         this.baixadaRepository = baixadaRepository;
         this.categoriaRepository = categoriaRepository;
@@ -64,17 +67,18 @@ public class ContaService {
         this.contaCorrenteRepository = contaCorrenteRepository;
         this.faturaCartaoService = faturaCartaoService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Transactional(readOnly = true)
     public Page<ContaResponseDto> listar(Pageable pageable) {
-        return contaRepository.findAllByUsuarioId(securityCtx.getUsuarioId(), pageable)
+        return contaRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), pageable)
                 .map(ContaResponseDto::from);
     }
 
     @Transactional(readOnly = true)
     public Page<ContaResponseDto> listarPorTipo(TipoConta tipo, Pageable pageable) {
-        return contaRepository.findAllByUsuarioIdAndTipo(securityCtx.getUsuarioId(), tipo, pageable)
+        return contaRepository.findAllByEmpresaIdAndTipo(tenantCtx.getEmpresaId(), tipo, pageable)
                 .map(ContaResponseDto::from);
     }
 
@@ -85,7 +89,7 @@ public class ContaService {
             Long parceiroId, BigDecimal valorMin, BigDecimal valorMax,
             Long categoriaId, Pageable pageable) {
 
-        Specification<Conta> spec = ContaSpec.usuarioId(securityCtx.getUsuarioId());
+        Specification<Conta> spec = ContaSpec.empresaId(tenantCtx.getEmpresaId());
         if (tipo != null)               spec = spec.and(ContaSpec.tipo(tipo));
         if (status != null)             spec = spec.and(ContaSpec.status(status));
         if (numeroDocumento != null && !numeroDocumento.isBlank())
@@ -113,14 +117,14 @@ public class ContaService {
     @Transactional
     public List<ContaResponseDto> criar(ContaCreateDto dto) {
         Usuario usuario = securityCtx.getUsuario();
-        Long usuarioId = usuario.getId();
+        Long empresaId = tenantCtx.getEmpresaId();
 
-        Categoria categoria = categoriaRepository.findByIdAndUsuarioId(dto.categoriaId(), usuarioId)
+        Categoria categoria = categoriaRepository.findByIdAndEmpresaId(dto.categoriaId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
 
         Parceiro parceiro = null;
         if (dto.parceiroId() != null) {
-            parceiro = parceiroRepository.findByIdAndUsuarioId(dto.parceiroId(), usuarioId)
+            parceiro = parceiroRepository.findByIdAndEmpresaId(dto.parceiroId(), empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         }
 
@@ -168,12 +172,12 @@ public class ContaService {
                     "Não é possível editar uma conta conciliada via extrato bancário");
         }
 
-        Long usuarioId = securityCtx.getUsuarioId();
-        Categoria categoria = categoriaRepository.findByIdAndUsuarioId(dto.categoriaId(), usuarioId)
+        Long empresaId = tenantCtx.getEmpresaId();
+        Categoria categoria = categoriaRepository.findByIdAndEmpresaId(dto.categoriaId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
         Parceiro parceiro = null;
         if (dto.parceiroId() != null) {
-            parceiro = parceiroRepository.findByIdAndUsuarioId(dto.parceiroId(), usuarioId)
+            parceiro = parceiroRepository.findByIdAndEmpresaId(dto.parceiroId(), empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         }
 
@@ -290,7 +294,7 @@ public class ContaService {
     }
 
     private Conta findOwned(Long id) {
-        return contaRepository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return contaRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conta não encontrada: " + id));
     }
 

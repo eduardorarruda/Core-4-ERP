@@ -6,12 +6,14 @@ import br.com.core4erp.auth.dto.EsqueciSenhaResponseDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
+import br.com.core4erp.auth.dto.PermissoesAtuaisResponseDto;
 import br.com.core4erp.auth.dto.RedefinirSenhaRequestDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.auth.dto.TrocarSenhaRequestDto;
 import br.com.core4erp.auth.service.AuthService;
 import br.com.core4erp.auth.service.PasswordResetService;
 import br.com.core4erp.auth.service.ProfileService;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.empresa.dto.EmpresaResumoDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +38,7 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final ProfileService profileService;
+    private final TenantContext tenantCtx;
 
     @Value("${jwt.expiration}")
     private long tokenExpiration;
@@ -45,10 +48,12 @@ public class AuthController {
 
     public AuthController(AuthService authService,
                           PasswordResetService passwordResetService,
-                          ProfileService profileService) {
+                          ProfileService profileService,
+                          TenantContext tenantCtx) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
         this.profileService = profileService;
+        this.tenantCtx = tenantCtx;
     }
 
     @Operation(summary = "Registrar novo usuário")
@@ -86,6 +91,15 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<MeResponseDto> me(Authentication authentication) {
         return ResponseEntity.ok(authService.me(authentication.getName()));
+    }
+
+    @Operation(summary = "Retorna as permissões efetivas do usuário na empresa atual")
+    @GetMapping("/me/permissoes")
+    public ResponseEntity<PermissoesAtuaisResponseDto> minhasPermissoes() {
+        return ResponseEntity.ok(new PermissoesAtuaisResponseDto(
+                tenantCtx.getPermissoes(),
+                tenantCtx.getPerfilNome()
+        ));
     }
 
     @Operation(summary = "Solicitar recuperação de senha — gera token e envia por e-mail")

@@ -101,6 +101,8 @@ export const auth = {
 
   me: () => request('/api/auth/me'),
 
+  refreshPermissoes: () => request('/api/auth/me/permissoes'),
+
   esqueciSenha: (email) =>
     request('/api/auth/esqueci-senha', { method: 'POST', body: JSON.stringify({ email }), skipAuthRedirect: true }),
 
@@ -150,7 +152,7 @@ export const operadores = {
     return request(`/api/empresa/operadores${qs ? `?${qs}` : ''}`);
   },
   alterarPerfil: (usuarioId, perfilId) =>
-    request(`/api/empresa/operadores/${usuarioId}/perfil`, { method: 'PUT', body: JSON.stringify({ perfilId }) }),
+    request(`/api/empresa/operadores/${usuarioId}/perfil`, { method: 'PATCH', body: JSON.stringify({ perfilId }) }),
   remover: (usuarioId) =>
     request(`/api/empresa/operadores/${usuarioId}/remover`, { method: 'PATCH' }),
   reativar: (usuarioId) =>

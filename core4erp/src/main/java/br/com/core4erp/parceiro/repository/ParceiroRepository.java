@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
-    List<Parceiro> findAllByUsuarioId(Long usuarioId);
-    Page<Parceiro> findAllByUsuarioId(Long usuarioId, Pageable pageable);
-    Optional<Parceiro> findByIdAndUsuarioId(Long id, Long usuarioId);
-    boolean existsByCpfCnpjAndUsuarioId(String cpfCnpj, Long usuarioId);
-    boolean existsByCpfCnpjAndUsuarioIdAndIdNot(String cpfCnpj, Long usuarioId, Long id);
+    List<Parceiro> findAllByEmpresaId(Long empresaId);
+    Page<Parceiro> findAllByEmpresaId(Long empresaId, Pageable pageable);
+    Optional<Parceiro> findByIdAndEmpresaId(Long id, Long empresaId);
+    boolean existsByCpfCnpjAndEmpresaId(String cpfCnpj, Long empresaId);
+    boolean existsByCpfCnpjAndEmpresaIdAndIdNot(String cpfCnpj, Long empresaId, Long id);
 }

@@ -8,7 +8,7 @@ import java.util.Optional;
 
 public interface TransferenciaRepository extends JpaRepository<Transferencia, Long> {
 
-    List<Transferencia> findAllByUsuarioIdOrderByDataTransferenciaDesc(Long usuarioId);
+    List<Transferencia> findAllByEmpresaIdOrderByDataTransferenciaDesc(Long empresaId);
 
-    Optional<Transferencia> findByIdAndUsuarioId(Long id, Long usuarioId);
+    Optional<Transferencia> findByIdAndEmpresaId(Long id, Long empresaId);
 }

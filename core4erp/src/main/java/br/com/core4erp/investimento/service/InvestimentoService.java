@@ -2,6 +2,7 @@ package br.com.core4erp.investimento.service;
 
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
@@ -27,17 +28,20 @@ public class InvestimentoService {
     private final ContaCorrenteService contaCorrenteService;
     private final TipoInvestimentoService tipoService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public InvestimentoService(ContaInvestimentoRepository contaRepo,
                                TransacaoInvestimentoRepository transacaoRepo,
                                ContaCorrenteService contaCorrenteService,
                                TipoInvestimentoService tipoService,
-                               SecurityContextUtils securityCtx) {
+                               SecurityContextUtils securityCtx,
+                               TenantContext tenantCtx) {
         this.contaRepo = contaRepo;
         this.transacaoRepo = transacaoRepo;
         this.contaCorrenteService = contaCorrenteService;
         this.tipoService = tipoService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     // ── Contas de Investimento ────────────────────────────────────────────────
@@ -45,7 +49,7 @@ public class InvestimentoService {
     @Requer("INVESTIMENTO_VISUALIZAR")
     @Transactional(readOnly = true)
     public List<ContaInvestimentoResponseDto> listar() {
-        return contaRepo.findAllByUsuarioId(securityCtx.getUsuarioId())
+        return contaRepo.findAllByEmpresaId(tenantCtx.getEmpresaId())
                 .stream().map(ContaInvestimentoResponseDto::from).toList();
     }
 
@@ -93,7 +97,7 @@ public class InvestimentoService {
     @Transactional(readOnly = true)
     public List<TransacaoInvestimentoResponseDto> listarTransacoes(Long contaId) {
         findOwnedConta(contaId);
-        return transacaoRepo.findAllByContaInvestimentoIdAndUsuarioId(contaId, securityCtx.getUsuarioId())
+        return transacaoRepo.findAllByContaInvestimentoIdAndEmpresaId(contaId, tenantCtx.getEmpresaId())
                 .stream().map(TransacaoInvestimentoResponseDto::from).toList();
     }
 
@@ -145,7 +149,7 @@ public class InvestimentoService {
     }
 
     private ContaInvestimento findOwnedConta(Long id) {
-        return contaRepo.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return contaRepo.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conta de investimento não encontrada: " + id));
     }
 }

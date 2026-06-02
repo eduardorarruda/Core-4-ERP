@@ -11,12 +11,12 @@ import java.util.Optional;
 
 public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCartao, Long> {
 
-    List<LancamentoCartao> findAllByCartaoCreditoIdAndUsuarioId(Long cartaoId, Long usuarioId);
+    List<LancamentoCartao> findAllByCartaoCreditoIdAndEmpresaId(Long cartaoId, Long empresaId);
 
-    List<LancamentoCartao> findAllByCartaoCreditoIdAndUsuarioIdAndMesFaturaAndAnoFatura(
-            Long cartaoId, Long usuarioId, Integer mes, Integer ano);
+    List<LancamentoCartao> findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(
+            Long cartaoId, Long empresaId, Integer mes, Integer ano);
 
-    Optional<LancamentoCartao> findByIdAndCartaoCreditoIdAndUsuarioId(Long id, Long cartaoId, Long usuarioId);
+    Optional<LancamentoCartao> findByIdAndCartaoCreditoIdAndEmpresaId(Long id, Long cartaoId, Long empresaId);
 
     boolean existsByCartaoCreditoId(Long cartaoId);
 
@@ -39,21 +39,21 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                          @Param("anoFim") Integer anoFim);
 
     @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
-           "WHERE l.usuario.id = :uid " +
+           "WHERE l.empresaId = :eid " +
            "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
            "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)")
-    BigDecimal sumValorByUsuarioAndPeriod(@Param("uid") Long uid,
+    BigDecimal sumValorByEmpresaAndPeriod(@Param("eid") Long eid,
                                           @Param("mesInicio") Integer mesInicio,
                                           @Param("anoInicio") Integer anoInicio,
                                           @Param("mesFim") Integer mesFim,
                                           @Param("anoFim") Integer anoFim);
 
     @Query("SELECT l FROM LancamentoCartao l " +
-           "WHERE l.usuario.id = :uid " +
+           "WHERE l.empresaId = :eid " +
            "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
            "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim) " +
            "ORDER BY l.anoFatura, l.mesFatura, l.dataCompra")
-    List<LancamentoCartao> findByUsuarioIdAndFaturaPeriod(@Param("uid") Long uid,
+    List<LancamentoCartao> findByEmpresaIdAndFaturaPeriod(@Param("eid") Long eid,
                                                           @Param("mesInicio") Integer mesInicio,
                                                           @Param("anoInicio") Integer anoInicio,
                                                           @Param("mesFim") Integer mesFim,
@@ -62,12 +62,12 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
     /** Single query returning [cartaoId, sumValor] for a set of cards — avoids N+1 in listar(). */
     @Query("SELECT l.cartaoCredito.id, COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
            "WHERE l.cartaoCredito.id IN :cartaoIds " +
-           "AND l.usuario.id = :uid " +
+           "AND l.empresaId = :eid " +
            "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
            "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim) " +
            "GROUP BY l.cartaoCredito.id")
     List<Object[]> sumValorByCartaoIdsAndPeriod(@Param("cartaoIds") List<Long> cartaoIds,
-                                                @Param("uid") Long uid,
+                                                @Param("eid") Long eid,
                                                 @Param("mesInicio") Integer mesInicio,
                                                 @Param("anoInicio") Integer anoInicio,
                                                 @Param("mesFim") Integer mesFim,
@@ -75,37 +75,37 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
 
     @Query("""
         SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l
-        WHERE l.usuario.id = :uid
+        WHERE l.empresaId = :eid
         AND NOT EXISTS (
             SELECT 1 FROM FaturaCartao f
             WHERE f.cartaoCredito.id = l.cartaoCredito.id
             AND f.mes = l.mesFatura AND f.ano = l.anoFatura
-            AND f.status = 'FECHADA' AND f.usuario.id = :uid
+            AND f.status = 'FECHADA' AND f.empresaId = :eid
         )
     """)
-    BigDecimal sumLancamentosEmFaturasAbertasByUsuario(@Param("uid") Long uid);
+    BigDecimal sumLancamentosEmFaturasAbertasByEmpresa(@Param("eid") Long eid);
 
     @Query("""
         SELECT l FROM LancamentoCartao l
         WHERE l.cartaoCredito.id = :cartaoId
-        AND l.usuario.id = :uid
+        AND l.empresaId = :eid
         AND l.dataCompra BETWEEN :dataMin AND :dataMax
     """)
     List<LancamentoCartao> findCandidatasParaConciliacao(@Param("cartaoId") Long cartaoId,
-                                                         @Param("uid") Long uid,
+                                                         @Param("eid") Long eid,
                                                          @Param("dataMin") java.time.LocalDate dataMin,
                                                          @Param("dataMax") java.time.LocalDate dataMax);
 
     @Query("""
         SELECT l.categoria.descricao, l.mesFatura, l.anoFatura, COALESCE(SUM(l.valor), 0)
         FROM LancamentoCartao l
-        WHERE l.usuario.id = :uid
+        WHERE l.empresaId = :eid
         AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
         AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
         GROUP BY l.categoria.descricao, l.mesFatura, l.anoFatura
         ORDER BY l.anoFatura, l.mesFatura, l.categoria.descricao
     """)
-    List<Object[]> resumoDashboardPorCategoria(@Param("uid") Long uid,
+    List<Object[]> resumoDashboardPorCategoria(@Param("eid") Long eid,
                                                @Param("mesInicio") Integer mesInicio,
                                                @Param("anoInicio") Integer anoInicio,
                                                @Param("mesFim") Integer mesFim,

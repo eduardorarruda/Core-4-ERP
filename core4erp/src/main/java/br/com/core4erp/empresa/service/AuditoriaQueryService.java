@@ -28,6 +28,8 @@ public class AuditoriaQueryService {
             Long usuarioId, LocalDate dataInicio, LocalDate dataFim,
             Pageable pageable) {
 
+        tenantCtx.exigirContaEmpresa();
+
         LocalDateTime inicio = dataInicio != null ? dataInicio.atStartOfDay() : null;
         LocalDateTime fim = dataFim != null ? dataFim.atTime(23, 59, 59) : null;
 

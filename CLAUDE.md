@@ -146,9 +146,10 @@ lib/          → utilitários puros (api.js, formatters.js, pdfUtils.js)
 ```
 src/hooks/useAuth.js         — hook central: temPermissao(), adminSistema, senhaProvisoria, logout
 src/lib/api.js               — fetch com credentials:include; getLoginState() com try-catch
-src/App.jsx                  — AdminRoute (adminSistema), PermissaoRoute (temPermissao), ProtectedLayout
+src/lib/routeUtils.js        — ROUTE_PRIORITY + getFirstAccessibleRoute(temPermissao)
+src/App.jsx                  — AdminRoute, PermissaoRoute, ContaEmpresaRoute, NavigateToFirstAccessible, ProtectedLayout
 src/components/layout/
-  Sidebar.jsx                — itens com {permissao: 'CODIGO'} filtrados por temPermissao()
+  Sidebar.jsx                — itens com {permissao: 'CODIGO', empresaOnly: true} filtrados
   TopNav.jsx                 — mostra "Admin Sistema" se adminSistema=true
 src/components/ui/
   PermissaoGuard.jsx         — renderização condicional (UX); validação real está no backend
@@ -160,19 +161,21 @@ src/components/ui/
 
 O projeto possui **dois níveis** de multi-tenancy: isolamento por usuário (dado financeiro) e isolamento por empresa (RBAC).
 
-### Nível 1 — Dados financeiros (por usuário)
+### Nível 1 — Dados financeiros (por empresa)
 
-**Todo dado financeiro pertence a um usuário.** Não existe dado compartilhado entre usuários.
+**Todo dado financeiro pertence a uma empresa.** Membros da mesma empresa compartilham acesso aos dados (controlado por permissões RBAC).
 
-- Todas as entidades financeiras possuem um campo `usuario` (`@ManyToOne`) ou `usuarioId` (`Long`).
-- **Toda query de repository DEVE filtrar por `usuarioId`** — nunca retorne dados sem esse filtro.
-- O `usuarioId` é extraído do JWT no `SecurityContext`, nunca aceito como parâmetro de request.
+- Todas as entidades financeiras estendem `TenantEntity` que possui `empresaId` (preenchido automaticamente pelo `TenantEntityListener` no `@PrePersist`).
+- **Toda query de repository DEVE filtrar por `empresaId`** — nunca retorne dados sem esse filtro.
+- O `empresaId` é obtido do `TenantContext`, nunca aceito como parâmetro de request.
 - Padrão de extração no service:
   ```java
-  Long usuarioId = ((UserDetailsImpl) SecurityContextHolder.getContext()
-      .getAuthentication().getPrincipal()).getId();
+  Long empresaId = tenantCtx.getEmpresaId();
+  return repo.findAllByEmpresaId(empresaId, pageable);
   ```
-- Violar este padrão é uma falha crítica de segurança.
+- O campo `usuario` nas entidades financeiras é o **creator/audit**, não o filtro de acesso.
+- Para PESSOA_FISICA: cada usuário tem sua própria empresa (criada em V22), então `empresaId` continua sendo único por usuário solo.
+- Violar este padrão é uma falha crítica de segurança (vazamento cross-tenant entre membros de empresas diferentes).
 
 ### Nível 2 — Empresas e RBAC (TenantContext)
 
@@ -240,7 +243,7 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 
 **Mapeamento tela → permissão (frontend):**
 ```
-/dashboard                  → sem PermissaoRoute (aterrissagem); SaldoDetalhadoPanel usa PermissaoGuard("DASHBOARD_CARTAO_VISUALIZAR")
+/dashboard                  → PermissaoRoute("DASHBOARD_VISUALIZAR"); SaldoDetalhadoPanel usa PermissaoGuard("DASHBOARD_CARTAO_VISUALIZAR")
 /cartoes/dashboard          → CARTAO_VISUALIZAR
 /cartoes (lançamentos)      → CARTAO_LANCAR
 /cartoes/conciliacao        → CARTAO_CONCILIACAO_VISUALIZAR
@@ -249,9 +252,9 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 /reports                    → sem PermissaoRoute; cada card usa PermissaoGuard(RELATORIO_*_VISUALIZAR)
                               botão Excel visível só com RELATORIO_*_EXPORTAR
 /calendario                 → CALENDARIO_VISUALIZAR
-/audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute, não AdminRoute)
-/empresa/operadores         → USUARIO_VISUALIZAR
-/empresa/perfis             → CONFIGURACAO_EDITAR
+/audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute + ContaEmpresaRoute)
+/empresa/operadores         → USUARIO_VISUALIZAR    (PermissaoRoute + ContaEmpresaRoute)
+/empresa/perfis             → CONFIGURACAO_EDITAR   (PermissaoRoute + ContaEmpresaRoute)
 /admin/planos               → AdminRoute (adminSistema)
 ```
 
@@ -348,7 +351,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V32** (V31 já existe).
+- **Próxima migration disponível: V33** (V32 já existe).
 
 **Sequência de migrations:**
 ```
@@ -381,6 +384,7 @@ V28     create_tb_pagamento_mock
 V29     fix_tipo_conta_to_varchar
 V30     add_calendario_e_cartao_conciliacao_permissions
 V31     add_relatorio_investimento_dashboard_permissions
+V32     add_empresa_id_to_perfil_acesso
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
@@ -618,9 +622,75 @@ Retorna `empresaId != null`. O `PermissaoAspect` verifica `isPopulado() || isAdm
 
 `shouldNotFilter()` retorna `false` para `/api/auth/login` — o rate limit **já está ativo**. O RateLimitFilter usa Bucket4j com 10 tentativas por IP por minuto.
 
+### Hibernate 6 + `@Query` com ORDER BY + Pageable com sort
+
+Hibernate 6 (Spring Boot 3.3.x) **não permite** `ORDER BY` hardcoded em `@Query` JPQL quando o método também recebe `Pageable` com sort — lança `QueryException` → HTTP 500.
+
+**Regra:** nunca colocar `ORDER BY` dentro de `@Query` JPQL quando o método aceita `Pageable`. Usar `@PageableDefault(sort = "campo", direction = Sort.Direction.DESC)` no controller como fallback de ordenação.
+
+```java
+// ❌ ERRADO — quebra quando Pageable tem sort
+@Query("SELECT a FROM Auditoria a WHERE ... ORDER BY a.timestamp DESC")
+Page<Auditoria> filtrar(..., Pageable pageable);
+
+// ✅ CORRETO — ordenação via Pageable
+@Query("SELECT a FROM Auditoria a WHERE ...")
+Page<Auditoria> filtrar(..., Pageable pageable);
+
+// No controller:
+@PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC)
+```
+
+### Perfis de acesso — isolamento por empresa (V32)
+
+Após a migration V32, `tb_perfil_acesso` tem campo `empresa_id` (nullable):
+- `empresa_id IS NULL` → perfil do sistema (global, imutável via API)
+- `empresa_id IS NOT NULL` → perfil customizado da empresa (visível e editável somente por ela)
+
+**Regra:** ao criar, atualizar ou deletar um `PerfilAcesso`, sempre verificar ownership: se `empresaId == null` → throw "Perfil do sistema não pode ser alterado"; se `empresaId != tenantCtx.getEmpresaId()` → throw `AcessoNegadoException`. A lógica `protegido` no DTO passou a ser `empresaId == null` (não mais por nome).
+
+### Permissões em sessão ativa — polling frontend
+
+O backend já invalida o cache Caffeine em mudanças individuais de permissão (explicitamente, antes de persistir) e tem TTL de 30s. O frontend **não faz refresh automático** de permissões — armazena em `sessionStorage` desde o login.
+
+**Solução implementada:** `useAuth.js` faz polling de `GET /api/auth/me/permissoes` a cada 30s e atualiza o `sessionStorage` via `setLoginState()`, disparando `auth-change` para re-render. O endpoint retorna as permissões calculadas pelo `TenantContext` (já corrigidas pelo TenantFilter a cada request).
+
 ### N+1 query com coleções JPA
 
 Iterar sobre uma lista de entidades e acessar uma coleção lazy em cada uma dispara N queries adicionais. Sintoma: logs cheios de `SELECT ... WHERE id = ?` repetidos. Solução: usar `JOIN FETCH` na query ou `@EntityGraph`. Nunca usar `FetchType.EAGER` como atalho — piora o problema em outros contextos.
+
+### Isolamento por empresa — dados financeiros usam empresaId, não usuarioId
+
+**Contexto:** após a migration V22 (`migrate_usuario_to_empresa`), cada usuário tem sua própria empresa. Empresas multi-usuário compartilham dados entre membros.
+
+**Regra:** queries de listagem/busca de dados financeiros devem filtrar por `tenantCtx.getEmpresaId()`, não por `securityCtx.getUsuarioId()`.
+
+- `findAllByEmpresaId(empresaId)` — listagem compartilhada pela empresa
+- `findByIdAndEmpresaId(id, empresaId)` — lookup com controle de acesso
+
+O campo `usuario` nas entidades (Conta, Categoria, etc.) permanece como creator/audit — não como filtro de acesso.
+
+**Padrão de serviço após migração:**
+```java
+Long eid = tenantCtx.getEmpresaId();
+return repo.findAllByEmpresaId(eid, pageable);
+```
+
+**Scheduler (SincronizacaoService):** itera `empresaRepository.findIdsAtivas()` — não mais `usuarioRepository.findAllIds()`.
+
+### Roteamento inteligente pós-login — getFirstAccessibleRoute
+
+`PermissaoRoute` e `AdminRoute` redirecionam para `<NavigateToFirstAccessible />` em vez de hardcodar `/dashboard`. Isso evita loop infinito quando o usuário não tem `DASHBOARD_VISUALIZAR`.
+
+`getFirstAccessibleRoute(temPermissao)` está em `src/lib/routeUtils.js` — use ao precisar calcular a rota inicial após login ou ao redirecionar por falta de permissão.
+
+O login em `Login.jsx` calcula a rota a partir das permissões retornadas na resposta, antes de navegar.
+
+### ContaEmpresaRoute — restrição de funcionalidades para PESSOA_FISICA
+
+As rotas `/audit`, `/empresa/operadores`, `/empresa/perfis` são envoltas por `<ContaEmpresaRoute>` em `App.jsx`. Se `tipoConta === 'PESSOA_FISICA'`, redireciona para primeira rota acessível.
+
+No backend: `tenantCtx.exigirContaEmpresa()` foi adicionado a `AuditoriaQueryService.filtrar()` e `PerfilAcessoService.listar()` — defense-in-depth.
 
 ### BigDecimal — nunca comparar com ==
 
@@ -648,6 +718,8 @@ if (valor.equals(new BigDecimal("0.00"))) { ... }   // ERRADO — escala diferen
 - Nunca comparar `BigDecimal` com `==` ou `.equals()` sem verificar escala — usar `.compareTo()`.
 - Nunca iterar sobre coleção lazy JPA dentro de loop — usar `JOIN FETCH` ou `@EntityGraph`.
 - Nunca usar `float`/`double` para cálculos financeiros — sempre `BigDecimal`.
+- Nunca colocar `ORDER BY` em `@Query` JPQL quando o método aceita `Pageable` com sort — Hibernate 6 lança `QueryException`. Usar `@PageableDefault` no controller.
+- Nunca editar ou deletar um `PerfilAcesso` com `empresaId == null` via API — são perfis do sistema, imutáveis.
 
 ---
 
