@@ -34,7 +34,11 @@ public class AuditoriaController {
             @RequestParam(required = false) Long usuarioId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataInicio,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dataFim,
-            @PageableDefault(size = 20, sort = "dataHora", direction = Sort.Direction.DESC) Pageable pageable) {
+            @RequestParam(required = false, defaultValue = "0") int page,
+            @RequestParam(required = false, defaultValue = "50") int size) {
+        
+        Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, Sort.Direction.DESC, "dataHora");
+        
         return ResponseEntity.ok(
             auditoriaQueryService.filtrar(entidade, entidadeId, acao, usuarioId, dataInicio, dataFim, pageable)
         );
