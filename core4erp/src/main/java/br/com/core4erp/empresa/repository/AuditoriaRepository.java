@@ -19,8 +19,8 @@ public interface AuditoriaRepository extends JpaRepository<Auditoria, Long> {
           AND (:entidadeId IS NULL OR a.entidadeId = :entidadeId)
           AND (:acao IS NULL OR a.acao = :acao)
           AND (:usuarioId IS NULL OR a.usuarioId = :usuarioId)
-          AND (:dataInicio IS NULL OR a.timestamp >= :dataInicio)
-          AND (:dataFim IS NULL OR a.timestamp <= :dataFim)
+          AND (:dataInicio IS NULL OR a.dataHora >= :dataInicio)
+          AND (:dataFim IS NULL OR a.dataHora <= :dataFim)
         """)
     Page<Auditoria> filtrar(
         @Param("empresaId") Long empresaId,

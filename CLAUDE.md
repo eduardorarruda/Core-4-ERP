@@ -139,7 +139,7 @@ components/   → componentes reutilizáveis, agrupados por domínio
   reports/    → filtros e cards de relatório
 hooks/        → custom hooks React
 context/      → React Context (Theme, Auth)
-lib/          → utilitários puros (api.js, formatters.js, pdfUtils.js)
+lib/          → utilitários puros (api.js, formatters.js, pdfUtils.js, permissaoMessages.js)
 ```
 
 **Arquivos-chave do frontend:**
@@ -351,7 +351,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V35** (V34 já existe).
+- **Próxima migration disponível: V36** (V35 já existe).
 
 **Sequência de migrations:**
 ```
@@ -387,6 +387,7 @@ V31     add_relatorio_investimento_dashboard_permissions
 V32     add_empresa_id_to_perfil_acesso
 V33     add_empresa_id_to_tipo_investimento
 V34     add_audit_columns_to_tipo_investimento
+V35     fix_conta_corrente_unique_numero_por_empresa
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
@@ -415,7 +416,37 @@ Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` 
 - `GlobalExceptionHandler` (`@RestControllerAdvice`) centraliza todos os erros.
 - Nunca lance exceções genéricas — use `ResponseStatusException` ou crie exceções de domínio específicas.
 - Resposta de erro padrão: `{ "status": 4xx, "mensagem": "...", "timestamp": "..." }`
-- Validações de entrada: use Bean Validation (`@NotNull`, `@NotBlank`, `@Valid`) nos DTOs.
+- Validações de entrada: use Bean Validation (`@NotNull`, `@NotBlank`, `@NotEmpty`, `@Valid`) nos DTOs. Use `@NotEmpty` para `Collection` e `Set` — `@NotNull` não impede coleções vazias.
+
+### Mensagens ao Usuário — Regra de Clareza
+
+**Toda mensagem exibida ao usuário final deve ser amigável, clara e livre de termos técnicos.**
+
+- Escreva como se o usuário não tivesse conhecimento técnico algum.
+- Descreva **o que aconteceu** e, quando possível, **o que o usuário pode fazer**.
+- Nunca exponha: códigos de permissão, nomes de exceções Java, stack traces, nomes de tabelas/colunas, chaves de constraint ou qualquer artefato interno do sistema.
+
+```
+❌ "Permissão necessária: INVESTIMENTO_CRIAR"
+✅ "Você não tem permissão para criar investimentos. Solicite acesso ao administrador."
+
+❌ "DataIntegrityViolationException: duplicate key value violates unique constraint"
+✅ "Já existe um registro com esses dados. Verifique as informações e tente novamente."
+
+❌ "EntityNotFoundException: Conta não encontrada: 42"
+✅ "Registro não encontrado. Ele pode ter sido removido."
+
+❌ "Operação viola restrições de integridade — verifique se o registro está em uso"
+✅ "Não é possível remover este item pois ele está sendo usado em outro lugar."
+```
+
+Esta regra se aplica a:
+- Mensagens retornadas pelo `GlobalExceptionHandler` (campo `mensagem`)
+- Toasts, alertas e textos de erro no frontend
+- Validações de formulário (Bean Validation `message =`)
+- Respostas de erro de qualquer endpoint REST
+
+**No frontend:** use `front-end/src/lib/permissaoMessages.js` como referência de padrão. Mensagens de permissão negada já são traduzidas automaticamente em `api.js`.
 
 ### JPA / Hibernate
 - Fetch type padrão: `LAZY`. Nunca use `EAGER` sem justificativa explícita.
@@ -632,7 +663,7 @@ Hibernate 6 (Spring Boot 3.3.x) **não permite** `ORDER BY` hardcoded em `@Query
 
 ```java
 // ❌ ERRADO — quebra quando Pageable tem sort
-@Query("SELECT a FROM Auditoria a WHERE ... ORDER BY a.timestamp DESC")
+@Query("SELECT a FROM Auditoria a WHERE ... ORDER BY a.dataHora DESC")
 Page<Auditoria> filtrar(..., Pageable pageable);
 
 // ✅ CORRETO — ordenação via Pageable
@@ -640,7 +671,8 @@ Page<Auditoria> filtrar(..., Pageable pageable);
 Page<Auditoria> filtrar(..., Pageable pageable);
 
 // No controller:
-@PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC)
+@PageableDefault(size = 20, sort = "dataHora", direction = Sort.Direction.DESC)
+// ⚠️ Nunca usar "timestamp" como sort field — é palavra reservada HQL (ver armadilha abaixo)
 ```
 
 ### Perfis de acesso — isolamento por empresa (V32)
@@ -656,6 +688,23 @@ Após a migration V32, `tb_perfil_acesso` tem campo `empresa_id` (nullable):
 O backend já invalida o cache Caffeine em mudanças individuais de permissão (explicitamente, antes de persistir) e tem TTL de 30s. O frontend **não faz refresh automático** de permissões — armazena em `sessionStorage` desde o login.
 
 **Solução implementada:** `useAuth.js` faz polling de `GET /api/auth/me/permissoes` a cada 30s e atualiza o `sessionStorage` via `setLoginState()`, disparando `auth-change` para re-render. O endpoint retorna as permissões calculadas pelo `TenantContext` (já corrigidas pelo TenantFilter a cada request).
+
+### Hibernate 6 — campo `timestamp` como palavra reservada HQL
+
+Campos de entidade JPA com nome `timestamp` conflitam com a gramática HQL do Hibernate 6 (`TIMESTAMP` é um tipo/função em JPQL). Quando Spring Data JPA acrescenta dinamicamente `ORDER BY a.timestamp DESC` à query (via Pageable sort), o parser HQL falha → HTTP 500.
+
+**Regra:** nunca nomear campos de entidade com palavras reservadas HQL (`timestamp`, `value`, `key`, `type`, `entry`, `index`). Renomear o campo Java e mapear a coluna explicitamente com `@Column(name = "timestamp")`.
+
+```java
+// ❌ ERRADO — timestamp é palavra reservada HQL
+private LocalDateTime timestamp;
+
+// ✅ CORRETO — nome Java neutro, coluna mapeada explicitamente
+@Column(name = "timestamp", nullable = false)
+private LocalDateTime dataHora;
+```
+
+Atualizar também `@PageableDefault(sort = "dataHora")` no controller e as referências `a.dataHora` no `@Query`.
 
 ### N+1 query com coleções JPA
 
@@ -722,6 +771,7 @@ if (valor.equals(new BigDecimal("0.00"))) { ... }   // ERRADO — escala diferen
 - Nunca usar `float`/`double` para cálculos financeiros — sempre `BigDecimal`.
 - Nunca colocar `ORDER BY` em `@Query` JPQL quando o método aceita `Pageable` com sort — Hibernate 6 lança `QueryException`. Usar `@PageableDefault` no controller.
 - Nunca editar ou deletar um `PerfilAcesso` com `empresaId == null` via API — são perfis do sistema, imutáveis.
+- Nunca exibir ao usuário mensagens técnicas — códigos de permissão, nomes de exceção, nomes de tabela/constraint, stack traces. Toda notificação visível ao usuário deve ser clara e compreensível por qualquer pessoa sem conhecimento técnico (ver seção 7 → "Mensagens ao Usuário").
 
 ---
 
@@ -942,7 +992,7 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 - DTO de saída: sufixo `ResponseDto` (ex: `ContaResponseDto`).
 - DTOs intermediários sem direção: sufixo `Dto` (ex: `EmpresaResumoDto`).
 - Campos sensíveis (`senha`, `token`, `resetToken`) **jamais** incluídos em responses.
-- Validação com Bean Validation (`@Valid`, `@NotNull`, `@NotBlank`, `@Positive`) nos DTOs de entrada.
+- Validação com Bean Validation (`@Valid`, `@NotNull`, `@NotBlank`, `@NotEmpty`, `@Positive`) nos DTOs de entrada. Use `@NotEmpty` para `Set<>` e `List<>` — `@NotNull` não impede coleções vazias.
 - Usar Java Records para DTOs simples quando não há lógica de transformação.
 
 ### Paginação

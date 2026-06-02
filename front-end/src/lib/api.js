@@ -1,3 +1,5 @@
+import { traduzirErroPermissao } from './permissaoMessages.js';
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 export function setUsuario(u) {
@@ -65,7 +67,7 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ mensagem: res.statusText }));
-    throw new Error(body.mensagem || `Erro ${res.status}`);
+    throw new Error(traduzirErroPermissao(body.mensagem || `Erro ${res.status}`));
   }
 
   if (res.status === 204) return null;

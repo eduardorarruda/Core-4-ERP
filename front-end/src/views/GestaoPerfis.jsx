@@ -148,9 +148,15 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave, loading }) {
           </div>
         </div>
 
+        {form.permissaoIds.size === 0 && (
+          <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,211,122,.08)', border: '1px solid rgba(255,211,122,.2)', color: '#FFD37A', fontSize: 12, marginTop: 8, fontFamily: "'DM Sans', sans-serif" }}>
+            É necessário selecionar pelo menos uma permissão para criar um perfil.
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
-          <button onClick={() => onSave({ nome: form.nome, descricao: form.descricao, permissaoIds: [...form.permissaoIds] })} disabled={loading || !form.nome.trim()} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, cursor: loading || !form.nome.trim() ? 'not-allowed' : 'pointer', fontSize: 13, fontFamily: "'Sora', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: loading || !form.nome.trim() ? .6 : 1 }}>
+          <button onClick={() => onSave({ nome: form.nome, descricao: form.descricao, permissaoIds: [...form.permissaoIds] })} disabled={loading || !form.nome.trim() || form.permissaoIds.size === 0} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, cursor: loading || !form.nome.trim() || form.permissaoIds.size === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontFamily: "'Sora', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: loading || !form.nome.trim() || form.permissaoIds.size === 0 ? .6 : 1 }}>
             {loading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
             Salvar
           </button>

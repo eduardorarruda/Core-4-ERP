@@ -23,7 +23,7 @@ public record AuditoriaResponseDto(
             a.getId(), a.getEmpresaId(), a.getUsuarioId(),
             a.getEntidade(), a.getEntidadeId(), a.getAcao(),
             a.getValorAnterior(), a.getValorNovo(),
-            a.getIpAddress(), a.getRequestId(), a.getTimestamp()
+            a.getIpAddress(), a.getRequestId(), a.getDataHora()
         );
     }
 }
