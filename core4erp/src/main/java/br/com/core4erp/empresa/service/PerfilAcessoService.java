@@ -55,6 +55,10 @@ public class PerfilAcessoService {
         Long empresaId = tenantCtx.getEmpresaId();
         String nome = dto.nome().toUpperCase();
 
+        if (dto.permissaoIds() == null || dto.permissaoIds().isEmpty()) {
+            throw new IllegalArgumentException("É necessário selecionar pelo menos uma permissão para criar um perfil.");
+        }
+
         if (perfilAcessoRepository.existsByNomeAndEmpresaIdIsNull(nome)
                 || perfilAcessoRepository.existsByNomeAndEmpresaId(nome, empresaId)) {
             throw new IllegalArgumentException("Já existe um perfil com o nome: " + nome);

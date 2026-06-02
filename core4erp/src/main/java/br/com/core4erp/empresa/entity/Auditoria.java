@@ -48,6 +48,6 @@ public class Auditoria {
     @Column(length = 36)
     private String requestId;
 
-    @Column(nullable = false)
-    private LocalDateTime timestamp = LocalDateTime.now();
+    @Column(name = "timestamp", nullable = false)
+    private LocalDateTime dataHora = LocalDateTime.now();
 }
