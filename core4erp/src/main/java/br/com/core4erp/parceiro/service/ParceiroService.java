@@ -1,6 +1,7 @@
 package br.com.core4erp.parceiro.service;
 
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.utils.Utils;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
@@ -18,18 +19,21 @@ public class ParceiroService {
     private final ParceiroRepository parceiroRepository;
     private final SecurityContextUtils securityCtx;
     private final BrasilApiService brasilApiService;
+    private final TenantContext tenantCtx;
 
     public ParceiroService(ParceiroRepository parceiroRepository,
                            SecurityContextUtils securityCtx,
-                           BrasilApiService brasilApiService) {
+                           BrasilApiService brasilApiService,
+                           TenantContext tenantCtx) {
         this.parceiroRepository = parceiroRepository;
         this.securityCtx = securityCtx;
         this.brasilApiService = brasilApiService;
+        this.tenantCtx = tenantCtx;
     }
 
     @Transactional(readOnly = true)
     public Page<ParceiroResponseDto> listar(Pageable pageable) {
-        return parceiroRepository.findAllByUsuarioId(securityCtx.getUsuarioId(), pageable)
+        return parceiroRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), pageable)
                 .map(ParceiroResponseDto::from);
     }
 
@@ -42,8 +46,8 @@ public class ParceiroService {
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
         validarCpfCnpj(docNormalizado);
-        Long usuarioId = securityCtx.getUsuarioId();
-        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndUsuarioId(docNormalizado, usuarioId)) {
+        Long empresaId = tenantCtx.getEmpresaId();
+        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaId(docNormalizado, empresaId)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
         Parceiro parceiro = new Parceiro();
@@ -57,8 +61,8 @@ public class ParceiroService {
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
         validarCpfCnpj(docNormalizado);
-        Long usuarioId = securityCtx.getUsuarioId();
-        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndUsuarioIdAndIdNot(docNormalizado, usuarioId, id)) {
+        Long empresaId = tenantCtx.getEmpresaId();
+        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaIdAndIdNot(docNormalizado, empresaId, id)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
         Parceiro parceiro = findOwned(id);
@@ -128,7 +132,7 @@ public class ParceiroService {
     }
 
     private Parceiro findOwned(Long id) {
-        return parceiroRepository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return parceiroRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado: " + id));
     }
 }

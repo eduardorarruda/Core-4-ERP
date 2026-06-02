@@ -11,14 +11,14 @@ import java.util.Optional;
 
 public interface AssinaturaRepository extends JpaRepository<Assinatura, Long> {
 
-    List<Assinatura> findAllByUsuarioId(Long usuarioId);
+    List<Assinatura> findAllByEmpresaId(Long empresaId);
 
-    Optional<Assinatura> findByIdAndUsuarioId(Long id, Long usuarioId);
+    Optional<Assinatura> findByIdAndEmpresaId(Long id, Long empresaId);
 
-    List<Assinatura> findAllByUsuarioIdAndAtiva(Long usuarioId, boolean ativa);
+    List<Assinatura> findAllByEmpresaIdAndAtiva(Long empresaId, boolean ativa);
 
-    List<Assinatura> findAllByUsuarioIdAndAtivaAndCartaoCreditoIsNotNull(Long usuarioId, boolean ativa);
+    List<Assinatura> findAllByEmpresaIdAndAtivaAndCartaoCreditoIsNotNull(Long empresaId, boolean ativa);
 
-    @Query("SELECT COALESCE(SUM(a.valor), 0) FROM Assinatura a WHERE a.usuario.id = :uid AND a.ativa = true")
-    BigDecimal sumValorAtivasByUsuarioId(@Param("uid") Long uid);
+    @Query("SELECT COALESCE(SUM(a.valor), 0) FROM Assinatura a WHERE a.empresaId = :eid AND a.ativa = true")
+    BigDecimal sumValorAtivasByEmpresaId(@Param("eid") Long eid);
 }

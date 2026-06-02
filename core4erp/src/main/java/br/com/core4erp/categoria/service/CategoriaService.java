@@ -6,6 +6,7 @@ import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,17 +18,20 @@ public class CategoriaService {
 
     private final CategoriaRepository categoriaRepository;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
-    public CategoriaService(CategoriaRepository categoriaRepository, SecurityContextUtils securityCtx) {
+    public CategoriaService(CategoriaRepository categoriaRepository,
+                            SecurityContextUtils securityCtx,
+                            TenantContext tenantCtx) {
         this.categoriaRepository = categoriaRepository;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Requer("CATEGORIA_VISUALIZAR")
     @Transactional(readOnly = true)
     public Page<CategoriaResponseDto> listar(Pageable pageable) {
-        Long usuarioId = securityCtx.getUsuarioId();
-        return categoriaRepository.findAllByUsuarioId(usuarioId, pageable)
+        return categoriaRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), pageable)
                 .map(CategoriaResponseDto::from);
     }
 
@@ -64,8 +68,7 @@ public class CategoriaService {
     }
 
     private Categoria findOwned(Long id) {
-        Long usuarioId = securityCtx.getUsuarioId();
-        return categoriaRepository.findByIdAndUsuarioId(id, usuarioId)
+        return categoriaRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada: " + id));
     }
 }

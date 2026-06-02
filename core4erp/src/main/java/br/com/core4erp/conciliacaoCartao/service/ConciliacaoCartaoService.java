@@ -15,6 +15,7 @@ import br.com.core4erp.conciliacaoCartao.enums.StatusItemConciliacaoCartao;
 import br.com.core4erp.conciliacaoCartao.repository.ConciliacaoCartaoItemRepository;
 import br.com.core4erp.conciliacaoCartao.repository.ConciliacaoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -42,6 +43,7 @@ public class ConciliacaoCartaoService {
     private final OfxCartaoParserService ofxParser;
     private final ConciliacaoCartaoScoreService scoreService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public ConciliacaoCartaoService(ConciliacaoCartaoRepository conciliacaoRepo,
                                     ConciliacaoCartaoItemRepository itemRepo,
@@ -51,7 +53,8 @@ public class ConciliacaoCartaoService {
                                     ParceiroRepository parceiroRepo,
                                     OfxCartaoParserService ofxParser,
                                     ConciliacaoCartaoScoreService scoreService,
-                                    SecurityContextUtils securityCtx) {
+                                    SecurityContextUtils securityCtx,
+                                    TenantContext tenantCtx) {
         this.conciliacaoRepo = conciliacaoRepo;
         this.itemRepo = itemRepo;
         this.cartaoRepo = cartaoRepo;
@@ -61,12 +64,13 @@ public class ConciliacaoCartaoService {
         this.ofxParser = ofxParser;
         this.scoreService = scoreService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Transactional(readOnly = true)
     public List<ConciliacaoCartaoResponseDto> listar() {
         return conciliacaoRepo
-                .findAllByUsuarioIdOrderByDataConciliacaoDesc(securityCtx.getUsuarioId())
+                .findAllByEmpresaIdOrderByDataConciliacaoDesc(tenantCtx.getEmpresaId())
                 .stream()
                 .map(ConciliacaoCartaoResponseDto::fromSemItens)
                 .toList();
@@ -112,11 +116,11 @@ public class ConciliacaoCartaoService {
             throw new IllegalArgumentException("Nenhuma transação encontrada no arquivo OFX");
         }
 
-        Long usuarioId = securityCtx.getUsuarioId();
+        Long empresaId = tenantCtx.getEmpresaId();
         CartaoCredito cartao;
 
         if (cartaoIdForcado != null) {
-            cartao = cartaoRepo.findByIdAndUsuarioId(cartaoIdForcado, usuarioId)
+            cartao = cartaoRepo.findByIdAndEmpresaId(cartaoIdForcado, empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado"));
             if (cartao.getAcctIdOfx() == null && ofxDados.getNumeroConta() != null) {
                 cartao.setAcctIdOfx(ofxDados.getNumeroConta());
@@ -124,7 +128,7 @@ public class ConciliacaoCartaoService {
             }
         } else {
             String acctId = ofxDados.getNumeroConta();
-            cartao = cartaoRepo.findByAcctIdOfxAndUsuarioId(acctId, usuarioId)
+            cartao = cartaoRepo.findByAcctIdOfxAndEmpresaId(acctId, empresaId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
                             "CARTAO_NAO_ENCONTRADO:" + acctId));
@@ -173,7 +177,7 @@ public class ConciliacaoCartaoService {
 
             if (ofxTrn.getData() != null) {
                 List<LancamentoCartao> candidatos = lancamentoRepo.findCandidatasParaConciliacao(
-                        cartao.getId(), usuarioId,
+                        cartao.getId(), empresaId,
                         ofxTrn.getData().minusDays(JANELA_DIAS),
                         ofxTrn.getData().plusDays(JANELA_DIAS));
 
@@ -220,8 +224,8 @@ public class ConciliacaoCartaoService {
         assertPendente(c);
 
         ConciliacaoCartaoItem item = findItem(itemId, conciliacaoId);
-        LancamentoCartao lanc = lancamentoRepo.findByIdAndCartaoCreditoIdAndUsuarioId(
-                dto.lancamentoId(), c.getCartaoCredito().getId(), securityCtx.getUsuarioId())
+        LancamentoCartao lanc = lancamentoRepo.findByIdAndCartaoCreditoIdAndEmpresaId(
+                dto.lancamentoId(), c.getCartaoCredito().getId(), tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Lançamento não encontrado"));
 
         item.setLancamento(lanc);
@@ -237,12 +241,12 @@ public class ConciliacaoCartaoService {
         assertPendente(c);
 
         ConciliacaoCartaoItem item = findItem(itemId, conciliacaoId);
-        Long usuarioId = securityCtx.getUsuarioId();
+        Long eid = tenantCtx.getEmpresaId();
 
-        var categoria = categoriaRepo.findByIdAndUsuarioId(dto.categoriaId(), usuarioId)
+        var categoria = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
         var parceiro = dto.parceiroId() != null
-                ? parceiroRepo.findByIdAndUsuarioId(dto.parceiroId(), usuarioId)
+                ? parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"))
                 : null;
 
@@ -341,7 +345,7 @@ public class ConciliacaoCartaoService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private ConciliacaoCartao findOwned(Long id) {
-        return conciliacaoRepo.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return conciliacaoRepo.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conciliação de cartão não encontrada: " + id));
     }
 

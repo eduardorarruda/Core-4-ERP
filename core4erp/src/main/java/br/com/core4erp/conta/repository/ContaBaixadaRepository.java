@@ -14,14 +14,14 @@ public interface ContaBaixadaRepository extends JpaRepository<ContaBaixada, Long
     boolean existsByContaId(Long contaId);
     Optional<ContaBaixada> findByContaId(Long contaId);
 
-    List<ContaBaixada> findByUsuarioIdAndDataPagamentoBetweenOrderByDataPagamento(
-            Long usuarioId, LocalDate inicio, LocalDate fim);
+    List<ContaBaixada> findByEmpresaIdAndDataPagamentoBetweenOrderByDataPagamento(
+            Long empresaId, LocalDate inicio, LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(cb.valorFinal), 0) FROM ContaBaixada cb " +
-           "WHERE cb.usuario.id = :uid AND cb.conta.tipo = 'PAGAR'")
-    BigDecimal sumTotalPagoByUsuario(@Param("uid") Long uid);
+           "WHERE cb.empresaId = :eid AND cb.conta.tipo = 'PAGAR'")
+    BigDecimal sumTotalPagoByEmpresa(@Param("eid") Long eid);
 
     @Query("SELECT COALESCE(SUM(cb.valorFinal), 0) FROM ContaBaixada cb " +
-           "WHERE cb.usuario.id = :uid AND cb.conta.tipo = 'RECEBER'")
-    BigDecimal sumTotalRecebidoByUsuario(@Param("uid") Long uid);
+           "WHERE cb.empresaId = :eid AND cb.conta.tipo = 'RECEBER'")
+    BigDecimal sumTotalRecebidoByEmpresa(@Param("eid") Long eid);
 }

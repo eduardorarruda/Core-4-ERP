@@ -12,6 +12,24 @@ export function useAuth() {
     return () => window.removeEventListener('auth-change', sync);
   }, []);
 
+  // Atualiza permissões a cada 30s para refletir mudanças feitas por administradores
+  // sem exigir logout do usuário
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        const data = await auth.refreshPermissoes();
+        const current = getLoginState();
+        if (current?.empresas?.[0] && data?.permissoes) {
+          current.empresas[0].permissoes = data.permissoes;
+          if (data.perfilNome) current.empresas[0].perfilNome = data.perfilNome;
+          setLoginState(current);
+        }
+      } catch { /* 401 handler em api.js já faz logout e redirecionamento */ }
+    };
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   // CR-F2: logout não silencia erro — sessão do servidor deve ser invalidada
   const logout = useCallback(async () => {
     await auth.logout();

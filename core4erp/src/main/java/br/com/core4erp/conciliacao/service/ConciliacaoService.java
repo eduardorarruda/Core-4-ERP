@@ -8,6 +8,7 @@ import br.com.core4erp.conciliacao.enums.StatusItemConciliacao;
 import br.com.core4erp.conciliacao.repository.ConciliacaoItemRepository;
 import br.com.core4erp.conciliacao.repository.ConciliacaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.entity.Conta;
@@ -48,6 +49,7 @@ public class ConciliacaoService {
     private final OfxParserService ofxParserService;
     private final ConciliacaoScoreService scoreService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public ConciliacaoService(ConciliacaoRepository conciliacaoRepository,
                                ConciliacaoItemRepository itemRepository,
@@ -57,7 +59,8 @@ public class ConciliacaoService {
                                ContaService contaService,
                                OfxParserService ofxParserService,
                                ConciliacaoScoreService scoreService,
-                               SecurityContextUtils securityCtx) {
+                               SecurityContextUtils securityCtx,
+                               TenantContext tenantCtx) {
         this.conciliacaoRepository = conciliacaoRepository;
         this.itemRepository = itemRepository;
         this.contaRepository = contaRepository;
@@ -67,12 +70,13 @@ public class ConciliacaoService {
         this.ofxParserService = ofxParserService;
         this.scoreService = scoreService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Transactional(readOnly = true)
     public List<ConciliacaoResponseDto> listar() {
         return conciliacaoRepository
-                .findAllByUsuarioIdOrderByDataConciliacaoDesc(securityCtx.getUsuarioId())
+                .findAllByEmpresaIdOrderByDataConciliacaoDesc(tenantCtx.getEmpresaId())
                 .stream()
                 .map(ConciliacaoResponseDto::fromSemItens)
                 .toList();
@@ -136,15 +140,15 @@ public class ConciliacaoService {
             throw new IllegalArgumentException("Nenhuma transação encontrada no arquivo OFX");
         }
 
-        Long usuarioId = securityCtx.getUsuarioId();
+        Long empresaId = tenantCtx.getEmpresaId();
         ContaCorrente contaCorrente;
 
         if (contaCorrenteIdForcado != null) {
-            contaCorrente = contaCorrenteRepository.findByIdAndUsuarioId(contaCorrenteIdForcado, usuarioId)
+            contaCorrente = contaCorrenteRepository.findByIdAndEmpresaId(contaCorrenteIdForcado, empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Conta corrente não encontrada"));
         } else {
             String numeroConta = ofxDados.getNumeroConta();
-            contaCorrente = contaCorrenteRepository.findByNumeroContaAndUsuarioId(numeroConta, usuarioId)
+            contaCorrente = contaCorrenteRepository.findByNumeroContaAndEmpresaId(numeroConta, empresaId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
                             "CONTA_NAO_ENCONTRADA:" + numeroConta));
@@ -173,7 +177,7 @@ public class ConciliacaoService {
 
             BigDecimal valorAbs = ofxTrn.getValor().abs();
             List<Conta> candidatas = contaRepository
-                    .findCandidatasParaConciliacao(usuarioId, statusesAbertos, valorAbs, TOLERANCIA_VALOR);
+                    .findCandidatasParaConciliacao(empresaId, statusesAbertos, valorAbs, TOLERANCIA_VALOR);
 
             ConciliacaoItem item = new ConciliacaoItem();
             item.setConciliacao(conciliacao);
@@ -224,7 +228,7 @@ public class ConciliacaoService {
         assertPendente(c);
 
         ConciliacaoItem item = findItem(itemId, conciliacaoId);
-        Conta conta = contaRepository.findByIdAndUsuarioId(dto.contaId(), securityCtx.getUsuarioId())
+        Conta conta = contaRepository.findByIdAndEmpresaId(dto.contaId(), tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conta não encontrada"));
 
         item.setConta(conta);
@@ -240,7 +244,7 @@ public class ConciliacaoService {
         assertPendente(c);
 
         ConciliacaoItem item = findItem(itemId, conciliacaoId);
-        Long usuarioId = securityCtx.getUsuarioId();
+        Long empresaId = tenantCtx.getEmpresaId();
 
         var contaCreateDto = new ContaCreateDto(
                 dto.descricao(),
@@ -252,7 +256,7 @@ public class ConciliacaoService {
                 1, 1, false, null, BigDecimal.ZERO, BigDecimal.ZERO
         );
         var criadas = contaService.criar(contaCreateDto);
-        Conta novaConta = contaRepository.findByIdAndUsuarioId(criadas.get(0).id(), usuarioId)
+        Conta novaConta = contaRepository.findByIdAndEmpresaId(criadas.get(0).id(), empresaId)
                 .orElseThrow();
 
         item.setConta(novaConta);
@@ -361,7 +365,7 @@ public class ConciliacaoService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private Conciliacao findOwned(Long id) {
-        return conciliacaoRepository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return conciliacaoRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conciliação não encontrada: " + id));
     }
 

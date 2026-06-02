@@ -6,6 +6,7 @@ import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.entity.ContaBaixada;
 import br.com.core4erp.conta.repository.ContaBaixadaRepository;
@@ -35,6 +36,7 @@ public class RelatorioService {
     private static final List<StatusConta> ABERTOS = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
 
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
     private final ContaRepository contaRepo;
     private final ContaBaixadaRepository baixadaRepo;
     private final TransacaoInvestimentoRepository transacaoRepo;
@@ -43,6 +45,7 @@ public class RelatorioService {
     private final ExcelRelatorioService excelService;
 
     public RelatorioService(SecurityContextUtils securityCtx,
+                            TenantContext tenantCtx,
                             ContaRepository contaRepo,
                             ContaBaixadaRepository baixadaRepo,
                             TransacaoInvestimentoRepository transacaoRepo,
@@ -50,6 +53,7 @@ public class RelatorioService {
                             AssinaturaRepository assinaturaRepo,
                             ExcelRelatorioService excelService) {
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
         this.contaRepo = contaRepo;
         this.baixadaRepo = baixadaRepo;
         this.transacaoRepo = transacaoRepo;
@@ -66,9 +70,9 @@ public class RelatorioService {
             LocalDate inicio, LocalDate fim,
             TipoConta tipo, Long categoriaId, Long parceiroId) {
 
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<Conta> contas = contaRepo
-                .findByUsuarioIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(uid, PAGOS, inicio, fim);
+                .findByEmpresaIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(uid, PAGOS, inicio, fim);
 
         contas = filtrarContas(contas, tipo, categoriaId, parceiroId);
 
@@ -112,10 +116,10 @@ public class RelatorioService {
             LocalDate inicio, LocalDate fim,
             TipoConta tipo, StatusConta status, Long categoriaId, Long parceiroId) {
 
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<StatusConta> statuses = status != null ? List.of(status) : ABERTOS;
         List<Conta> contas = contaRepo
-                .findByUsuarioIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(uid, statuses, inicio, fim);
+                .findByEmpresaIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(uid, statuses, inicio, fim);
 
         contas = filtrarContas(contas, tipo, categoriaId, parceiroId);
 
@@ -163,9 +167,9 @@ public class RelatorioService {
             LocalDate inicio, LocalDate fim,
             TipoConta tipo, Long contaCorrenteId, Long categoriaId) {
 
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<ContaBaixada> baixadas = baixadaRepo
-                .findByUsuarioIdAndDataPagamentoBetweenOrderByDataPagamento(uid, inicio, fim);
+                .findByEmpresaIdAndDataPagamentoBetweenOrderByDataPagamento(uid, inicio, fim);
 
         if (tipo != null)
             baixadas = baixadas.stream().filter(cb -> cb.getConta().getTipo() == tipo).toList();
@@ -219,14 +223,14 @@ public class RelatorioService {
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosDre(LocalDate inicio, LocalDate fim, TipoConta tipo) {
 
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<StatusConta> statuses;
         if (tipo == TipoConta.RECEBER)     statuses = List.of(StatusConta.RECEBIDO);
         else if (tipo == TipoConta.PAGAR)  statuses = List.of(StatusConta.PAGO);
         else                               statuses = PAGOS;
 
         List<Conta> contas = contaRepo
-                .findByUsuarioIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(uid, statuses, inicio, fim);
+                .findByEmpresaIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(uid, statuses, inicio, fim);
 
         Map<String, BigDecimal> receitas = new TreeMap<>();
         Map<String, BigDecimal> despesas = new TreeMap<>();
@@ -271,9 +275,9 @@ public class RelatorioService {
             LocalDate inicio, LocalDate fim,
             TipoTransacaoInvestimento tipoTransacao, Long contaInvestimentoId) {
 
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<TransacaoInvestimento> transacoes = transacaoRepo
-                .findByUsuarioIdAndDataTransacaoBetweenOrderByDataTransacao(uid, inicio, fim);
+                .findByEmpresaIdAndDataTransacaoBetweenOrderByDataTransacao(uid, inicio, fim);
 
         if (tipoTransacao != null)
             transacoes = transacoes.stream().filter(t -> t.getTipoTransacao() == tipoTransacao).toList();
@@ -330,12 +334,12 @@ public class RelatorioService {
     @Requer("RELATORIO_POSICAO_FINANCEIRA_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosPosicaoFinanceira(LocalDate inicio, LocalDate fim) {
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
 
         List<ContaBaixada> baixadas = baixadaRepo
-                .findByUsuarioIdAndDataPagamentoBetweenOrderByDataPagamento(uid, inicio, fim);
+                .findByEmpresaIdAndDataPagamentoBetweenOrderByDataPagamento(uid, inicio, fim);
         List<TransacaoInvestimento> transacoes = transacaoRepo
-                .findByUsuarioIdAndDataTransacaoBetweenOrderByDataTransacao(uid, inicio, fim);
+                .findByEmpresaIdAndDataTransacaoBetweenOrderByDataTransacao(uid, inicio, fim);
 
         BigDecimal totalPago = baixadas.stream()
                 .filter(b -> b.getConta().getTipo() == TipoConta.PAGAR)
@@ -411,10 +415,10 @@ public class RelatorioService {
     @Requer("RELATORIO_ASSINATURAS_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosAssinaturas(Boolean soAtivas) {
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<Assinatura> lista = (soAtivas == null || soAtivas)
-                ? assinaturaRepo.findAllByUsuarioIdAndAtiva(uid, true)
-                : assinaturaRepo.findAllByUsuarioId(uid);
+                ? assinaturaRepo.findAllByEmpresaIdAndAtiva(uid, true)
+                : assinaturaRepo.findAllByEmpresaId(uid);
 
         Map<String, BigDecimal> porCategoria = new LinkedHashMap<>();
         BigDecimal totalAtivas = BigDecimal.ZERO;
@@ -451,11 +455,11 @@ public class RelatorioService {
             LocalDate inicio, LocalDate fim,
             Long cartaoId, Long categoriaId) {
 
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         YearMonth ymInicio = YearMonth.from(inicio);
         YearMonth ymFim    = YearMonth.from(fim);
 
-        List<LancamentoCartao> lancamentos = lancamentoRepo.findByUsuarioIdAndFaturaPeriod(
+        List<LancamentoCartao> lancamentos = lancamentoRepo.findByEmpresaIdAndFaturaPeriod(
                 uid, ymInicio.getMonthValue(), ymInicio.getYear(),
                 ymFim.getMonthValue(), ymFim.getYear());
 

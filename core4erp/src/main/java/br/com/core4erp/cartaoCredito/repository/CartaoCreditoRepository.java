@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CartaoCreditoRepository extends JpaRepository<CartaoCredito, Long> {
-    List<CartaoCredito> findAllByUsuarioId(Long usuarioId);
-    Page<CartaoCredito> findAllByUsuarioId(Long usuarioId, Pageable pageable);
-    Optional<CartaoCredito> findByIdAndUsuarioId(Long id, Long usuarioId);
-    boolean existsByContaCorrenteIdAndUsuarioId(Long contaCorrenteId, Long usuarioId);
+    List<CartaoCredito> findAllByEmpresaId(Long empresaId);
+    Page<CartaoCredito> findAllByEmpresaId(Long empresaId, Pageable pageable);
+    Optional<CartaoCredito> findByIdAndEmpresaId(Long id, Long empresaId);
+    boolean existsByContaCorrenteIdAndEmpresaId(Long contaCorrenteId, Long empresaId);
 
-    @Query("SELECT COALESCE(SUM(c.limite), 0) FROM CartaoCredito c WHERE c.usuario.id = :uid")
-    BigDecimal sumLimiteByUsuarioId(@Param("uid") Long uid);
+    @Query("SELECT COALESCE(SUM(c.limite), 0) FROM CartaoCredito c WHERE c.empresaId = :eid")
+    BigDecimal sumLimiteByEmpresaId(@Param("eid") Long eid);
 
-    Optional<CartaoCredito> findByAcctIdOfxAndUsuarioId(String acctIdOfx, Long usuarioId);
+    Optional<CartaoCredito> findByAcctIdOfxAndEmpresaId(String acctIdOfx, Long empresaId);
 }

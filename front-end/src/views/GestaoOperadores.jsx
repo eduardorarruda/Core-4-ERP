@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, UserPlus, Trash2, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Loader2, UserPlus, Trash2, AlertTriangle, RotateCcw, Pencil } from 'lucide-react';
 import { operadores, convites, perfisAcesso } from '../lib/api';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
 
@@ -43,6 +43,36 @@ function ModalConvite({ perfis, onClose, onSave, loading }) {
   );
 }
 
+function ModalEditarPerfil({ membro, perfis, onClose, onSave, loading }) {
+  const [perfilId, setPerfilId] = useState('');
+  const perfisDisponiveis = perfis.filter((p) => p.nome !== 'PROPRIETARIO');
+  const S = {
+    overlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center' },
+    card: { background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 420, width: '90%' },
+    input: { display: 'block', width: '100%', padding: '12px 14px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, color: '#fafafa', fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: 'none', marginBottom: 12, boxSizing: 'border-box' },
+  };
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.card} onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 6 }}>Alterar Perfil</h2>
+        <p style={{ fontSize: 13, color: 'rgba(250,250,250,.4)', marginBottom: 20, fontFamily: "'DM Sans', sans-serif" }}>{membro.nome}</p>
+        <label style={{ fontSize: 11, color: 'rgba(250,250,250,.4)', display: 'block', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Novo perfil</label>
+        <select style={{ ...S.input, appearance: 'none' }} value={perfilId} onChange={(e) => setPerfilId(e.target.value)}>
+          <option value="">Selecione um perfil…</option>
+          {perfisDisponiveis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+        </select>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+          <button onClick={() => onSave(membro.usuarioId, Number(perfilId))} disabled={loading || !perfilId} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: "'Sora', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: loading || !perfilId ? .6 : 1 }}>
+            {loading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+            Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GestaoOperadores() {
   const [tab, setTab] = useState('ativos');
   const [membros, setMembros] = useState([]);
@@ -51,6 +81,8 @@ export default function GestaoOperadores() {
   const [loading, setLoading] = useState(true);
   const [modalConvite, setModalConvite] = useState(false);
   const [savingConvite, setSavingConvite] = useState(false);
+  const [editandoPerfil, setEditandoPerfil] = useState(null);
+  const [savingPerfil, setSavingPerfil] = useState(false);
   const [reenvId, setReenvId] = useState(null);
   const [erro, setErro] = useState('');
 
@@ -117,6 +149,19 @@ export default function GestaoOperadores() {
     }
   };
 
+  const alterarPerfilHandler = async (usuarioId, perfilId) => {
+    setSavingPerfil(true);
+    try {
+      await operadores.alterarPerfil(usuarioId, perfilId);
+      setEditandoPerfil(null);
+      carregar();
+    } catch (err) {
+      setErro(err.message || 'Erro ao alterar perfil.');
+    } finally {
+      setSavingPerfil(false);
+    }
+  };
+
   const thStyle = { padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'rgba(250,250,250,.3)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.1em' };
   const tdStyle = { padding: '12px 16px', fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: 'rgba(250,250,250,.8)' };
 
@@ -180,15 +225,24 @@ export default function GestaoOperadores() {
                     </span>
                   </td>
                   <td style={tdStyle}>
-                    {m.ativo ? (
-                      <button onClick={() => remover(m.usuarioId, m.nome)} title="Remover" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,100,100,.06)', border: '1px solid rgba(255,100,100,.15)', color: '#FFB4AB', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    ) : (
-                      <button onClick={() => reativar(m.usuarioId, m.nome)} title="Reativar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(110,255,192,.06)', border: '1px solid rgba(110,255,192,.2)', color: '#6EFFC0', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
-                        <RotateCcw size={12} /> Reativar
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      {m.perfilNome !== 'PROPRIETARIO' && (
+                        <PermissaoGuard permissao="USUARIO_EDITAR">
+                          <button onClick={() => setEditandoPerfil(m)} title="Alterar perfil" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(172,199,255,.06)', border: '1px solid rgba(172,199,255,.15)', color: '#ACC7FF', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                            <Pencil size={13} />
+                          </button>
+                        </PermissaoGuard>
+                      )}
+                      {m.ativo ? (
+                        <button onClick={() => remover(m.usuarioId, m.nome)} title="Remover" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,100,100,.06)', border: '1px solid rgba(255,100,100,.15)', color: '#FFB4AB', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                          <Trash2 size={13} />
+                        </button>
+                      ) : (
+                        <button onClick={() => reativar(m.usuarioId, m.nome)} title="Reativar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(110,255,192,.06)', border: '1px solid rgba(110,255,192,.2)', color: '#6EFFC0', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+                          <RotateCcw size={12} /> Reativar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -246,6 +300,16 @@ export default function GestaoOperadores() {
           onClose={() => setModalConvite(false)}
           onSave={enviarConvite}
           loading={savingConvite}
+        />
+      )}
+
+      {editandoPerfil && (
+        <ModalEditarPerfil
+          membro={editandoPerfil}
+          perfis={perfis}
+          onClose={() => setEditandoPerfil(null)}
+          onSave={alterarPerfilHandler}
+          loading={savingPerfil}
         />
       )}
     </>

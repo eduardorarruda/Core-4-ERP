@@ -7,6 +7,6 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TipoInvestimentoRepository extends JpaRepository<TipoInvestimentoCustom, Long> {
-    List<TipoInvestimentoCustom> findAllByUsuarioId(Long usuarioId);
-    Optional<TipoInvestimentoCustom> findByIdAndUsuarioId(Long id, Long usuarioId);
+    List<TipoInvestimentoCustom> findAllByEmpresaId(Long empresaId);
+    Optional<TipoInvestimentoCustom> findByIdAndEmpresaId(Long id, Long empresaId);
 }

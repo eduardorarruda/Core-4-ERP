@@ -12,6 +12,7 @@ import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
 import br.com.core4erp.conta.entity.Conta;
@@ -56,6 +57,7 @@ public class CartaoCreditoService {
     private final ContaCorrenteService contaCorrenteService;
     private final ContaService contaService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public CartaoCreditoService(CartaoCreditoRepository cartaoRepo,
                                 LancamentoCartaoRepository lancamentoRepo,
@@ -66,7 +68,8 @@ public class CartaoCreditoService {
                                 ParceiroRepository parceiroRepo,
                                 ContaCorrenteService contaCorrenteService,
                                 ContaService contaService,
-                                SecurityContextUtils securityCtx) {
+                                SecurityContextUtils securityCtx,
+                                TenantContext tenantCtx) {
         this.cartaoRepo = cartaoRepo;
         this.lancamentoRepo = lancamentoRepo;
         this.faturaRepo = faturaRepo;
@@ -77,14 +80,15 @@ public class CartaoCreditoService {
         this.contaCorrenteService = contaCorrenteService;
         this.contaService = contaService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     // ── Cartões ───────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public Page<CartaoCreditoResponseDto> listar(Pageable pageable) {
-        Long uid = securityCtx.getUsuarioId();
-        Page<CartaoCredito> page = cartaoRepo.findAllByUsuarioId(uid, pageable);
+        Long eid = tenantCtx.getEmpresaId();
+        Page<CartaoCredito> page = cartaoRepo.findAllByEmpresaId(eid, pageable);
         if (page.isEmpty()) return page.map(c -> CartaoCreditoResponseDto.from(c, BigDecimal.ZERO));
 
         YearMonth fim = YearMonth.now();
@@ -92,7 +96,7 @@ public class CartaoCreditoService {
         List<Long> ids = page.getContent().stream().map(CartaoCredito::getId).toList();
         Map<Long, BigDecimal> limitesUsados = new HashMap<>();
         lancamentoRepo.sumValorByCartaoIdsAndPeriod(
-                ids, uid,
+                ids, eid,
                 inicio.getMonthValue(), inicio.getYear(),
                 fim.getMonthValue(), fim.getYear()
         ).forEach(row -> {
@@ -141,13 +145,13 @@ public class CartaoCreditoService {
 
     @Transactional(readOnly = true)
     public List<LancamentoResponseDto> listarLancamentos(Long cartaoId, Integer mes, Integer ano) {
-        Long uid = securityCtx.getUsuarioId();
+        Long eid = tenantCtx.getEmpresaId();
         findOwnedCartao(cartaoId);
         List<LancamentoCartao> lista = (mes != null && ano != null)
-                ? lancamentoRepo.findAllByCartaoCreditoIdAndUsuarioIdAndMesFaturaAndAnoFatura(cartaoId, uid, mes, ano)
-                : lancamentoRepo.findAllByCartaoCreditoIdAndUsuarioId(cartaoId, uid);
+                ? lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(cartaoId, eid, mes, ano)
+                : lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid);
 
-        Set<String> fechadas = faturaRepo.findAllByCartaoCreditoIdAndUsuarioId(cartaoId, uid).stream()
+        Set<String> fechadas = faturaRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid).stream()
                 .filter(f -> f.getStatus() == StatusFatura.FECHADA)
                 .map(f -> f.getMes() + ":" + f.getAno())
                 .collect(Collectors.toSet());
@@ -164,11 +168,11 @@ public class CartaoCreditoService {
     @Transactional
     public List<LancamentoResponseDto> criarLancamento(Long cartaoId, LancamentoRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
-        Long uid = securityCtx.getUsuarioId();
+        Long eid = tenantCtx.getEmpresaId();
 
-        Categoria categoria = categoriaRepo.findByIdAndUsuarioId(dto.categoriaId(), uid)
+        Categoria categoria = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
-        Parceiro parceiro = parceiroRepo.findByIdAndUsuarioId(dto.parceiroId(), uid)
+        Parceiro parceiro = parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
 
         int parcelas = ParcelamentoHelper.normalizarParcelas(dto.quantidadeParcelas());
@@ -210,10 +214,10 @@ public class CartaoCreditoService {
         if (novaFatura.getMonthValue() != l.getMesFatura() || novaFatura.getYear() != l.getAnoFatura()) {
             verificarFaturaAberta(cartaoId, novaFatura.getMonthValue(), novaFatura.getYear());
         }
-        Long uid = securityCtx.getUsuarioId();
-        Categoria cat = categoriaRepo.findByIdAndUsuarioId(dto.categoriaId(), uid)
+        Long eid = tenantCtx.getEmpresaId();
+        Categoria cat = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
-        Parceiro par = parceiroRepo.findByIdAndUsuarioId(dto.parceiroId(), uid)
+        Parceiro par = parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         l.setDescricao(dto.descricao());
         l.setValor(dto.valor());
@@ -237,14 +241,14 @@ public class CartaoCreditoService {
     @Transactional
     public ContaResponseDto fecharFatura(Long cartaoId, FechamentoFaturaRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
-        Long uid = securityCtx.getUsuarioId();
+        Long eid = tenantCtx.getEmpresaId();
 
-        faturaRepo.findByCartaoCreditoIdAndMesAndAnoAndUsuarioId(cartaoId, dto.mes(), dto.ano(), uid)
+        faturaRepo.findByCartaoCreditoIdAndMesAndAnoAndEmpresaId(cartaoId, dto.mes(), dto.ano(), eid)
                 .filter(f -> f.getStatus() == StatusFatura.FECHADA)
                 .ifPresent(f -> { throw new IllegalStateException("Fatura já fechada para este período"); });
 
         List<LancamentoCartao> lancamentos = lancamentoRepo
-                .findAllByCartaoCreditoIdAndUsuarioIdAndMesFaturaAndAnoFatura(cartaoId, uid, dto.mes(), dto.ano());
+                .findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(cartaoId, eid, dto.mes(), dto.ano());
         if (lancamentos.isEmpty()) {
             throw new IllegalStateException("Nenhum lançamento encontrado para esta fatura");
         }
@@ -271,7 +275,7 @@ public class CartaoCreditoService {
         Conta contaGerada = contaService.findOwnedEntity(contas.get(0).id());
 
         FaturaCartao fatura = faturaRepo
-                .findByCartaoCreditoIdAndMesAndAnoAndUsuarioId(cartaoId, dto.mes(), dto.ano(), uid)
+                .findByCartaoCreditoIdAndMesAndAnoAndEmpresaId(cartaoId, dto.mes(), dto.ano(), eid)
                 .orElseGet(() -> {
                     FaturaCartao nova = new FaturaCartao();
                     nova.setCartaoCredito(cartao);
@@ -312,10 +316,10 @@ public class CartaoCreditoService {
      * Chamado pelo scheduler e pelo endpoint de sincronização.
      */
     @Transactional
-    public void gerarLancamentosAssinaturas(Long usuarioId) {
+    public void gerarLancamentosAssinaturas(Long empresaId) {
         LocalDate hoje = LocalDate.now();
         List<Assinatura> assinaturas = assinaturaRepo
-                .findAllByUsuarioIdAndAtivaAndCartaoCreditoIsNotNull(usuarioId, true);
+                .findAllByEmpresaIdAndAtivaAndCartaoCreditoIsNotNull(empresaId, true);
 
         for (Assinatura assinatura : assinaturas) {
             CartaoCredito cartao = assinatura.getCartaoCredito();
@@ -338,7 +342,7 @@ public class CartaoCreditoService {
             l.setCategoria(assinatura.getCategoria());
             l.setParceiro(assinatura.getParceiro());
             l.setAssinatura(assinatura);
-            l.setUsuario(usuarioRepo.getReferenceById(usuarioId));
+            l.setUsuario(assinatura.getUsuario());
             lancamentoRepo.save(l);
         }
     }
@@ -355,9 +359,8 @@ public class CartaoCreditoService {
     }
 
     private void verificarFaturaAberta(Long cartaoId, Integer mes, Integer ano) {
-        Long uid = securityCtx.getUsuarioId();
-        if (faturaRepo.existsByCartaoCreditoIdAndMesAndAnoAndUsuarioIdAndStatus(
-                cartaoId, mes, ano, uid, StatusFatura.FECHADA)) {
+        if (faturaRepo.existsByCartaoCreditoIdAndMesAndAnoAndEmpresaIdAndStatus(
+                cartaoId, mes, ano, tenantCtx.getEmpresaId(), StatusFatura.FECHADA)) {
             throw new IllegalStateException("Fatura " + String.format("%02d", mes) + "/" + ano
                     + " está fechada. Estorne o pagamento ou reabra a fatura para editar lançamentos.");
         }
@@ -365,11 +368,11 @@ public class CartaoCreditoService {
 
     @Transactional(readOnly = true)
     public List<CartaoDashboardResumoDto> dashboardResumo() {
-        Long uid = securityCtx.getUsuarioId();
+        Long eid = tenantCtx.getEmpresaId();
         YearMonth fim = YearMonth.now();
         YearMonth inicio = fim.minusMonths(2);
         return lancamentoRepo.resumoDashboardPorCategoria(
-                uid,
+                eid,
                 inicio.getMonthValue(), inicio.getYear(),
                 fim.getMonthValue(), fim.getYear()
         ).stream().map(row -> new CartaoDashboardResumoDto(
@@ -381,12 +384,12 @@ public class CartaoCreditoService {
     }
 
     private CartaoCredito findOwnedCartao(Long id) {
-        return cartaoRepo.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return cartaoRepo.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado: " + id));
     }
 
     private LancamentoCartao findOwnedLancamento(Long cartaoId, Long lancamentoId) {
-        return lancamentoRepo.findByIdAndCartaoCreditoIdAndUsuarioId(lancamentoId, cartaoId, securityCtx.getUsuarioId())
+        return lancamentoRepo.findByIdAndCartaoCreditoIdAndEmpresaId(lancamentoId, cartaoId, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Lançamento não encontrado: " + lancamentoId));
     }
 }

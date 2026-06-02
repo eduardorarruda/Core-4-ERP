@@ -5,6 +5,7 @@ import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.repository.ContaRepository;
+import br.com.core4erp.empresa.repository.EmpresaRepository;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoNotificacao;
 import br.com.core4erp.notificacao.entity.Notificacao;
@@ -28,17 +29,20 @@ public class SincronizacaoService {
     private final CartaoCreditoRepository cartaoRepository;
     private final CartaoCreditoService cartaoCreditoService;
     private final NotificacaoRepository notificacaoRepository;
+    private final EmpresaRepository empresaRepository;
 
     public SincronizacaoService(UsuarioRepository usuarioRepository,
                                 ContaRepository contaRepository,
                                 CartaoCreditoRepository cartaoRepository,
                                 CartaoCreditoService cartaoCreditoService,
-                                NotificacaoRepository notificacaoRepository) {
+                                NotificacaoRepository notificacaoRepository,
+                                EmpresaRepository empresaRepository) {
         this.usuarioRepository = usuarioRepository;
         this.contaRepository = contaRepository;
         this.cartaoRepository = cartaoRepository;
         this.cartaoCreditoService = cartaoCreditoService;
         this.notificacaoRepository = notificacaoRepository;
+        this.empresaRepository = empresaRepository;
     }
 
     /**
@@ -47,34 +51,35 @@ public class SincronizacaoService {
      * Idempotente: não duplica notificações.
      */
     @Transactional
-    public void sincronizar(Long usuarioId) {
-        cartaoCreditoService.gerarLancamentosAssinaturas(usuarioId);
-        sincronizarContasVencidas(usuarioId);
-        sincronizarFaturasCartao(usuarioId);
+    public void sincronizar(Long empresaId) {
+        cartaoCreditoService.gerarLancamentosAssinaturas(empresaId);
+        sincronizarContasVencidas(empresaId);
+        sincronizarFaturasCartao(empresaId);
     }
 
-    /** Sincroniza todos os usuários (chamada administrativa). */
+    /** Sincroniza todas as empresas (chamada administrativa). */
     @Transactional
     public void sincronizarTodos() {
-        usuarioRepository.findAllIds().forEach(this::sincronizar);
+        empresaRepository.findIdsAtivas().forEach(this::sincronizar);
     }
 
-    /** Gera lançamentos de assinaturas para todos os usuários às 7h diariamente. */
+    /** Gera lançamentos de assinaturas para todas as empresas às 7h diariamente. */
     @Scheduled(cron = "0 0 7 * * *")
     public void gerarAssinaturasScheduled() {
-        usuarioRepository.findAllIds().forEach(cartaoCreditoService::gerarLancamentosAssinaturas);
+        empresaRepository.findIdsAtivas().forEach(cartaoCreditoService::gerarLancamentosAssinaturas);
     }
 
     // ── Regra 1 ──────────────────────────────────────────────────────────────
 
-    private void sincronizarContasVencidas(Long uid) {
+    private void sincronizarContasVencidas(Long empresaId) {
         List<Conta> vencidas = contaRepository
-                .findByUsuarioIdAndStatusAndDataVencimentoBefore(uid, StatusConta.PENDENTE, LocalDate.now());
+                .findByEmpresaIdAndStatusAndDataVencimentoBefore(empresaId, StatusConta.PENDENTE, LocalDate.now());
 
         vencidas.forEach(c -> c.setStatus(StatusConta.ATRASADO));
         contaRepository.saveAll(vencidas);
 
         for (Conta conta : vencidas) {
+            Long uid = conta.getUsuario().getId();
             boolean jaNotificado = notificacaoRepository
                     .existsByUsuarioIdAndTipoAndReferenciaId(uid, TipoNotificacao.VENCIMENTO, conta.getId());
             if (!jaNotificado) {
@@ -87,13 +92,14 @@ public class SincronizacaoService {
 
     // ── Regra 2 ──────────────────────────────────────────────────────────────
 
-    private void sincronizarFaturasCartao(Long uid) {
+    private void sincronizarFaturasCartao(Long empresaId) {
         int diaHoje = LocalDate.now().getDayOfMonth();
-        List<CartaoCredito> cartoes = cartaoRepository.findAllByUsuarioId(uid);
+        List<CartaoCredito> cartoes = cartaoRepository.findAllByEmpresaId(empresaId);
 
         for (CartaoCredito cartao : cartoes) {
             if (!cartao.getDiaFechamento().equals(diaHoje)) continue;
 
+            Long uid = cartao.getUsuario().getId();
             YearMonth mesAtual = YearMonth.now();
             LocalDateTime inicioDoDia = LocalDate.now().atStartOfDay();
             LocalDateTime fimDoDia = LocalDate.now().atTime(23, 59, 59);

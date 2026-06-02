@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { auth, setLoginState } from '../lib/api';
+import { getFirstAccessibleRoute } from '../lib/routeUtils';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
 import HeroPane, { BrandMark } from '../components/login/HeroPane';
 
@@ -87,7 +88,9 @@ export default function Login() {
       const result = await auth.login(email, senha);
       setLoginState(result);
       setSuccess(true);
-      setTimeout(() => navigate('/dashboard'), 2400);
+      const permSet = new Set(result.empresas?.[0]?.permissoes ?? []);
+      const check = (cod) => result.adminSistema || permSet.has(cod);
+      setTimeout(() => navigate(getFirstAccessibleRoute(check)), 2400);
     } catch (err) {
       setErro(err.message || 'Credenciais inválidas');
     } finally {
@@ -305,7 +308,7 @@ export default function Login() {
                 Bem-vindo de volta!
               </div>
               <div style={{ color: 'rgba(250,250,250,.55)', fontSize: 14 }}>
-                Redirecionando para o dashboard…
+                Redirecionando…
               </div>
             </div>
           </div>
