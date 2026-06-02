@@ -194,19 +194,19 @@ export default function App() {
             <Route path="/conciliacao/:id"          element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
             <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><ConciliacaoRelatorio /></ProtectedLayout>} />
             <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
-            <Route path="/calendario"       element={<ProtectedLayout><Calendario /></ProtectedLayout>} />
+            <Route path="/calendario"       element={<ProtectedLayout><PermissaoRoute permissao="CALENDARIO_VISUALIZAR"><Calendario /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
-            <Route path="/audit"            element={<ProtectedLayout><AdminRoute><Audit /></AdminRoute></ProtectedLayout>} />
+            <Route path="/audit"            element={<ProtectedLayout><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
             <Route path="/categorias"       element={<ProtectedLayout><Categorias /></ProtectedLayout>} />
             <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
             <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
-            <Route path="/cartoes"                              element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />
-            <Route path="/cartoes/dashboard"                    element={<ProtectedLayout><CartaoDashboard /></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao"                  element={<ProtectedLayout><ConciliacaoCartao /></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao/historico"        element={<ProtectedLayout><ConciliacaoCartaoHistorico /></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao/:id"              element={<ProtectedLayout><ConciliacaoCartao /></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><ConciliacaoCartaoRelatorio /></ProtectedLayout>} />
+            <Route path="/cartoes"                              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_LANCAR"><Cartoes /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/dashboard"                    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_VISUALIZAR"><CartaoDashboard /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao"                  element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/historico"        element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoHistorico /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/:id"              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/investimentos"    element={<ProtectedLayout><Investimentos /></ProtectedLayout>} />
             <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />

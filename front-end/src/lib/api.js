@@ -153,6 +153,8 @@ export const operadores = {
     request(`/api/empresa/operadores/${usuarioId}/perfil`, { method: 'PUT', body: JSON.stringify({ perfilId }) }),
   remover: (usuarioId) =>
     request(`/api/empresa/operadores/${usuarioId}/remover`, { method: 'PATCH' }),
+  reativar: (usuarioId) =>
+    request(`/api/empresa/operadores/${usuarioId}/reativar`, { method: 'PATCH' }),
 };
 
 // ── Perfis de Acesso ──────────────────────────────────────────────────────────

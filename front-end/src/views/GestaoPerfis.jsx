@@ -6,15 +6,17 @@ const MODULO_LABEL = {
   CONTA: 'Lançamentos',
   CONTA_CORRENTE: 'Contas Correntes',
   CARTAO: 'Cartões',
+  CARTAO_CONCILIACAO: 'Conciliação de Cartão',
   CATEGORIA: 'Categorias',
   PARCEIRO: 'Parceiros',
   INVESTIMENTO: 'Investimentos',
   ASSINATURA: 'Assinaturas',
-  CONCILIACAO: 'Conciliação',
+  CONCILIACAO: 'Conciliação Bancária',
   RELATORIO: 'Relatórios',
   USUARIO: 'Usuários',
   CONFIGURACAO: 'Configurações',
   AUDITORIA: 'Auditoria',
+  CALENDARIO: 'Calendário',
 };
 
 const FORM_VAZIO = { nome: '', descricao: '', permissaoIds: new Set() };
@@ -43,7 +45,22 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave, loading }) {
   const togglePermissao = (id) => {
     setForm((prev) => {
       const ids = new Set(prev.permissaoIds);
-      ids.has(id) ? ids.delete(id) : ids.add(id);
+      const permissao = todasPermissoes.find((p) => p.id === id);
+      if (ids.has(id)) {
+        ids.delete(id);
+        // Ao remover VISUALIZAR, remove todas as outras do mesmo módulo
+        if (permissao?.acao === 'VISUALIZAR') {
+          const idsModulo = grupos[permissao.modulo]?.map((p) => p.id) ?? [];
+          idsModulo.forEach((mid) => ids.delete(mid));
+        }
+      } else {
+        ids.add(id);
+        // Ao adicionar qualquer ação não-VISUALIZAR, auto-adiciona VISUALIZAR do módulo
+        if (permissao && permissao.acao !== 'VISUALIZAR') {
+          const visualizar = grupos[permissao.modulo]?.find((p) => p.acao === 'VISUALIZAR');
+          if (visualizar) ids.add(visualizar.id);
+        }
+      }
       return { ...prev, permissaoIds: ids };
     });
   };

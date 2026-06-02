@@ -18,6 +18,8 @@ public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa, 
 
     Optional<UsuarioEmpresa> findByUsuarioIdAndEmpresaIdAndAtivoTrue(Long usuarioId, Long empresaId);
 
+    Optional<UsuarioEmpresa> findByUsuarioIdAndEmpresaId(Long usuarioId, Long empresaId);
+
     List<UsuarioEmpresa> findByUsuario_EmailAndAtivoTrue(String email);
 
     List<UsuarioEmpresa> findByEmpresaIdAndAtivoTrue(Long empresaId);

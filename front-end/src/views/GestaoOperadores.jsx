@@ -81,6 +81,16 @@ export default function GestaoOperadores() {
     }
   };
 
+  const reativar = async (usuarioId, nome) => {
+    if (!window.confirm(`Reativar ${nome} na empresa?`)) return;
+    try {
+      await operadores.reativar(usuarioId);
+      carregar();
+    } catch (err) {
+      setErro(err.message || 'Erro ao reativar operador.');
+    }
+  };
+
   const reenviarConvite = async (id) => {
     setReenvId(id);
     setErro('');
@@ -170,9 +180,15 @@ export default function GestaoOperadores() {
                     </span>
                   </td>
                   <td style={tdStyle}>
-                    <button onClick={() => remover(m.usuarioId, m.nome)} title="Remover" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,100,100,.06)', border: '1px solid rgba(255,100,100,.15)', color: '#FFB4AB', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                      <Trash2 size={13} />
-                    </button>
+                    {m.ativo ? (
+                      <button onClick={() => remover(m.usuarioId, m.nome)} title="Remover" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,100,100,.06)', border: '1px solid rgba(255,100,100,.15)', color: '#FFB4AB', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <button onClick={() => reativar(m.usuarioId, m.nome)} title="Reativar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(110,255,192,.06)', border: '1px solid rgba(110,255,192,.2)', color: '#6EFFC0', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
+                        <RotateCcw size={12} /> Reativar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
