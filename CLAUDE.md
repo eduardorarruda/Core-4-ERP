@@ -209,21 +209,40 @@ empresa/
   service/ConviteService.java          — convite e aceite de novos operadores
 ```
 
-**Códigos de permissão (tb_permissao, V19):**
+**Códigos de permissão (tb_permissao, V19 + V30):**
 ```
 CONTA_VISUALIZAR/CRIAR/EDITAR/DELETAR/BAIXAR/ESTORNAR
 CONTA_CORRENTE_VISUALIZAR/CRIAR/EDITAR/DELETAR/TRANSFERIR
 CARTAO_VISUALIZAR/CRIAR/EDITAR/DELETAR/LANCAR/FECHAR_FATURA
+CARTAO_CONCILIACAO_VISUALIZAR/IMPORTAR/VINCULAR   ← V30 (tela /cartoes/conciliacao)
 CATEGORIA_VISUALIZAR/CRIAR/EDITAR/DELETAR
 PARCEIRO_VISUALIZAR/CRIAR/EDITAR/DELETAR
 INVESTIMENTO_VISUALIZAR/CRIAR/EDITAR/DELETAR
 ASSINATURA_VISUALIZAR/CRIAR/EDITAR/DELETAR
-CONCILIACAO_VISUALIZAR/IMPORTAR/VINCULAR
+CONCILIACAO_VISUALIZAR/IMPORTAR/VINCULAR           (conciliação bancária)
 RELATORIO_EXPORTAR
 USUARIO_VISUALIZAR/CONVIDAR/EDITAR/REMOVER
 AUDITORIA_VISUALIZAR
 CONFIGURACAO_EDITAR
+CALENDARIO_VISUALIZAR                              ← V30 (tela /calendario)
 ```
+
+**Mapeamento tela → permissão (frontend):**
+```
+/cartoes/dashboard          → CARTAO_VISUALIZAR
+/cartoes (lançamentos)      → CARTAO_LANCAR
+/cartoes/conciliacao        → CARTAO_CONCILIACAO_VISUALIZAR
+/calendario                 → CALENDARIO_VISUALIZAR
+/audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute, não AdminRoute)
+/empresa/operadores         → USUARIO_VISUALIZAR
+/empresa/perfis             → CONFIGURACAO_EDITAR
+/admin/planos               → AdminRoute (adminSistema)
+```
+
+**Regra de dependência VISUALIZAR em Perfis (GestaoPerfis.jsx):**
+- Ao habilitar qualquer ação que não seja VISUALIZAR em um módulo → VISUALIZAR desse módulo é adicionado automaticamente.
+- Ao desabilitar VISUALIZAR de um módulo → todas as outras ações do módulo são também removidas.
+- Implementado em `togglePermissao()` no `ModalPerfil`.
 
 **Métodos de TenantContext usados nos services:**
 - `temPermissao(String codigo)` → boolean; verificação sem exceção
@@ -244,6 +263,16 @@ CONFIGURACAO_EDITAR
 - `/admin/planos` → `AdminRoute`
 - `/empresa/operadores` → `PermissaoRoute("USUARIO_VISUALIZAR")`
 - `/empresa/perfis` → `PermissaoRoute("CONFIGURACAO_EDITAR")`
+- `/audit` → `PermissaoRoute("AUDITORIA_VISUALIZAR")` (não AdminRoute)
+- `/calendario` → `PermissaoRoute("CALENDARIO_VISUALIZAR")`
+- `/cartoes/dashboard` → `PermissaoRoute("CARTAO_VISUALIZAR")`
+- `/cartoes` → `PermissaoRoute("CARTAO_LANCAR")`
+- `/cartoes/conciliacao` e sub-rotas → `PermissaoRoute("CARTAO_CONCILIACAO_VISUALIZAR")`
+
+**Operadores — reativação:**
+- `PATCH /api/empresa/operadores/{usuarioId}/reativar` — requer `USUARIO_EDITAR`
+- `OperadorService.reativar()` usa `findByUsuarioIdAndEmpresaId()` (sem filtro ativo) para encontrar inativos
+- Frontend: botão "Reativar" aparece para operadores com `ativo=false`; botão "Remover" para `ativo=true`
 
 ---
 
@@ -299,7 +328,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V30** (V29 já existe).
+- **Próxima migration disponível: V31** (V30 já existe).
 
 **Sequência de migrations:**
 ```
@@ -330,6 +359,7 @@ V26     create_tb_plano
 V27     create_tb_convite
 V28     create_tb_pagamento_mock
 V29     fix_tipo_conta_to_varchar
+V30     add_calendario_e_cartao_conciliacao_permissions
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.

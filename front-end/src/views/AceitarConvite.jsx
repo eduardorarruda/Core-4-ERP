@@ -28,11 +28,18 @@ export default function AceitarConvite() {
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
+  const senhaReqs = {
+    tamanho: form.senha.length >= 8,
+    maiuscula: /[A-Z]/.test(form.senha),
+    numero: /[0-9]/.test(form.senha),
+  };
+  const senhaValida = senhaReqs.tamanho && senhaReqs.maiuscula && senhaReqs.numero;
+
   const handleAceitar = async (e) => {
     e.preventDefault();
     setErro('');
     if (form.senha !== form.confirmarSenha) { setErro('As senhas não coincidem.'); return; }
-    if (form.senha.length < 8) { setErro('A senha deve ter no mínimo 8 caracteres.'); return; }
+    if (!senhaValida) { setErro('A senha não atende a todos os requisitos.'); return; }
     setLoading(true);
     try {
       await convites.aceitar({ token, nome: form.nome, senha: form.senha });
@@ -125,6 +132,26 @@ export default function AceitarConvite() {
           <form onSubmit={handleAceitar}>
             <FloatingInput id="nome" label="Seu nome completo" type="text" value={form.nome} onChange={set('nome')} autoComplete="name" required />
             <FloatingPasswordInput id="senha" label="Crie uma senha" value={form.senha} onChange={set('senha')} autoComplete="new-password" required />
+
+            {form.senha.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', marginBottom: 12 }}>
+                {[
+                  { ok: senhaReqs.tamanho,   label: 'Mínimo 8 caracteres' },
+                  { ok: senhaReqs.maiuscula, label: 'Pelo menos uma letra maiúscula' },
+                  { ok: senhaReqs.numero,    label: 'Pelo menos um número' },
+                ].map(({ ok, label }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontFamily: "'DM Sans', sans-serif", color: ok ? '#6EFFC0' : 'rgba(250,250,250,.4)' }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      {ok
+                        ? <path d="M2 6l3 3 5-5" stroke="#6EFFC0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        : <circle cx="6" cy="6" r="5" stroke="rgba(250,250,250,.2)" strokeWidth="1.5"/>}
+                    </svg>
+                    {label}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <FloatingPasswordInput id="confirmarSenha" label="Confirmar senha" value={form.confirmarSenha} onChange={set('confirmarSenha')} autoComplete="new-password" required />
 
             {erro && <div style={S.errBanner}>{erro}</div>}

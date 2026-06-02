@@ -45,4 +45,11 @@ public class OperadorController {
         operadorService.remover(usuarioId);
         return ResponseEntity.noContent().build();
     }
+
+    @Operation(summary = "Reativar operador previamente desativado")
+    @PatchMapping("/{usuarioId}/reativar")
+    @Requer("USUARIO_EDITAR")
+    public ResponseEntity<OperadorResponseDto> reativar(@PathVariable Long usuarioId) {
+        return ResponseEntity.ok(operadorService.reativar(usuarioId));
+    }
 }

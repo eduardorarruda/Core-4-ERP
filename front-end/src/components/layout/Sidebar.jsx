@@ -19,21 +19,21 @@ const NAV_GROUPS = [
   {
     label: 'Financeiro',
     items: [
-      { id: 'parceiros',        icon: Users,       label: 'Parceiros',        path: '/parceiros' },
-      { id: 'categorias',       icon: Tag,         label: 'Categorias',       path: '/categorias' },
-      { id: 'contas-correntes', icon: Landmark,    label: 'Contas Correntes', path: '/contas-correntes' },
-      { id: 'contas',           icon: FileText,    label: 'Lançamentos',      path: '/contas' },
+      { id: 'parceiros',        icon: Users,       label: 'Parceiros',        path: '/parceiros', permissao: 'PARCEIRO_VISUALIZAR' },
+      { id: 'categorias',       icon: Tag,         label: 'Categorias',       path: '/categorias', permissao: 'CATEGORIA_VISUALIZAR' },
+      { id: 'contas-correntes', icon: Landmark,    label: 'Contas Correntes', path: '/contas-correntes', permissao: 'CONTA_CORRENTE_VISUALIZAR' },
+      { id: 'contas',           icon: FileText,    label: 'Lançamentos',      path: '/contas', permissao: 'CONTA_VISUALIZAR' },
       { id: 'cartoes-dropdown', type: 'DROPDOWN', icon: CreditCard, label: 'Cartões' },
-      { id: 'investimentos',    icon: TrendingUp,  label: 'Investimentos',    path: '/investimentos' },
-      { id: 'assinaturas',      icon: Repeat,      label: 'Assinaturas',      path: '/assinaturas' },
-      { id: 'conciliacao',      icon: GitMerge,    label: 'Conciliação',      path: '/conciliacao' },
+      { id: 'investimentos',    icon: TrendingUp,  label: 'Investimentos',    path: '/investimentos', permissao: 'INVESTIMENTO_VISUALIZAR' },
+      { id: 'assinaturas',      icon: Repeat,      label: 'Assinaturas',      path: '/assinaturas', permissao: 'ASSINATURA_VISUALIZAR' },
+      { id: 'conciliacao',      icon: GitMerge,    label: 'Conciliação',      path: '/conciliacao', permissao: 'CONCILIACAO_VISUALIZAR' },
     ],
   },
   {
     label: 'Análises',
     items: [
       { id: 'notificacoes', icon: Bell,         label: 'Notificações', path: '/notificacoes' },
-      { id: 'calendario',   icon: CalendarDays, label: 'Calendário',   path: '/calendario' },
+      { id: 'calendario',   icon: CalendarDays, label: 'Calendário',   path: '/calendario', permissao: 'CALENDARIO_VISUALIZAR' },
       { id: 'reports',      icon: BarChart3,    label: 'Relatórios',   path: '/reports' },
     ],
   },
@@ -86,14 +86,17 @@ function BrandMark({ expanded }) {
 }
 
 const CARTAO_SUB_ITEMS = [
-  { label: 'Dashboard',    path: '/cartoes/dashboard' },
-  { label: 'Lançamentos',  path: '/cartoes' },
-  { label: 'Conciliação',  path: '/cartoes/conciliacao' },
+  { label: 'Dashboard',    path: '/cartoes/dashboard',  permissao: 'CARTAO_VISUALIZAR' },
+  { label: 'Lançamentos',  path: '/cartoes',             permissao: 'CARTAO_LANCAR' },
+  { label: 'Conciliação',  path: '/cartoes/conciliacao', permissao: 'CARTAO_CONCILIACAO_VISUALIZAR' },
 ];
 
-function CartaoDropdown({ onClose }) {
+function CartaoDropdown({ onClose, temPermissao }) {
   const [open, setOpen] = useState(false);
   const isActive = useMatch('/cartoes/*');
+
+  const visibleSubItems = CARTAO_SUB_ITEMS.filter((sub) => temPermissao(sub.permissao));
+  if (visibleSubItems.length === 0) return null;
 
   return (
     <>
@@ -113,7 +116,7 @@ function CartaoDropdown({ onClose }) {
       </button>
       {open && (
         <div className="pl-8 space-y-0.5 opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
-          {CARTAO_SUB_ITEMS.map((sub) => (
+          {visibleSubItems.map((sub) => (
             <NavLink
               key={sub.path}
               to={sub.path}
@@ -161,7 +164,7 @@ export default function Sidebar({ onClose }) {
               </div>
               {visibleItems.map((item) =>
                 item.type === 'DROPDOWN'
-                  ? <CartaoDropdown key={item.id} onClose={onClose} />
+                  ? <CartaoDropdown key={item.id} onClose={onClose} temPermissao={temPermissao} />
                   : (
                     <NavLink
                       key={item.id}

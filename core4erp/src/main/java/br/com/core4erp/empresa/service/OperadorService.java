@@ -68,6 +68,20 @@ public class OperadorService {
         usuarioEmpresaRepository.save(ue);
     }
 
+    @Requer("USUARIO_EDITAR")
+    @Transactional
+    public OperadorResponseDto reativar(Long usuarioId) {
+        UsuarioEmpresa ue = usuarioEmpresaRepository
+            .findByUsuarioIdAndEmpresaId(usuarioId, tenantCtx.getEmpresaId())
+            .orElseThrow(() -> new EntityNotFoundException("Operador não encontrado nesta empresa"));
+        if ("PROPRIETARIO".equals(ue.getPerfil().getNome())) {
+            throw new BusinessException("OPERACAO_INVALIDA",
+                "Operação não permitida para o proprietário");
+        }
+        ue.setAtivo(true);
+        return toDto(usuarioEmpresaRepository.save(ue));
+    }
+
     private UsuarioEmpresa buscarMembro(Long usuarioId) {
         return usuarioEmpresaRepository
             .findByUsuarioIdAndEmpresaIdAndAtivoTrue(usuarioId, tenantCtx.getEmpresaId())
