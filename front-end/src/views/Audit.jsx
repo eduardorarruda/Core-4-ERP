@@ -53,7 +53,7 @@ export default function Audit() {
       dataInicio: dataInicio || undefined,
       dataFim: dataFim || undefined,
       size: 50,
-      sort: 'timestamp,desc',
+      sort: 'dataHora,desc',
     }).then((page) => {
       setLogs(page?.content ?? []);
       setTotal(page?.totalElements ?? 0);
