@@ -1,5 +1,6 @@
 package br.com.core4erp.dashboard.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto;
 import br.com.core4erp.dashboard.dto.SaldoDetalhadoResponseDto;
 import br.com.core4erp.dashboard.service.DashboardService;
@@ -23,12 +24,14 @@ public class DashboardController {
 
     @Operation(summary = "Retorna saldos, totais, fluxo mensal e despesas por categoria")
     @GetMapping
+    @Requer("DASHBOARD_VISUALIZAR")
     public ResponseEntity<DashboardResponseDto> getDashboard() {
         return ResponseEntity.ok(service.getDashboard());
     }
 
     @Operation(summary = "Retorna saldo detalhado com composição, projeções e cartão")
     @GetMapping("/saldo-detalhado")
+    @Requer("DASHBOARD_CARTAO_VISUALIZAR")
     public ResponseEntity<SaldoDetalhadoResponseDto> getSaldoDetalhado() {
         return ResponseEntity.ok(service.getSaldoDetalhado());
     }

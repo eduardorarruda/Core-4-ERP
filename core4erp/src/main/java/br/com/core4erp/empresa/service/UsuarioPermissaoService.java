@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -131,14 +132,33 @@ public class UsuarioPermissaoService {
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public PermissoesUsuarioResponseDto substituirTodas(Long usuarioId, PermissaoUsuarioBulkRequestDto dto) {
         validarNaoEhProprietario(usuarioId);
-        buscarMembroNaEmpresa(usuarioId);
+        UsuarioEmpresa ue = buscarMembroNaEmpresa(usuarioId);
 
         List<UsuarioEmpresaPermissao> atuais =
             permissaoUsuarioRepository.findByUsuarioIdAndEmpresaId(usuarioId, tenantCtx.getEmpresaId());
         permissaoUsuarioRepository.deleteAll(atuais);
         permissaoUsuarioRepository.flush();
 
-        dto.permissoes().forEach(p -> concederOuRevogar(usuarioId, p));
+        // IDs que o admin quer manter concedidos (não revogados)
+        Set<Long> idsConcedidos = dto.permissoes().stream()
+            .filter(p -> !Boolean.TRUE.equals(p.revogada()))
+            .map(PermissaoUsuarioRequestDto::permissaoId)
+            .collect(Collectors.toSet());
+
+        // Mapa final indexado por permissaoId — itens explícitos têm prioridade
+        Map<Long, PermissaoUsuarioRequestDto> toApply = new LinkedHashMap<>();
+        dto.permissoes().forEach(p -> toApply.put(p.permissaoId(), p));
+
+        // Permissões do perfil não cobertas pelo DTO devem ser explicitamente revogadas;
+        // caso contrário, o usuário as manteria pelo perfil mesmo após um "substituir tudo"
+        ue.getPerfil().getPermissoes().forEach(perm -> {
+            if (!toApply.containsKey(perm.getId()) && !idsConcedidos.contains(perm.getId())) {
+                toApply.put(perm.getId(),
+                    new PermissaoUsuarioRequestDto(perm.getId(), true, "Revogação automática por substituição"));
+            }
+        });
+
+        toApply.values().forEach(p -> concederOuRevogar(usuarioId, p));
         return listar(usuarioId);
     }
 

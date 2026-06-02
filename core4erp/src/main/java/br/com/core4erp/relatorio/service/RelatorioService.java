@@ -1,5 +1,6 @@
 package br.com.core4erp.relatorio.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.assinatura.entity.Assinatura;
 import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
@@ -59,6 +60,7 @@ public class RelatorioService {
 
     // ── Fluxo de Caixa ───────────────────────────────────────────────────────
 
+    @Requer("RELATORIO_FLUXO_CAIXA_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosFluxoCaixa(
             LocalDate inicio, LocalDate fim,
@@ -104,6 +106,7 @@ public class RelatorioService {
 
     // ── Contas Abertas ───────────────────────────────────────────────────────
 
+    @Requer("RELATORIO_CONTAS_ABERTAS_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosContasAbertas(
             LocalDate inicio, LocalDate fim,
@@ -154,6 +157,7 @@ public class RelatorioService {
 
     // ── Extrato ──────────────────────────────────────────────────────────────
 
+    @Requer("RELATORIO_EXTRATO_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosExtrato(
             LocalDate inicio, LocalDate fim,
@@ -211,6 +215,7 @@ public class RelatorioService {
 
     // ── DRE ─────────────────────────────────────────────────────────────────
 
+    @Requer("RELATORIO_DRE_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosDre(LocalDate inicio, LocalDate fim, TipoConta tipo) {
 
@@ -260,6 +265,7 @@ public class RelatorioService {
 
     // ── Investimentos ────────────────────────────────────────────────────────
 
+    @Requer("RELATORIO_INVESTIMENTOS_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosInvestimentos(
             LocalDate inicio, LocalDate fim,
@@ -321,6 +327,7 @@ public class RelatorioService {
 
     // ── Posição Financeira ───────────────────────────────────────────────────
 
+    @Requer("RELATORIO_POSICAO_FINANCEIRA_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosPosicaoFinanceira(LocalDate inicio, LocalDate fim) {
         Long uid = securityCtx.getUsuarioId();
@@ -401,6 +408,7 @@ public class RelatorioService {
 
     // ── Assinaturas ──────────────────────────────────────────────────────────
 
+    @Requer("RELATORIO_ASSINATURAS_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosAssinaturas(Boolean soAtivas) {
         Long uid = securityCtx.getUsuarioId();
@@ -437,6 +445,7 @@ public class RelatorioService {
 
     // ── Cartões de Crédito ───────────────────────────────────────────────────
 
+    @Requer("RELATORIO_CARTOES_VISUALIZAR")
     @Transactional(readOnly = true)
     public RelatorioResponseDto getDadosCartoes(
             LocalDate inicio, LocalDate fim,

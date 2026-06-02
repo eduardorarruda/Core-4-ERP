@@ -1,5 +1,6 @@
 package br.com.core4erp.dashboard.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
@@ -70,6 +71,7 @@ public class DashboardService {
      * fluxo mensal dos últimos 6 meses e top-5 despesas por categoria do mês corrente.
      * Todas as somas são feitas via queries agregadas no banco para evitar carregamento em memória.
      */
+    @Requer("DASHBOARD_VISUALIZAR")
     @Transactional(readOnly = true)
     public DashboardResponseDto getDashboard() {
         Long uid = securityCtx.getUsuarioId();
@@ -133,6 +135,7 @@ public class DashboardService {
                 totalMensalAssinaturas);
     }
 
+    @Requer("DASHBOARD_CARTAO_VISUALIZAR")
     @Transactional(readOnly = true)
     public SaldoDetalhadoResponseDto getSaldoDetalhado() {
         Long uid = securityCtx.getUsuarioId();

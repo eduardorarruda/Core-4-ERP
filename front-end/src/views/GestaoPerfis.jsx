@@ -13,10 +13,20 @@ const MODULO_LABEL = {
   ASSINATURA: 'Assinaturas',
   CONCILIACAO: 'Conciliação Bancária',
   RELATORIO: 'Relatórios',
+  RELATORIO_FLUXO_CAIXA: 'Relatório: Fluxo de Caixa',
+  RELATORIO_CONTAS_ABERTAS: 'Relatório: Contas Abertas',
+  RELATORIO_EXTRATO: 'Relatório: Extrato',
+  RELATORIO_DRE: 'Relatório: DRE',
+  RELATORIO_INVESTIMENTOS: 'Relatório: Investimentos',
+  RELATORIO_CARTOES: 'Relatório: Cartões',
+  RELATORIO_POSICAO_FINANCEIRA: 'Relatório: Posição Financeira',
+  RELATORIO_ASSINATURAS: 'Relatório: Assinaturas',
   USUARIO: 'Usuários',
   CONFIGURACAO: 'Configurações',
   AUDITORIA: 'Auditoria',
   CALENDARIO: 'Calendário',
+  DASHBOARD: 'Dashboard Geral',
+  DASHBOARD_CARTAO: 'Dashboard de Cartões',
 };
 
 const FORM_VAZIO = { nome: '', descricao: '', permissaoIds: new Set() };
