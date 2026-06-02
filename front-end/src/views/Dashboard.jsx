@@ -11,6 +11,7 @@ import DespesasPanel from '../components/dashboard/DespesasPanel';
 import CarteiraPanel from '../components/dashboard/CarteiraPanel';
 import AssinaturasPanel from '../components/dashboard/AssinaturasPanel';
 import AcessoRapidoPanel from '../components/dashboard/AcessoRapidoPanel';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
 import { dashboard, investimentos, assinaturas as assinaturasApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { ThemeContext } from '../context/ThemeContext';
@@ -171,9 +172,11 @@ export default function Dashboard() {
           mediaEntradas={mediaEntradas}
         />
 
-        <div className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-2">
-          <SaldoDetalhadoPanel />
-        </div>
+        <PermissaoGuard permissao="DASHBOARD_CARTAO_VISUALIZAR">
+          <div className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-2">
+            <SaldoDetalhadoPanel />
+          </div>
+        </PermissaoGuard>
 
         <ResultadosCaixaChart resultsData={resultsData} carregando={carregando} isDark={isDark} />
 

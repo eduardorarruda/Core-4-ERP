@@ -209,7 +209,7 @@ empresa/
   service/ConviteService.java          — convite e aceite de novos operadores
 ```
 
-**Códigos de permissão (tb_permissao, V19 + V30):**
+**Códigos de permissão (tb_permissao, V19 + V30 + V31):**
 ```
 CONTA_VISUALIZAR/CRIAR/EDITAR/DELETAR/BAIXAR/ESTORNAR
 CONTA_CORRENTE_VISUALIZAR/CRIAR/EDITAR/DELETAR/TRANSFERIR
@@ -218,20 +218,36 @@ CARTAO_CONCILIACAO_VISUALIZAR/IMPORTAR/VINCULAR   ← V30 (tela /cartoes/concili
 CATEGORIA_VISUALIZAR/CRIAR/EDITAR/DELETAR
 PARCEIRO_VISUALIZAR/CRIAR/EDITAR/DELETAR
 INVESTIMENTO_VISUALIZAR/CRIAR/EDITAR/DELETAR
+INVESTIMENTO_TIPO_GERENCIAR                       ← V31 (gerenciar tipos de investimento)
 ASSINATURA_VISUALIZAR/CRIAR/EDITAR/DELETAR
 CONCILIACAO_VISUALIZAR/IMPORTAR/VINCULAR           (conciliação bancária)
-RELATORIO_EXPORTAR
+RELATORIO_EXPORTAR                                 (legado V19 — não usado por @Requer)
+RELATORIO_FLUXO_CAIXA_VISUALIZAR/EXPORTAR         ← V31
+RELATORIO_CONTAS_ABERTAS_VISUALIZAR/EXPORTAR      ← V31
+RELATORIO_EXTRATO_VISUALIZAR/EXPORTAR             ← V31
+RELATORIO_DRE_VISUALIZAR/EXPORTAR                 ← V31
+RELATORIO_INVESTIMENTOS_VISUALIZAR/EXPORTAR       ← V31
+RELATORIO_CARTOES_VISUALIZAR/EXPORTAR             ← V31
+RELATORIO_POSICAO_FINANCEIRA_VISUALIZAR/EXPORTAR  ← V31
+RELATORIO_ASSINATURAS_VISUALIZAR/EXPORTAR         ← V31
 USUARIO_VISUALIZAR/CONVIDAR/EDITAR/REMOVER
 AUDITORIA_VISUALIZAR
 CONFIGURACAO_EDITAR
 CALENDARIO_VISUALIZAR                              ← V30 (tela /calendario)
+DASHBOARD_VISUALIZAR                               ← V31 (GET /api/dashboard)
+DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/saldo-detalhado)
 ```
 
 **Mapeamento tela → permissão (frontend):**
 ```
+/dashboard                  → sem PermissaoRoute (aterrissagem); SaldoDetalhadoPanel usa PermissaoGuard("DASHBOARD_CARTAO_VISUALIZAR")
 /cartoes/dashboard          → CARTAO_VISUALIZAR
 /cartoes (lançamentos)      → CARTAO_LANCAR
 /cartoes/conciliacao        → CARTAO_CONCILIACAO_VISUALIZAR
+/categorias                 → CATEGORIA_VISUALIZAR  (PermissaoRoute)
+/investimentos              → INVESTIMENTO_VISUALIZAR (PermissaoRoute)
+/reports                    → sem PermissaoRoute; cada card usa PermissaoGuard(RELATORIO_*_VISUALIZAR)
+                              botão Excel visível só com RELATORIO_*_EXPORTAR
 /calendario                 → CALENDARIO_VISUALIZAR
 /audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute, não AdminRoute)
 /empresa/operadores         → USUARIO_VISUALIZAR
@@ -265,9 +281,13 @@ CALENDARIO_VISUALIZAR                              ← V30 (tela /calendario)
 - `/empresa/perfis` → `PermissaoRoute("CONFIGURACAO_EDITAR")`
 - `/audit` → `PermissaoRoute("AUDITORIA_VISUALIZAR")` (não AdminRoute)
 - `/calendario` → `PermissaoRoute("CALENDARIO_VISUALIZAR")`
+- `/categorias` → `PermissaoRoute("CATEGORIA_VISUALIZAR")`
+- `/investimentos` → `PermissaoRoute("INVESTIMENTO_VISUALIZAR")`
 - `/cartoes/dashboard` → `PermissaoRoute("CARTAO_VISUALIZAR")`
 - `/cartoes` → `PermissaoRoute("CARTAO_LANCAR")`
 - `/cartoes/conciliacao` e sub-rotas → `PermissaoRoute("CARTAO_CONCILIACAO_VISUALIZAR")`
+- `/reports` → sem PermissaoRoute; PermissaoGuard por card (RELATORIO_*_VISUALIZAR / EXPORTAR)
+- `/dashboard` → sem PermissaoRoute; SaldoDetalhadoPanel gateado por DASHBOARD_CARTAO_VISUALIZAR
 
 **Operadores — reativação:**
 - `PATCH /api/empresa/operadores/{usuarioId}/reativar` — requer `USUARIO_EDITAR`
@@ -328,7 +348,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V31** (V30 já existe).
+- **Próxima migration disponível: V32** (V31 já existe).
 
 **Sequência de migrations:**
 ```
@@ -360,6 +380,7 @@ V27     create_tb_convite
 V28     create_tb_pagamento_mock
 V29     fix_tipo_conta_to_varchar
 V30     add_calendario_e_cartao_conciliacao_permissions
+V31     add_relatorio_investimento_dashboard_permissions
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
@@ -429,6 +450,11 @@ public Page<OperadorResponseDto> listar(Pageable pageable) {
 invalidarCache(ue.getUsuario().getEmail());  // ANTES
 permissaoUsuarioRepository.save(registro);
 ```
+
+**`substituirTodas` gera revogações automáticas para permissões de perfil:**
+- Após deletar as diretas existentes, para cada permissão do perfil do usuário que NÃO esteja no conjunto desejado (idsConcedidos), cria automaticamente uma revogação (revogada=true).
+- Garante que "Somente Deletar" de fato remove CRIAR/EDITAR do perfil, sem depender do frontend enviar revogações explícitas.
+- Itens explícitos do DTO têm prioridade sobre revogações automáticas (LinkedHashMap com chave por permissaoId).
 
 **Log sem email em plaintext (LGPD):**
 ```java

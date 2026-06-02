@@ -11,6 +11,7 @@ export default function ReportCard({
   title, description, icon: Icon,
   onGetData, onDownloadXlsx, onError,
   filterConfig = [],
+  canExport = true,
 }) {
   const [loading, setLoading] = useState({ online: false, pdf: false, xlsx: false });
   const [periodo, setPeriodo] = useState({
@@ -110,7 +111,7 @@ export default function ReportCard({
             onToggle={() => setFiltersOpen(v => !v)}
           />
 
-          <FormatButtons loading={loading} onSelect={handleSelect} />
+          <FormatButtons loading={loading} onSelect={handleSelect} canExport={canExport} />
         </div>
       </BentoCard>
 

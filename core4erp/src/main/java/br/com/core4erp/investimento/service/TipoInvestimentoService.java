@@ -1,5 +1,6 @@
 package br.com.core4erp.investimento.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.investimento.dto.TipoInvestimentoRequestDto;
 import br.com.core4erp.investimento.dto.TipoInvestimentoResponseDto;
@@ -22,12 +23,14 @@ public class TipoInvestimentoService {
         this.securityCtx = securityCtx;
     }
 
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     @Transactional(readOnly = true)
     public List<TipoInvestimentoResponseDto> listar() {
         return tipoRepo.findAllByUsuarioId(securityCtx.getUsuarioId())
                 .stream().map(TipoInvestimentoResponseDto::from).toList();
     }
 
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     @Transactional
     public TipoInvestimentoResponseDto criar(TipoInvestimentoRequestDto dto) {
         TipoInvestimentoCustom t = new TipoInvestimentoCustom();
@@ -36,6 +39,7 @@ public class TipoInvestimentoService {
         return TipoInvestimentoResponseDto.from(tipoRepo.save(t));
     }
 
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     @Transactional
     public TipoInvestimentoResponseDto atualizar(Long id, TipoInvestimentoRequestDto dto) {
         TipoInvestimentoCustom t = findOwned(id);
@@ -43,6 +47,7 @@ public class TipoInvestimentoService {
         return TipoInvestimentoResponseDto.from(tipoRepo.save(t));
     }
 
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     @Transactional
     public void deletar(Long id) {
         TipoInvestimentoCustom t = findOwned(id);

@@ -4,6 +4,7 @@ import br.com.core4erp.categoria.dto.CategoriaRequestDto;
 import br.com.core4erp.categoria.dto.CategoriaResponseDto;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ public class CategoriaService {
         this.securityCtx = securityCtx;
     }
 
+    @Requer("CATEGORIA_VISUALIZAR")
     @Transactional(readOnly = true)
     public Page<CategoriaResponseDto> listar(Pageable pageable) {
         Long usuarioId = securityCtx.getUsuarioId();
@@ -29,11 +31,13 @@ public class CategoriaService {
                 .map(CategoriaResponseDto::from);
     }
 
+    @Requer("CATEGORIA_VISUALIZAR")
     @Transactional(readOnly = true)
     public CategoriaResponseDto buscarPorId(Long id) {
         return CategoriaResponseDto.from(findOwned(id));
     }
 
+    @Requer("CATEGORIA_CRIAR")
     @Transactional
     public CategoriaResponseDto criar(CategoriaRequestDto dto) {
         Categoria categoria = new Categoria();
@@ -43,6 +47,7 @@ public class CategoriaService {
         return CategoriaResponseDto.from(categoriaRepository.save(categoria));
     }
 
+    @Requer("CATEGORIA_EDITAR")
     @Transactional
     public CategoriaResponseDto atualizar(Long id, CategoriaRequestDto dto) {
         Categoria categoria = findOwned(id);
@@ -51,6 +56,7 @@ public class CategoriaService {
         return CategoriaResponseDto.from(categoriaRepository.save(categoria));
     }
 
+    @Requer("CATEGORIA_DELETAR")
     @Transactional
     public void deletar(Long id) {
         Categoria categoria = findOwned(id);

@@ -3,7 +3,9 @@ import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard, Wallet
 import { relatorios, categorias, parceiros, cartoes, contasCorrentes, investimentos } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import ReportCard from '../components/reports/ReportCard';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
 import { useToast } from '../hooks/useToast';
+import { useAuth } from '../hooks/useAuth';
 
 const fetchCategorias = () =>
   categorias.listar().then((cs) => cs.map((c) => ({ value: String(c.id), label: c.descricao })));
@@ -48,6 +50,8 @@ const REPORT_CARDS = [
     onGetData: relatorios.dados.posicaoFinanceira,
     onDownloadXlsx: relatorios.posicaoFinanceira,
     filterConfig: [],
+    visualizarPermissao: 'RELATORIO_POSICAO_FINANCEIRA_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_POSICAO_FINANCEIRA_EXPORTAR',
   },
   {
     id: 'R01',
@@ -61,6 +65,8 @@ const REPORT_CARDS = [
       { key: 'categoriaId', label: 'Categoria', type: 'async-select', fetchFn: fetchCategorias },
       { key: 'parceiroId', label: 'Parceiro', type: 'async-select', fetchFn: fetchParceiros },
     ],
+    visualizarPermissao: 'RELATORIO_FLUXO_CAIXA_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_FLUXO_CAIXA_EXPORTAR',
   },
   {
     id: 'R02',
@@ -75,6 +81,8 @@ const REPORT_CARDS = [
       { key: 'categoriaId', label: 'Categoria', type: 'async-select', fetchFn: fetchCategorias },
       { key: 'parceiroId', label: 'Parceiro', type: 'async-select', fetchFn: fetchParceiros },
     ],
+    visualizarPermissao: 'RELATORIO_CONTAS_ABERTAS_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_CONTAS_ABERTAS_EXPORTAR',
   },
   {
     id: 'R03',
@@ -88,6 +96,8 @@ const REPORT_CARDS = [
       { key: 'contaCorrenteId', label: 'Conta Corrente', type: 'async-select', fetchFn: fetchContasCorrentes },
       { key: 'categoriaId', label: 'Categoria', type: 'async-select', fetchFn: fetchCategorias },
     ],
+    visualizarPermissao: 'RELATORIO_EXTRATO_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_EXTRATO_EXPORTAR',
   },
   {
     id: 'R04',
@@ -104,6 +114,8 @@ const REPORT_CARDS = [
         ],
       },
     ],
+    visualizarPermissao: 'RELATORIO_DRE_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_DRE_EXPORTAR',
   },
   {
     id: 'R05',
@@ -116,6 +128,8 @@ const REPORT_CARDS = [
       { key: 'tipoTransacao', label: 'Tipo de Transação', type: 'select', options: TIPO_TRANSACAO_OPTS },
       { key: 'contaInvestimentoId', label: 'Carteira', type: 'async-select', fetchFn: fetchCarteiraInvestimento },
     ],
+    visualizarPermissao: 'RELATORIO_INVESTIMENTOS_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_INVESTIMENTOS_EXPORTAR',
   },
   {
     id: 'R06',
@@ -128,6 +142,8 @@ const REPORT_CARDS = [
       { key: 'cartaoId', label: 'Cartão', type: 'async-select', fetchFn: fetchCartoes },
       { key: 'categoriaId', label: 'Categoria', type: 'async-select', fetchFn: fetchCategorias },
     ],
+    visualizarPermissao: 'RELATORIO_CARTOES_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_CARTOES_EXPORTAR',
   },
   {
     id: 'R07',
@@ -144,11 +160,14 @@ const REPORT_CARDS = [
         ],
       },
     ],
+    visualizarPermissao: 'RELATORIO_ASSINATURAS_VISUALIZAR',
+    exportarPermissao:   'RELATORIO_ASSINATURAS_EXPORTAR',
   },
 ];
 
 export default function Reports() {
   const toast = useToast();
+  const { temPermissao } = useAuth();
 
   return (
     <div className="space-y-6">
@@ -159,16 +178,18 @@ export default function Reports() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {REPORT_CARDS.map((card) => (
-          <ReportCard
-            key={card.id}
-            title={card.title}
-            description={card.description}
-            icon={card.icon}
-            onGetData={card.onGetData}
-            onDownloadXlsx={card.onDownloadXlsx}
-            filterConfig={card.filterConfig}
-            onError={(msg) => toast.error(msg)}
-          />
+          <PermissaoGuard key={card.id} permissao={card.visualizarPermissao}>
+            <ReportCard
+              title={card.title}
+              description={card.description}
+              icon={card.icon}
+              onGetData={card.onGetData}
+              onDownloadXlsx={card.onDownloadXlsx}
+              filterConfig={card.filterConfig}
+              canExport={temPermissao(card.exportarPermissao)}
+              onError={(msg) => toast.error(msg)}
+            />
+          </PermissaoGuard>
         ))}
       </div>
     </div>

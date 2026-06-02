@@ -1,5 +1,6 @@
 package br.com.core4erp.investimento.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
@@ -41,17 +42,20 @@ public class InvestimentoService {
 
     // ── Contas de Investimento ────────────────────────────────────────────────
 
+    @Requer("INVESTIMENTO_VISUALIZAR")
     @Transactional(readOnly = true)
     public List<ContaInvestimentoResponseDto> listar() {
         return contaRepo.findAllByUsuarioId(securityCtx.getUsuarioId())
                 .stream().map(ContaInvestimentoResponseDto::from).toList();
     }
 
+    @Requer("INVESTIMENTO_VISUALIZAR")
     @Transactional(readOnly = true)
     public ContaInvestimentoResponseDto buscarPorId(Long id) {
         return ContaInvestimentoResponseDto.from(findOwnedConta(id));
     }
 
+    @Requer("INVESTIMENTO_CRIAR")
     @Transactional
     public ContaInvestimentoResponseDto criar(ContaInvestimentoRequestDto dto) {
         TipoInvestimentoCustom tipo = tipoService.findOwned(dto.tipoId());
@@ -63,6 +67,7 @@ public class InvestimentoService {
         return ContaInvestimentoResponseDto.from(contaRepo.save(c));
     }
 
+    @Requer("INVESTIMENTO_EDITAR")
     @Transactional
     public ContaInvestimentoResponseDto atualizar(Long id, ContaInvestimentoRequestDto dto) {
         TipoInvestimentoCustom tipo = tipoService.findOwned(dto.tipoId());
@@ -72,6 +77,7 @@ public class InvestimentoService {
         return ContaInvestimentoResponseDto.from(contaRepo.save(c));
     }
 
+    @Requer("INVESTIMENTO_DELETAR")
     @Transactional
     public void deletar(Long id) {
         ContaInvestimento c = findOwnedConta(id);
@@ -83,6 +89,7 @@ public class InvestimentoService {
 
     // ── Transações ────────────────────────────────────────────────────────────
 
+    @Requer("INVESTIMENTO_VISUALIZAR")
     @Transactional(readOnly = true)
     public List<TransacaoInvestimentoResponseDto> listarTransacoes(Long contaId) {
         findOwnedConta(contaId);
@@ -90,6 +97,7 @@ public class InvestimentoService {
                 .stream().map(TransacaoInvestimentoResponseDto::from).toList();
     }
 
+    @Requer("INVESTIMENTO_CRIAR")
     @Transactional
     public TransacaoInvestimentoResponseDto registrarTransacao(Long contaId, TransacaoInvestimentoRequestDto dto) {
         ContaInvestimento conta = findOwnedConta(contaId);
