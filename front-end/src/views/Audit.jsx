@@ -52,8 +52,8 @@ export default function Audit() {
       acao: filtroAcao || undefined,
       dataInicio: dataInicio || undefined,
       dataFim: dataFim || undefined,
+      page: 0,
       size: 50,
-      sort: 'dataHora,desc',
     }).then((page) => {
       setLogs(page?.content ?? []);
       setTotal(page?.totalElements ?? 0);
