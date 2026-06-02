@@ -1,6 +1,7 @@
 package br.com.core4erp.chat.tools.relatorio;
 
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.repository.ContaRepository;
 import io.micrometer.core.instrument.Counter;
@@ -28,6 +29,7 @@ public class RelatorioExcelService {
 
     private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
     private final Counter totalRelatoriosGerados;
     private final Timer tempoGeracaoRelatorio;
 
@@ -39,9 +41,11 @@ public class RelatorioExcelService {
 
     public RelatorioExcelService(ContaRepository contaRepository,
                                  SecurityContextUtils securityCtx,
+                                 TenantContext tenantCtx,
                                  MeterRegistry registry) {
         this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
         this.totalRelatoriosGerados = Counter.builder("erp.relatorio.gerado")
                 .description("Total de relatórios Excel gerados")
                 .tag("tipo", "despesas")
@@ -59,8 +63,8 @@ public class RelatorioExcelService {
 
     public String gerarRelatorioDespesas(LocalDate inicio, LocalDate fim) {
         Timer.Sample sample = Timer.start();
-        Long uid = securityCtx.getUsuarioId();
-        var contas = contaRepository.findAllByUsuarioIdAndDataVencimentoBetween(uid, inicio, fim);
+        Long uid = tenantCtx.getEmpresaId();
+        var contas = contaRepository.findAllByEmpresaIdAndDataVencimentoBetween(uid, inicio, fim);
 
         String fileName = UUID.randomUUID() + ".xlsx";
         Path filePath = Path.of(relatoriosDir, fileName);

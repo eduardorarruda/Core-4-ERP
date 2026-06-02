@@ -290,7 +290,7 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 - `/cartoes` → `PermissaoRoute("CARTAO_LANCAR")`
 - `/cartoes/conciliacao` e sub-rotas → `PermissaoRoute("CARTAO_CONCILIACAO_VISUALIZAR")`
 - `/reports` → sem PermissaoRoute; PermissaoGuard por card (RELATORIO_*_VISUALIZAR / EXPORTAR)
-- `/dashboard` → sem PermissaoRoute; SaldoDetalhadoPanel gateado por DASHBOARD_CARTAO_VISUALIZAR
+- `/dashboard` → `PermissaoRoute("DASHBOARD_VISUALIZAR")`; SaldoDetalhadoPanel gateado por DASHBOARD_CARTAO_VISUALIZAR
 
 **Operadores — reativação:**
 - `PATCH /api/empresa/operadores/{usuarioId}/reativar` — requer `USUARIO_EDITAR`
@@ -351,7 +351,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V33** (V32 já existe).
+- **Próxima migration disponível: V34** (V33 já existe).
 
 **Sequência de migrations:**
 ```
@@ -385,6 +385,7 @@ V29     fix_tipo_conta_to_varchar
 V30     add_calendario_e_cartao_conciliacao_permissions
 V31     add_relatorio_investimento_dashboard_permissions
 V32     add_empresa_id_to_perfil_acesso
+V33     add_empresa_id_to_tipo_investimento
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
@@ -565,7 +566,7 @@ chat/tools/
 ### Relatórios (`relatorio/`)
 - `RelatorioService` agrega dados financeiros (contas, categorias, parceiros) por período.
 - `ExcelRelatorioService` gera arquivo `.xlsx` via Apache POI — retorna `byte[]` no controller com `Content-Disposition: attachment`.
-- Toda query de relatório DEVE filtrar por `usuarioId` e pelo intervalo de datas (`data_competencia` ou `data_pagamento` — especificar qual).
+- Toda query de relatório DEVE filtrar por `empresaId` (via `tenantCtx.getEmpresaId()`) e pelo intervalo de datas (`data_competencia` ou `data_pagamento` — especificar qual).
 
 ### Dashboard (`dashboard/`)
 - `DashboardService` fornece saldo total, saldo por conta corrente, receitas/despesas do mês e projeção de vencimentos.
@@ -851,11 +852,11 @@ CANCELADA           (terminal — não pode ser reativada)
 - Alterar `diaVencimento` de uma assinatura afeta apenas a próxima geração — contas já geradas permanecem.
 
 ### Dependências entre módulos
-- **Não baixar** uma conta sem que o `usuarioId` da conta bata com o do TenantContext.
+- **Não baixar** uma conta sem que o `empresaId` da conta bata com o do TenantContext.
 - **Não fechar fatura** sem verificar que todos os lançamentos pertencem à mesma fatura.
 - **Não conciliar** item OFX já vinculado (`status = CONCILIADO`) — verificar antes de vincular.
 - **Não criar transferência** com conta corrente origem = destino.
-- Toda operação de escrita em dados financeiros deve validar que a entidade-mãe pertence ao mesmo `usuarioId`.
+- Toda operação de escrita em dados financeiros deve validar que a entidade-mãe pertence ao mesmo `empresaId`.
 
 ---
 
@@ -863,7 +864,7 @@ CANCELADA           (terminal — não pode ser reativada)
 
 ### CNPJ e CPF em Parceiros
 - Validação obrigatória com dígito verificador — nunca aceitar apenas formato `XX.XXX.XXX/XXXX-XX`.
-- CNPJ/CPF são únicos **por usuário** (`usuario_id`), não globalmente — dois usuários podem cadastrar o mesmo CNPJ.
+- CNPJ/CPF são únicos **por empresa** (`empresa_id`), não globalmente — duas empresas diferentes podem cadastrar o mesmo CNPJ.
 - Armazenar apenas dígitos (sem máscara) no banco; formatar na exibição via `formatters.js`.
 
 ### Formatação de dados sensíveis (LGPD)
@@ -970,7 +971,7 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 
 ### Tools (Function Calling)
 - Cada tool é um `@Component` Spring com métodos `@Tool` — Spring AI injeta automaticamente no `ChatClient`.
-- Tools de **leitura** (`consulta/`): recebem `usuarioId` do contexto de segurança, filtram dados por ele.
+- Tools de **leitura** (`consulta/`): obtêm `empresaId` do `TenantContext`, filtram dados financeiros por ele.
 - Tools de **escrita** (`lancamento/`): validam `usuarioId` do `SecurityContext` **dentro da tool**, nunca confiam no parâmetro recebido do modelo.
 - Schema de tools é gerado automaticamente pelo Spring AI a partir da assinatura do método — manter parâmetros tipados e documentados com Javadoc (Spring AI usa como descrição).
 - Resultado de tools deve ser validado antes de repassar ao agente — se retornar null ou lista vazia, retornar mensagem descritiva, não null cru.
@@ -1018,7 +1019,7 @@ Antes de abrir PR que adiciona ou modifica uma integração externa:
 > **Nota sobre cobertura atual:** O projeto possui apenas `Core4erpApplicationTests.java` (context load). Não há testes unitários ou de integração implementados. Novas integrações não precisam ter cobertura completa no primeiro PR, mas devem ao menos ter o caminho feliz coberto com mock.
 
 **Multi-Tenancy**
-- [ ] Dados retornados pela integração filtrados por `usuarioId` antes de persistir
+- [ ] Dados retornados pela integração filtrados por `empresaId` antes de persistir
 - [ ] Tool de IA (se aplicável) valida `usuarioId` do `SecurityContext` internamente
 
 ---
