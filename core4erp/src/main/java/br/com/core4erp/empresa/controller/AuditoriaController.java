@@ -1,5 +1,6 @@
 package br.com.core4erp.empresa.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.empresa.dto.AuditoriaResponseDto;
 import br.com.core4erp.empresa.entity.AcaoAuditoria;
 import br.com.core4erp.empresa.service.AuditoriaQueryService;
@@ -24,6 +25,7 @@ public class AuditoriaController {
     private final AuditoriaQueryService auditoriaQueryService;
 
     @GetMapping
+    @Requer("AUDITORIA_VISUALIZAR")
     public ResponseEntity<Page<AuditoriaResponseDto>> listar(
             @RequestParam(required = false) String entidade,
             @RequestParam(required = false) Long entidadeId,

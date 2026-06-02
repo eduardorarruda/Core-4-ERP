@@ -2,6 +2,7 @@ package br.com.core4erp.conciliacao.controller;
 
 import br.com.core4erp.conciliacao.dto.*;
 import br.com.core4erp.conciliacao.service.ConciliacaoService;
+import br.com.core4erp.config.rbac.Requer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Upload de arquivo OFX — inicia sessão de conciliação")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Requer("CONCILIACAO_IMPORTAR")
     public ResponseEntity<ConciliacaoResponseDto> upload(
             @RequestPart("arquivo") MultipartFile arquivo,
             @RequestParam(required = false) Long contaCorrenteId) {
@@ -35,24 +37,28 @@ public class ConciliacaoController {
 
     @Operation(summary = "Listar histórico de conciliações do usuário")
     @GetMapping
+    @Requer("CONCILIACAO_VISUALIZAR")
     public ResponseEntity<List<ConciliacaoResponseDto>> listar() {
         return ResponseEntity.ok(service.listar());
     }
 
     @Operation(summary = "Buscar sessão de conciliação com todos os itens")
     @GetMapping("/{id}")
+    @Requer("CONCILIACAO_VISUALIZAR")
     public ResponseEntity<ConciliacaoResponseDto> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(service.buscar(id));
     }
 
     @Operation(summary = "Relatório detalhado da conciliação")
     @GetMapping("/{id}/relatorio")
+    @Requer("CONCILIACAO_VISUALIZAR")
     public ResponseEntity<ConciliacaoRelatorioDto> relatorio(@PathVariable Long id) {
         return ResponseEntity.ok(service.relatorio(id));
     }
 
     @Operation(summary = "Vincular manualmente um item a uma conta existente")
     @PutMapping("/{id}/itens/{itemId}/vincular")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<ConciliacaoItemResponseDto> vincular(
             @PathVariable Long id,
             @PathVariable Long itemId,
@@ -62,6 +68,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Criar nova conta a pagar/receber e vincular ao item")
     @PostMapping("/{id}/itens/{itemId}/nova-conta")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<ConciliacaoItemResponseDto> novaConta(
             @PathVariable Long id,
             @PathVariable Long itemId,
@@ -72,6 +79,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Marcar item como ignorado")
     @PutMapping("/{id}/itens/{itemId}/ignorar")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<ConciliacaoItemResponseDto> ignorar(
             @PathVariable Long id,
             @PathVariable Long itemId) {
@@ -80,6 +88,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Desfazer ignorar — volta item IGNORADO para NAO_IDENTIFICADO")
     @PatchMapping("/{id}/itens/{itemId}/desfazer-ignorar")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<ConciliacaoItemResponseDto> desfazerIgnorar(
             @PathVariable Long id,
             @PathVariable Long itemId) {
@@ -88,6 +97,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Desvincular item (voltar a NAO_IDENTIFICADO)")
     @PutMapping("/{id}/itens/{itemId}/desvincular")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<ConciliacaoItemResponseDto> desvincular(
             @PathVariable Long id,
             @PathVariable Long itemId) {
@@ -96,6 +106,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Finalizar conciliação — dispara todas as baixas em lote")
     @PostMapping("/{id}/finalizar")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<ConciliacaoResponseDto> finalizar(
             @PathVariable Long id,
             @Valid @RequestBody(required = false) FinalizarConciliacaoRequestDto dto) {
@@ -104,6 +115,7 @@ public class ConciliacaoController {
 
     @Operation(summary = "Cancelar sessão de conciliação pendente")
     @DeleteMapping("/{id}")
+    @Requer("CONCILIACAO_VINCULAR")
     public ResponseEntity<Void> cancelar(@PathVariable Long id) {
         service.cancelar(id);
         return ResponseEntity.noContent().build();

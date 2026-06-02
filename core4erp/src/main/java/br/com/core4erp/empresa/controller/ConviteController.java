@@ -1,5 +1,6 @@
 package br.com.core4erp.empresa.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.empresa.dto.ConvidarOperadorRequestDto;
 import br.com.core4erp.empresa.dto.ConviteResponseDto;
 import br.com.core4erp.empresa.service.ConviteService;
@@ -23,6 +24,7 @@ public class ConviteController {
 
     @Operation(summary = "Convidar operador para a empresa")
     @PostMapping("/api/empresa/usuarios/convidar")
+    @Requer("USUARIO_CONVIDAR")
     public ResponseEntity<ConviteResponseDto> convidar(
             @Valid @RequestBody ConvidarOperadorRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -31,12 +33,14 @@ public class ConviteController {
 
     @Operation(summary = "Reenviar e-mail de convite pendente")
     @PostMapping("/api/empresa/convites/{id}/reenviar")
+    @Requer("USUARIO_CONVIDAR")
     public ResponseEntity<ConviteResponseDto> reenviar(@PathVariable Long id) {
         return ResponseEntity.ok(conviteService.reenviar(id));
     }
 
     @Operation(summary = "Listar convites pendentes da empresa")
     @GetMapping("/api/empresa/convites/pendentes")
+    @Requer("USUARIO_VISUALIZAR")
     public ResponseEntity<Page<ConviteResponseDto>> listarPendentes(
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(conviteService.listarPendentes(pageable));

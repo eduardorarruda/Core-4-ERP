@@ -65,7 +65,7 @@ function TickerBar() {
 export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, adminSistema } = useAuth();
   const { theme, toggleTheme } = useContext(ThemeContext);
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
@@ -174,9 +174,9 @@ export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
                   <div className="px-4 py-3 border-b border-text-primary/10">
                     <p className="text-xs font-bold text-text-primary truncate">{usuario.nome}</p>
                     <p className="text-[10px] text-text-primary/50 truncate font-mono">{usuario.email}</p>
-                    {usuario.role && (
+                    {adminSistema && (
                       <p className="text-[10px] text-primary/70 uppercase tracking-wider font-bold mt-0.5 font-mono">
-                        {usuario.role === 'ROLE_ADMIN' ? 'Administrador' : 'Usuário'}
+                        Admin Sistema
                       </p>
                     )}
                   </div>

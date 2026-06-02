@@ -3,6 +3,8 @@ package br.com.core4erp.empresa.service;
 import br.com.core4erp.config.rbac.PermissaoCalculadora;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.empresa.dto.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import br.com.core4erp.empresa.entity.*;
 import br.com.core4erp.empresa.repository.*;
 import br.com.core4erp.exception.AcessoNegadoException;
@@ -24,6 +26,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UsuarioPermissaoService {
+
+    private static final Logger log = LoggerFactory.getLogger(UsuarioPermissaoService.class);
 
     private final UsuarioEmpresaRepository usuarioEmpresaRepository;
     private final UsuarioEmpresaPermissaoRepository permissaoUsuarioRepository;
@@ -112,8 +116,9 @@ public class UsuarioPermissaoService {
         registro.setDataConcessao(LocalDateTime.now());
         registro.setObservacao(dto.observacao());
 
-        permissaoUsuarioRepository.save(registro);
+        // CR-B7: invalidar cache ANTES de persistir para evitar leitura com dados antigos
         invalidarCache(ue.getUsuario().getEmail());
+        permissaoUsuarioRepository.save(registro);
 
         String origem = revogada ? "DIRETA_REVOGADA" : "DIRETA_CONCEDIDA";
         return new PermissaoUsuarioResponseDto(
@@ -171,12 +176,16 @@ public class UsuarioPermissaoService {
         Permissao p = permissaoRepository.findById(dto.permissaoId())
             .orElseThrow(() -> new EntityNotFoundException("Permissão não encontrada"));
         if (!tenantCtx.temPermissao(p.getCodigo())) {
-            throw new AcessoNegadoException(
-                "Não é possível conceder uma permissão que você mesmo não possui: " + p.getCodigo());
+            // CR-B8: log interno específico, mensagem externa genérica
+            log.warn("Escalada de privilégio negada: usuarioId={} tentouConceder={}",
+                tenantCtx.getUsuarioId(), p.getCodigo());
+            throw new AcessoNegadoException("Permissão insuficiente para esta operação");
         }
     }
 
     private void invalidarCache(String email) {
-        permissaoCache.invalidate(email + ":" + tenantCtx.getEmpresaId());
+        // CR-B10: hash determinístico evita colisão quando email contém ':'
+        permissaoCache.invalidate(Integer.toHexString(
+            Objects.hash(email, tenantCtx.getEmpresaId())));
     }
 }

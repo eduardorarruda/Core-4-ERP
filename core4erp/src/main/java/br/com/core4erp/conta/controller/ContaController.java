@@ -1,5 +1,6 @@
 package br.com.core4erp.conta.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
@@ -34,6 +35,7 @@ public class ContaController {
 
     @Operation(summary = "Listar contas com filtros opcionais (tipo, status, datas, parceiro, valor, categoria)")
     @GetMapping
+    @Requer("CONTA_VISUALIZAR")
     public ResponseEntity<Page<ContaResponseDto>> listar(
             @RequestParam(required = false) TipoConta tipo,
             @RequestParam(required = false) StatusConta status,
@@ -54,18 +56,21 @@ public class ContaController {
 
     @Operation(summary = "Buscar conta por ID")
     @GetMapping("/{id}")
+    @Requer("CONTA_VISUALIZAR")
     public ResponseEntity<ContaResponseDto> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(contaService.buscarPorId(id));
     }
 
     @Operation(summary = "Criar conta (gera recorrências automaticamente se configurado)")
     @PostMapping
+    @Requer("CONTA_CRIAR")
     public ResponseEntity<List<ContaResponseDto>> criar(@Valid @RequestBody ContaCreateDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(contaService.criar(dto));
     }
 
     @Operation(summary = "Atualizar conta")
     @PutMapping("/{id}")
+    @Requer("CONTA_EDITAR")
     public ResponseEntity<ContaResponseDto> atualizar(@PathVariable Long id,
                                                        @Valid @RequestBody ContaCreateDto dto) {
         return ResponseEntity.ok(contaService.atualizar(id, dto));
@@ -73,6 +78,7 @@ public class ContaController {
 
     @Operation(summary = "Remover conta")
     @DeleteMapping("/{id}")
+    @Requer("CONTA_DELETAR")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         contaService.deletar(id);
         return ResponseEntity.noContent().build();
@@ -80,6 +86,7 @@ public class ContaController {
 
     @Operation(summary = "Baixar conta (registrar pagamento/recebimento)")
     @PatchMapping("/{id}/baixa")
+    @Requer("CONTA_BAIXAR")
     public ResponseEntity<ContaResponseDto> baixar(@PathVariable Long id,
                                                     @Valid @RequestBody BaixaRequestDto dto) {
         return ResponseEntity.ok(contaService.baixar(id, dto));
@@ -87,6 +94,7 @@ public class ContaController {
 
     @Operation(summary = "Estornar baixa e devolver saldo à conta corrente")
     @DeleteMapping("/{id}/baixa")
+    @Requer("CONTA_ESTORNAR")
     public ResponseEntity<ContaResponseDto> estornar(@PathVariable Long id) {
         return ResponseEntity.ok(contaService.estornar(id));
     }

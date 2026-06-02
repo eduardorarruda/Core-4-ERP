@@ -85,8 +85,8 @@ public class ConviteService {
 
         Convite salvo = conviteRepository.save(convite);
 
-        log.info("Convite criado — empresaId={} emailConvidado={} perfilId={} expiraEm={}",
-            empresaId, dto.email(), dto.perfilId(), salvo.getExpiraEm());
+        log.info("Convite criado — empresaId={} emailHash={} perfilId={} expiraEm={}",
+            empresaId, hashEmail(dto.email()), dto.perfilId(), salvo.getExpiraEm());
 
         emailService.enviarConvite(salvo.getEmailConvidado(), salvo.getToken(),
             frontendUrl, empresa.getNome());
@@ -126,8 +126,8 @@ public class ConviteService {
         convite.setAceito(true);
         conviteRepository.save(convite);
 
-        log.info("Convite aceito — emailConvidado={} empresaId={} perfilId={}",
-            convite.getEmailConvidado(),
+        log.info("Convite aceito — emailHash={} empresaId={} perfilId={}",
+            hashEmail(convite.getEmailConvidado()),
             convite.getEmpresa().getId(),
             convite.getPerfil().getId());
     }
@@ -151,8 +151,8 @@ public class ConviteService {
         convite.setExpiraEm(LocalDateTime.now().plusHours(CONVITE_VALIDADE_HORAS));
         Convite salvo = conviteRepository.save(convite);
 
-        log.info("Convite reenviado — empresaId={} emailConvidado={} conviteId={}",
-            empresaId, salvo.getEmailConvidado(), conviteId);
+        log.info("Convite reenviado — empresaId={} emailHash={} conviteId={}",
+            empresaId, hashEmail(salvo.getEmailConvidado()), conviteId);
 
         emailService.enviarConvite(salvo.getEmailConvidado(), salvo.getToken(),
             frontendUrl, salvo.getEmpresa().getNome());
@@ -201,5 +201,10 @@ public class ConviteService {
             c.getAceito(),
             c.getConvidadoPor() != null ? c.getConvidadoPor().getEmail() : null
         );
+    }
+
+    // CR-B15: nunca logar email em plaintext — LGPD
+    private String hashEmail(String email) {
+        return email == null ? "null" : Integer.toHexString(email.hashCode());
     }
 }

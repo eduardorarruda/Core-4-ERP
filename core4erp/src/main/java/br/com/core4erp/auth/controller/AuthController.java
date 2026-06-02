@@ -40,6 +40,9 @@ public class AuthController {
     @Value("${jwt.expiration}")
     private long tokenExpiration;
 
+    @Value("${security.cookie.same-site:None}")
+    private String cookieSameSite;
+
     public AuthController(AuthService authService,
                           PasswordResetService passwordResetService,
                           ProfileService profileService) {
@@ -127,11 +130,11 @@ public class AuthController {
         return ResponseEntity.ok(profileService.atualizarFotoPerfil(authentication.getName(), foto.getBytes(), contentType));
     }
 
-    private static String jwtCookie(String value, long maxAgeSeconds) {
+    private String jwtCookie(String value, long maxAgeSeconds) {
         return ResponseCookie.from("access_token", value)
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("None")
+                .sameSite(cookieSameSite)
                 .path("/")
                 .maxAge(maxAgeSeconds)
                 .build()

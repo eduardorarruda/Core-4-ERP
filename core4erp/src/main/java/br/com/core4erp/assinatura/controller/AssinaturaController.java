@@ -3,6 +3,7 @@ package br.com.core4erp.assinatura.controller;
 import br.com.core4erp.assinatura.dto.AssinaturaRequestDto;
 import br.com.core4erp.assinatura.dto.AssinaturaResponseDto;
 import br.com.core4erp.assinatura.service.AssinaturaService;
+import br.com.core4erp.config.rbac.Requer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,24 +26,28 @@ public class AssinaturaController {
 
     @Operation(summary = "Listar todas as assinaturas do usuário")
     @GetMapping
+    @Requer("ASSINATURA_VISUALIZAR")
     public ResponseEntity<List<AssinaturaResponseDto>> listar() {
         return ResponseEntity.ok(assinaturaService.listar());
     }
 
     @Operation(summary = "Buscar assinatura por ID")
     @GetMapping("/{id}")
+    @Requer("ASSINATURA_VISUALIZAR")
     public ResponseEntity<AssinaturaResponseDto> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(assinaturaService.buscarPorId(id));
     }
 
     @Operation(summary = "Criar nova assinatura")
     @PostMapping
+    @Requer("ASSINATURA_CRIAR")
     public ResponseEntity<AssinaturaResponseDto> criar(@Valid @RequestBody AssinaturaRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(assinaturaService.criar(dto));
     }
 
     @Operation(summary = "Atualizar assinatura")
     @PutMapping("/{id}")
+    @Requer("ASSINATURA_EDITAR")
     public ResponseEntity<AssinaturaResponseDto> atualizar(@PathVariable Long id,
                                                             @Valid @RequestBody AssinaturaRequestDto dto) {
         return ResponseEntity.ok(assinaturaService.atualizar(id, dto));
@@ -50,6 +55,7 @@ public class AssinaturaController {
 
     @Operation(summary = "Remover assinatura")
     @DeleteMapping("/{id}")
+    @Requer("ASSINATURA_DELETAR")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         assinaturaService.deletar(id);
         return ResponseEntity.noContent().build();
@@ -57,6 +63,7 @@ public class AssinaturaController {
 
     @Operation(summary = "Listar apenas assinaturas ativas")
     @GetMapping("/ativas")
+    @Requer("ASSINATURA_VISUALIZAR")
     public ResponseEntity<List<AssinaturaResponseDto>> listarAtivas() {
         return ResponseEntity.ok(assinaturaService.listarAtivas());
     }
