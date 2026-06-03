@@ -385,6 +385,10 @@ public class CartaoCreditoService {
 
     @Transactional(readOnly = true)
     public List<CartaoDashboardResumoDto> dashboardResumo(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
+        if ((mesInicio != null) != (anoInicio != null))
+            throw new IllegalArgumentException("Informe o mês e o ano de início juntos.");
+        if ((mesFim != null) != (anoFim != null))
+            throw new IllegalArgumentException("Informe o mês e o ano de fim juntos.");
         Long eid = tenantCtx.getEmpresaId();
         YearMonth now = YearMonth.now();
         YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;
@@ -403,6 +407,10 @@ public class CartaoCreditoService {
 
     @Transactional(readOnly = true)
     public CartaoDashboardBIResponseDto dashboardBI(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
+        if ((mesInicio != null) != (anoInicio != null))
+            throw new IllegalArgumentException("Informe o mês e o ano de início juntos.");
+        if ((mesFim != null) != (anoFim != null))
+            throw new IllegalArgumentException("Informe o mês e o ano de fim juntos.");
         Long eid = tenantCtx.getEmpresaId();
         YearMonth now = YearMonth.now();
         YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;

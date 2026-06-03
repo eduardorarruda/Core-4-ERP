@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users, Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Loader2, Search, CheckCircle2 } from 'lucide-react';
 import { parceiros as api } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
@@ -35,6 +35,8 @@ export default function Parceiros() {
   const [showForm, setShowForm] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
+  const [autoPreenchido, setAutoPreenchido] = useState(false);
+  const [camposAuto, setCamposAuto] = useState([]);
 
   useEffect(() => { carregar(); }, []);
 
@@ -44,6 +46,7 @@ export default function Parceiros() {
   }
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const autoCls = (campo) => camposAuto.includes(campo) ? `${inputCls} ring-1 ring-primary/40` : inputCls;
 
   const handleCpfCnpjChange = useCallback(async (e) => {
     const val = e.target.value;
@@ -53,6 +56,15 @@ export default function Parceiros() {
     setBuscandoCnpj(true);
     try {
       const data = await api.buscarCnpj(digits);
+      const auto = [];
+      if (data.razao_social) auto.push('razaoSocial');
+      if (data.nome_fantasia) auto.push('nomeFantasia');
+      if (data.logradouro) auto.push('logradouro');
+      if (data.numero) auto.push('numero');
+      if (data.cep) auto.push('cep');
+      if (data.bairro) auto.push('bairro');
+      if (data.municipio) auto.push('municipio');
+      if (data.uf) auto.push('uf');
       setForm((f) => ({
         ...f,
         razaoSocial: data.razao_social || f.razaoSocial,
@@ -67,6 +79,8 @@ export default function Parceiros() {
         telefone: f.telefone || (data.ddd_telefone_1 ? data.ddd_telefone_1.trim() : ''),
         email: f.email || data.email || '',
       }));
+      setCamposAuto(auto);
+      setAutoPreenchido(true);
     } catch (_) { /* CNPJ não encontrado */ }
     finally { setBuscandoCnpj(false); }
   }, []);
@@ -75,7 +89,9 @@ export default function Parceiros() {
     const errs = {};
     if (!form.razaoSocial.trim()) errs.razaoSocial = 'Obrigatório';
     if (!form.tipo) errs.tipo = 'Selecione o tipo';
-    if (form.cpfCnpj) {
+    if (!form.cpfCnpj.trim()) {
+      errs.cpfCnpj = 'CPF/CNPJ é obrigatório';
+    } else {
       const d = form.cpfCnpj.replace(/\D/g, '');
       if (d.length !== 11 && d.length !== 14) errs.cpfCnpj = 'CPF (11) ou CNPJ (14 dígitos)';
     }
@@ -95,6 +111,8 @@ export default function Parceiros() {
       setForm(empty);
       setEditId(null);
       setShowForm(false);
+      setAutoPreenchido(false);
+      setCamposAuto([]);
       toast.success(editId ? 'Parceiro atualizado!' : 'Parceiro criado!');
       await carregar();
     } catch (err) {
@@ -119,6 +137,8 @@ export default function Parceiros() {
 
   function editar(p) {
     setForm({ razaoSocial: p.razaoSocial || '', nomeFantasia: p.nomeFantasia || '', cpfCnpj: p.cpfCnpj || '', tipo: p.tipo || '', logradouro: p.logradouro || '', numero: p.numero || '', complemento: p.complemento || '', cep: p.cep || '', bairro: p.bairro || '', municipio: p.municipio || '', uf: p.uf || '', telefone: p.telefone || '', email: p.email || '' });
+    setAutoPreenchido(false);
+    setCamposAuto([]);
     setEditId(p.id);
     setActiveTab('Dados Gerais');
     setShowForm(true);
@@ -217,12 +237,18 @@ export default function Parceiros() {
                       </span>
                     )}
                   </div>
+                  {autoPreenchido && !buscandoCnpj && (
+                    <div className="flex items-center gap-1.5 mt-1.5 px-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <span className="text-xs text-primary/80 font-medium">Dados carregados da Receita Federal</span>
+                    </div>
+                  )}
                 </FormField>
                 <FormField label="Razão Social" required error={errors.razaoSocial}>
-                  <input className={inputCls} value={form.razaoSocial} onChange={set('razaoSocial')} required />
+                  <input className={autoCls('razaoSocial')} value={form.razaoSocial} onChange={set('razaoSocial')} required />
                 </FormField>
                 <FormField label="Nome Fantasia">
-                  <input className={inputCls} value={form.nomeFantasia} onChange={set('nomeFantasia')} />
+                  <input className={autoCls('nomeFantasia')} value={form.nomeFantasia} onChange={set('nomeFantasia')} />
                 </FormField>
                 <FormField label="Tipo" required error={errors.tipo}>
                   <select className={`${inputCls} appearance-none`} value={form.tipo} onChange={set('tipo')} required>
@@ -234,13 +260,13 @@ export default function Parceiros() {
             )}
             {activeTab === 'Endereço' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FormField label="CEP"><input className={inputCls} value={form.cep} onChange={set('cep')} placeholder="00000-000" /></FormField>
-                <FormField label="Logradouro"><input className={inputCls} value={form.logradouro} onChange={set('logradouro')} /></FormField>
-                <FormField label="Número"><input className={inputCls} value={form.numero} onChange={set('numero')} /></FormField>
+                <FormField label="CEP"><input className={autoCls('cep')} value={form.cep} onChange={set('cep')} placeholder="00000-000" /></FormField>
+                <FormField label="Logradouro"><input className={autoCls('logradouro')} value={form.logradouro} onChange={set('logradouro')} /></FormField>
+                <FormField label="Número"><input className={autoCls('numero')} value={form.numero} onChange={set('numero')} /></FormField>
                 <FormField label="Complemento"><input className={inputCls} value={form.complemento} onChange={set('complemento')} /></FormField>
-                <FormField label="Bairro"><input className={inputCls} value={form.bairro} onChange={set('bairro')} /></FormField>
-                <FormField label="Município"><input className={inputCls} value={form.municipio} onChange={set('municipio')} /></FormField>
-                <FormField label="UF"><input className={inputCls} value={form.uf} onChange={set('uf')} maxLength={2} placeholder="SP" /></FormField>
+                <FormField label="Bairro"><input className={autoCls('bairro')} value={form.bairro} onChange={set('bairro')} /></FormField>
+                <FormField label="Município"><input className={autoCls('municipio')} value={form.municipio} onChange={set('municipio')} /></FormField>
+                <FormField label="UF"><input className={autoCls('uf')} value={form.uf} onChange={set('uf')} maxLength={2} placeholder="SP" /></FormField>
               </div>
             )}
             {activeTab === 'Contato' && (

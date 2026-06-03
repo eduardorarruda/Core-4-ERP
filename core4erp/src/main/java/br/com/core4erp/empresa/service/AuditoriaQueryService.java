@@ -34,7 +34,8 @@ public class AuditoriaQueryService {
         LocalDateTime fim = dataFim != null ? dataFim.atTime(23, 59, 59) : null;
 
         return auditoriaRepository.filtrar(
-            tenantCtx.getEmpresaId(), entidade, entidadeId, acao,
+            tenantCtx.getEmpresaId(), entidade, entidadeId,
+            acao != null ? acao.name() : null,
             usuarioId, inicio, fim, pageable
         ).map(AuditoriaResponseDto::from);
     }
