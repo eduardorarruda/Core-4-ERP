@@ -17,6 +17,7 @@ import br.com.core4erp.conciliacaoCartao.repository.ConciliacaoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
+import br.com.core4erp.utils.FaturaHelper;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -250,12 +251,15 @@ public class ConciliacaoCartaoService {
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"))
                 : null;
 
+        CartaoCredito cartaoConc = c.getCartaoCredito();
+        java.time.YearMonth fatura = FaturaHelper.calcularFatura(dto.dataCompra(), cartaoConc.getDiaFechamento());
+
         LancamentoCartao novoLanc = new LancamentoCartao();
         novoLanc.setDescricao(dto.descricao());
         novoLanc.setValor(dto.valor());
         novoLanc.setDataCompra(dto.dataCompra());
-        novoLanc.setMesFatura(dto.dataCompra().getMonthValue());
-        novoLanc.setAnoFatura(dto.dataCompra().getYear());
+        novoLanc.setMesFatura(fatura.getMonthValue());
+        novoLanc.setAnoFatura(fatura.getYear());
         novoLanc.setNumeroParcela(1);
         novoLanc.setTotalParcelas(1);
         novoLanc.setCartaoCredito(c.getCartaoCredito());

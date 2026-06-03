@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Cartões de Crédito", description = "Cartões, lançamentos e fechamento de fatura")
 @RestController
@@ -69,14 +70,15 @@ public class CartaoCreditoController {
 
     // ── Lançamentos ───────────────────────────────────────────────────────────
 
-    @Operation(summary = "Listar lançamentos do cartão (filtro opcional por mês/ano)")
+    @Operation(summary = "Listar lançamentos do cartão (filtro opcional por mês/ano/texto)")
     @GetMapping("/{id}/lancamentos")
     @Requer("CARTAO_VISUALIZAR")
     public ResponseEntity<List<LancamentoResponseDto>> listarLancamentos(
             @PathVariable Long id,
             @RequestParam(required = false) Integer mes,
-            @RequestParam(required = false) Integer ano) {
-        return ResponseEntity.ok(service.listarLancamentos(id, mes, ano));
+            @RequestParam(required = false) Integer ano,
+            @RequestParam(required = false) String busca) {
+        return ResponseEntity.ok(service.listarLancamentos(id, mes, ano, busca));
     }
 
     @Operation(summary = "Registrar lançamento (cria parcelas se parcelado)")
@@ -119,10 +121,25 @@ public class CartaoCreditoController {
 
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
-    @Operation(summary = "Resumo de gastos por categoria para o dashboard de cartão (últimos 3 meses)")
+    @Operation(summary = "Resumo de gastos por categoria para o dashboard de cartão")
     @GetMapping("/dashboard/resumo")
     @Requer("CARTAO_VISUALIZAR")
-    public ResponseEntity<java.util.List<CartaoDashboardResumoDto>> dashboardResumo() {
-        return ResponseEntity.ok(service.dashboardResumo());
+    public ResponseEntity<List<CartaoDashboardResumoDto>> dashboardResumo(
+            @RequestParam(required = false) Integer mesInicio,
+            @RequestParam(required = false) Integer anoInicio,
+            @RequestParam(required = false) Integer mesFim,
+            @RequestParam(required = false) Integer anoFim) {
+        return ResponseEntity.ok(service.dashboardResumo(mesInicio, anoInicio, mesFim, anoFim));
+    }
+
+    @Operation(summary = "Dashboard BI com 7 painéis analíticos de cartões")
+    @GetMapping("/dashboard/bi")
+    @Requer("CARTAO_VISUALIZAR")
+    public ResponseEntity<CartaoDashboardBIResponseDto> dashboardBI(
+            @RequestParam(required = false) Integer mesInicio,
+            @RequestParam(required = false) Integer anoInicio,
+            @RequestParam(required = false) Integer mesFim,
+            @RequestParam(required = false) Integer anoFim) {
+        return ResponseEntity.ok(service.dashboardBI(mesInicio, anoInicio, mesFim, anoFim));
     }
 }

@@ -31,18 +31,27 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import br.com.core4erp.utils.FaturaHelper;
 import br.com.core4erp.utils.ParcelamentoHelper;
+
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
+
+import br.com.core4erp.cartaoCredito.dto.CartaoDashboardBIResponseDto;
+import br.com.core4erp.cartaoCredito.dto.CartaoDashboardBIResponseDto.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import org.springframework.data.domain.PageRequest;
 
 @Service
 public class CartaoCreditoService {
@@ -144,12 +153,14 @@ public class CartaoCreditoService {
     // ── Lançamentos ───────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<LancamentoResponseDto> listarLancamentos(Long cartaoId, Integer mes, Integer ano) {
+    public List<LancamentoResponseDto> listarLancamentos(Long cartaoId, Integer mes, Integer ano, String busca) {
         Long eid = tenantCtx.getEmpresaId();
         findOwnedCartao(cartaoId);
-        List<LancamentoCartao> lista = (mes != null && ano != null)
-                ? lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(cartaoId, eid, mes, ano)
-                : lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid);
+        List<LancamentoCartao> lista = (busca != null && !busca.isBlank())
+                ? lancamentoRepo.filtrar(cartaoId, eid, mes, ano, busca.trim())
+                : (mes != null && ano != null)
+                        ? lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(cartaoId, eid, mes, ano)
+                        : lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid);
 
         Set<String> fechadas = faturaRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid).stream()
                 .filter(f -> f.getStatus() == StatusFatura.FECHADA)
@@ -184,6 +195,8 @@ public class CartaoCreditoService {
         List<LancamentoCartao> criados = new ArrayList<>();
         YearMonth faturaBase = calcularFatura(dto.dataCompra(), cartao.getDiaFechamento());
 
+        TipoLancamentoCartao tipo = dto.tipo() != null ? dto.tipo() : TipoLancamentoCartao.SAIDA;
+
         for (int i = 0; i < parcelas; i++) {
             YearMonth ym = faturaBase.plusMonths(i);
             LancamentoCartao l = new LancamentoCartao();
@@ -195,6 +208,7 @@ public class CartaoCreditoService {
             l.setGrupoParcelamento(grupo);
             l.setNumeroParcela(i + 1);
             l.setTotalParcelas(parcelas);
+            l.setTipo(tipo);
             l.setCartaoCredito(cartao);
             l.setCategoria(categoria);
             l.setParceiro(parceiro);
@@ -253,9 +267,19 @@ public class CartaoCreditoService {
             throw new IllegalStateException("Nenhum lançamento encontrado para esta fatura");
         }
 
-        BigDecimal total = lancamentos.stream()
+        BigDecimal saidas   = lancamentos.stream()
+                .filter(l -> l.getTipo() == TipoLancamentoCartao.SAIDA)
                 .map(LancamentoCartao::getValor)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal entradas = lancamentos.stream()
+                .filter(l -> l.getTipo() == TipoLancamentoCartao.ENTRADA)
+                .map(LancamentoCartao::getValor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = saidas.subtract(entradas);
+        if (total.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException(
+                    "O total líquido da fatura é zero ou negativo. Verifique os lançamentos antes de fechar.");
+        }
 
         YearMonth mesFatura = YearMonth.of(dto.ano(), dto.mes());
         LocalDate dataVencimento = mesFatura.plusMonths(1)
@@ -347,15 +371,8 @@ public class CartaoCreditoService {
         }
     }
 
-    /**
-     * Retorna o YearMonth da fatura à qual a compra pertence.
-     * Se o dia da compra >= diaFechamento, a compra cai na fatura do mês seguinte.
-     */
     private YearMonth calcularFatura(LocalDate dataCompra, int diaFechamento) {
-        YearMonth mesCompra = YearMonth.from(dataCompra);
-        return dataCompra.getDayOfMonth() >= diaFechamento
-                ? mesCompra.plusMonths(1)
-                : mesCompra;
+        return FaturaHelper.calcularFatura(dataCompra, diaFechamento);
     }
 
     private void verificarFaturaAberta(Long cartaoId, Integer mes, Integer ano) {
@@ -367,10 +384,11 @@ public class CartaoCreditoService {
     }
 
     @Transactional(readOnly = true)
-    public List<CartaoDashboardResumoDto> dashboardResumo() {
+    public List<CartaoDashboardResumoDto> dashboardResumo(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
         Long eid = tenantCtx.getEmpresaId();
-        YearMonth fim = YearMonth.now();
-        YearMonth inicio = fim.minusMonths(2);
+        YearMonth now = YearMonth.now();
+        YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;
+        YearMonth inicio = (mesInicio != null && anoInicio != null) ? YearMonth.of(anoInicio, mesInicio) : fim.minusMonths(2);
         return lancamentoRepo.resumoDashboardPorCategoria(
                 eid,
                 inicio.getMonthValue(), inicio.getYear(),
@@ -381,6 +399,116 @@ public class CartaoCreditoService {
                 ((Number) row[2]).intValue(),
                 row[3] instanceof BigDecimal bd ? bd : new BigDecimal(row[3].toString())
         )).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CartaoDashboardBIResponseDto dashboardBI(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
+        Long eid = tenantCtx.getEmpresaId();
+        YearMonth now = YearMonth.now();
+        YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;
+        YearMonth inicio = (mesInicio != null && anoInicio != null) ? YearMonth.of(anoInicio, mesInicio) : fim.minusMonths(11);
+
+        // Painel 1 — Evolução mensal
+        List<EvolucaoMensalDto> evolucao = lancamentoRepo.evolucaoMensalFatura(
+                eid, inicio.getMonthValue(), inicio.getYear(), fim.getMonthValue(), fim.getYear()
+        ).stream().map(r -> new EvolucaoMensalDto(
+                ((Number) r[0]).intValue(),
+                ((Number) r[1]).intValue(),
+                r[2] instanceof BigDecimal bd ? bd : new BigDecimal(r[2].toString())
+        )).toList();
+
+        // Painel 2 — Distribuição de limite
+        List<DistribuicaoLimiteDto> distribuicao = cartaoRepo.limitesPorCartao(eid)
+                .stream().map(r -> new DistribuicaoLimiteDto(
+                        (String) r[0],
+                        r[1] instanceof BigDecimal bd ? bd : new BigDecimal(r[1].toString())
+                )).toList();
+
+        // Painel 3 — Gastos por parceiro (top-10)
+        List<GastoPorParceiroDto> parceiros = lancamentoRepo.gastosPorParceiro(
+                eid, inicio.getMonthValue(), inicio.getYear(), fim.getMonthValue(), fim.getYear(),
+                PageRequest.of(0, 10)
+        ).stream().map(r -> new GastoPorParceiroDto(
+                r[0] != null ? (String) r[0] : "Sem parceiro",
+                r[1] instanceof BigDecimal bd ? bd : new BigDecimal(r[1].toString())
+        )).toList();
+
+        // Painel 4 — Próximas faturas + §8 alertas
+        List<CartaoCredito> cartoes = cartaoRepo.findAllByEmpresaId(eid, PageRequest.of(0, 200)).getContent();
+        LocalDate hoje = LocalDate.now();
+        List<ProximaFaturaDto> proximasFaturas = new ArrayList<>();
+        List<AlertaFechamentoDto> alertas = new ArrayList<>();
+
+        for (CartaoCredito c : cartoes) {
+            int diaVenc = c.getDiaVencimento();
+            LocalDate dataVencimento = hoje.withDayOfMonth(Math.min(diaVenc, hoje.lengthOfMonth()));
+            if (dataVencimento.isBefore(hoje)) {
+                dataVencimento = dataVencimento.plusMonths(1)
+                        .withDayOfMonth(Math.min(diaVenc, dataVencimento.plusMonths(1).lengthOfMonth()));
+            }
+            long diasRestVenc = ChronoUnit.DAYS.between(hoje, dataVencimento);
+
+            BigDecimal valorAcumulado = lancamentoRepo.sumFaturaAbertaByCartaoAndPeriod(
+                    c.getId(), eid, hoje.getMonthValue(), hoje.getYear());
+            if (valorAcumulado == null) valorAcumulado = BigDecimal.ZERO;
+            if (valorAcumulado.compareTo(BigDecimal.ZERO) > 0) {
+                proximasFaturas.add(new ProximaFaturaDto(c.getNome(), valorAcumulado, dataVencimento, diasRestVenc));
+            }
+
+            // Alertas de fechamento (§8)
+            int diaFech = c.getDiaFechamento();
+            int diaHoje = hoje.getDayOfMonth();
+            long diasAteFechamento = diaFech >= diaHoje
+                    ? diaFech - diaHoje
+                    : (long) (hoje.lengthOfMonth() - diaHoje) + diaFech;
+            if (diasAteFechamento <= 7) {
+                alertas.add(new AlertaFechamentoDto(c.getId(), c.getNome(), diaFech, diasAteFechamento));
+            }
+        }
+
+        // Painel 5 — Projeção do mês corrente
+        ProjecaoMesDto projecao;
+        int diasDecorridos = hoje.getDayOfMonth();
+        int totalDiasNoMes = hoje.lengthOfMonth();
+        BigDecimal totalAcumulado = lancamentoRepo.sumValorByEmpresaAndPeriod(
+                eid, hoje.getMonthValue(), hoje.getYear(), hoje.getMonthValue(), hoje.getYear());
+        if (totalAcumulado == null) totalAcumulado = BigDecimal.ZERO;
+        if (diasDecorridos == 0) {
+            projecao = new ProjecaoMesDto(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, totalDiasNoMes);
+        } else {
+            BigDecimal mediaDiaria = totalAcumulado.divide(
+                    BigDecimal.valueOf(diasDecorridos), 2, RoundingMode.HALF_UP);
+            BigDecimal projecaoFinal = totalAcumulado.add(
+                    mediaDiaria.multiply(BigDecimal.valueOf((long) totalDiasNoMes - diasDecorridos)));
+            projecao = new ProjecaoMesDto(totalAcumulado, mediaDiaria, projecaoFinal,
+                    diasDecorridos, totalDiasNoMes - diasDecorridos);
+        }
+
+        // Painel 6 — Impacto de parcelamentos futuros
+        List<ImpactoParcelamentoDto> impacto = lancamentoRepo.impactoParcelamentosFuturos(
+                eid, hoje.getMonthValue(), hoje.getYear()
+        ).stream().map(r -> new ImpactoParcelamentoDto(
+                ((Number) r[0]).intValue(),
+                ((Number) r[1]).intValue(),
+                r[2] instanceof BigDecimal bd ? bd : new BigDecimal(r[2].toString()),
+                ((Number) r[3]).longValue()
+        )).toList();
+
+        // Painel 7 — Assinaturas vs. avulsos
+        Object[] avRow = lancamentoRepo.assinaturasVsAvulsos(
+                eid, inicio.getMonthValue(), inicio.getYear(), fim.getMonthValue(), fim.getYear());
+        AssinaturaVsAvulsoDto assVsAv;
+        if (avRow != null) {
+            BigDecimal totalAss = avRow[0] instanceof BigDecimal bd ? bd : new BigDecimal(avRow[0].toString());
+            BigDecimal totalAv  = avRow[1] instanceof BigDecimal bd ? bd : new BigDecimal(avRow[1].toString());
+            assVsAv = new AssinaturaVsAvulsoDto(totalAss, totalAv);
+        } else {
+            assVsAv = new AssinaturaVsAvulsoDto(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+
+        return new CartaoDashboardBIResponseDto(
+                evolucao, distribuicao, parceiros, proximasFaturas,
+                projecao, impacto, assVsAv, alertas);
     }
 
     private CartaoCredito findOwnedCartao(Long id) {

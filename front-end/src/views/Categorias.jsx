@@ -4,6 +4,14 @@ import {
   ShoppingCart, Home, Car, Utensils, Heart, Zap, Wifi,
   GraduationCap, Plane, Music, Gift, Coffee, Dumbbell, Shirt,
   Briefcase, TrendingUp, DollarSign, Landmark, CreditCard, Wallet,
+  Sofa, Lightbulb, Flame, Wrench, Key,
+  Bus, Fuel, CarFront, TrainFront, Bike,
+  Pizza, ShoppingBasket, UtensilsCrossed,
+  Pill, Stethoscope, Activity,
+  Gamepad2, Tv, BookOpen, Camera,
+  Smartphone, Laptop, Monitor,
+  Building2, PiggyBank, Receipt, Banknote, Calculator,
+  Baby, Dog, Package,
 } from 'lucide-react';
 import { categorias as api } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -15,26 +23,66 @@ import { cn } from '../lib/utils';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
 
 const ICONES = [
+  // Compras e consumo
   { nome: 'ShoppingCart', componente: ShoppingCart },
+  { nome: 'ShoppingBasket', componente: ShoppingBasket },
+  { nome: 'Receipt', componente: Receipt },
+  { nome: 'Package', componente: Package },
+  // Habitação e moradia
   { nome: 'Home', componente: Home },
+  { nome: 'Sofa', componente: Sofa },
+  { nome: 'Lightbulb', componente: Lightbulb },
+  { nome: 'Flame', componente: Flame },
+  { nome: 'Wrench', componente: Wrench },
+  { nome: 'Key', componente: Key },
+  // Transporte
   { nome: 'Car', componente: Car },
-  { nome: 'Utensils', componente: Utensils },
-  { nome: 'Heart', componente: Heart },
-  { nome: 'Zap', componente: Zap },
-  { nome: 'Wifi', componente: Wifi },
-  { nome: 'GraduationCap', componente: GraduationCap },
+  { nome: 'CarFront', componente: CarFront },
+  { nome: 'Bus', componente: Bus },
+  { nome: 'TrainFront', componente: TrainFront },
+  { nome: 'Bike', componente: Bike },
+  { nome: 'Fuel', componente: Fuel },
   { nome: 'Plane', componente: Plane },
-  { nome: 'Music', componente: Music },
-  { nome: 'Gift', componente: Gift },
+  // Alimentação
+  { nome: 'Utensils', componente: Utensils },
+  { nome: 'UtensilsCrossed', componente: UtensilsCrossed },
+  { nome: 'Pizza', componente: Pizza },
   { nome: 'Coffee', componente: Coffee },
+  // Saúde e bem-estar
+  { nome: 'Heart', componente: Heart },
+  { nome: 'Pill', componente: Pill },
+  { nome: 'Stethoscope', componente: Stethoscope },
+  { nome: 'Activity', componente: Activity },
   { nome: 'Dumbbell', componente: Dumbbell },
-  { nome: 'Shirt', componente: Shirt },
-  { nome: 'Briefcase', componente: Briefcase },
-  { nome: 'TrendingUp', componente: TrendingUp },
+  // Educação e lazer
+  { nome: 'GraduationCap', componente: GraduationCap },
+  { nome: 'BookOpen', componente: BookOpen },
+  { nome: 'Music', componente: Music },
+  { nome: 'Gamepad2', componente: Gamepad2 },
+  { nome: 'Tv', componente: Tv },
+  { nome: 'Camera', componente: Camera },
+  { nome: 'Gift', componente: Gift },
+  // Tecnologia
+  { nome: 'Smartphone', componente: Smartphone },
+  { nome: 'Laptop', componente: Laptop },
+  { nome: 'Monitor', componente: Monitor },
+  { nome: 'Wifi', componente: Wifi },
+  { nome: 'Zap', componente: Zap },
+  // Finanças
   { nome: 'DollarSign', componente: DollarSign },
-  { nome: 'Landmark', componente: Landmark },
-  { nome: 'CreditCard', componente: CreditCard },
   { nome: 'Wallet', componente: Wallet },
+  { nome: 'Banknote', componente: Banknote },
+  { nome: 'CreditCard', componente: CreditCard },
+  { nome: 'Landmark', componente: Landmark },
+  { nome: 'PiggyBank', componente: PiggyBank },
+  { nome: 'Building2', componente: Building2 },
+  { nome: 'Calculator', componente: Calculator },
+  { nome: 'TrendingUp', componente: TrendingUp },
+  // Trabalho e pessoal
+  { nome: 'Briefcase', componente: Briefcase },
+  { nome: 'Shirt', componente: Shirt },
+  { nome: 'Baby', componente: Baby },
+  { nome: 'Dog', componente: Dog },
 ];
 
 function IconeCategoria({ nome, className = 'w-5 h-5' }) {

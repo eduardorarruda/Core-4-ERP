@@ -1,6 +1,7 @@
 package br.com.core4erp.cartaoCredito.entity;
 
 import br.com.core4erp.assinatura.entity.Assinatura;
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.parceiro.entity.Parceiro;
@@ -38,6 +39,10 @@ public class LancamentoCartao extends TenantEntity {
 
     @Column(nullable = false)
     private Integer anoFatura;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private TipoLancamentoCartao tipo = TipoLancamentoCartao.SAIDA;
 
     /** UUID para agrupar parcelas de um mesmo lançamento. */
     private String grupoParcelamento;

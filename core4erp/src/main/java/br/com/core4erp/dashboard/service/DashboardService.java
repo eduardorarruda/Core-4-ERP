@@ -77,7 +77,7 @@ public class DashboardService {
      */
     @Requer("DASHBOARD_VISUALIZAR")
     @Transactional(readOnly = true)
-    public DashboardResponseDto getDashboard() {
+    public DashboardResponseDto getDashboard(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
         Long uid = tenantCtx.getEmpresaId();
         LocalDate hoje = LocalDate.now();
         List<StatusConta> pendentes = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
@@ -92,11 +92,13 @@ public class DashboardService {
         BigDecimal limiteTotal = cartaoRepo.sumLimiteByEmpresaId(uid);
 
         YearMonth now = YearMonth.now();
-        YearMonth sixAgo = now.minusMonths(5);
+        YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;
+        YearMonth inicio = (mesInicio != null && anoInicio != null) ? YearMonth.of(anoInicio, mesInicio) : fim.minusMonths(5);
+
         BigDecimal limiteUsado = lancamentoRepo.sumValorByEmpresaAndPeriod(
                 uid,
-                sixAgo.getMonthValue(), sixAgo.getYear(),
-                now.getMonthValue(), now.getYear());
+                inicio.getMonthValue(), inicio.getYear(),
+                fim.getMonthValue(), fim.getYear());
 
         LocalDate inicioFluxo = hoje.withDayOfMonth(1).minusMonths(5);
         LocalDate fimFluxo = hoje.withDayOfMonth(hoje.lengthOfMonth());
