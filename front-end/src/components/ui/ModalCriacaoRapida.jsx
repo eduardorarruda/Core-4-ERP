@@ -2,10 +2,24 @@ import React, { useState } from 'react';
 import { X, Plus, Loader2 } from 'lucide-react';
 import { categorias as catApi, parceiros as parApi } from '../../lib/api';
 import FormField, { inputCls } from './FormField';
+import IconDropdown from './IconDropdown';
+
+const TIPOS_PARCEIRO = [
+  { value: 'FORNECEDOR', label: 'Fornecedor' },
+  { value: 'CLIENTE',    label: 'Cliente' },
+  { value: 'AMBOS',      label: 'Ambos' },
+];
 
 export default function ModalCriacaoRapida({ tipo, onCriado, onFechar }) {
   const isCat = tipo === 'categoria';
-  const [form, setForm] = useState({ descricao: '', nomeFantasia: '', razaoSocial: '' });
+  const [form, setForm] = useState({
+    descricao: '',
+    icone: '',
+    nomeFantasia: '',
+    razaoSocial: '',
+    cpfCnpj: '',
+    tipoParceiro: 'FORNECEDOR',
+  });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -14,20 +28,36 @@ export default function ModalCriacaoRapida({ tipo, onCriado, onFechar }) {
   async function salvar(e) {
     e.preventDefault();
     setErro('');
+
+    if (isCat) {
+      if (!form.descricao.trim()) { setErro('Descrição obrigatória'); return; }
+    } else {
+      if (!form.razaoSocial.trim() && !form.nomeFantasia.trim()) {
+        setErro('Informe ao menos o nome fantasia ou razão social');
+        return;
+      }
+      if (!form.cpfCnpj.trim()) { setErro('CPF/CNPJ é obrigatório'); return; }
+      const digits = form.cpfCnpj.replace(/\D/g, '');
+      if (digits.length !== 11 && digits.length !== 14) {
+        setErro('CPF deve ter 11 dígitos ou CNPJ 14 dígitos');
+        return;
+      }
+    }
+
     setSalvando(true);
     try {
       let criado;
       if (isCat) {
-        if (!form.descricao.trim()) { setErro('Descrição obrigatória'); return; }
-        criado = await catApi.criar({ descricao: form.descricao.trim(), icone: '' });
+        criado = await catApi.criar({
+          descricao: form.descricao.trim(),
+          icone: form.icone || '',
+        });
       } else {
-        if (!form.nomeFantasia.trim() && !form.razaoSocial.trim()) {
-          setErro('Informe ao menos o nome fantasia ou razão social');
-          return;
-        }
         criado = await parApi.criar({
           nomeFantasia: form.nomeFantasia.trim() || null,
           razaoSocial: form.razaoSocial.trim() || form.nomeFantasia.trim(),
+          cpfCnpj: form.cpfCnpj.replace(/\D/g, ''),
+          tipo: form.tipoParceiro,
         });
       }
       onCriado(criado);
@@ -55,15 +85,20 @@ export default function ModalCriacaoRapida({ tipo, onCriado, onFechar }) {
 
         <form onSubmit={salvar} className="space-y-3">
           {isCat ? (
-            <FormField label="Descrição" required>
-              <input
-                className={inputCls}
-                placeholder="Ex: Alimentação"
-                value={form.descricao}
-                onChange={setF('descricao')}
-                autoFocus
-              />
-            </FormField>
+            <>
+              <FormField label="Descrição" required>
+                <input
+                  className={inputCls}
+                  placeholder="Ex: Alimentação"
+                  value={form.descricao}
+                  onChange={setF('descricao')}
+                  autoFocus
+                />
+              </FormField>
+              <FormField label="Ícone">
+                <IconDropdown value={form.icone} onChange={(v) => setForm((f) => ({ ...f, icone: v }))} />
+              </FormField>
+            </>
           ) : (
             <>
               <FormField label="Nome Fantasia">
@@ -82,6 +117,21 @@ export default function ModalCriacaoRapida({ tipo, onCriado, onFechar }) {
                   value={form.razaoSocial}
                   onChange={setF('razaoSocial')}
                 />
+              </FormField>
+              <FormField label="CPF / CNPJ" required>
+                <input
+                  className={inputCls}
+                  placeholder="000.000.000-00 ou CNPJ"
+                  value={form.cpfCnpj}
+                  onChange={setF('cpfCnpj')}
+                />
+              </FormField>
+              <FormField label="Tipo" required>
+                <select className={`${inputCls} appearance-none`} value={form.tipoParceiro} onChange={setF('tipoParceiro')}>
+                  {TIPOS_PARCEIRO.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
               </FormField>
             </>
           )}

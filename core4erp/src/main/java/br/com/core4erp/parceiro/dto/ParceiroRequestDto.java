@@ -12,6 +12,8 @@ public record ParceiroRequestDto(
         String razaoSocial,
 
         @Size(max = 150) String nomeFantasia,
+
+        @NotBlank(message = "CPF/CNPJ é obrigatório")
         @Size(max = 20) String cpfCnpj,
 
         @NotNull(message = "Tipo é obrigatório")

@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CreditCard, TrendingUp, Wallet, AlertCircle, FileText, Loader2,
-  AlertTriangle, PieChart as PieIcon, BarChart2, Calendar,
+  AlertTriangle, PieChart as PieIcon, BarChart2, Calendar, SlidersHorizontal,
 } from 'lucide-react';
 import { cartoes as cartoesApi } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import PeriodoSelector from '../components/ui/PeriodoSelector';
+import DateRangeModal from '../components/ui/DateRangeModal';
 import { brl } from '../lib/formatters';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -35,7 +36,16 @@ function buildChartData(resumo) {
 
 const cardSurface = { background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)' };
 const h2Cls = 'text-xs font-bold uppercase tracking-widest text-text-primary/40 font-mono mb-4';
-const emptyVal = { mesInicio: null, anoInicio: null, mesFim: null, anoFim: null };
+function periodoMesesAtras(meses) {
+  const now = new Date();
+  const past = new Date(now.getFullYear(), now.getMonth() - meses, 1);
+  return {
+    mesInicio: past.getMonth() + 1,
+    anoInicio: past.getFullYear(),
+    mesFim: now.getMonth() + 1,
+    anoFim: now.getFullYear(),
+  };
+}
 
 export default function CartaoDashboard() {
   const navigate = useNavigate();
@@ -44,7 +54,9 @@ export default function CartaoDashboard() {
   const [bi, setBi] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingBi, setLoadingBi] = useState(false);
-  const [periodo, setPeriodo] = useState(emptyVal);
+  const [periodo, setPeriodo] = useState(() => periodoMesesAtras(1));
+  const [activeFilter, setActiveFilter] = useState('30d');
+  const [showDateModal, setShowDateModal] = useState(false);
 
   const carregarBi = useCallback(async (p) => {
     setLoadingBi(true);
@@ -71,8 +83,14 @@ export default function CartaoDashboard() {
       .then(([lista, res]) => { setCartoes(lista); setResumo(res); })
       .catch(() => {})
       .finally(() => setLoading(false));
-    carregarBi(emptyVal);
+    carregarBi(periodoMesesAtras(1));
   }, [carregarBi]);
+
+  function aplicarFiltroRapido(id, novoPeriodo) {
+    setActiveFilter(id);
+    setPeriodo(novoPeriodo);
+    carregarBi(novoPeriodo);
+  }
 
   const totalLimite = cartoes.reduce((acc, c) => acc + parseFloat(c.limite ?? 0), 0);
   const totalUsado = cartoes.reduce((acc, c) => acc + parseFloat(c.limiteUsado ?? 0), 0);
@@ -203,12 +221,44 @@ export default function CartaoDashboard() {
 
       {/* ── §7 — Painéis BI ──────────────────────────────────────────── */}
       <div className="rounded-2xl p-6" style={cardSurface}>
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-secondary" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono">Análise BI — Período Personalizado</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono">Análise BI</h2>
           </div>
-          <PeriodoSelector value={periodo} onChange={(p) => { setPeriodo(p); carregarBi(p); }} />
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'today', label: 'Este mês', periodo: () => periodoMesesAtras(0) },
+              { id: '15d',   label: 'Últimos 15 dias', periodo: () => periodoMesesAtras(0) },
+              { id: '30d',   label: 'Últimos 30 dias', periodo: () => periodoMesesAtras(1) },
+            ].map(({ id, label, periodo: getPeriodo }) => (
+              <button
+                key={id}
+                onClick={() => aplicarFiltroRapido(id, getPeriodo())}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                  activeFilter === id
+                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary hover:border-text-primary/20'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => { setActiveFilter('custom'); setShowDateModal(true); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                activeFilter === 'custom'
+                  ? 'bg-secondary/20 text-secondary border border-secondary/30'
+                  : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary hover:border-text-primary/20'
+              }`}
+            >
+              <SlidersHorizontal className="w-3 h-3" /> Personalizado
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <PeriodoSelector value={periodo} onChange={(p) => { setActiveFilter('custom'); setPeriodo(p); carregarBi(p); }} />
         </div>
 
         {loadingBi ? (
@@ -381,6 +431,17 @@ export default function CartaoDashboard() {
             Cadastrar cartão
           </button>
         </div>
+      )}
+
+      {showDateModal && (
+        <DateRangeModal
+          onApply={(p) => {
+            setShowDateModal(false);
+            setPeriodo(p);
+            carregarBi(p);
+          }}
+          onCancel={() => { setShowDateModal(false); setActiveFilter('30d'); }}
+        />
       )}
     </div>
   );
