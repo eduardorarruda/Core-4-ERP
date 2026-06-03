@@ -60,7 +60,7 @@ public class ConsultaTools {
             "Quanto tenho a pagar?", "Resumo financeiro".
             """)
     public DashboardResponseDto consultarDashboard() {
-        return dashboardService.getDashboard();
+        return dashboardService.getDashboard(null, null, null, null);
     }
 
     @Tool(description = """

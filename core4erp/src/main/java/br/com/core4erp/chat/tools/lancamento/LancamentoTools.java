@@ -107,7 +107,8 @@ public class LancamentoTools {
                 categoriaId,
                 null,
                 quantidadeParcelas != null ? quantidadeParcelas : 1,
-                true
+                true,
+                null
         );
         return cartaoCreditoService.criarLancamento(cartaoId, dto);
     }

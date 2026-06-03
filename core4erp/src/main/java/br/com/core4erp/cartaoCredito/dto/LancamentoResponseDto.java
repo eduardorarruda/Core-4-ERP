@@ -1,6 +1,7 @@
 package br.com.core4erp.cartaoCredito.dto;
 
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,7 +21,8 @@ public record LancamentoResponseDto(
         boolean faturaFechada,
         Long assinaturaId,
         Long parceiroId,
-        String parceiroNome
+        String parceiroNome,
+        TipoLancamentoCartao tipo
 ) {
     public static LancamentoResponseDto from(LancamentoCartao l, boolean faturaFechada) {
         return new LancamentoResponseDto(
@@ -32,7 +34,8 @@ public record LancamentoResponseDto(
                 l.getAssinatura() != null ? l.getAssinatura().getId() : null,
                 l.getParceiro() != null ? l.getParceiro().getId() : null,
                 l.getParceiro() != null ? (l.getParceiro().getNomeFantasia() != null
-                        ? l.getParceiro().getNomeFantasia() : l.getParceiro().getRazaoSocial()) : null
+                        ? l.getParceiro().getNomeFantasia() : l.getParceiro().getRazaoSocial()) : null,
+                l.getTipo() != null ? l.getTipo() : TipoLancamentoCartao.SAIDA
         );
     }
 }

@@ -1,5 +1,6 @@
 package br.com.core4erp.cartaoCredito.dto;
 
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -30,5 +31,8 @@ public record LancamentoRequestDto(
         Integer quantidadeParcelas,
 
         /** true = divide o valor; false = repete em cada parcela. */
-        Boolean dividirValor
+        Boolean dividirValor,
+
+        /** SAIDA (default) ou ENTRADA (crédito/estorno). Valor sempre positivo, tipo indica direção. */
+        TipoLancamentoCartao tipo
 ) {}

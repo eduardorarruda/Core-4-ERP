@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Dashboard", description = "Agregação financeira consolidada do usuário")
@@ -25,8 +26,12 @@ public class DashboardController {
     @Operation(summary = "Retorna saldos, totais, fluxo mensal e despesas por categoria")
     @GetMapping
     @Requer("DASHBOARD_VISUALIZAR")
-    public ResponseEntity<DashboardResponseDto> getDashboard() {
-        return ResponseEntity.ok(service.getDashboard());
+    public ResponseEntity<DashboardResponseDto> getDashboard(
+            @RequestParam(required = false) Integer mesInicio,
+            @RequestParam(required = false) Integer anoInicio,
+            @RequestParam(required = false) Integer mesFim,
+            @RequestParam(required = false) Integer anoFim) {
+        return ResponseEntity.ok(service.getDashboard(mesInicio, anoInicio, mesFim, anoFim));
     }
 
     @Operation(summary = "Retorna saldo detalhado com composição, projeções e cartão")

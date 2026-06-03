@@ -254,7 +254,8 @@ export const cartoes = {
     atualizar: (cartaoId, id, dto) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     deletar: (cartaoId, id) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'DELETE' }),
   },
-  dashboard: () => request('/api/cartoes/dashboard/resumo'),
+  dashboard: (qs) => request(`/api/cartoes/dashboard/resumo${qs ? `?${qs}` : ''}`),
+  dashboardBI: (qs) => request(`/api/cartoes/dashboard/bi${qs ? `?${qs}` : ''}`),
 };
 
 // ── Notificações ──────────────────────────────────────────────────────────────
@@ -295,7 +296,7 @@ export const assinaturas = {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboard = {
-  resumo: () => request('/api/dashboard'),
+  resumo: (qs) => request(`/api/dashboard${qs ? `?${qs}` : ''}`),
   saldoDetalhado: () => request('/api/dashboard/saldo-detalhado'),
 };
 

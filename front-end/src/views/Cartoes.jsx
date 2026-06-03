@@ -10,7 +10,7 @@ import EmptyState from '../components/ui/EmptyState';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 
-const emptyLancForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: true };
+const emptyLancForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: true, tipo: 'SAIDA' };
 
 const GRADIENTS = [
   'from-violet-600 to-indigo-700',
@@ -46,6 +46,7 @@ export default function Cartoes() {
   const [showForm, setShowForm] = useState(false);
   const [filterMes, setFilterMes] = useState('');
   const [filterAno, setFilterAno] = useState('');
+  const [busca, setBusca] = useState('');
 
   useEffect(() => {
     Promise.all([api.listar(), ccApi.listar(), catApi.listar(), parApi.listar()])
@@ -53,9 +54,9 @@ export default function Cartoes() {
       .catch((e) => toast.error(e.message));
   }, []);
 
-  async function recarregarLancamentos() {
+  async function recarregarLancamentos(params = {}) {
     if (!cartaoSel) return;
-    const l = await api.lancamentos.listar(cartaoSel.id);
+    const l = await api.lancamentos.listar(cartaoSel.id, params);
     setLancamentos(l);
   }
 
@@ -134,7 +135,7 @@ export default function Cartoes() {
     setErrors({});
     setSalvandoLanc(true);
     try {
-      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor });
+      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor, tipo: lancForm.tipo });
       await recarregarLancamentos();
       setLancForm(emptyLancForm);
       toast.success('Lançamento criado!');
@@ -225,7 +226,11 @@ export default function Cartoes() {
         </div>
       ),
     },
-    { key: 'valor', label: 'Valor', render: (v) => <span className="font-medium text-text-primary">R$ {brl(v)}</span> },
+    { key: 'valor', label: 'Valor', render: (v, row) => (
+      <span className={`font-mono font-bold ${row.tipo === 'ENTRADA' ? 'text-primary' : 'text-error'}`}>
+        {row.tipo === 'ENTRADA' ? '+' : '-'} R$ {brl(v)}
+      </span>
+    )},
     { key: 'mesFatura', label: 'Fatura', render: (v, row) => `${String(v).padStart(2, '0')}/${row.anoFatura}` },
     { key: 'numeroParcela', label: 'Parcela', render: (v, row) => `${v}/${row.totalParcelas}` },
     {
@@ -435,7 +440,19 @@ export default function Cartoes() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Novo lançamento */}
             <form onSubmit={criarLancamento} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Lançamento</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Lançamento</h3>
+                <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold">
+                  <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'SAIDA' }))}
+                    className={`px-3 py-1.5 transition-colors ${lancForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    Saída
+                  </button>
+                  <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
+                    className={`px-3 py-1.5 transition-colors ${lancForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    Entrada
+                  </button>
+                </div>
+              </div>
               <FormField label="Descrição" error={errors.descricao}>
                 <input className={inputCls} value={lancForm.descricao} onChange={(e) => setLancForm((f) => ({ ...f, descricao: e.target.value }))} required />
               </FormField>
@@ -494,7 +511,7 @@ export default function Cartoes() {
             <select
               className={`${inputCls} !w-auto min-w-[90px]`}
               value={filterMes}
-              onChange={(e) => setFilterMes(e.target.value)}
+              onChange={(e) => { setFilterMes(e.target.value); recarregarLancamentos({ mes: e.target.value || undefined, ano: filterAno || undefined, busca: busca || undefined }); }}
             >
               <option value="">Mês</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -506,10 +523,17 @@ export default function Cartoes() {
               className={`${inputCls} !w-auto min-w-[90px]`}
               placeholder="Ano"
               value={filterAno}
-              onChange={(e) => setFilterAno(e.target.value)}
+              onChange={(e) => { setFilterAno(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: e.target.value || undefined, busca: busca || undefined }); }}
             />
-            {(filterMes || filterAno) && (
-              <button onClick={() => { setFilterMes(''); setFilterAno(''); }} className="text-xs text-text-primary/40 hover:text-text-primary transition-colors underline underline-offset-2">
+            <input
+              type="search"
+              className={`${inputCls} !w-auto min-w-[160px]`}
+              placeholder="Buscar descrição, categoria..."
+              value={busca}
+              onChange={(e) => { setBusca(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: filterAno || undefined, busca: e.target.value || undefined }); }}
+            />
+            {(filterMes || filterAno || busca) && (
+              <button onClick={() => { setFilterMes(''); setFilterAno(''); setBusca(''); recarregarLancamentos(); }} className="text-xs text-text-primary/40 hover:text-text-primary transition-colors underline underline-offset-2">
                 Limpar filtros
               </button>
             )}
