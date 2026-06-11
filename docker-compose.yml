@@ -19,8 +19,9 @@ services:
 
   backend:
     build: ./core4erp
+    mem_limit: 1500m
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/core4erp}
       DB_USERNAME: ${DB_USERNAME}
@@ -48,6 +49,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+
+  frontend:
+    build: ./front-end
+    container_name: core4erp-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   prometheus:
     image: prom/prometheus:latest
@@ -125,6 +141,16 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+    networks:
+      - app-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

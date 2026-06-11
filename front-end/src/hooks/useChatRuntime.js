@@ -2,7 +2,7 @@ import { useLocalRuntime } from "@assistant-ui/react";
 import { clearAuth } from "../lib/api";
 
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 const core4ChatAdapter = {
   async *run({ messages, abortSignal }) {
