@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -94,6 +95,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDto> handleResponseStatus(ResponseStatusException e) {
         return ResponseEntity.status(e.getStatusCode()).body(new ErrorResponseDto(
                 "ERRO_HTTP", e.getReason() != null ? e.getReason() : e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
+    @ExceptionHandler(WebClientResponseException.class)
+    public ResponseEntity<ErrorResponseDto> handleWebClient(WebClientResponseException e) {
+        // Falha em chamada a serviço externo (ex.: OpenAI). Loga o corpo da resposta,
+        // que contém o motivo exato (ex.: schema de função inválido), sem expô-lo ao cliente.
+        log.error("[ERRO_UPSTREAM] {} de {} — corpo: {}",
+                e.getStatusCode(), e.getRequest() != null ? e.getRequest().getURI() : "?",
+                e.getResponseBodyAsString());
+        return ResponseEntity.status(502).body(new ErrorResponseDto(
+                "ERRO_SERVICO_EXTERNO",
+                "O assistente está temporariamente indisponível. Tente novamente em instantes.",
+                LocalDateTime.now()
         ));
     }
 
