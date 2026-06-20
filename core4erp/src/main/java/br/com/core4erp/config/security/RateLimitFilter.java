@@ -7,6 +7,7 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -26,9 +27,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final Cache<String, Bucket> chatBuckets;
     private final Cache<String, Bucket> uploadBuckets;
     private final ObjectMapper objectMapper;
+    private final JwtService jwtService;
 
-    public RateLimitFilter(ObjectMapper objectMapper) {
+    public RateLimitFilter(ObjectMapper objectMapper, JwtService jwtService) {
         this.objectMapper = objectMapper;
+        this.jwtService = jwtService;
         this.buckets = Caffeine.newBuilder()
                 .expireAfterAccess(10, TimeUnit.MINUTES)
                 .maximumSize(5_000)
@@ -59,7 +62,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         boolean isChat = path.startsWith("/api/chat");
         boolean isUpload = path.equals("/api/conciliacao/upload");
-        Bucket bucket = isChat ? resolveChatBucket(ip)
+        Bucket bucket = isChat ? resolveChatBucket(resolveChatKey(request, ip))
                 : isUpload ? resolveUploadBucket(ip)
                         : resolveBucket(ip);
 
@@ -90,8 +93,43 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 .build());
     }
 
-    private Bucket resolveChatBucket(String ip) {
-        return chatBuckets.get(ip, k -> Bucket.builder()
+    /**
+     * Chave do rate limit do chat: e-mail do usuário autenticado (do JWT) quando disponível,
+     * caso contrário o IP. Resolve o token diretamente porque este filtro roda antes do
+     * {@code JwtFilter}, então o {@code SecurityContext} ainda não está populado.
+     */
+    private String resolveChatKey(HttpServletRequest request, String ip) {
+        try {
+            String token = extractToken(request);
+            if (token != null && jwtService.isTokenValid(token)) {
+                String email = jwtService.extractEmail(token);
+                if (email != null && !email.isBlank()) {
+                    return "user:" + email;
+                }
+            }
+        } catch (Exception ignored) {
+            // Token inválido/ausente — cai para o IP
+        }
+        return "ip:" + ip;
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("access_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
+    }
+
+    private Bucket resolveChatBucket(String key) {
+        return chatBuckets.get(key, k -> Bucket.builder()
                 .addLimit(Bandwidth.builder()
                         .capacity(30)
                         .refillIntervally(30, Duration.ofMinutes(1))

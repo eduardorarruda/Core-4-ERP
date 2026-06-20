@@ -30,7 +30,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       TOKEN_EXPIRATION: ${TOKEN_EXPIRATION:-604800000}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
