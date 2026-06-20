@@ -58,7 +58,10 @@ dependencies {
 
 	// Spring AI
 	implementation platform('org.springframework.ai:spring-ai-bom:1.1.4')
-	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+
+	// Propagação de ThreadLocal (SecurityContext / RequestAttributes) para threads do Reactor
+	implementation 'io.micrometer:context-propagation'
 
 	// Email
 	implementation 'org.springframework.boot:spring-boot-starter-mail'

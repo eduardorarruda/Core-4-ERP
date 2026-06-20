@@ -12,6 +12,9 @@ public class ChatMetrics {
 
     private final Counter totalMensagens;
     private final Counter totalErros;
+    private final Counter tokensPrompt;
+    private final Counter tokensCompletion;
+    private final Counter tokensTotal;
     private final Timer tempoChatTimer;
     private final AtomicInteger sessoesAtivas;
 
@@ -22,6 +25,18 @@ public class ChatMetrics {
 
         this.totalErros = Counter.builder("chat.erros.total")
                 .description("Total de erros no chat IA")
+                .register(registry);
+
+        this.tokensPrompt = Counter.builder("chat.tokens.prompt")
+                .description("Total de tokens de entrada (prompt) consumidos pelo chat IA")
+                .register(registry);
+
+        this.tokensCompletion = Counter.builder("chat.tokens.completion")
+                .description("Total de tokens de saída (completion) gerados pelo chat IA")
+                .register(registry);
+
+        this.tokensTotal = Counter.builder("chat.tokens.total")
+                .description("Total de tokens (prompt + completion) do chat IA")
                 .register(registry);
 
         this.tempoChatTimer = Timer.builder("chat.processamento.duracao")
@@ -38,6 +53,12 @@ public class ChatMetrics {
 
     public void registrarErro() {
         totalErros.increment();
+    }
+
+    public void registrarTokens(long prompt, long completion) {
+        if (prompt > 0) tokensPrompt.increment(prompt);
+        if (completion > 0) tokensCompletion.increment(completion);
+        if (prompt + completion > 0) tokensTotal.increment(prompt + completion);
     }
 
     public Timer.Sample iniciarTimer() {

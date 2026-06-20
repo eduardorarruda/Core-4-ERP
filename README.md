@@ -52,7 +52,8 @@ Copie `core4erp/.env.example` e preencha os valores.
 
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
-| `GEMINI_API_KEY` | Chave da API Google Gemini (Chat IA) | — |
+| `OPENAI_API_KEY` | Chave da API OpenAI (Chat IA) | — |
+| `OPENAI_MODEL` | Modelo OpenAI usado no Chat IA | `gpt-4o-mini` |
 | `APP_ENV` | Ambiente atual; aparece nas métricas Prometheus | `development` |
 | `HIBERNATE_STATS_ENABLED` | Ativa estatísticas Hibernate (útil em staging para detectar N+1) | `false` |
 | `PORT` | Porta HTTP do servidor | `8080` |
@@ -118,7 +119,7 @@ FrontEnd/
 │   │   ├── assinatura/        # Assinaturas recorrentes
 │   │   ├── conciliacao/       # Conciliação bancária (upload de extratos)
 │   │   ├── notificacao/       # Alertas de vencimento
-│   │   ├── chat/              # Chat IA (Gemini 2.0 Flash + tools)
+│   │   ├── chat/              # Chat IA (OpenAI gpt-4o-mini + tools)
 │   │   ├── relatorio/         # Relatórios Excel e JSON
 │   │   ├── dashboard/         # Agregação financeira consolidada
 │   │   ├── observabilidade/   # Logging estruturado + métricas de performance

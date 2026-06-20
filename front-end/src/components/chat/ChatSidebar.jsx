@@ -109,17 +109,15 @@ function ChatContent({ onClose }) {
           <div className="px-4 pb-2">
             <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
-                <ComposerPrimitive.Root key={s}>
-                  <button
-                    type="button"
-                    className="text-[11px] px-3 py-1.5 rounded-full border border-text-primary/10 text-text-primary/50 hover:border-primary/30 hover:text-primary transition-colors"
-                    onClick={() => {
-                      /* Suggestions auto-fill via ComposerPrimitive - just visual for now */
-                    }}
-                  >
-                    {s}
-                  </button>
-                </ComposerPrimitive.Root>
+                <ThreadPrimitive.Suggestion
+                  key={s}
+                  prompt={s}
+                  method="replace"
+                  autoSend
+                  className="text-[11px] px-3 py-1.5 rounded-full border border-text-primary/10 text-text-primary/50 hover:border-primary/30 hover:text-primary transition-colors"
+                >
+                  {s}
+                </ThreadPrimitive.Suggestion>
               ))}
             </div>
           </div>

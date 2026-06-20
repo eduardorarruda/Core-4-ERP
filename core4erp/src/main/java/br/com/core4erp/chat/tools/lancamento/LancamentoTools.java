@@ -14,6 +14,7 @@ import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoRequestDto;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.InvestimentoService;
+import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -34,17 +35,20 @@ public class LancamentoTools {
     private final CartaoCreditoService cartaoCreditoService;
     private final InvestimentoService investimentoService;
     private final SecurityContextUtils securityCtx;
+    private final ChatAuditoriaService auditoria;
 
     public LancamentoTools(ContaService contaService,
                            ContaCorrenteService contaCorrenteService,
                            CartaoCreditoService cartaoCreditoService,
                            InvestimentoService investimentoService,
-                           SecurityContextUtils securityCtx) {
+                           SecurityContextUtils securityCtx,
+                           ChatAuditoriaService auditoria) {
         this.contaService = contaService;
         this.contaCorrenteService = contaCorrenteService;
         this.cartaoCreditoService = cartaoCreditoService;
         this.investimentoService = investimentoService;
         this.securityCtx = securityCtx;
+        this.auditoria = auditoria;
     }
 
     @Tool(description = """
@@ -64,6 +68,8 @@ public class LancamentoTools {
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
         log.info("[CHAT-AUDIT] user={} tool=registrarConta descricao={} valor={} tipo={}",
                 securityCtx.getEmail(), descricao, valorOriginal, tipo);
+        auditoria.registrar("registrarConta",
+                "descricao=" + descricao + " valor=" + valorOriginal + " tipo=" + tipo);
         TipoConta tipoConta;
         try {
             tipoConta = TipoConta.valueOf(tipo.toUpperCase());
@@ -100,6 +106,8 @@ public class LancamentoTools {
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
         log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={}",
                 securityCtx.getEmail(), cartaoId, descricao, valor);
+        auditoria.registrar("registrarLancamentoCartao",
+                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor);
         LancamentoRequestDto dto = new LancamentoRequestDto(
                 descricao,
                 valor,
@@ -124,6 +132,8 @@ public class LancamentoTools {
             @ToolParam(description = "Data em que a transferência ocorreu no formato YYYY-MM-DD") LocalDate dataTransferencia) {
         log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={} data={}",
                 securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
+        auditoria.registrar("transferirEntreContas",
+                "origem=" + contaOrigemId + " destino=" + contaDestinoId + " valor=" + valor);
         TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor, dataTransferencia);
         contaCorrenteService.transferir(dto);
         return Map.of("status", "Transferência realizada com sucesso");
@@ -141,6 +151,8 @@ public class LancamentoTools {
             @ToolParam(description = "Valor de multa. Padrão: 0") BigDecimal multa) {
         log.info("[CHAT-AUDIT] user={} tool=baixarConta contaId={} contaCorrenteId={} data={}",
                 securityCtx.getEmail(), contaId, contaCorrenteId, dataPagamento);
+        auditoria.registrar("baixarConta",
+                "contaId=" + contaId + " contaCorrenteId=" + contaCorrenteId + " data=" + dataPagamento);
         BaixaRequestDto dto = new BaixaRequestDto(
                 contaCorrenteId,
                 dataPagamento,
@@ -165,6 +177,8 @@ public class LancamentoTools {
             @ToolParam(description = "ID da conta corrente para débito (apenas para APORTE). Opcional") Long contaCorrenteOrigemId) {
         log.info("[CHAT-AUDIT] user={} tool=registrarTransacaoInvestimento contaId={} tipo={} valor={}",
                 securityCtx.getEmail(), contaInvestimentoId, tipoTransacao, valor);
+        auditoria.registrar("registrarTransacaoInvestimento",
+                "contaInvestimentoId=" + contaInvestimentoId + " tipo=" + tipoTransacao + " valor=" + valor);
         TipoTransacaoInvestimento tipoEnum;
         try {
             tipoEnum = TipoTransacaoInvestimento.valueOf(tipoTransacao.toUpperCase());

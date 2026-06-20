@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.tools.relatorio;
 
+import br.com.core4erp.chat.service.ChatAuditoriaService;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -11,9 +12,11 @@ import java.util.Map;
 public class RelatorioTools {
 
     private final RelatorioExcelService excelService;
+    private final ChatAuditoriaService auditoria;
 
-    public RelatorioTools(RelatorioExcelService excelService) {
+    public RelatorioTools(RelatorioExcelService excelService, ChatAuditoriaService auditoria) {
         this.excelService = excelService;
+        this.auditoria = auditoria;
     }
 
     @Tool(description = """
@@ -27,6 +30,8 @@ public class RelatorioTools {
             @ToolParam(description = "Data de início do relatório no formato YYYY-MM-DD") LocalDate dataInicio,
             @ToolParam(description = "Data de fim do relatório no formato YYYY-MM-DD") LocalDate dataFim) {
         String fileName = excelService.gerarRelatorioDespesas(dataInicio, dataFim);
+        auditoria.registrar("gerarRelatorioExcel",
+                "dataInicio=" + dataInicio + " dataFim=" + dataFim);
         return Map.of(
                 "downloadUrl", "/api/chat/relatorios/" + fileName,
                 "mensagem", "Relatório gerado com sucesso. Disponível para download."

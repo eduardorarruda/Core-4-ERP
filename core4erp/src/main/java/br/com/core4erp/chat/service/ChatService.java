@@ -2,21 +2,20 @@ package br.com.core4erp.chat.service;
 
 import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
+import br.com.core4erp.chat.entity.ChatMensagem;
 import br.com.core4erp.chat.metrics.ChatMetrics;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import io.micrometer.core.instrument.Timer;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,12 +41,11 @@ public class ChatService {
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
     private final ChatMetrics chatMetrics;
+    private final ChatMemoryService memoryService;
+    private final int maxHistorico;
 
     private static final Pattern DOWNLOAD_URL_PATTERN =
             Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
-
-    private final Cache<String, List<Message>> memoriaConversas;
-    private final int maxHistorico;
 
     public ChatService(ChatClient.Builder chatClientBuilder,
                        SystemPromptBuilder promptBuilder,
@@ -57,8 +55,7 @@ public class ChatService {
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
                        ChatMetrics chatMetrics,
-                       @Value("${chat.cache.ttl-hours:2}") int cacheTtlHours,
-                       @Value("${chat.cache.max-size:1000}") long cacheMaxSize,
+                       ChatMemoryService memoryService,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
@@ -68,11 +65,8 @@ public class ChatService {
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
         this.chatMetrics = chatMetrics;
+        this.memoryService = memoryService;
         this.maxHistorico = maxHistorico;
-        this.memoriaConversas = Caffeine.newBuilder()
-                .expireAfterAccess(cacheTtlHours, TimeUnit.HOURS)
-                .maximumSize(cacheMaxSize)
-                .build();
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
@@ -80,16 +74,12 @@ public class ChatService {
         Timer.Sample timer = chatMetrics.iniciarTimer();
 
         String email = securityCtx.getEmail();
+        Long usuarioId = securityCtx.getUsuarioId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
+        String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
-        List<Message> historico = memoriaConversas.get(email, k -> new ArrayList<>());
-
-        historico.add(new UserMessage(sanitizer.sanitize(request.mensagem())));
-
-        // SystemMessage primeiro, depois o histórico completo
-        List<Message> allMessages = new ArrayList<>();
-        allMessages.add(new SystemMessage(systemPrompt));
-        allMessages.addAll(historico);
+        List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
+        memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
         try {
             ChatResponse response = chatClient.prompt()
@@ -102,13 +92,10 @@ public class ChatService {
                     ? response.getResult().getOutput().getText()
                     : "";
 
-            log.info("[CHAT-USAGE] user={} usage={}", email, response.getMetadata().getUsage());
-
-            historico.add(new AssistantMessage(respostaTexto));
-            podarHistorico(historico);
+            registrarUsage(response, email);
+            memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
 
             String downloadUrl = extrairDownloadUrl(respostaTexto);
-
             return new ChatResponseDto(respostaTexto, downloadUrl, List.of());
         } catch (Exception e) {
             chatMetrics.registrarErro();
@@ -122,35 +109,40 @@ public class ChatService {
         chatMetrics.registrarMensagem();
         chatMetrics.incrementarSessoes();
 
-        // Capture security context on the servlet thread before async hand-off
+        // Captura a identidade na thread da requisição antes do hand-off assíncrono.
+        // (O contexto de segurança é propagado às threads do Reactor por
+        // ReactorContextPropagationConfig, mas usamos o usuarioId explícito na persistência.)
         String email = securityCtx.getEmail();
+        Long usuarioId = securityCtx.getUsuarioId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
+        String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
-        List<Message> historico = memoriaConversas.get(email, k -> new ArrayList<>());
-        historico.add(new UserMessage(sanitizer.sanitize(request.mensagem())));
-
-        List<Message> allMessages = new ArrayList<>();
-        allMessages.add(new SystemMessage(systemPrompt));
-        allMessages.addAll(historico);
+        List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
+        memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
         StringBuilder fullResponse = new StringBuilder();
+        AtomicReference<ChatResponse> ultimaResposta = new AtomicReference<>();
 
         chatClient.prompt()
                 .messages(allMessages)
                 .tools(consultaTools, lancamentoTools, relatorioTools)
                 .stream()
-                .content()
-                .doOnNext(token -> {
-                    try {
-                        fullResponse.append(token);
-                        emitter.send(SseEmitter.event().data(token));
-                    } catch (IOException e) {
-                        emitter.completeWithError(e);
+                .chatResponse()
+                .doOnNext(resp -> {
+                    ultimaResposta.set(resp);
+                    String token = extrairTexto(resp);
+                    if (token != null && !token.isEmpty()) {
+                        try {
+                            fullResponse.append(token);
+                            emitter.send(SseEmitter.event().data(token));
+                        } catch (IOException e) {
+                            emitter.completeWithError(e);
+                        }
                     }
                 })
                 .doOnComplete(() -> {
-                    historico.add(new AssistantMessage(fullResponse.toString()));
-                    podarHistorico(historico);
+                    registrarUsage(ultimaResposta.get(), email);
+                    memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, fullResponse.toString());
                     chatMetrics.decrementarSessoes();
                     emitter.complete();
                 })
@@ -163,13 +155,37 @@ public class ChatService {
     }
 
     public void limparHistorico() {
-        memoriaConversas.invalidate(securityCtx.getEmail());
+        memoryService.limpar(securityCtx.getUsuarioId());
     }
 
-    private void podarHistorico(List<Message> historico) {
-        if (historico.size() > maxHistorico) {
-            historico.subList(0, historico.size() - maxHistorico).clear();
+    private List<Message> montarMensagens(Long usuarioId, String systemPrompt, String mensagemUsuario) {
+        List<Message> historico = memoryService.carregar(usuarioId, maxHistorico);
+        List<Message> allMessages = new ArrayList<>(historico.size() + 2);
+        allMessages.add(new SystemMessage(systemPrompt));
+        allMessages.addAll(historico);
+        allMessages.add(new UserMessage(mensagemUsuario));
+        return allMessages;
+    }
+
+    private String extrairTexto(ChatResponse resp) {
+        if (resp == null || resp.getResult() == null || resp.getResult().getOutput() == null) {
+            return null;
         }
+        return resp.getResult().getOutput().getText();
+    }
+
+    private void registrarUsage(ChatResponse response, String email) {
+        if (response == null || response.getMetadata() == null) {
+            return;
+        }
+        Usage usage = response.getMetadata().getUsage();
+        if (usage == null) {
+            return;
+        }
+        long prompt = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : 0L;
+        long completion = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : 0L;
+        chatMetrics.registrarTokens(prompt, completion);
+        log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={}", email, prompt, completion);
     }
 
     private String extrairDownloadUrl(String resposta) {
