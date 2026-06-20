@@ -4,6 +4,7 @@ import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
 import br.com.core4erp.chat.entity.ChatMensagem;
 import br.com.core4erp.chat.metrics.ChatMetrics;
+import br.com.core4erp.chat.tools.cadastro.CadastroTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
@@ -18,13 +19,17 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,9 +45,23 @@ public class ChatService {
     private final ConsultaTools consultaTools;
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
+    private final CadastroTools cadastroTools;
     private final ChatMetrics chatMetrics;
     private final ChatMemoryService memoryService;
     private final int maxHistorico;
+
+    /**
+     * Pool dedicado para o processamento assíncrono do streaming. Cada tarefa restaura
+     * o SecurityContext e os RequestAttributes capturados da thread da requisição, de modo
+     * que as tools (e os serviços de domínio que dependem de {@link SecurityContextUtils})
+     * executem com o usuário/tenant correto — algo que a execução em threads do Reactor não
+     * garantia.
+     */
+    private final ExecutorService streamExecutor = Executors.newFixedThreadPool(16, r -> {
+        Thread t = new Thread(r, "chat-stream");
+        t.setDaemon(true);
+        return t;
+    });
 
     private static final Pattern DOWNLOAD_URL_PATTERN =
             Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
@@ -54,6 +73,7 @@ public class ChatService {
                        ConsultaTools consultaTools,
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
+                       CadastroTools cadastroTools,
                        ChatMetrics chatMetrics,
                        ChatMemoryService memoryService,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
@@ -64,6 +84,7 @@ public class ChatService {
         this.consultaTools = consultaTools;
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
+        this.cadastroTools = cadastroTools;
         this.chatMetrics = chatMetrics;
         this.memoryService = memoryService;
         this.maxHistorico = maxHistorico;
@@ -84,14 +105,11 @@ public class ChatService {
         try {
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
-                    .tools(consultaTools, lancamentoTools, relatorioTools)
+                    .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
                     .call()
                     .chatResponse();
 
-            String respostaTexto = (response.getResult() != null && response.getResult().getOutput() != null)
-                    ? response.getResult().getOutput().getText()
-                    : "";
-
+            String respostaTexto = extrairTexto(response);
             registrarUsage(response, email);
             memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
 
@@ -109,49 +127,52 @@ public class ChatService {
         chatMetrics.registrarMensagem();
         chatMetrics.incrementarSessoes();
 
-        // Captura a identidade na thread da requisição antes do hand-off assíncrono.
-        // (O contexto de segurança é propagado às threads do Reactor por
-        // ReactorContextPropagationConfig, mas usamos o usuarioId explícito na persistência.)
+        // Captura identidade e contexto na thread da requisição (HTTP), antes do hand-off.
         String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
-
         List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
         memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
-        StringBuilder fullResponse = new StringBuilder();
-        AtomicReference<ChatResponse> ultimaResposta = new AtomicReference<>();
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
 
-        chatClient.prompt()
-                .messages(allMessages)
-                .tools(consultaTools, lancamentoTools, relatorioTools)
-                .stream()
-                .chatResponse()
-                .doOnNext(resp -> {
-                    ultimaResposta.set(resp);
-                    String token = extrairTexto(resp);
-                    if (token != null && !token.isEmpty()) {
-                        try {
-                            fullResponse.append(token);
-                            emitter.send(SseEmitter.event().data(token));
-                        } catch (IOException e) {
-                            emitter.completeWithError(e);
-                        }
-                    }
-                })
-                .doOnComplete(() -> {
-                    registrarUsage(ultimaResposta.get(), email);
-                    memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, fullResponse.toString());
-                    chatMetrics.decrementarSessoes();
-                    emitter.complete();
-                })
-                .doOnError(err -> {
-                    chatMetrics.registrarErro();
-                    chatMetrics.decrementarSessoes();
-                    emitter.completeWithError(err);
-                })
-                .subscribe();
+        streamExecutor.submit(() -> {
+            try {
+                // Restaura o contexto na thread de execução para que tools e serviços de
+                // domínio (que usam SecurityContextUtils) enxerguem o usuário correto.
+                SecurityContextHolder.setContext(securityContext);
+                if (requestAttributes != null) {
+                    RequestContextHolder.setRequestAttributes(requestAttributes, true);
+                }
+
+                ChatResponse response = chatClient.prompt()
+                        .messages(allMessages)
+                        .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
+                        .call()
+                        .chatResponse();
+
+                String respostaTexto = extrairTexto(response);
+                registrarUsage(response, email);
+                memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
+
+                emitter.send(SseEmitter.event().data(respostaTexto));
+                emitter.complete();
+            } catch (Exception e) {
+                chatMetrics.registrarErro();
+                log.error("[CHAT-STREAM] erro ao processar mensagem de {}: {}", email, e.getMessage(), e);
+                try {
+                    emitter.completeWithError(e);
+                } catch (Exception ignored) {
+                    // emitter já encerrado
+                }
+            } finally {
+                chatMetrics.decrementarSessoes();
+                RequestContextHolder.resetRequestAttributes();
+                SecurityContextHolder.clearContext();
+            }
+        });
     }
 
     public void limparHistorico() {
@@ -167,11 +188,12 @@ public class ChatService {
         return allMessages;
     }
 
-    private String extrairTexto(ChatResponse resp) {
-        if (resp == null || resp.getResult() == null || resp.getResult().getOutput() == null) {
-            return null;
+    private String extrairTexto(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
         }
-        return resp.getResult().getOutput().getText();
+        String texto = response.getResult().getOutput().getText();
+        return texto != null ? texto : "";
     }
 
     private void registrarUsage(ChatResponse response, String email) {

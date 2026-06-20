@@ -60,9 +60,6 @@ dependencies {
 	implementation platform('org.springframework.ai:spring-ai-bom:1.1.8')
 	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
-	// Propagação de ThreadLocal (SecurityContext / RequestAttributes) para threads do Reactor
-	implementation 'io.micrometer:context-propagation'
-
 	// Email
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 
