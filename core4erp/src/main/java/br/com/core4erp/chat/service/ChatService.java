@@ -116,7 +116,7 @@ public class ChatService {
                     .chatResponse();
 
             String respostaTexto = extrairTexto(response);
-            String downloadUrl = RelatorioDownloadHolder.getAndClear();
+            String downloadUrl = RelatorioDownloadHolder.getAndClear(usuarioId);
             respostaTexto = anexarDownload(respostaTexto, downloadUrl);
 
             registrarUsage(response, email);
@@ -183,7 +183,7 @@ public class ChatService {
                         });
 
                 // Pós-processamento após o término do streaming.
-                String downloadUrl = RelatorioDownloadHolder.getAndClear();
+                String downloadUrl = RelatorioDownloadHolder.getAndClear(usuarioId);
                 if (downloadUrl != null) {
                     String linkMd = "\n\n[Baixar Relatório (.xlsx)](" + downloadUrl + ")";
                     full.append(linkMd);
@@ -209,7 +209,7 @@ public class ChatService {
                 }
             } finally {
                 chatMetrics.decrementarSessoes();
-                RelatorioDownloadHolder.clear();
+                RelatorioDownloadHolder.clear(usuarioId);
                 RequestContextHolder.resetRequestAttributes();
                 SecurityContextHolder.clearContext();
             }
