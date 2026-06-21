@@ -20,12 +20,18 @@ const SUGGESTIONS = [
 ];
 
 // Renderiza links de relatório como botão azul em evidência; demais links abrem em nova aba.
+// Extrai o caminho relativo do relatório de qualquer href (ignora domínio inventado pelo modelo).
+const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
+
 const markdownComponents = {
   a: ({ href = "", children, ...props }) => {
-    if (href.includes("/api/chat/relatorios/")) {
+    const match = href.match(RELATORIO_PATH);
+    if (match) {
+      // Sempre usa o caminho relativo à origem atual — nunca o domínio do href original.
+      const relative = match[0];
       return (
         <a
-          href={href}
+          href={relative}
           download
           className="inline-flex items-center gap-2 mt-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-semibold shadow-md no-underline"
         >
