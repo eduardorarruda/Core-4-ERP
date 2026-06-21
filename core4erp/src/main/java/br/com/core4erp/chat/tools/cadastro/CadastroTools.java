@@ -67,6 +67,28 @@ public class CadastroTools {
     }
 
     @Tool(description = """
+            Altera o TIPO de um parceiro existente (CLIENTE, FORNECEDOR ou AMBOS).
+            Use, por exemplo, quando o usuário quiser lançar uma despesa para um parceiro que
+            hoje é apenas CLIENTE: pergunte se deseja mudar para AMBOS e, se confirmado, use esta
+            ferramenta. Obtenha o parceiroId via consultarParceiros.
+            """)
+    public ParceiroResponseDto atualizarTipoParceiro(
+            @ToolParam(description = "ID do parceiro (use consultarParceiros para descobrir)") Long parceiroId,
+            @ToolParam(description = "Novo tipo: CLIENTE, FORNECEDOR ou AMBOS") String tipo) {
+        log.info("[CHAT-AUDIT] user={} tool=atualizarTipoParceiro parceiroId={} tipo={}",
+                securityCtx.getEmail(), parceiroId, tipo);
+        auditoria.registrar("atualizarTipoParceiro", "parceiroId=" + parceiroId + " tipo=" + tipo);
+        TipoParceiro tipoEnum;
+        try {
+            tipoEnum = TipoParceiro.valueOf(tipo.toUpperCase());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new IllegalArgumentException(
+                    "Tipo de parceiro inválido: '" + tipo + "'. Use CLIENTE, FORNECEDOR ou AMBOS.");
+        }
+        return parceiroService.atualizarTipo(parceiroId, tipoEnum);
+    }
+
+    @Tool(description = """
             Cadastra uma nova categoria de receita/despesa.
             Campo obrigatório: descricao. O ícone é opcional.
             Use quando o usuário quiser uma categoria que ainda não existe.
