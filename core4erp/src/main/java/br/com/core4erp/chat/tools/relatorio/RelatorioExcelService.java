@@ -14,6 +14,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -57,6 +58,12 @@ public class RelatorioExcelService {
         Files.createDirectories(Path.of(relatoriosDir));
     }
 
+    /**
+     * Mantém a sessão Hibernate aberta durante toda a geração para que as associações lazy
+     * (ex.: {@code conta.getCategoria()}) sejam carregadas mesmo quando executado fora do
+     * dispatch HTTP — caso do chat por streaming, que roda numa thread de pool sem OSIV.
+     */
+    @Transactional(readOnly = true)
     public String gerarRelatorioDespesas(LocalDate inicio, LocalDate fim) {
         Timer.Sample sample = Timer.start();
         Long uid = securityCtx.getUsuarioId();
