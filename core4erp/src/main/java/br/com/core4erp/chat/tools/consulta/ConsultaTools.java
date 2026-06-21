@@ -14,6 +14,8 @@ import br.com.core4erp.investimento.dto.ContaInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.InvestimentoService;
 import br.com.core4erp.notificacao.dto.NotificacaoResponseDto;
 import br.com.core4erp.notificacao.service.NotificacaoService;
+import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
+import br.com.core4erp.parceiro.service.ParceiroService;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,6 +33,7 @@ public class ConsultaTools {
     private final InvestimentoService investimentoService;
     private final NotificacaoService notificacaoService;
     private final AssinaturaService assinaturaService;
+    private final ParceiroService parceiroService;
 
     public ConsultaTools(DashboardService dashboardService,
                          ContaCorrenteService contaCorrenteService,
@@ -38,7 +41,8 @@ public class ConsultaTools {
                          CartaoCreditoService cartaoCreditoService,
                          InvestimentoService investimentoService,
                          NotificacaoService notificacaoService,
-                         AssinaturaService assinaturaService) {
+                         AssinaturaService assinaturaService,
+                         ParceiroService parceiroService) {
         this.dashboardService = dashboardService;
         this.contaCorrenteService = contaCorrenteService;
         this.categoriaService = categoriaService;
@@ -46,6 +50,7 @@ public class ConsultaTools {
         this.investimentoService = investimentoService;
         this.notificacaoService = notificacaoService;
         this.assinaturaService = assinaturaService;
+        this.parceiroService = parceiroService;
     }
 
     @Tool(description = """
@@ -115,5 +120,16 @@ public class ConsultaTools {
             """)
     public List<AssinaturaResponseDto> consultarAssinaturas() {
         return assinaturaService.listar();
+    }
+
+    @Tool(description = """
+            Lista os parceiros (clientes/fornecedores) do usuário com: id, razão social,
+            nome fantasia, CPF/CNPJ e tipo (CLIENTE, FORNECEDOR ou AMBOS).
+            IMPORTANTE: use SEMPRE esta ferramenta para localizar um parceiro pelo nome e obter
+            o parceiroId ANTES de vincular um lançamento. Nunca cadastre um parceiro novo se já
+            existir um com o mesmo nome — reaproveite o existente.
+            """)
+    public List<ParceiroResponseDto> consultarParceiros() {
+        return parceiroService.listar(PageRequest.of(0, 200, Sort.by("razaoSocial"))).getContent();
     }
 }

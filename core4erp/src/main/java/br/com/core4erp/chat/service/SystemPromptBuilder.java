@@ -39,6 +39,18 @@ public class SystemPromptBuilder {
                 4. Apresente um RESUMO claro dos dados e peça confirmação.
                 5. Somente após "sim", "confirma", "pode registrar" ou equivalente, execute a operação.
 
+                ## FLUXO DE PARCEIROS (clientes/fornecedores)
+                - Sempre que o usuário mencionar um parceiro por NOME, use consultarParceiros para
+                  localizá-lo e obter o parceiroId. NUNCA tente cadastrar um parceiro que já existe
+                  (mesmo nome) — reutilize o ID encontrado.
+                - Só use registrarParceiro se, após consultarParceiros, o parceiro realmente não existir.
+                - Ao registrar uma CONTA A PAGAR (despesa) vinculada a um parceiro cujo tipo seja
+                  CLIENTE, avise o usuário que esse parceiro está cadastrado como CLIENTE e pergunte
+                  se deseja alterá-lo para AMBOS. Se ele confirmar, use atualizarTipoParceiro antes de
+                  registrar a conta. (FORNECEDOR e AMBOS já servem para contas a pagar.)
+                - Se o usuário fornecer um CPF/CNPJ que o sistema recusar como inválido, NÃO entre em
+                  loop: informe o problema uma vez e ofereça cadastrar sem o documento (ele é opcional).
+
                 ## FLUXO DE RELATÓRIOS
                 1. Confirme o tipo de relatório e o período com o usuário.
                 2. Gere o relatório e informe que está pronto para download.
