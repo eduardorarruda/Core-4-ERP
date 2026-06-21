@@ -52,10 +52,8 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Registra uma nova conta a pagar ou a receber.
-            ANTES de chamar, o assistente DEVE ter confirmado os dados com o usuário.
-            Se não souber o categoriaId, use consultarCategorias primeiro.
-            Retorna a lista de contas criadas (pode ser mais de uma se parcelado).
+            Registra conta a pagar ou a receber (chame só APÓS o usuário confirmar). Se não souber
+            o categoriaId, use consultarCategorias antes. Retorna as contas criadas (uma por parcela).
             """)
     public List<ContaResponseDto> registrarConta(
             @ToolParam(description = "Descrição da conta. Ex: 'Conta de Luz', 'Salário'") String descricao,
@@ -92,10 +90,9 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Registra um lançamento em cartão de crédito. Suporta parcelamento.
-            Use consultarCartoes para obter o cartaoId e consultarCategorias
-            para o categoriaId. A fatura é calculada automaticamente com base
-            na data da compra e no dia de fechamento do cartão. CONFIRME os dados antes de executar.
+            Registra lançamento em cartão de crédito (suporta parcelamento). Use consultarCartoes
+            para o cartaoId e consultarCategorias para o categoriaId. A fatura é calculada pela data
+            da compra e dia de fechamento. Chame só APÓS o usuário confirmar.
             """)
     public List<LancamentoResponseDto> registrarLancamentoCartao(
             @ToolParam(description = "ID do cartão de crédito. Use consultarCartoes para descobrir") Long cartaoId,
@@ -121,9 +118,8 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Transfere um valor entre duas contas correntes do usuário.
-            Use consultarContasCorrentes para obter os IDs das contas.
-            A data da transferência é obrigatória.
+            Transfere valor entre duas contas correntes. Use consultarContasCorrentes para os IDs.
+            Data obrigatória. Chame só APÓS o usuário confirmar.
             """)
     public Map<String, String> transferirEntreContas(
             @ToolParam(description = "ID da conta corrente de origem") Long contaOrigemId,
@@ -140,8 +136,8 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Registra o pagamento (baixa) de uma conta a pagar ou o recebimento
-            de uma conta a receber. Move o saldo da conta corrente informada.
+            Baixa uma conta (pagamento de conta a pagar ou recebimento de conta a receber),
+            movendo o saldo da conta corrente informada. Chame só APÓS o usuário confirmar.
             """)
     public ContaResponseDto baixarConta(
             @ToolParam(description = "ID da conta a ser baixada") Long contaId,
@@ -165,9 +161,8 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Registra uma transação em conta de investimento:
-            APORTE (adiciona), RESGATE (retira) ou RENDIMENTO (rendimento creditado).
-            Se for APORTE, pode debitar de uma conta corrente.
+            Registra transação em conta de investimento: APORTE (adiciona), RESGATE (retira) ou
+            RENDIMENTO (creditado). APORTE pode debitar de uma conta corrente. Confirme antes.
             """)
     public TransacaoInvestimentoResponseDto registrarTransacaoInvestimento(
             @ToolParam(description = "ID da conta de investimento") Long contaInvestimentoId,

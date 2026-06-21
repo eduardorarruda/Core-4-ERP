@@ -20,11 +20,9 @@ public class RelatorioTools {
     }
 
     @Tool(description = """
-            Gera um relatório financeiro em formato Excel (.xlsx) para download.
-            O relatório contém todas as contas (a pagar e a receber) do período
-            informado, com descrição, valor, vencimento, tipo, status, categoria
-            e parcela. Retorna a URL de download do arquivo.
-            Confirme o período com o usuário antes de gerar.
+            Gera relatório financeiro Excel (.xlsx) com todas as contas (a pagar e a receber) do
+            período, com descrição, valor, vencimento, tipo, status, categoria e parcela.
+            Confirme o período com o usuário antes de gerar. O link de download é anexado pelo sistema.
             """)
     public Map<String, String> gerarRelatorioExcel(
             @ToolParam(description = "Data de início do relatório no formato YYYY-MM-DD") LocalDate dataInicio,

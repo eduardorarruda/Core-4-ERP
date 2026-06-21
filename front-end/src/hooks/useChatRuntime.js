@@ -57,8 +57,18 @@ const core4ChatAdapter = {
 
         for (const line of lines) {
           if (line.startsWith("data:")) {
-            const token = line.slice(5);
-            accumulatedText += token;
+            const payload = line.slice(5).trim();
+            if (!payload) continue;
+            // O backend envia cada delta como JSON {"t":"..."} numa única linha, para que
+            // markdown com quebras de linha não quebre o framing SSE.
+            let delta = "";
+            try {
+              delta = JSON.parse(payload).t ?? "";
+            } catch {
+              // Fallback: formato antigo (texto cru) — concatena como veio.
+              delta = payload;
+            }
+            accumulatedText += delta;
             yield { content: [{ type: "text", text: accumulatedText }] };
           }
         }
