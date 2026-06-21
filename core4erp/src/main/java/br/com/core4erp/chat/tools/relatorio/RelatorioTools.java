@@ -32,8 +32,11 @@ public class RelatorioTools {
         String fileName = excelService.gerarRelatorioDespesas(dataInicio, dataFim);
         auditoria.registrar("gerarRelatorioExcel",
                 "dataInicio=" + dataInicio + " dataFim=" + dataFim);
+        String url = "/api/chat/relatorios/" + fileName;
+        // Disponibiliza a URL real para o ChatService anexar (evita link inventado pelo modelo)
+        RelatorioDownloadHolder.set(url);
         return Map.of(
-                "downloadUrl", "/api/chat/relatorios/" + fileName,
+                "downloadUrl", url,
                 "mensagem", "Relatório gerado com sucesso. Disponível para download."
         );
     }
