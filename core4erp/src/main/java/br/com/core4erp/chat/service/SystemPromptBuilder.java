@@ -41,7 +41,9 @@ public class SystemPromptBuilder {
 
                 ## FLUXO DE RELATÓRIOS
                 1. Confirme o tipo de relatório e o período com o usuário.
-                2. Gere o relatório e informe que o download está disponível.
+                2. Gere o relatório e informe que está pronto para download.
+                3. NUNCA escreva você mesmo a URL ou um link de download, e NUNCA invente
+                   domínios (ex.: example.com). O sistema anexa o botão de download automaticamente.
 
                 ## TOM DE COMUNICAÇÃO
                 - Seja conciso e direto.

@@ -7,6 +7,7 @@ import br.com.core4erp.chat.metrics.ChatMetrics;
 import br.com.core4erp.chat.tools.cadastro.CadastroTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
+import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import io.micrometer.core.instrument.Timer;
@@ -110,10 +111,15 @@ public class ChatService {
                     .chatResponse();
 
             String respostaTexto = extrairTexto(response);
+            String downloadUrl = RelatorioDownloadHolder.getAndClear();
+            respostaTexto = anexarDownload(respostaTexto, downloadUrl);
+
             registrarUsage(response, email);
             memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
 
-            String downloadUrl = extrairDownloadUrl(respostaTexto);
+            if (downloadUrl == null) {
+                downloadUrl = extrairDownloadUrl(respostaTexto);
+            }
             return new ChatResponseDto(respostaTexto, downloadUrl, List.of());
         } catch (Exception e) {
             chatMetrics.registrarErro();
@@ -154,6 +160,8 @@ public class ChatService {
                         .chatResponse();
 
                 String respostaTexto = extrairTexto(response);
+                respostaTexto = anexarDownload(respostaTexto, RelatorioDownloadHolder.getAndClear());
+
                 registrarUsage(response, email);
                 memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
 
@@ -169,6 +177,7 @@ public class ChatService {
                 }
             } finally {
                 chatMetrics.decrementarSessoes();
+                RelatorioDownloadHolder.clear();
                 RequestContextHolder.resetRequestAttributes();
                 SecurityContextHolder.clearContext();
             }
@@ -208,6 +217,15 @@ public class ChatService {
         long completion = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : 0L;
         chatMetrics.registrarTokens(prompt, completion);
         log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={}", email, prompt, completion);
+    }
+
+    /** Anexa o link de download do relatório à resposta, caso ainda não esteja presente. */
+    private String anexarDownload(String texto, String url) {
+        String base = texto != null ? texto : "";
+        if (url == null || base.contains(url)) {
+            return base;
+        }
+        return base + "\n\n[Baixar Relatório (.xlsx)](" + url + ")";
     }
 
     private String extrairDownloadUrl(String resposta) {

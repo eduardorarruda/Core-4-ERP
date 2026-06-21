@@ -6,7 +6,7 @@ import {
   MessagePrimitive,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
-import { MessageCircle, X, Trash2, Send } from "lucide-react";
+import { MessageCircle, X, Trash2, Send, Download } from "lucide-react";
 import { useChatRuntime } from "../../hooks/useChatRuntime";
 import { DownloadToolUI } from "./RelatorioToolUI";
 import { cn } from "../../lib/utils";
@@ -18,6 +18,33 @@ const SUGGESTIONS = [
   "Resumo do mês",
   "Relatório rápido",
 ];
+
+// Renderiza links de relatório como botão azul em evidência; demais links abrem em nova aba.
+const markdownComponents = {
+  a: ({ href = "", children, ...props }) => {
+    if (href.includes("/api/chat/relatorios/")) {
+      return (
+        <a
+          href={href}
+          download
+          className="inline-flex items-center gap-2 mt-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-semibold shadow-md no-underline"
+        >
+          <Download className="w-4 h-4" />
+          Baixar Relatório (.xlsx)
+        </a>
+      );
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline" {...props}>
+        {children}
+      </a>
+    );
+  },
+};
+
+function MarkdownText(props) {
+  return <MarkdownTextPrimitive {...props} components={markdownComponents} />;
+}
 
 function TypingDots() {
   return (
@@ -97,7 +124,7 @@ function ChatContent({ onClose }) {
                 AssistantMessage: () => (
                   <MessagePrimitive.Root className="flex justify-start">
                     <div className="bg-surface-medium text-text-primary/80 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm leading-relaxed">
-                      <MessagePrimitive.Content components={{ Text: MarkdownTextPrimitive }} />
+                      <MessagePrimitive.Content components={{ Text: MarkdownText }} />
                     </div>
                   </MessagePrimitive.Root>
                 ),
