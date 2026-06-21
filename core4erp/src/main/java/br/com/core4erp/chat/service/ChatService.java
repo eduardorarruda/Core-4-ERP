@@ -219,10 +219,24 @@ public class ChatService {
         log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={}", email, prompt, completion);
     }
 
-    /** Anexa o link de download do relatório à resposta, caso ainda não esteja presente. */
+    // Remove qualquer referência a relatório que o modelo tenha escrito (markdown link com
+    // domínio inventado, ex.: example.com, ou URL "crua"), para anexarmos um único link limpo.
+    private static final Pattern RELATORIO_MD_LINK =
+            Pattern.compile("\\[[^\\]]*\\]\\([^)]*/api/chat/relatorios/[^)]*\\)");
+    private static final Pattern RELATORIO_BARE_URL =
+            Pattern.compile("\\S*/api/chat/relatorios/\\S*");
+
+    /**
+     * Garante exatamente um link de download correto e relativo. Remove qualquer link/URL de
+     * relatório escrito pelo modelo (que costuma inventar o domínio) e anexa o nosso, relativo
+     * à origem — assim o nginx faz o proxy para o backend com o cookie de autenticação.
+     */
     private String anexarDownload(String texto, String url) {
         String base = texto != null ? texto : "";
-        if (url == null || base.contains(url)) {
+        base = RELATORIO_MD_LINK.matcher(base).replaceAll("");
+        base = RELATORIO_BARE_URL.matcher(base).replaceAll("");
+        base = base.strip();
+        if (url == null) {
             return base;
         }
         return base + "\n\n[Baixar Relatório (.xlsx)](" + url + ")";
