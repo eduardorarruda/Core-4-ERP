@@ -1,6 +1,7 @@
 package br.com.core4erp.chat.tools.relatorio;
 
 import br.com.core4erp.chat.service.ChatAuditoriaService;
+import br.com.core4erp.config.security.SecurityContextUtils;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -13,10 +14,14 @@ public class RelatorioTools {
 
     private final RelatorioExcelService excelService;
     private final ChatAuditoriaService auditoria;
+    private final SecurityContextUtils securityCtx;
 
-    public RelatorioTools(RelatorioExcelService excelService, ChatAuditoriaService auditoria) {
+    public RelatorioTools(RelatorioExcelService excelService,
+                          ChatAuditoriaService auditoria,
+                          SecurityContextUtils securityCtx) {
         this.excelService = excelService;
         this.auditoria = auditoria;
+        this.securityCtx = securityCtx;
     }
 
     @Tool(description = """
@@ -31,8 +36,9 @@ public class RelatorioTools {
         auditoria.registrar("gerarRelatorioExcel",
                 "dataInicio=" + dataInicio + " dataFim=" + dataFim);
         String url = "/api/chat/relatorios/" + fileName;
-        // Disponibiliza a URL real para o ChatService anexar (evita link inventado pelo modelo)
-        RelatorioDownloadHolder.set(url);
+        // Disponibiliza a URL real para o ChatService anexar (evita link inventado pelo modelo).
+        // Chaveado por usuário porque, no streaming, tool e ChatService rodam em threads distintas.
+        RelatorioDownloadHolder.set(securityCtx.getUsuarioId(), url);
         return Map.of(
                 "downloadUrl", url,
                 "mensagem", "Relatório gerado com sucesso. Disponível para download."
