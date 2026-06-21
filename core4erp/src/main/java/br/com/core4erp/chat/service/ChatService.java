@@ -10,6 +10,7 @@ import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +51,7 @@ public class ChatService {
     private final CadastroTools cadastroTools;
     private final ChatMetrics chatMetrics;
     private final ChatMemoryService memoryService;
+    private final ObjectMapper objectMapper;
     private final int maxHistorico;
 
     /**
@@ -77,6 +80,7 @@ public class ChatService {
                        CadastroTools cadastroTools,
                        ChatMetrics chatMetrics,
                        ChatMemoryService memoryService,
+                       ObjectMapper objectMapper,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
@@ -88,6 +92,7 @@ public class ChatService {
         this.cadastroTools = cadastroTools;
         this.chatMetrics = chatMetrics;
         this.memoryService = memoryService;
+        this.objectMapper = objectMapper;
         this.maxHistorico = maxHistorico;
     }
 
@@ -146,26 +151,53 @@ public class ChatService {
 
         streamExecutor.submit(() -> {
             try {
-                // Restaura o contexto na thread de execução para que tools e serviços de
-                // domínio (que usam SecurityContextUtils) enxerguem o usuário correto.
+                // Restaura o contexto na thread que assina o fluxo. Com
+                // spring.reactor.context-propagation=auto (ver ChatAiConfig), o SecurityContext
+                // é capturado daqui e restaurado nas threads do Reactor onde as tools executam.
                 SecurityContextHolder.setContext(securityContext);
                 if (requestAttributes != null) {
                     RequestContextHolder.setRequestAttributes(requestAttributes, true);
                 }
 
-                ChatResponse response = chatClient.prompt()
+                StringBuilder full = new StringBuilder();
+                AtomicReference<Usage> usageRef = new AtomicReference<>();
+                AtomicReference<String> finishRef = new AtomicReference<>();
+
+                // .stream() emite a resposta em deltas (token a token). Cada delta é enviado ao
+                // cliente imediatamente, dando feedback incremental em vez da tela em branco até o fim.
+                // toStream() consome de forma bloqueante NESTA thread, mantendo o SecurityContext
+                // ativo durante toda a execução (inclusive das tools) e a limpeza correta no finally.
+                chatClient.prompt()
                         .messages(allMessages)
                         .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
-                        .call()
-                        .chatResponse();
+                        .stream()
+                        .chatResponse()
+                        .toStream()
+                        .forEach(resp -> {
+                            capturarMetadados(resp, usageRef, finishRef);
+                            String delta = extrairTexto(resp);
+                            if (!delta.isEmpty()) {
+                                full.append(delta);
+                                enviarDelta(emitter, delta);
+                            }
+                        });
 
-                String respostaTexto = extrairTexto(response);
-                respostaTexto = anexarDownload(respostaTexto, RelatorioDownloadHolder.getAndClear());
+                // Pós-processamento após o término do streaming.
+                String downloadUrl = RelatorioDownloadHolder.getAndClear();
+                if (downloadUrl != null) {
+                    String linkMd = "\n\n[Baixar Relatório (.xlsx)](" + downloadUrl + ")";
+                    full.append(linkMd);
+                    enviarDelta(emitter, linkMd);
+                }
+                if ("LENGTH".equalsIgnoreCase(finishRef.get())) {
+                    String aviso = "\n\n_(resposta truncada por limite de tamanho — peça a continuação se precisar de mais)_";
+                    full.append(aviso);
+                    enviarDelta(emitter, aviso);
+                }
 
-                registrarUsage(response, email);
-                memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
+                registrarUsage(usageRef.get(), email);
+                memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, full.toString());
 
-                emitter.send(SseEmitter.event().data(respostaTexto));
                 emitter.complete();
             } catch (Exception e) {
                 chatMetrics.registrarErro();
@@ -182,6 +214,36 @@ public class ChatService {
                 SecurityContextHolder.clearContext();
             }
         });
+    }
+
+    /**
+     * Envia um delta de texto como um evento SSE. O payload é JSON ({@code {"t":"..."}}) numa
+     * única linha — o JSON escapa quebras de linha do conteúdo, evitando que markdown com {@code \n}
+     * quebre o framing {@code data:} do SSE. O front desserializa e concatena.
+     */
+    private void enviarDelta(SseEmitter emitter, String delta) {
+        try {
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(new Delta(delta))));
+        } catch (Exception e) {
+            throw new RuntimeException("Falha ao enviar delta SSE", e);
+        }
+    }
+
+    private record Delta(String t) {}
+
+    private void capturarMetadados(ChatResponse resp, AtomicReference<Usage> usageRef, AtomicReference<String> finishRef) {
+        if (resp == null) {
+            return;
+        }
+        if (resp.getMetadata() != null && resp.getMetadata().getUsage() != null) {
+            usageRef.set(resp.getMetadata().getUsage());
+        }
+        if (resp.getResult() != null && resp.getResult().getMetadata() != null) {
+            String fr = resp.getResult().getMetadata().getFinishReason();
+            if (fr != null && !fr.isBlank()) {
+                finishRef.set(fr);
+            }
+        }
     }
 
     public void limparHistorico() {
@@ -209,7 +271,10 @@ public class ChatService {
         if (response == null || response.getMetadata() == null) {
             return;
         }
-        Usage usage = response.getMetadata().getUsage();
+        registrarUsage(response.getMetadata().getUsage(), email);
+    }
+
+    private void registrarUsage(Usage usage, String email) {
         if (usage == null) {
             return;
         }

@@ -12,6 +12,8 @@ import br.com.core4erp.parceiro.service.ParceiroService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,10 +39,9 @@ public class CadastroTools {
     }
 
     @Tool(description = """
-            Cadastra um novo parceiro (cliente, fornecedor ou ambos).
-            Campos obrigatórios: razaoSocial (nome) e tipo.
-            CPF/CNPJ é opcional, mas se informado deve ser válido e único.
-            CONFIRME os dados com o usuário antes de executar.
+            Cadastra um parceiro (cliente, fornecedor ou ambos). Obrigatórios: razaoSocial e tipo.
+            CPF/CNPJ é opcional, mas se informado deve ser válido e único. Se já existir parceiro
+            com o mesmo nome, o existente é reaproveitado (não duplica). Confirme antes de executar.
             """)
     public ParceiroResponseDto registrarParceiro(
             @ToolParam(description = "Razão social ou nome do parceiro") String razaoSocial,
@@ -52,6 +53,17 @@ public class CadastroTools {
         log.info("[CHAT-AUDIT] user={} tool=registrarParceiro razaoSocial={} tipo={}",
                 securityCtx.getEmail(), razaoSocial, tipo);
         auditoria.registrar("registrarParceiro", "razaoSocial=" + razaoSocial + " tipo=" + tipo);
+
+        // Idempotência: se já existe parceiro com o mesmo nome, reaproveita em vez de duplicar.
+        ParceiroResponseDto existente = parceiroService
+                .listar(PageRequest.of(0, 500, Sort.by("razaoSocial"))).getContent().stream()
+                .filter(p -> p.razaoSocial() != null && p.razaoSocial().equalsIgnoreCase(razaoSocial.strip()))
+                .findFirst().orElse(null);
+        if (existente != null) {
+            log.info("[CHAT-AUDIT] registrarParceiro: reaproveitando parceiro existente id={}", existente.id());
+            return existente;
+        }
+
         TipoParceiro tipoEnum;
         try {
             tipoEnum = TipoParceiro.valueOf(tipo.toUpperCase());
@@ -67,10 +79,9 @@ public class CadastroTools {
     }
 
     @Tool(description = """
-            Altera o TIPO de um parceiro existente (CLIENTE, FORNECEDOR ou AMBOS).
-            Use, por exemplo, quando o usuário quiser lançar uma despesa para um parceiro que
-            hoje é apenas CLIENTE: pergunte se deseja mudar para AMBOS e, se confirmado, use esta
-            ferramenta. Obtenha o parceiroId via consultarParceiros.
+            Altera o TIPO de um parceiro existente (CLIENTE, FORNECEDOR ou AMBOS). Ex.: para lançar
+            despesa a um parceiro que hoje é só CLIENTE, mude para AMBOS após confirmação.
+            Obtenha o parceiroId via consultarParceiros.
             """)
     public ParceiroResponseDto atualizarTipoParceiro(
             @ToolParam(description = "ID do parceiro (use consultarParceiros para descobrir)") Long parceiroId,
@@ -89,10 +100,9 @@ public class CadastroTools {
     }
 
     @Tool(description = """
-            Cadastra uma nova categoria de receita/despesa.
-            Campo obrigatório: descricao. O ícone é opcional.
-            Use quando o usuário quiser uma categoria que ainda não existe.
-            CONFIRME a descrição com o usuário antes de executar.
+            Cadastra uma categoria de receita/despesa. Obrigatório: descricao (ícone opcional).
+            Se já existir categoria com a mesma descrição, a existente é reaproveitada (não duplica).
+            Confirme a descrição com o usuário antes de executar.
             """)
     public CategoriaResponseDto registrarCategoria(
             @ToolParam(description = "Descrição da categoria. Ex: 'Alimentação', 'Salário'") String descricao,
@@ -100,6 +110,18 @@ public class CadastroTools {
         log.info("[CHAT-AUDIT] user={} tool=registrarCategoria descricao={}",
                 securityCtx.getEmail(), descricao);
         auditoria.registrar("registrarCategoria", "descricao=" + descricao);
+
+        // Idempotência: evita as duplicações observadas em produção (ex.: criar "Compras" e o
+        // usuário confirmar de novo). Se já existe categoria com a mesma descrição, reaproveita.
+        CategoriaResponseDto existente = categoriaService
+                .listar(PageRequest.of(0, 500, Sort.by("descricao"))).getContent().stream()
+                .filter(c -> c.descricao() != null && c.descricao().equalsIgnoreCase(descricao.strip()))
+                .findFirst().orElse(null);
+        if (existente != null) {
+            log.info("[CHAT-AUDIT] registrarCategoria: reaproveitando categoria existente id={}", existente.id());
+            return existente;
+        }
+
         return categoriaService.criar(new CategoriaRequestDto(descricao, icone));
     }
 }
