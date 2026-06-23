@@ -2,30 +2,37 @@ package br.com.core4erp.chat.service;
 
 import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
+import br.com.core4erp.chat.entity.ChatMensagem;
 import br.com.core4erp.chat.metrics.ChatMetrics;
+import br.com.core4erp.chat.tools.cadastro.CadastroTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
+import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Timer;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -41,13 +48,27 @@ public class ChatService {
     private final ConsultaTools consultaTools;
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
+    private final CadastroTools cadastroTools;
     private final ChatMetrics chatMetrics;
+    private final ChatMemoryService memoryService;
+    private final ObjectMapper objectMapper;
+    private final int maxHistorico;
+
+    /**
+     * Pool dedicado para o processamento assíncrono do streaming. Cada tarefa restaura
+     * o SecurityContext e os RequestAttributes capturados da thread da requisição, de modo
+     * que as tools (e os serviços de domínio que dependem de {@link SecurityContextUtils})
+     * executem com o usuário/tenant correto — algo que a execução em threads do Reactor não
+     * garantia.
+     */
+    private final ExecutorService streamExecutor = Executors.newFixedThreadPool(16, r -> {
+        Thread t = new Thread(r, "chat-stream");
+        t.setDaemon(true);
+        return t;
+    });
 
     private static final Pattern DOWNLOAD_URL_PATTERN =
             Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
-
-    private final Cache<String, List<Message>> memoriaConversas;
-    private final int maxHistorico;
 
     public ChatService(ChatClient.Builder chatClientBuilder,
                        SystemPromptBuilder promptBuilder,
@@ -56,9 +77,10 @@ public class ChatService {
                        ConsultaTools consultaTools,
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
+                       CadastroTools cadastroTools,
                        ChatMetrics chatMetrics,
-                       @Value("${chat.cache.ttl-hours:2}") int cacheTtlHours,
-                       @Value("${chat.cache.max-size:1000}") long cacheMaxSize,
+                       ChatMemoryService memoryService,
+                       ObjectMapper objectMapper,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
@@ -67,12 +89,11 @@ public class ChatService {
         this.consultaTools = consultaTools;
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
+        this.cadastroTools = cadastroTools;
         this.chatMetrics = chatMetrics;
+        this.memoryService = memoryService;
+        this.objectMapper = objectMapper;
         this.maxHistorico = maxHistorico;
-        this.memoriaConversas = Caffeine.newBuilder()
-                .expireAfterAccess(cacheTtlHours, TimeUnit.HOURS)
-                .maximumSize(cacheMaxSize)
-                .build();
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
@@ -80,35 +101,30 @@ public class ChatService {
         Timer.Sample timer = chatMetrics.iniciarTimer();
 
         String email = securityCtx.getEmail();
+        Long usuarioId = securityCtx.getUsuarioId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
+        String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
-        List<Message> historico = memoriaConversas.get(email, k -> new ArrayList<>());
-
-        historico.add(new UserMessage(sanitizer.sanitize(request.mensagem())));
-
-        // SystemMessage primeiro, depois o histórico completo
-        List<Message> allMessages = new ArrayList<>();
-        allMessages.add(new SystemMessage(systemPrompt));
-        allMessages.addAll(historico);
+        List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
+        memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
         try {
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
-                    .tools(consultaTools, lancamentoTools, relatorioTools)
+                    .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
                     .call()
                     .chatResponse();
 
-            String respostaTexto = (response.getResult() != null && response.getResult().getOutput() != null)
-                    ? response.getResult().getOutput().getText()
-                    : "";
+            String respostaTexto = extrairTexto(response);
+            String downloadUrl = RelatorioDownloadHolder.getAndClear(usuarioId);
+            respostaTexto = anexarDownload(respostaTexto, downloadUrl);
 
-            log.info("[CHAT-USAGE] user={} usage={}", email, response.getMetadata().getUsage());
+            registrarUsage(response, email);
+            memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
 
-            historico.add(new AssistantMessage(respostaTexto));
-            podarHistorico(historico);
-
-            String downloadUrl = extrairDownloadUrl(respostaTexto);
-
+            if (downloadUrl == null) {
+                downloadUrl = extrairDownloadUrl(respostaTexto);
+            }
             return new ChatResponseDto(respostaTexto, downloadUrl, List.of());
         } catch (Exception e) {
             chatMetrics.registrarErro();
@@ -122,54 +138,173 @@ public class ChatService {
         chatMetrics.registrarMensagem();
         chatMetrics.incrementarSessoes();
 
-        // Capture security context on the servlet thread before async hand-off
+        // Captura identidade e contexto na thread da requisição (HTTP), antes do hand-off.
         String email = securityCtx.getEmail();
+        Long usuarioId = securityCtx.getUsuarioId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
+        String mensagemUsuario = sanitizer.sanitize(request.mensagem());
+        List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
+        memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
-        List<Message> historico = memoriaConversas.get(email, k -> new ArrayList<>());
-        historico.add(new UserMessage(sanitizer.sanitize(request.mensagem())));
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
 
-        List<Message> allMessages = new ArrayList<>();
-        allMessages.add(new SystemMessage(systemPrompt));
-        allMessages.addAll(historico);
+        streamExecutor.submit(() -> {
+            try {
+                // Restaura o contexto na thread que assina o fluxo. Com
+                // spring.reactor.context-propagation=auto (ver ChatAiConfig), o SecurityContext
+                // é capturado daqui e restaurado nas threads do Reactor onde as tools executam.
+                SecurityContextHolder.setContext(securityContext);
+                if (requestAttributes != null) {
+                    RequestContextHolder.setRequestAttributes(requestAttributes, true);
+                }
 
-        StringBuilder fullResponse = new StringBuilder();
+                StringBuilder full = new StringBuilder();
+                AtomicReference<Usage> usageRef = new AtomicReference<>();
+                AtomicReference<String> finishRef = new AtomicReference<>();
 
-        chatClient.prompt()
-                .messages(allMessages)
-                .tools(consultaTools, lancamentoTools, relatorioTools)
-                .stream()
-                .content()
-                .doOnNext(token -> {
-                    try {
-                        fullResponse.append(token);
-                        emitter.send(SseEmitter.event().data(token));
-                    } catch (IOException e) {
-                        emitter.completeWithError(e);
-                    }
-                })
-                .doOnComplete(() -> {
-                    historico.add(new AssistantMessage(fullResponse.toString()));
-                    podarHistorico(historico);
-                    chatMetrics.decrementarSessoes();
-                    emitter.complete();
-                })
-                .doOnError(err -> {
-                    chatMetrics.registrarErro();
-                    chatMetrics.decrementarSessoes();
-                    emitter.completeWithError(err);
-                })
-                .subscribe();
+                // .stream() emite a resposta em deltas (token a token). Cada delta é enviado ao
+                // cliente imediatamente, dando feedback incremental em vez da tela em branco até o fim.
+                // toStream() consome de forma bloqueante NESTA thread, mantendo o SecurityContext
+                // ativo durante toda a execução (inclusive das tools) e a limpeza correta no finally.
+                chatClient.prompt()
+                        .messages(allMessages)
+                        .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
+                        .stream()
+                        .chatResponse()
+                        .toStream()
+                        .forEach(resp -> {
+                            capturarMetadados(resp, usageRef, finishRef);
+                            String delta = extrairTexto(resp);
+                            if (!delta.isEmpty()) {
+                                full.append(delta);
+                                enviarDelta(emitter, delta);
+                            }
+                        });
+
+                // Pós-processamento após o término do streaming.
+                String downloadUrl = RelatorioDownloadHolder.getAndClear(usuarioId);
+                if (downloadUrl != null) {
+                    String linkMd = "\n\n[Baixar Relatório (.xlsx)](" + downloadUrl + ")";
+                    full.append(linkMd);
+                    enviarDelta(emitter, linkMd);
+                }
+                if ("LENGTH".equalsIgnoreCase(finishRef.get())) {
+                    String aviso = "\n\n_(resposta truncada por limite de tamanho — peça a continuação se precisar de mais)_";
+                    full.append(aviso);
+                    enviarDelta(emitter, aviso);
+                }
+
+                registrarUsage(usageRef.get(), email);
+                memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, full.toString());
+
+                emitter.complete();
+            } catch (Exception e) {
+                chatMetrics.registrarErro();
+                log.error("[CHAT-STREAM] erro ao processar mensagem de {}: {}", email, e.getMessage(), e);
+                try {
+                    emitter.completeWithError(e);
+                } catch (Exception ignored) {
+                    // emitter já encerrado
+                }
+            } finally {
+                chatMetrics.decrementarSessoes();
+                RelatorioDownloadHolder.clear(usuarioId);
+                RequestContextHolder.resetRequestAttributes();
+                SecurityContextHolder.clearContext();
+            }
+        });
+    }
+
+    /**
+     * Envia um delta de texto como um evento SSE. O payload é JSON ({@code {"t":"..."}}) numa
+     * única linha — o JSON escapa quebras de linha do conteúdo, evitando que markdown com {@code \n}
+     * quebre o framing {@code data:} do SSE. O front desserializa e concatena.
+     */
+    private void enviarDelta(SseEmitter emitter, String delta) {
+        try {
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(new Delta(delta))));
+        } catch (Exception e) {
+            throw new RuntimeException("Falha ao enviar delta SSE", e);
+        }
+    }
+
+    private record Delta(String t) {}
+
+    private void capturarMetadados(ChatResponse resp, AtomicReference<Usage> usageRef, AtomicReference<String> finishRef) {
+        if (resp == null) {
+            return;
+        }
+        if (resp.getMetadata() != null && resp.getMetadata().getUsage() != null) {
+            usageRef.set(resp.getMetadata().getUsage());
+        }
+        if (resp.getResult() != null && resp.getResult().getMetadata() != null) {
+            String fr = resp.getResult().getMetadata().getFinishReason();
+            if (fr != null && !fr.isBlank()) {
+                finishRef.set(fr);
+            }
+        }
     }
 
     public void limparHistorico() {
-        memoriaConversas.invalidate(securityCtx.getEmail());
+        memoryService.limpar(securityCtx.getUsuarioId());
     }
 
-    private void podarHistorico(List<Message> historico) {
-        if (historico.size() > maxHistorico) {
-            historico.subList(0, historico.size() - maxHistorico).clear();
+    private List<Message> montarMensagens(Long usuarioId, String systemPrompt, String mensagemUsuario) {
+        List<Message> historico = memoryService.carregar(usuarioId, maxHistorico);
+        List<Message> allMessages = new ArrayList<>(historico.size() + 2);
+        allMessages.add(new SystemMessage(systemPrompt));
+        allMessages.addAll(historico);
+        allMessages.add(new UserMessage(mensagemUsuario));
+        return allMessages;
+    }
+
+    private String extrairTexto(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
         }
+        String texto = response.getResult().getOutput().getText();
+        return texto != null ? texto : "";
+    }
+
+    private void registrarUsage(ChatResponse response, String email) {
+        if (response == null || response.getMetadata() == null) {
+            return;
+        }
+        registrarUsage(response.getMetadata().getUsage(), email);
+    }
+
+    private void registrarUsage(Usage usage, String email) {
+        if (usage == null) {
+            return;
+        }
+        long prompt = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : 0L;
+        long completion = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : 0L;
+        chatMetrics.registrarTokens(prompt, completion);
+        log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={}", email, prompt, completion);
+    }
+
+    // Remove qualquer referência a relatório que o modelo tenha escrito (markdown link com
+    // domínio inventado, ex.: example.com, ou URL "crua"), para anexarmos um único link limpo.
+    private static final Pattern RELATORIO_MD_LINK =
+            Pattern.compile("\\[[^\\]]*\\]\\([^)]*/api/chat/relatorios/[^)]*\\)");
+    private static final Pattern RELATORIO_BARE_URL =
+            Pattern.compile("\\S*/api/chat/relatorios/\\S*");
+
+    /**
+     * Garante exatamente um link de download correto e relativo. Remove qualquer link/URL de
+     * relatório escrito pelo modelo (que costuma inventar o domínio) e anexa o nosso, relativo
+     * à origem — assim o nginx faz o proxy para o backend com o cookie de autenticação.
+     */
+    private String anexarDownload(String texto, String url) {
+        String base = texto != null ? texto : "";
+        base = RELATORIO_MD_LINK.matcher(base).replaceAll("");
+        base = RELATORIO_BARE_URL.matcher(base).replaceAll("");
+        base = base.strip();
+        if (url == null) {
+            return base;
+        }
+        return base + "\n\n[Baixar Relatório (.xlsx)](" + url + ")";
     }
 
     private String extrairDownloadUrl(String resposta) {

@@ -57,8 +57,8 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 
 	// Spring AI
-	implementation platform('org.springframework.ai:spring-ai-bom:1.1.4')
-	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+	implementation platform('org.springframework.ai:spring-ai-bom:1.1.8')
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
 	// Email
 	implementation 'org.springframework.boot:spring-boot-starter-mail'

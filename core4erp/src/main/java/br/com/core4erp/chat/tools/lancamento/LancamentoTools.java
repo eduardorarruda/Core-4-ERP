@@ -15,6 +15,7 @@ import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoRequestDto;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.InvestimentoService;
+import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -34,24 +35,25 @@ public class LancamentoTools {
     private final CartaoCreditoService cartaoCreditoService;
     private final InvestimentoService investimentoService;
     private final SecurityContextUtils securityCtx;
+    private final ChatAuditoriaService auditoria;
 
     public LancamentoTools(ContaService contaService,
                            ContaCorrenteService contaCorrenteService,
                            CartaoCreditoService cartaoCreditoService,
                            InvestimentoService investimentoService,
-                           SecurityContextUtils securityCtx) {
+                           SecurityContextUtils securityCtx,
+                           ChatAuditoriaService auditoria) {
         this.contaService = contaService;
         this.contaCorrenteService = contaCorrenteService;
         this.cartaoCreditoService = cartaoCreditoService;
         this.investimentoService = investimentoService;
         this.securityCtx = securityCtx;
+        this.auditoria = auditoria;
     }
 
     @Tool(description = """
-            Registra uma nova conta a pagar ou a receber.
-            ANTES de chamar, o assistente DEVE ter confirmado os dados com o usuário.
-            Se não souber o categoriaId, use consultarCategorias primeiro.
-            Retorna a lista de contas criadas (pode ser mais de uma se parcelado).
+            Registra conta a pagar ou a receber (chame só APÓS o usuário confirmar). Se não souber
+            o categoriaId, use consultarCategorias antes. Retorna as contas criadas (uma por parcela).
             """)
     public List<ContaResponseDto> registrarConta(
             @ToolParam(description = "Descrição da conta. Ex: 'Conta de Luz', 'Salário'") String descricao,
@@ -64,6 +66,8 @@ public class LancamentoTools {
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
         log.info("[CHAT-AUDIT] user={} tool=registrarConta descricao={} valor={} tipo={}",
                 securityCtx.getEmail(), descricao, valorOriginal, tipo);
+        auditoria.registrar("registrarConta",
+                "descricao=" + descricao + " valor=" + valorOriginal + " tipo=" + tipo);
         TipoConta tipoConta;
         try {
             tipoConta = TipoConta.valueOf(tipo.toUpperCase());
@@ -86,10 +90,9 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Registra um lançamento em cartão de crédito. Suporta parcelamento.
-            Use consultarCartoes para obter o cartaoId e consultarCategorias
-            para o categoriaId. A fatura é calculada automaticamente com base
-            na data da compra e no dia de fechamento do cartão. CONFIRME os dados antes de executar.
+            Registra lançamento em cartão de crédito (suporta parcelamento). Use consultarCartoes
+            para o cartaoId e consultarCategorias para o categoriaId. A fatura é calculada pela data
+            da compra e dia de fechamento. Chame só APÓS o usuário confirmar.
             """)
     public List<LancamentoResponseDto> registrarLancamentoCartao(
             @ToolParam(description = "ID do cartão de crédito. Use consultarCartoes para descobrir") Long cartaoId,
@@ -100,6 +103,8 @@ public class LancamentoTools {
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
         log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={}",
                 securityCtx.getEmail(), cartaoId, descricao, valor);
+        auditoria.registrar("registrarLancamentoCartao",
+                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor);
         LancamentoRequestDto dto = new LancamentoRequestDto(
                 descricao,
                 valor,
@@ -114,9 +119,8 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Transfere um valor entre duas contas correntes do usuário.
-            Use consultarContasCorrentes para obter os IDs das contas.
-            A data da transferência é obrigatória.
+            Transfere valor entre duas contas correntes. Use consultarContasCorrentes para os IDs.
+            Data obrigatória. Chame só APÓS o usuário confirmar.
             """)
     public TransferenciaResponseDto transferirEntreContas(
             @ToolParam(description = "ID da conta corrente de origem") Long contaOrigemId,
@@ -125,13 +129,15 @@ public class LancamentoTools {
             @ToolParam(description = "Data em que a transferência ocorreu no formato YYYY-MM-DD") LocalDate dataTransferencia) {
         log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={} data={}",
                 securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
+        auditoria.registrar("transferirEntreContas",
+                "origem=" + contaOrigemId + " destino=" + contaDestinoId + " valor=" + valor);
         TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor, dataTransferencia);
         return contaCorrenteService.transferir(dto);
     }
 
     @Tool(description = """
-            Registra o pagamento (baixa) de uma conta a pagar ou o recebimento
-            de uma conta a receber. Move o saldo da conta corrente informada.
+            Baixa uma conta (pagamento de conta a pagar ou recebimento de conta a receber),
+            movendo o saldo da conta corrente informada. Chame só APÓS o usuário confirmar.
             """)
     public ContaResponseDto baixarConta(
             @ToolParam(description = "ID da conta a ser baixada") Long contaId,
@@ -141,6 +147,8 @@ public class LancamentoTools {
             @ToolParam(description = "Valor de multa. Padrão: 0") BigDecimal multa) {
         log.info("[CHAT-AUDIT] user={} tool=baixarConta contaId={} contaCorrenteId={} data={}",
                 securityCtx.getEmail(), contaId, contaCorrenteId, dataPagamento);
+        auditoria.registrar("baixarConta",
+                "contaId=" + contaId + " contaCorrenteId=" + contaCorrenteId + " data=" + dataPagamento);
         BaixaRequestDto dto = new BaixaRequestDto(
                 contaCorrenteId,
                 dataPagamento,
@@ -153,9 +161,8 @@ public class LancamentoTools {
     }
 
     @Tool(description = """
-            Registra uma transação em conta de investimento:
-            APORTE (adiciona), RESGATE (retira) ou RENDIMENTO (rendimento creditado).
-            Se for APORTE, pode debitar de uma conta corrente.
+            Registra transação em conta de investimento: APORTE (adiciona), RESGATE (retira) ou
+            RENDIMENTO (creditado). APORTE pode debitar de uma conta corrente. Confirme antes.
             """)
     public TransacaoInvestimentoResponseDto registrarTransacaoInvestimento(
             @ToolParam(description = "ID da conta de investimento") Long contaInvestimentoId,
@@ -165,6 +172,8 @@ public class LancamentoTools {
             @ToolParam(description = "ID da conta corrente para débito (apenas para APORTE). Opcional") Long contaCorrenteOrigemId) {
         log.info("[CHAT-AUDIT] user={} tool=registrarTransacaoInvestimento contaId={} tipo={} valor={}",
                 securityCtx.getEmail(), contaInvestimentoId, tipoTransacao, valor);
+        auditoria.registrar("registrarTransacaoInvestimento",
+                "contaInvestimentoId=" + contaInvestimentoId + " tipo=" + tipoTransacao + " valor=" + valor);
         TipoTransacaoInvestimento tipoEnum;
         try {
             tipoEnum = TipoTransacaoInvestimento.valueOf(tipoTransacao.toUpperCase());
