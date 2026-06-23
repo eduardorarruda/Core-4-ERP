@@ -2,6 +2,7 @@ package br.com.core4erp.parceiro.service;
 
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.enums.TipoParceiro;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.utils.Utils;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
@@ -54,6 +55,14 @@ public class ParceiroService {
         preencherCampos(parceiro, dto, docNormalizado);
         parceiro.setUsuario(securityCtx.getUsuario());
         enrichCnpj(parceiro);
+        return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
+    }
+
+    /** Altera apenas o tipo do parceiro (ex.: CLIENTE -> AMBOS), preservando os demais campos. */
+    @Transactional
+    public ParceiroResponseDto atualizarTipo(Long id, TipoParceiro tipo) {
+        Parceiro parceiro = findOwned(id);
+        parceiro.setTipo(tipo);
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
     }
 

@@ -2,26 +2,25 @@ package br.com.core4erp.chat.service;
 
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
+/**
+ * Sanitização de entrada do chat.
+ *
+ * <p>A defesa real contra uso indevido de tools não é um blocklist de frases (trivialmente
+ * contornável por tradução/encoding e que degrada a UX), e sim a autorização na camada de
+ * serviço: toda tool de escrita passa pelos serviços de domínio, que filtram pelo usuário
+ * autenticado ({@code SecurityContextUtils}). Aqui apenas limitamos o tamanho da entrada
+ * para conter custo de tokens e evitar payloads abusivos.
+ */
 @Component
 public class ChatInputSanitizer {
 
-    private static final List<String> BLOCKED_PATTERNS = List.of(
-            "ignore previous instructions",
-            "ignore all instructions",
-            "you are now",
-            "system prompt",
-            "reveal your instructions"
-    );
+    private static final int MAX_CHARS = 4000;
 
     public String sanitize(String input) {
-        String lower = input.toLowerCase();
-        for (String pattern : BLOCKED_PATTERNS) {
-            if (lower.contains(pattern)) {
-                return "[mensagem bloqueada por segurança]";
-            }
+        if (input == null) {
+            return "";
         }
-        return input.length() > 4000 ? input.substring(0, 4000) : input;
+        String trimmed = input.strip();
+        return trimmed.length() > MAX_CHARS ? trimmed.substring(0, MAX_CHARS) : trimmed;
     }
 }

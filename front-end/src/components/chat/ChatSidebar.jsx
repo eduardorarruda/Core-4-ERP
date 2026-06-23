@@ -6,7 +6,7 @@ import {
   MessagePrimitive,
 } from "@assistant-ui/react";
 import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
-import { MessageCircle, X, Trash2, Send } from "lucide-react";
+import { MessageCircle, X, Trash2, Send, Download } from "lucide-react";
 import { useChatRuntime } from "../../hooks/useChatRuntime";
 import { DownloadToolUI } from "./RelatorioToolUI";
 import { cn } from "../../lib/utils";
@@ -18,6 +18,39 @@ const SUGGESTIONS = [
   "Resumo do mês",
   "Relatório rápido",
 ];
+
+// Renderiza links de relatório como botão azul em evidência; demais links abrem em nova aba.
+// Extrai o caminho relativo do relatório de qualquer href (ignora domínio inventado pelo modelo).
+const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
+
+const markdownComponents = {
+  a: ({ href = "", children, ...props }) => {
+    const match = href.match(RELATORIO_PATH);
+    if (match) {
+      // Sempre usa o caminho relativo à origem atual — nunca o domínio do href original.
+      const relative = match[0];
+      return (
+        <a
+          href={relative}
+          download
+          className="inline-flex items-center gap-2 mt-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-semibold shadow-md no-underline"
+        >
+          <Download className="w-4 h-4" />
+          Baixar Relatório (.xlsx)
+        </a>
+      );
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline" {...props}>
+        {children}
+      </a>
+    );
+  },
+};
+
+function MarkdownText(props) {
+  return <MarkdownTextPrimitive {...props} components={markdownComponents} />;
+}
 
 function TypingDots() {
   return (
@@ -97,7 +130,7 @@ function ChatContent({ onClose }) {
                 AssistantMessage: () => (
                   <MessagePrimitive.Root className="flex justify-start">
                     <div className="bg-surface-medium text-text-primary/80 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm leading-relaxed">
-                      <MessagePrimitive.Content components={{ Text: MarkdownTextPrimitive }} />
+                      <MessagePrimitive.Content components={{ Text: MarkdownText }} />
                     </div>
                   </MessagePrimitive.Root>
                 ),
@@ -109,17 +142,15 @@ function ChatContent({ onClose }) {
           <div className="px-4 pb-2">
             <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
-                <ComposerPrimitive.Root key={s}>
-                  <button
-                    type="button"
-                    className="text-[11px] px-3 py-1.5 rounded-full border border-text-primary/10 text-text-primary/50 hover:border-primary/30 hover:text-primary transition-colors"
-                    onClick={() => {
-                      /* Suggestions auto-fill via ComposerPrimitive - just visual for now */
-                    }}
-                  >
-                    {s}
-                  </button>
-                </ComposerPrimitive.Root>
+                <ThreadPrimitive.Suggestion
+                  key={s}
+                  prompt={s}
+                  method="replace"
+                  autoSend
+                  className="text-[11px] px-3 py-1.5 rounded-full border border-text-primary/10 text-text-primary/50 hover:border-primary/30 hover:text-primary transition-colors"
+                >
+                  {s}
+                </ThreadPrimitive.Suggestion>
               ))}
             </div>
           </div>
