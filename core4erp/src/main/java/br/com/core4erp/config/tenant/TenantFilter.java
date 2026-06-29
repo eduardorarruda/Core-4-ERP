@@ -85,8 +85,11 @@ public class TenantFilter extends OncePerRequestFilter {
                     if (adminEmpresaId != null) {
                         tenantContext.setEmpresaId(adminEmpresaId);
                         MDC.put("empresaId", adminEmpresaId.toString());
-                        log.debug("Admin sistema acessando empresa: adminId={} empresaId={}",
-                            usuario.getId(), adminEmpresaId);
+                        // 3.2: acesso de Admin Sistema a uma empresa é privilegiado — registrar em INFO
+                        // (trilha de auditoria), não em DEBUG (silencioso em produção).
+                        log.info("Admin sistema acessando empresa: adminId={} empresaId={} ip={} metodo={} endpoint={}",
+                            usuario.getId(), adminEmpresaId, request.getRemoteAddr(),
+                            request.getMethod(), request.getRequestURI());
                     }
                     MDC.put("usuarioId", usuario.getId().toString());
 

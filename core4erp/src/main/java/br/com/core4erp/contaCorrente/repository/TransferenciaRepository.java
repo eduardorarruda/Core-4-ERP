@@ -11,4 +11,7 @@ public interface TransferenciaRepository extends JpaRepository<Transferencia, Lo
     List<Transferencia> findAllByEmpresaIdOrderByDataTransferenciaDesc(Long empresaId);
 
     Optional<Transferencia> findByIdAndEmpresaId(Long id, Long empresaId);
+
+    // S.3: bloqueia exclusão de conta corrente que ainda possui transferências (origem ou destino)
+    boolean existsByContaOrigemIdOrContaDestinoId(Long contaOrigemId, Long contaDestinoId);
 }

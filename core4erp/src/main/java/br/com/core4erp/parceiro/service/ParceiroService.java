@@ -1,5 +1,6 @@
 package br.com.core4erp.parceiro.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.enums.TipoParceiro;
@@ -43,6 +44,7 @@ public class ParceiroService {
         return ParceiroResponseDto.from(findOwned(id));
     }
 
+    @Requer("PARCEIRO_CRIAR") // 3.1: defense-in-depth — cobre a porta do chat IA
     @Transactional
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
@@ -59,6 +61,7 @@ public class ParceiroService {
     }
 
     /** Altera apenas o tipo do parceiro (ex.: CLIENTE -> AMBOS), preservando os demais campos. */
+    @Requer("PARCEIRO_EDITAR") // 3.1: defense-in-depth — cobre a porta do chat IA
     @Transactional
     public ParceiroResponseDto atualizarTipo(Long id, TipoParceiro tipo) {
         Parceiro parceiro = findOwned(id);

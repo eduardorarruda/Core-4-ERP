@@ -12,6 +12,8 @@ import java.util.Optional;
 
 public interface ContaBaixadaRepository extends JpaRepository<ContaBaixada, Long> {
     boolean existsByContaId(Long contaId);
+    // S.3: bloqueia exclusão de conta corrente que já possui baixas vinculadas
+    boolean existsByContaCorrenteId(Long contaCorrenteId);
     Optional<ContaBaixada> findByContaId(Long contaId);
 
     List<ContaBaixada> findByEmpresaIdAndDataPagamentoBetweenOrderByDataPagamento(

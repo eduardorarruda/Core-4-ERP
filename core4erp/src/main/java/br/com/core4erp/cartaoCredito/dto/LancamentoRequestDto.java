@@ -23,7 +23,7 @@ public record LancamentoRequestDto(
         @NotNull(message = "Categoria é obrigatória")
         Long categoriaId,
 
-        @NotNull(message = "Parceiro é obrigatório")
+        /** S.9: parceiro é opcional (ex.: compras sem fornecedor cadastrado, lançamentos pela IA). */
         Long parceiroId,
 
         /** Número de parcelas (>= 1). */

@@ -23,6 +23,28 @@ export function getLoginState() {
   }
 }
 
+// S.11: empresa ativa explícita (em vez de assumir sempre empresas[0]). Mantém compatibilidade
+// — se nada foi selecionado, cai no primeiro vínculo. Pronto para um seletor de empresa.
+export function getEmpresaAtiva() {
+  const state = getLoginState();
+  if (!state) return null;
+  const empresas = state.empresas ?? [];
+  const ativa = empresas.find((e) => e.id === state.empresaAtivaId);
+  return ativa ?? empresas[0] ?? null;
+}
+
+export function getEmpresaAtivaId() {
+  return getEmpresaAtiva()?.id ?? null;
+}
+
+export function setEmpresaAtiva(id) {
+  const state = getLoginState();
+  if (!state) return;
+  state.empresaAtivaId = id;
+  sessionStorage.setItem('loginState', JSON.stringify(state));
+  window.dispatchEvent(new CustomEvent('auth-change'));
+}
+
 export function clearAuth() {
   sessionStorage.removeItem('usuario');
   sessionStorage.removeItem('loginState');
@@ -33,8 +55,8 @@ async function request(path, options = {}) {
   const { skipAuthRedirect, timeout = 30000, blob: expectBlob = false, ...fetchOptions } = options;
   const isFormData = fetchOptions.body instanceof FormData;
 
-  // Envia o id da empresa atual em todo request para o TenantFilter resolver o contexto certo
-  const empresaAtualId = getLoginState()?.empresas?.[0]?.id;
+  // Envia o id da empresa ATIVA em todo request para o TenantFilter resolver o contexto certo
+  const empresaAtualId = getEmpresaAtivaId();
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(empresaAtualId ? { 'X-Empresa-Id': String(empresaAtualId) } : {}),

@@ -51,7 +51,7 @@ public class CadastroTools {
             @ToolParam(description = "Telefone. Opcional, pode ser null") String telefone,
             @ToolParam(description = "E-mail. Opcional, pode ser null") String email) {
         log.info("[CHAT-AUDIT] user={} tool=registrarParceiro razaoSocial={} tipo={}",
-                securityCtx.getEmail(), razaoSocial, tipo);
+                securityCtx.getUsuarioId(), razaoSocial, tipo);
         auditoria.registrar("registrarParceiro", "razaoSocial=" + razaoSocial + " tipo=" + tipo);
 
         // Idempotência: se já existe parceiro com o mesmo nome, reaproveita em vez de duplicar.
@@ -87,7 +87,7 @@ public class CadastroTools {
             @ToolParam(description = "ID do parceiro (use consultarParceiros para descobrir)") Long parceiroId,
             @ToolParam(description = "Novo tipo: CLIENTE, FORNECEDOR ou AMBOS") String tipo) {
         log.info("[CHAT-AUDIT] user={} tool=atualizarTipoParceiro parceiroId={} tipo={}",
-                securityCtx.getEmail(), parceiroId, tipo);
+                securityCtx.getUsuarioId(), parceiroId, tipo);
         auditoria.registrar("atualizarTipoParceiro", "parceiroId=" + parceiroId + " tipo=" + tipo);
         TipoParceiro tipoEnum;
         try {
@@ -108,7 +108,7 @@ public class CadastroTools {
             @ToolParam(description = "Descrição da categoria. Ex: 'Alimentação', 'Salário'") String descricao,
             @ToolParam(description = "Nome do ícone. Opcional, pode ser null") String icone) {
         log.info("[CHAT-AUDIT] user={} tool=registrarCategoria descricao={}",
-                securityCtx.getEmail(), descricao);
+                securityCtx.getUsuarioId(), descricao);
         auditoria.registrar("registrarCategoria", "descricao=" + descricao);
 
         // Idempotência: evita as duplicações observadas em produção (ex.: criar "Compras" e o

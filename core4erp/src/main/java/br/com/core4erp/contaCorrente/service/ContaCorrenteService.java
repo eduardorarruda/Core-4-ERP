@@ -1,7 +1,11 @@
 package br.com.core4erp.contaCorrente.service;
 
+import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
+import br.com.core4erp.conciliacao.repository.ConciliacaoRepository;
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.conta.repository.ContaBaixadaRepository;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteRequestDto;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteResponseDto;
 import br.com.core4erp.contaCorrente.dto.TransferenciaRequestDto;
@@ -10,6 +14,7 @@ import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.contaCorrente.entity.Transferencia;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.contaCorrente.repository.TransferenciaRepository;
+import br.com.core4erp.exception.BusinessException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -23,15 +28,24 @@ public class ContaCorrenteService {
 
     private final ContaCorrenteRepository repository;
     private final TransferenciaRepository transferenciaRepository;
+    private final ContaBaixadaRepository contaBaixadaRepository;
+    private final ConciliacaoRepository conciliacaoRepository;
+    private final CartaoCreditoRepository cartaoCreditoRepository;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
 
     public ContaCorrenteService(ContaCorrenteRepository repository,
                                 TransferenciaRepository transferenciaRepository,
+                                ContaBaixadaRepository contaBaixadaRepository,
+                                ConciliacaoRepository conciliacaoRepository,
+                                CartaoCreditoRepository cartaoCreditoRepository,
                                 SecurityContextUtils securityCtx,
                                 TenantContext tenantCtx) {
         this.repository = repository;
         this.transferenciaRepository = transferenciaRepository;
+        this.contaBaixadaRepository = contaBaixadaRepository;
+        this.conciliacaoRepository = conciliacaoRepository;
+        this.cartaoCreditoRepository = cartaoCreditoRepository;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
     }
@@ -56,6 +70,7 @@ public class ContaCorrenteService {
         validarSaldo(dto);
         ContaCorrente conta = new ContaCorrente();
         preencherCampos(conta, dto);
+        conta.setSaldo(dto.saldo()); // S.2: saldo só é definido na criação (saldo inicial)
         conta.setUsuario(securityCtx.getUsuario());
         return ContaCorrenteResponseDto.from(repository.save(conta));
     }
@@ -63,22 +78,47 @@ public class ContaCorrenteService {
     @Transactional
     public ContaCorrenteResponseDto atualizar(Long id, ContaCorrenteRequestDto dto) {
         ContaCorrente conta = findOwned(id);
-        validarSaldo(dto);
+        // S.2: o saldo é um campo calculado (soma de lançamentos/transferências/baixas) e
+        // NUNCA deve ser sobrescrito por um update direto. preencherCampos não toca no saldo.
         preencherCampos(conta, dto);
         return ContaCorrenteResponseDto.from(repository.save(conta));
     }
 
     @Transactional
     public void deletar(Long id) {
-        repository.delete(findOwned(id));
+        ContaCorrente conta = findOwned(id);
+        Long empresaId = tenantCtx.getEmpresaId();
+        // S.3: bloqueia exclusão quando há histórico/dependências vinculadas (§19)
+        if (transferenciaRepository.existsByContaOrigemIdOrContaDestinoId(id, id)) {
+            throw new BusinessException("CONTA_CORRENTE_EM_USO",
+                    "Não é possível remover esta conta corrente: existem transferências vinculadas a ela.");
+        }
+        if (contaBaixadaRepository.existsByContaCorrenteId(id)) {
+            throw new BusinessException("CONTA_CORRENTE_EM_USO",
+                    "Não é possível remover esta conta corrente: existem pagamentos/recebimentos baixados nela.");
+        }
+        if (conciliacaoRepository.existsByContaCorrenteId(id)) {
+            throw new BusinessException("CONTA_CORRENTE_EM_USO",
+                    "Não é possível remover esta conta corrente: existem conciliações vinculadas a ela.");
+        }
+        if (cartaoCreditoRepository.existsByContaCorrenteIdAndEmpresaId(id, empresaId)) {
+            throw new BusinessException("CONTA_CORRENTE_EM_USO",
+                    "Não é possível remover esta conta corrente: existe um cartão de crédito vinculado a ela.");
+        }
+        repository.delete(conta);
     }
 
+    @Requer("CONTA_CORRENTE_TRANSFERIR") // 3.1/S.6: defense-in-depth — vale também para a porta do chat IA
     @Transactional
     public TransferenciaResponseDto transferir(TransferenciaRequestDto dto) {
         Long empresaId = tenantCtx.getEmpresaId();
 
         if (dto.contaOrigemId().equals(dto.contaDestinoId())) {
             throw new IllegalArgumentException("Conta origem e destino não podem ser iguais");
+        }
+        // S.6: valida o valor no service (o @Valid do DTO só protege a porta HTTP, não o chat)
+        if (dto.valor() == null || dto.valor().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("O valor da transferência deve ser maior que zero.");
         }
 
         ContaCorrente origem = repository.findByIdAndEmpresaId(dto.contaOrigemId(), empresaId)
@@ -113,6 +153,7 @@ public class ContaCorrenteService {
                 .stream().map(TransferenciaResponseDto::from).toList();
     }
 
+    @Requer("CONTA_CORRENTE_TRANSFERIR")
     @Transactional
     public TransferenciaResponseDto atualizarTransferencia(Long id, TransferenciaRequestDto dto) {
         Long empresaId = tenantCtx.getEmpresaId();
@@ -121,6 +162,9 @@ public class ContaCorrenteService {
 
         if (dto.contaOrigemId().equals(dto.contaDestinoId())) {
             throw new IllegalArgumentException("Conta origem e destino não podem ser iguais");
+        }
+        if (dto.valor() == null || dto.valor().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("O valor da transferência deve ser maior que zero.");
         }
 
         // Estornar transferência antiga
@@ -182,11 +226,11 @@ public class ContaCorrenteService {
         }
     }
 
+    // S.2: NÃO define saldo aqui — é campo calculado. O saldo inicial é setado apenas em criar().
     private void preencherCampos(ContaCorrente c, ContaCorrenteRequestDto dto) {
         c.setNumeroConta(dto.numeroConta());
         c.setAgencia(dto.agencia());
         c.setDescricao(dto.descricao());
-        c.setSaldo(dto.saldo());
         c.setDataSaldoInicial(dto.dataSaldoInicial());
         c.setPermitirSaldoNegativo(Boolean.TRUE.equals(dto.permitirSaldoNegativo()));
     }

@@ -167,6 +167,13 @@ public class ContaService {
     public ContaResponseDto atualizar(Long id, ContaCreateDto dto) {
         Conta conta = findOwned(id);
 
+        // S.1: conta já baixada é imutável (§16). Editar valor/vencimento de uma conta paga
+        // dessincronizaria o saldo da conta corrente. Para ajustar, estorne antes.
+        if (conta.getStatus() == StatusConta.PAGO || conta.getStatus() == StatusConta.RECEBIDO) {
+            throw new BusinessException("CONTA_BAIXADA",
+                    "Não é possível editar uma conta já baixada. Estorne a baixa antes de alterar os dados.");
+        }
+
         if (Boolean.TRUE.equals(conta.getConciliada())) {
             throw new BusinessException("CONTA_CONCILIADA",
                     "Não é possível editar uma conta conciliada via extrato bancário");
