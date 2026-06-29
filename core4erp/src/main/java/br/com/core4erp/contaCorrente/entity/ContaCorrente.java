@@ -21,6 +21,11 @@ public class ContaCorrente extends TenantEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // S.12: lock otimista — evita lost update do saldo em baixas/transferências/conciliações concorrentes
+    @Version
+    @Column(nullable = false)
+    private Long version;
+
     private String numeroConta;
 
     private String agencia;

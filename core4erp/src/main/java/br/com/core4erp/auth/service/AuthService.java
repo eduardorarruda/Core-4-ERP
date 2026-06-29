@@ -37,6 +37,11 @@ public class AuthService {
     private static final int MAX_LOGIN_ATTEMPTS = 5;
     private static final int LOCKOUT_MINUTES = 15;
 
+    // S.14: hash bcrypt fixo usado para nivelar o tempo de resposta quando o e-mail não existe,
+    // evitando enumeração de usuários por timing. Não corresponde a nenhuma senha real.
+    private static final String DUMMY_HASH =
+            "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
     public record LoginResult(String token, MeResponseDto usuario, List<EmpresaResumoDto> empresas, Boolean senhaProvisoria, Boolean adminSistema) {}
 
     private final UsuarioRepository usuarioRepository;
@@ -102,8 +107,14 @@ public class AuthService {
 
     @Transactional
     public LoginResult login(LoginRequestDto request) {
-        Usuario usuario = usuarioRepository.findByEmail(request.email())
-                .orElseThrow(() -> new BadCredentialsException("Credenciais inválidas"));
+        Usuario usuario = usuarioRepository.findByEmail(request.email()).orElse(null);
+
+        // S.14: e-mail inexistente — executa um bcrypt "dummy" para nivelar o tempo de resposta
+        // e não permitir enumeração de contas por diferença de tempo.
+        if (usuario == null) {
+            passwordEncoder.matches(request.senha(), DUMMY_HASH);
+            throw new BadCredentialsException("Credenciais inválidas");
+        }
 
         if (usuario.getLockedUntil() != null && usuario.getLockedUntil().isAfter(LocalDateTime.now())) {
             throw new LockedException("Conta bloqueada temporariamente. Tente novamente em " + LOCKOUT_MINUTES + " minutos.");

@@ -28,7 +28,7 @@ public record ContaCreateDto(
         @NotNull(message = "Categoria é obrigatória")
         Long categoriaId,
 
-        @NotNull(message = "Parceiro é obrigatório")
+        /** S.9: parceiro é opcional (o service já tratava null; alinha o contrato com a regra). */
         Long parceiroId,
 
         @PositiveOrZero

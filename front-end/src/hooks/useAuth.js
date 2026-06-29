@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getLoginState, auth, clearAuth } from '../lib/api';
+import { getLoginState, getEmpresaAtiva, auth, clearAuth } from '../lib/api';
 
 export function useAuth() {
   const navigate = useNavigate();
@@ -19,9 +19,12 @@ export function useAuth() {
       try {
         const data = await auth.refreshPermissoes();
         const current = getLoginState();
-        if (current?.empresas?.[0] && data?.permissoes) {
-          current.empresas[0].permissoes = data.permissoes;
-          if (data.perfilNome) current.empresas[0].perfilNome = data.perfilNome;
+        // S.11: atualiza as permissões da empresa ATIVA (não assume índice 0)
+        const ativa = getEmpresaAtiva();
+        const alvo = current?.empresas?.find((e) => e.id === ativa?.id) ?? current?.empresas?.[0];
+        if (alvo && data?.permissoes) {
+          alvo.permissoes = data.permissoes;
+          if (data.perfilNome) alvo.perfilNome = data.perfilNome;
           setLoginState(current);
         }
       } catch { /* 401 handler em api.js já faz logout e redirecionamento */ }
@@ -37,8 +40,9 @@ export function useAuth() {
     navigate('/login');
   }, [navigate]);
 
-  // Permissões efetivas da empresa atual (primeira da lista ao fazer login)
-  const permissoes = new Set(loginState?.empresas?.[0]?.permissoes ?? []);
+  // Permissões efetivas da empresa ATIVA (S.11: empresa selecionada, com fallback ao 1º vínculo)
+  const empresaAtiva = getEmpresaAtiva();
+  const permissoes = new Set(empresaAtiva?.permissoes ?? loginState?.empresas?.[0]?.permissoes ?? []);
 
   // CR-F7: deps completas — permissoes incluída para evitar stale closure
   const temPermissao = useCallback((codigo) => {

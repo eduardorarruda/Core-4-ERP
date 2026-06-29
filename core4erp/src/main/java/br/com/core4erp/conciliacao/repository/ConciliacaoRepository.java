@@ -14,4 +14,7 @@ public interface ConciliacaoRepository extends JpaRepository<Conciliacao, Long> 
     Optional<Conciliacao> findByIdAndEmpresaId(Long id, Long empresaId);
 
     boolean existsByIdAndEmpresaIdAndStatus(Long id, Long empresaId, StatusConciliacao status);
+
+    // S.3: bloqueia exclusão de conta corrente que já possui conciliações vinculadas
+    boolean existsByContaCorrenteId(Long contaCorrenteId);
 }

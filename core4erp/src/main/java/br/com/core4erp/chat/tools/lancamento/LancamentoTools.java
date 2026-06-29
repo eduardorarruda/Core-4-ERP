@@ -17,6 +17,7 @@ import br.com.core4erp.investimento.dto.TransacaoInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.InvestimentoService;
 import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
@@ -35,6 +36,7 @@ public class LancamentoTools {
     private final CartaoCreditoService cartaoCreditoService;
     private final InvestimentoService investimentoService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
     private final ChatAuditoriaService auditoria;
 
     public LancamentoTools(ContaService contaService,
@@ -42,12 +44,14 @@ public class LancamentoTools {
                            CartaoCreditoService cartaoCreditoService,
                            InvestimentoService investimentoService,
                            SecurityContextUtils securityCtx,
+                           TenantContext tenantCtx,
                            ChatAuditoriaService auditoria) {
         this.contaService = contaService;
         this.contaCorrenteService = contaCorrenteService;
         this.cartaoCreditoService = cartaoCreditoService;
         this.investimentoService = investimentoService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
         this.auditoria = auditoria;
     }
 
@@ -64,8 +68,11 @@ public class LancamentoTools {
             @ToolParam(description = "ID do parceiro/fornecedor. Opcional, pode ser null") Long parceiroId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
+        // 3.1: ContaService.criar é reusado internamente (fechamento de fatura/conciliação), por isso
+        // a barreira de permissão fica aqui, na porta do chat, e não com @Requer no service.
+        tenantCtx.exigirPermissao("CONTA_CRIAR");
         log.info("[CHAT-AUDIT] user={} tool=registrarConta descricao={} valor={} tipo={}",
-                securityCtx.getEmail(), descricao, valorOriginal, tipo);
+                securityCtx.getUsuarioId(), descricao, valorOriginal, tipo);
         auditoria.registrar("registrarConta",
                 "descricao=" + descricao + " valor=" + valorOriginal + " tipo=" + tipo);
         TipoConta tipoConta;
@@ -102,7 +109,7 @@ public class LancamentoTools {
             @ToolParam(description = "ID da categoria") Long categoriaId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
         log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={}",
-                securityCtx.getEmail(), cartaoId, descricao, valor);
+                securityCtx.getUsuarioId(), cartaoId, descricao, valor);
         auditoria.registrar("registrarLancamentoCartao",
                 "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor);
         LancamentoRequestDto dto = new LancamentoRequestDto(
@@ -128,7 +135,7 @@ public class LancamentoTools {
             @ToolParam(description = "Valor a transferir em reais") BigDecimal valor,
             @ToolParam(description = "Data em que a transferência ocorreu no formato YYYY-MM-DD") LocalDate dataTransferencia) {
         log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={} data={}",
-                securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
+                securityCtx.getUsuarioId(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
         auditoria.registrar("transferirEntreContas",
                 "origem=" + contaOrigemId + " destino=" + contaDestinoId + " valor=" + valor);
         TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor, dataTransferencia);
@@ -145,8 +152,9 @@ public class LancamentoTools {
             @ToolParam(description = "Data do pagamento/recebimento no formato YYYY-MM-DD") LocalDate dataPagamento,
             @ToolParam(description = "Valor de juros. Padrão: 0") BigDecimal juros,
             @ToolParam(description = "Valor de multa. Padrão: 0") BigDecimal multa) {
+        tenantCtx.exigirPermissao("CONTA_BAIXAR"); // 3.1: barreira na porta do chat (service reusado)
         log.info("[CHAT-AUDIT] user={} tool=baixarConta contaId={} contaCorrenteId={} data={}",
-                securityCtx.getEmail(), contaId, contaCorrenteId, dataPagamento);
+                securityCtx.getUsuarioId(), contaId, contaCorrenteId, dataPagamento);
         auditoria.registrar("baixarConta",
                 "contaId=" + contaId + " contaCorrenteId=" + contaCorrenteId + " data=" + dataPagamento);
         BaixaRequestDto dto = new BaixaRequestDto(
@@ -171,7 +179,7 @@ public class LancamentoTools {
             @ToolParam(description = "Data da transação no formato YYYY-MM-DD") LocalDate dataTransacao,
             @ToolParam(description = "ID da conta corrente para débito (apenas para APORTE). Opcional") Long contaCorrenteOrigemId) {
         log.info("[CHAT-AUDIT] user={} tool=registrarTransacaoInvestimento contaId={} tipo={} valor={}",
-                securityCtx.getEmail(), contaInvestimentoId, tipoTransacao, valor);
+                securityCtx.getUsuarioId(), contaInvestimentoId, tipoTransacao, valor);
         auditoria.registrar("registrarTransacaoInvestimento",
                 "contaInvestimentoId=" + contaInvestimentoId + " tipo=" + tipoTransacao + " valor=" + valor);
         TipoTransacaoInvestimento tipoEnum;

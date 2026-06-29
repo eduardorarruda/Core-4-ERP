@@ -20,8 +20,11 @@ public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa, 
 
     Optional<UsuarioEmpresa> findByUsuarioIdAndEmpresaId(Long usuarioId, Long empresaId);
 
+    // S.16: evita N+1 no login (carrega empresa + perfil + permissões em uma query)
+    @EntityGraph(attributePaths = {"empresa", "perfil", "perfil.permissoes"})
     List<UsuarioEmpresa> findByUsuario_EmailAndAtivoTrue(String email);
 
+    @EntityGraph(attributePaths = {"usuario"})
     List<UsuarioEmpresa> findByEmpresaIdAndAtivoTrue(Long empresaId);
 
     Page<UsuarioEmpresa> findByEmpresaIdAndAtivoTrue(Long empresaId, Pageable pageable);

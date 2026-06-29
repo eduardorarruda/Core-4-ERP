@@ -5,6 +5,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.LockedException;
@@ -62,6 +63,17 @@ public class GlobalExceptionHandler {
         log.warn("Acesso negado: {}", e.getMessage());
         return ResponseEntity.status(403).body(new ErrorResponseDto(
                 "ACESSO_NEGADO", e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
+    // S.12: conflito de concorrência no saldo (lock otimista @Version) — peça para repetir a operação
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponseDto> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        log.warn("Conflito de concorrência: {}", e.getMessage());
+        return ResponseEntity.status(409).body(new ErrorResponseDto(
+                "CONFLITO_CONCORRENCIA",
+                "Este registro foi alterado por outra operação ao mesmo tempo. Tente novamente.",
+                LocalDateTime.now()
         ));
     }
 

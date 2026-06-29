@@ -46,7 +46,9 @@ public class ChatController {
     @PostMapping("/stream")
     public SseEmitter enviarMensagemStream(
             @Valid @RequestBody ChatRequestDto request) {
-        SseEmitter emitter = new SseEmitter(300_000L);
+        // 4.2: timeout reduzido (120s) — limita threads do pool de streaming presas caso a IA
+        // demore/trave, reduzindo o risco de exaustão. Respostas são limitadas por max-tokens.
+        SseEmitter emitter = new SseEmitter(120_000L);
         emitter.onTimeout(emitter::complete);
         chatService.processarStream(request, emitter);
         return emitter;

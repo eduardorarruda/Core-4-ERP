@@ -11,6 +11,7 @@ import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.ContaCreateDto;
@@ -20,6 +21,7 @@ import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
+import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.StatusFatura;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.usuario.entity.Usuario;
@@ -176,6 +178,7 @@ public class CartaoCreditoService {
      * Cria um ou mais lançamentos no cartão. Se {@code quantidadeParcelas > 1}, distribui o valor
      * pelas faturas subsequentes e agrupa sob o mesmo {@code grupoParcelamento}.
      */
+    @Requer("CARTAO_LANCAR") // 3.1: defense-in-depth — vale também para a porta do chat IA
     @Transactional
     public List<LancamentoResponseDto> criarLancamento(Long cartaoId, LancamentoRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
@@ -183,8 +186,11 @@ public class CartaoCreditoService {
 
         Categoria categoria = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
-        Parceiro parceiro = parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
-                .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
+        // S.4/S.9: parceiro é opcional (alinha com ContaService e permite lançamento pela IA)
+        Parceiro parceiro = dto.parceiroId() != null
+                ? parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
+                        .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"))
+                : null;
 
         int parcelas = ParcelamentoHelper.normalizarParcelas(dto.quantidadeParcelas());
         boolean dividir = Boolean.TRUE.equals(dto.dividirValor());
@@ -231,8 +237,10 @@ public class CartaoCreditoService {
         Long eid = tenantCtx.getEmpresaId();
         Categoria cat = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
-        Parceiro par = parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
-                .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
+        Parceiro par = dto.parceiroId() != null
+                ? parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
+                        .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"))
+                : null;
         l.setDescricao(dto.descricao());
         l.setValor(dto.valor());
         l.setDataCompra(dto.dataCompra());
@@ -294,6 +302,15 @@ public class CartaoCreditoService {
                 descricaoFatura, total, dataVencimento, TipoConta.PAGAR,
                 categoriaDaFatura.getId(), null, 1, 1, false, null, null, null
         );
+
+        // S.5: se a fatura já existe e tem uma Conta vinculada ainda NÃO paga (cenário de
+        // estorno + refechamento), remove a Conta antiga para não duplicar a dívida.
+        faturaRepo.findByCartaoCreditoIdAndMesAndAnoAndEmpresaId(cartaoId, dto.mes(), dto.ano(), eid)
+                .map(FaturaCartao::getConta)
+                .filter(antiga -> antiga != null
+                        && antiga.getStatus() != StatusConta.PAGO
+                        && antiga.getStatus() != StatusConta.RECEBIDO)
+                .ifPresent(antiga -> contaService.deletar(antiga.getId()));
 
         List<ContaResponseDto> contas = contaService.criar(contaDto);
         Conta contaGerada = contaService.findOwnedEntity(contas.get(0).id());
