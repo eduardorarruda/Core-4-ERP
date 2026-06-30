@@ -26,6 +26,11 @@ public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecific
 
     Optional<Conta> findByIdAndEmpresaId(Long id, Long empresaId);
 
+    /** Há alguma conta usando esta categoria/parceiro? Usado para bloquear exclusão (integridade referencial). */
+    boolean existsByCategoria_IdAndEmpresaId(Long categoriaId, Long empresaId);
+
+    boolean existsByParceiro_IdAndEmpresaId(Long parceiroId, Long empresaId);
+
     /** Para sincronização de status ATRASADO. */
     List<Conta> findByEmpresaIdAndStatusAndDataVencimentoBefore(
             Long empresaId, StatusConta status, LocalDate data);
