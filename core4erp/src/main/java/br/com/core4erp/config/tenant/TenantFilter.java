@@ -96,6 +96,7 @@ public class TenantFilter extends OncePerRequestFilter {
                     try {
                         chain.doFilter(request, response);
                     } finally {
+                        tenantContext.clear();
                         MDC.clear();
                     }
                     return;
@@ -148,6 +149,9 @@ public class TenantFilter extends OncePerRequestFilter {
 
             chain.doFilter(request, response);
         } finally {
+            // Limpa o estado por thread (ThreadLocal) — evita vazamento cross-tenant em threads
+            // de pool reaproveitadas. Cobre todos os caminhos, inclusive o return do adminSistema.
+            tenantContext.clear();
             MDC.clear();
         }
     }
