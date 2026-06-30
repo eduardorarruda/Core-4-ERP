@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
   LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge,
-  ChevronRight, UserCog, Layers, ShieldCheck,
+  ChevronRight, UserCog, Layers, ShieldCheck, Sparkles,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -14,6 +14,7 @@ const NAV_GROUPS = [
     label: 'Principal',
     items: [
       { id: 'dashboard',  icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard' },
+      { id: 'assistente', icon: Sparkles,        label: 'Assistente IA',    path: '/assistente' },
     ],
   },
   {
