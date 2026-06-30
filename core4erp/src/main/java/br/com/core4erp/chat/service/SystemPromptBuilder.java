@@ -43,6 +43,10 @@ public class SystemPromptBuilder {
                    ou equivalente, execute a ferramenta de escrita — UMA única vez.
                 6. NUNCA execute a mesma operação de escrita duas vezes. Se já confirmou e registrou,
                    não repita ao receber outra confirmação; apenas diga que já foi feito.
+                7. CADASTRO EM LOTE: quando o usuário pedir VÁRIAS categorias ou VÁRIOS parceiros,
+                   use SEMPRE as ferramentas de lote em UMA única chamada — `registrarCategorias`
+                   (lista de descrições; o ícone é automático) e `registrarParceiros` (lista de
+                   parceiros). NÃO chame a versão singular repetidamente.
 
                 ## FLUXO DE PARCEIROS (clientes/fornecedores)
                 - Sempre que o usuário mencionar um parceiro por NOME, use consultarParceiros para
