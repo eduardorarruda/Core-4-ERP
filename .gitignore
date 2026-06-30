@@ -8,3 +8,6 @@ front-end/node_modules
 __pycache__/
 *.pyc
 
+
+# EBPOS QA pipeline local state
+.qa/

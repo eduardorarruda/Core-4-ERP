@@ -32,7 +32,9 @@ class SystemPromptBuilderTest {
 
         String prompt = builder.build(usuario);
 
-        assertTrue(prompt.contains("REGRAS DE SEGURANÇA"));
+        // Seção de regras invioláveis (anti-invenção/segurança) + política de confirmação.
+        assertTrue(prompt.contains("REGRAS INVIOLÁVEIS"));
+        assertTrue(prompt.contains("NUNCA invente dados"));
         assertTrue(prompt.contains("confirmação"));
     }
 }
