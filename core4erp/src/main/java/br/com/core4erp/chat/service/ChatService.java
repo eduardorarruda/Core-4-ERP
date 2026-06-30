@@ -8,6 +8,7 @@ import br.com.core4erp.chat.tools.cadastro.CadastroTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
+import br.com.core4erp.chat.tools.gestao.GestaoFinanceiraTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
@@ -50,6 +51,7 @@ public class ChatService {
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
     private final CadastroTools cadastroTools;
+    private final GestaoFinanceiraTools gestaoFinanceiraTools;
     private final ChatMetrics chatMetrics;
     private final ChatMemoryService memoryService;
     private final ObjectMapper objectMapper;
@@ -79,6 +81,7 @@ public class ChatService {
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
                        CadastroTools cadastroTools,
+                       GestaoFinanceiraTools gestaoFinanceiraTools,
                        ChatMetrics chatMetrics,
                        ChatMemoryService memoryService,
                        ObjectMapper objectMapper,
@@ -91,6 +94,7 @@ public class ChatService {
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
         this.cadastroTools = cadastroTools;
+        this.gestaoFinanceiraTools = gestaoFinanceiraTools;
         this.chatMetrics = chatMetrics;
         this.memoryService = memoryService;
         this.objectMapper = objectMapper;
@@ -112,7 +116,7 @@ public class ChatService {
         try {
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
-                    .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
+                    .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
                     .call()
                     .chatResponse();
 
@@ -175,7 +179,7 @@ public class ChatService {
                 // ativo durante toda a execução (inclusive das tools) e a limpeza correta no finally.
                 chatClient.prompt()
                         .messages(allMessages)
-                        .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools)
+                        .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
                         .stream()
                         .chatResponse()
                         .toStream()

@@ -126,6 +126,7 @@ public class CartaoCreditoService {
         return CartaoCreditoResponseDto.from(c, calcularLimiteUsado(c));
     }
 
+    @Requer("CARTAO_CRIAR")
     @Transactional
     public CartaoCreditoResponseDto criar(CartaoCreditoRequestDto dto) {
         CartaoCredito cartao = new CartaoCredito();
@@ -135,6 +136,7 @@ public class CartaoCreditoService {
         return CartaoCreditoResponseDto.from(cartao, BigDecimal.ZERO);
     }
 
+    @Requer("CARTAO_EDITAR")
     @Transactional
     public CartaoCreditoResponseDto atualizar(Long id, CartaoCreditoRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(id);
@@ -143,6 +145,7 @@ public class CartaoCreditoService {
         return CartaoCreditoResponseDto.from(cartao, calcularLimiteUsado(cartao));
     }
 
+    @Requer("CARTAO_DELETAR")
     @Transactional
     public void deletar(Long id) {
         CartaoCredito cartao = findOwnedCartao(id);
@@ -225,6 +228,7 @@ public class CartaoCreditoService {
         return lancamentoRepo.saveAll(criados).stream().map(l -> LancamentoResponseDto.from(l, false)).toList();
     }
 
+    @Requer("CARTAO_LANCAR")
     @Transactional
     public LancamentoResponseDto atualizarLancamento(Long cartaoId, Long lancamentoId, LancamentoRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);
@@ -251,6 +255,7 @@ public class CartaoCreditoService {
         return LancamentoResponseDto.from(lancamentoRepo.save(l), false);
     }
 
+    @Requer("CARTAO_LANCAR")
     @Transactional
     public void deletarLancamento(Long cartaoId, Long lancamentoId) {
         LancamentoCartao l = findOwnedLancamento(cartaoId, lancamentoId);

@@ -61,6 +61,7 @@ public class ContaCorrenteService {
         return ContaCorrenteResponseDto.from(findOwned(id));
     }
 
+    @Requer("CONTA_CORRENTE_CRIAR")
     @Transactional
     public ContaCorrenteResponseDto criar(ContaCorrenteRequestDto dto) {
         Long empresaId = tenantCtx.getEmpresaId();
@@ -75,6 +76,7 @@ public class ContaCorrenteService {
         return ContaCorrenteResponseDto.from(repository.save(conta));
     }
 
+    @Requer("CONTA_CORRENTE_EDITAR")
     @Transactional
     public ContaCorrenteResponseDto atualizar(Long id, ContaCorrenteRequestDto dto) {
         ContaCorrente conta = findOwned(id);
@@ -84,6 +86,7 @@ public class ContaCorrenteService {
         return ContaCorrenteResponseDto.from(repository.save(conta));
     }
 
+    @Requer("CONTA_CORRENTE_DELETAR")
     @Transactional
     public void deletar(Long id) {
         ContaCorrente conta = findOwned(id);
