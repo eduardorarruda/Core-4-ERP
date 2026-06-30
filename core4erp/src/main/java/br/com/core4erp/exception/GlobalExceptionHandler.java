@@ -11,8 +11,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -43,12 +45,27 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    // Anexo/parâmetro de formulário ausente (ex.: POST /api/chat/anexo sem o arquivo) → 400 amigável, não 500.
-    @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
+    // Anexo/parâmetro de formulário ausente ou upload malformado (ex.: POST /api/chat/anexo
+    // sem o arquivo) → 400 amigável, não 500.
+    @ExceptionHandler({
+            MissingServletRequestPartException.class,
+            MissingServletRequestParameterException.class,
+            MultipartException.class
+    })
     public ResponseEntity<ErrorResponseDto> handleMissingPart(Exception e) {
         return ResponseEntity.status(400).body(new ErrorResponseDto(
                 "REQUISICAO_INVALIDA",
-                "Nenhum arquivo foi enviado. Selecione um arquivo e tente novamente.",
+                "Nenhum arquivo válido foi enviado. Selecione um arquivo e tente novamente.",
+                LocalDateTime.now()
+        ));
+    }
+
+    // Content-Type não suportado pelo endpoint → 415 (mensagem neutra, vale p/ upload e JSON).
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponseDto> handleMediaType(HttpMediaTypeNotSupportedException e) {
+        return ResponseEntity.status(415).body(new ErrorResponseDto(
+                "FORMATO_NAO_SUPORTADO",
+                "Formato de requisição não suportado para esta operação.",
                 LocalDateTime.now()
         ));
     }
