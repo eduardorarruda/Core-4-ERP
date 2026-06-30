@@ -153,11 +153,36 @@ services:
       - app-network
     restart: unless-stopped
 
+  # n8n self-hosted — orquestra o processamento pesado/assíncrono da IA (arquivos/lote).
+  # Mesma rede do backend (interno: backend -> http://n8n:5678 ; n8n -> http://backend:8080).
+  # Exposto só em 127.0.0.1 (acesso ao editor via túnel SSH; n8n é poderoso e não deve ficar
+  # público sem TLS). N8N_SECURE_COOKIE=false permite acesso por HTTP no túnel/localhost.
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      - N8N_DIAGNOSTICS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - app-network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
   loki_data:
+  n8n_data:
 
 networks:
   app-network:
