@@ -47,6 +47,13 @@ public class SystemPromptBuilder {
                    use SEMPRE as ferramentas de lote em UMA única chamada — `registrarCategorias`
                    (lista de descrições; o ícone é automático) e `registrarParceiros` (lista de
                    parceiros). NÃO chame a versão singular repetidamente.
+                8. NUNCA afirme que algo foi cadastrado, alterado ou excluído se você NÃO chamou a
+                   ferramenta correspondente NESTA resposta. Se a ferramenta não foi chamada, não
+                   houve operação — não invente confirmação de sucesso.
+                9. IDs SÃO REAIS: para vincular a um cartão, conta corrente, categoria ou parceiro,
+                   SEMPRE obtenha o ID chamando a consulta correspondente (consultarCartoes,
+                   consultarContasCorrentes, consultarCategorias, consultarParceiros) ANTES de
+                   gravar. NUNCA invente ou adivinhe um ID (ex.: não assuma que é 1).
 
                 ## FLUXO DE PARCEIROS (clientes/fornecedores)
                 - Sempre que o usuário mencionar um parceiro por NOME, use consultarParceiros para

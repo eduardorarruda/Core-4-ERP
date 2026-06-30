@@ -18,6 +18,7 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -123,6 +124,12 @@ public class GestaoFinanceiraTools {
             @ToolParam(description = "Dia de vencimento da fatura (1 a 31)") Integer diaVencimento,
             @ToolParam(description = "ID da conta corrente vinculada") Long contaCorrenteId) {
         audit("registrarCartaoCredito", "nome=" + nome);
+        // Idempotência: se já existe cartão com o mesmo nome, reaproveita (evita duplicata da IA).
+        CartaoCreditoResponseDto existente = cartaoCreditoService.listar(PageRequest.of(0, 200))
+                .getContent().stream()
+                .filter(c -> c.nome() != null && c.nome().equalsIgnoreCase(nome.strip()))
+                .findFirst().orElse(null);
+        if (existente != null) return existente;
         CartaoCreditoRequestDto dto = new CartaoCreditoRequestDto(
                 nome, limite, diaFechamento, diaVencimento, contaCorrenteId);
         return cartaoCreditoService.criar(dto);
@@ -237,6 +244,11 @@ public class GestaoFinanceiraTools {
             @ToolParam(description = "ID do cartão de crédito para cobrança (opcional)") Long cartaoCreditoId,
             @ToolParam(description = "Ativa? Padrão true") Boolean ativa) {
         audit("registrarAssinatura", "descricao=" + descricao);
+        // Idempotência: se já existe assinatura com a mesma descrição, reaproveita (evita duplicata).
+        AssinaturaResponseDto existente = assinaturaService.listar().stream()
+                .filter(a -> a.descricao() != null && a.descricao().equalsIgnoreCase(descricao.strip()))
+                .findFirst().orElse(null);
+        if (existente != null) return existente;
         AssinaturaRequestDto dto = new AssinaturaRequestDto(
                 descricao, valor, diaVencimento, ativa, categoriaId, parceiroId, cartaoCreditoId);
         return assinaturaService.criar(dto);
