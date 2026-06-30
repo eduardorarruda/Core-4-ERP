@@ -153,6 +153,19 @@ services:
       - app-network
     restart: unless-stopped
 
+  # Qdrant — banco vetorial do RAG (embeddings de documentos/descrições). Isolado, na mesma
+  # rede (backend e n8n usam internamente http://qdrant:6333). Exposto só em 127.0.0.1 (admin via túnel).
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - app-network
+    restart: unless-stopped
+
   # n8n self-hosted — orquestra o processamento pesado/assíncrono da IA (arquivos/lote).
   # Mesma rede do backend (interno: backend -> http://n8n:5678 ; n8n -> http://backend:8080).
   # Exposto só em 127.0.0.1 (acesso ao editor via túnel SSH; n8n é poderoso e não deve ficar
@@ -183,6 +196,7 @@ volumes:
   grafana_data:
   loki_data:
   n8n_data:
+  qdrant_data:
 
 networks:
   app-network:
