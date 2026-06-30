@@ -11,6 +11,9 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,8 +41,11 @@ public class ChatAnexoService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatAnexoService.class);
 
-    private static final Set<String> EXTENSOES = Set.of("ofx", "xlsx", "xls", "csv");
+    private static final Set<String> EXTENSOES = Set.of("ofx", "xlsx", "xls", "csv", "pdf");
     private static final long MAX_BYTES = 5L * 1024 * 1024; // 5 MB
+    // Teto de segurança da extração (alinhado ao limite do RAG). O conteúdo COMPLETO (até aqui) vai
+    // para o RAG; para a IA enviamos no máximo {@code maxChars} (custo de tokens).
+    private static final int MAX_EXTRACT_CHARS = 100_000;
 
     private final OfxParserService ofxParserService;
     private final ChatService chatService;
@@ -70,19 +76,19 @@ public class ChatAnexoService {
         String ext = extensao(nome);
         if (!EXTENSOES.contains(ext)) {
             throw new IllegalArgumentException(
-                    "Tipo de arquivo não suportado. Envie planilha (.xlsx, .xls, .csv) ou extrato bancário (.ofx).");
+                    "Tipo de arquivo não suportado. Envie planilha (.xlsx, .xls, .csv), extrato bancário (.ofx) ou documento (.pdf).");
         }
 
-        String conteudo = switch (ext) {
+        // Conteúdo COMPLETO extraído (até o teto de segurança) — usado para indexar no RAG.
+        String conteudoCompleto = switch (ext) {
             case "ofx" -> extrairOfx(arquivo);
-            case "csv" -> extrairTextoSimples(arquivo);
+            case "csv", "pdf" -> ext.equals("pdf") ? extrairPdf(arquivo) : extrairTextoSimples(arquivo);
             default -> extrairExcel(arquivo);
         };
 
-        boolean truncado = conteudo.length() >= maxChars;
-        if (truncado) {
-            conteudo = conteudo.substring(0, maxChars);
-        }
+        // Para a IA enviamos no máximo maxChars (custo de tokens); o RAG recebe o conteúdo completo.
+        boolean truncado = conteudoCompleto.length() > maxChars;
+        String conteudo = truncado ? conteudoCompleto.substring(0, maxChars) : conteudoCompleto;
 
         // Gancho n8n (processamento pesado/assíncrono) — habilitado quando a URL estiver configurada.
         if (n8nWebhookUrl != null && !n8nWebhookUrl.isBlank()) {
@@ -109,10 +115,10 @@ public class ChatAnexoService {
         log.info("[CHAT-ANEXO] processando '{}' ({}), {} chars{}", nome, ext, conteudo.length(),
                 truncado ? " (truncado)" : "");
 
-        // RAG: indexa o conteúdo do arquivo para que o usuário possa fazer perguntas sobre ele
-        // depois (busca semântica). Não-fatal — falha aqui não impede o processamento principal.
+        // RAG: indexa o conteúdo COMPLETO do arquivo (não o truncado para a IA), para que o usuário
+        // possa perguntar sobre ele depois (busca semântica). Não-fatal — falha aqui não impede o fluxo.
         try {
-            ragService.indexar(conteudo, "anexo", nome);
+            ragService.indexar(conteudoCompleto, "anexo", nome);
         } catch (Exception e) {
             log.warn("[CHAT-ANEXO] falha ao indexar '{}' no RAG (seguindo): {}", nome, e.getMessage());
         }
@@ -137,7 +143,7 @@ public class ChatAnexoService {
                     sb.append("- ").append(nvl(t.getData())).append(" | ")
                       .append(t.getValor() != null ? t.getValor() : BigDecimal.ZERO).append(" | ")
                       .append(desc).append("\n");
-                    if (sb.length() >= maxChars) break;
+                    if (sb.length() >= MAX_EXTRACT_CHARS) break;
                 }
             }
             return sb.toString();
@@ -172,9 +178,19 @@ public class ChatAnexoService {
     private String extrairTextoSimples(MultipartFile arquivo) {
         try {
             String txt = new String(arquivo.getBytes(), StandardCharsets.UTF_8);
-            return txt.length() > maxChars ? txt.substring(0, maxChars) : txt;
+            return txt.length() > MAX_EXTRACT_CHARS ? txt.substring(0, MAX_EXTRACT_CHARS) : txt;
         } catch (Exception e) {
             throw new IllegalArgumentException("Não consegui ler o arquivo: " + e.getMessage());
+        }
+    }
+
+    private String extrairPdf(MultipartFile arquivo) {
+        try (PDDocument doc = Loader.loadPDF(arquivo.getBytes())) {
+            String txt = new PDFTextStripper().getText(doc).strip();
+            if (txt.isBlank()) return "(PDF sem texto extraível — pode ser um documento digitalizado/imagem)";
+            return txt.length() > MAX_EXTRACT_CHARS ? txt.substring(0, MAX_EXTRACT_CHARS) : txt;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Não consegui ler o PDF: " + e.getMessage());
         }
     }
 

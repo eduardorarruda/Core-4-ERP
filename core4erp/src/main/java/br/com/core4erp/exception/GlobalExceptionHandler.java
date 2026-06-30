@@ -12,6 +12,8 @@ import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -37,6 +39,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(400).body(new ErrorResponseDto(
                 "VIOLACAO_INTEGRIDADE",
                 "Operação viola restrições de integridade — verifique se o registro está em uso",
+                LocalDateTime.now()
+        ));
+    }
+
+    // Anexo/parâmetro de formulário ausente (ex.: POST /api/chat/anexo sem o arquivo) → 400 amigável, não 500.
+    @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
+    public ResponseEntity<ErrorResponseDto> handleMissingPart(Exception e) {
+        return ResponseEntity.status(400).body(new ErrorResponseDto(
+                "REQUISICAO_INVALIDA",
+                "Nenhum arquivo foi enviado. Selecione um arquivo e tente novamente.",
                 LocalDateTime.now()
         ));
     }
@@ -80,7 +92,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponseDto> handleBusiness(BusinessException e) {
         int status = switch (e.getCode()) {
-            case "CONVITE_PENDENTE", "USUARIO_JA_MEMBRO" -> 409;
+            case "CONVITE_PENDENTE", "USUARIO_JA_MEMBRO", "REGISTRO_EM_USO" -> 409;
             case "LIMITE_PLANO", "OPERACAO_INVALIDA", "CONVITE_EXPIRADO" -> 422;
             case "PLANO_INATIVO", "SENHA_INCORRETA" -> 400;
             default -> 422;

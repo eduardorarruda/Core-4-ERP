@@ -3,7 +3,9 @@ package br.com.core4erp.parceiro.service;
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.enums.TipoParceiro;
+import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.utils.Utils;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
@@ -19,15 +21,18 @@ import org.springframework.transaction.annotation.Transactional;
 public class ParceiroService {
 
     private final ParceiroRepository parceiroRepository;
+    private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
     private final BrasilApiService brasilApiService;
     private final TenantContext tenantCtx;
 
     public ParceiroService(ParceiroRepository parceiroRepository,
+                           ContaRepository contaRepository,
                            SecurityContextUtils securityCtx,
                            BrasilApiService brasilApiService,
                            TenantContext tenantCtx) {
         this.parceiroRepository = parceiroRepository;
+        this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
         this.brasilApiService = brasilApiService;
         this.tenantCtx = tenantCtx;
@@ -87,7 +92,14 @@ public class ParceiroService {
     @Requer("PARCEIRO_DELETAR")
     @Transactional
     public void deletar(Long id) {
-        parceiroRepository.delete(findOwned(id));
+        Parceiro parceiro = findOwned(id);
+        // Integridade: não remover parceiro em uso por contas/lançamentos (mensagem clara ao usuário).
+        if (contaRepository.existsByParceiro_IdAndEmpresaId(id, tenantCtx.getEmpresaId())) {
+            throw new BusinessException("REGISTRO_EM_USO",
+                    "Não é possível excluir este parceiro porque há lançamentos vinculados a ele. "
+                    + "Remova ou altere esses lançamentos antes.");
+        }
+        parceiroRepository.delete(parceiro);
     }
 
     private void preencherCampos(Parceiro p, ParceiroRequestDto dto, String docNormalizado) {

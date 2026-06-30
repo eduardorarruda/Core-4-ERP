@@ -7,6 +7,8 @@ import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.conta.repository.ContaRepository;
+import br.com.core4erp.exception.BusinessException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,13 +19,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class CategoriaService {
 
     private final CategoriaRepository categoriaRepository;
+    private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
 
     public CategoriaService(CategoriaRepository categoriaRepository,
+                            ContaRepository contaRepository,
                             SecurityContextUtils securityCtx,
                             TenantContext tenantCtx) {
         this.categoriaRepository = categoriaRepository;
+        this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
     }
@@ -64,6 +69,12 @@ public class CategoriaService {
     @Transactional
     public void deletar(Long id) {
         Categoria categoria = findOwned(id);
+        // Integridade: não remover categoria em uso por contas/lançamentos (mensagem clara ao usuário).
+        if (contaRepository.existsByCategoria_IdAndEmpresaId(id, tenantCtx.getEmpresaId())) {
+            throw new BusinessException("REGISTRO_EM_USO",
+                    "Não é possível excluir esta categoria porque há lançamentos usando ela. "
+                    + "Remova ou altere esses lançamentos antes.");
+        }
         categoriaRepository.delete(categoria);
     }
 
