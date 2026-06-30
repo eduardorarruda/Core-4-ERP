@@ -26,4 +26,11 @@ public interface ContaBaixadaRepository extends JpaRepository<ContaBaixada, Long
     @Query("SELECT COALESCE(SUM(cb.valorFinal), 0) FROM ContaBaixada cb " +
            "WHERE cb.empresaId = :eid AND cb.conta.tipo = 'RECEBER'")
     BigDecimal sumTotalRecebidoByEmpresa(@Param("eid") Long eid);
+
+    /** Total pago (saídas) por conta corrente — para a IA responder "onde gasto mais". */
+    @Query("SELECT cb.contaCorrente.descricao, SUM(cb.valorFinal) FROM ContaBaixada cb " +
+           "WHERE cb.empresaId = :eid AND cb.conta.tipo = 'PAGAR' " +
+           "GROUP BY cb.contaCorrente.id, cb.contaCorrente.descricao " +
+           "ORDER BY SUM(cb.valorFinal) DESC")
+    List<Object[]> gastoPorContaCorrente(@Param("eid") Long eid);
 }
