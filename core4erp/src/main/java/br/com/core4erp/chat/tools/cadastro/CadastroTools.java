@@ -16,6 +16,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 /**
  * Ferramentas de cadastro (parceiros e categorias) acionáveis pelo chat IA.
  */
@@ -123,5 +129,130 @@ public class CadastroTools {
         }
 
         return categoriaService.criar(new CategoriaRequestDto(descricao, icone));
+    }
+
+    // ── Cadastro em LOTE (várias de uma vez) ──────────────────────────────────
+
+    @Tool(description = """
+            Cadastra VÁRIAS categorias de uma só vez (em lote). Use SEMPRE que o usuário pedir mais
+            de uma categoria. Passe apenas as descrições — o ícone é escolhido automaticamente pelo
+            sistema. Reaproveita as que já existem (não duplica). Confirme a lista antes de executar.
+            """)
+    public String registrarCategorias(
+            @ToolParam(description = "Descrições das categorias. Ex: [\"Alimentação\",\"Mercado\",\"Combustível\"]")
+            List<String> descricoes) {
+        if (descricoes == null || descricoes.isEmpty()) return "Nenhuma categoria informada.";
+        log.info("[CHAT-AUDIT] user={} tool=registrarCategorias qtd={}",
+                securityCtx.getUsuarioId(), descricoes.size());
+        auditoria.registrar("registrarCategorias", "qtd=" + descricoes.size());
+
+        Set<String> existentes = categoriaService.listar(PageRequest.of(0, 500, Sort.by("descricao")))
+                .getContent().stream()
+                .map(c -> c.descricao() == null ? "" : c.descricao().strip().toLowerCase())
+                .collect(Collectors.toSet());
+
+        int criadas = 0, jaExistiam = 0, falhas = 0;
+        List<String> erros = new ArrayList<>();
+        for (String raw : descricoes) {
+            if (raw == null || raw.isBlank()) continue;
+            String descricao = raw.strip();
+            if (existentes.contains(descricao.toLowerCase())) { jaExistiam++; continue; }
+            try {
+                categoriaService.criar(new CategoriaRequestDto(descricao, iconePara(descricao)));
+                existentes.add(descricao.toLowerCase());
+                criadas++;
+            } catch (Exception e) {
+                falhas++; erros.add(descricao + " (" + e.getMessage() + ")");
+            }
+        }
+        StringBuilder sb = new StringBuilder(criadas + " categoria(s) criada(s)");
+        if (jaExistiam > 0) sb.append(", ").append(jaExistiam).append(" já existia(m)");
+        if (falhas > 0) sb.append(", ").append(falhas).append(" com erro: ").append(String.join("; ", erros));
+        return sb.append(".").toString();
+    }
+
+    /** Item de parceiro para cadastro em lote. */
+    public record NovoParceiro(
+            @ToolParam(description = "Razão social ou nome do parceiro") String razaoSocial,
+            @ToolParam(description = "CPF ou CNPJ (opcional, mas se informado deve ser válido)") String cpfCnpj,
+            @ToolParam(description = "Tipo: CLIENTE, FORNECEDOR ou AMBOS (padrão FORNECEDOR)") String tipo,
+            @ToolParam(description = "Nome fantasia (opcional)") String nomeFantasia) {}
+
+    @Tool(description = """
+            Cadastra VÁRIOS parceiros (fornecedores/clientes) de uma só vez (em lote). Use SEMPRE que
+            o usuário pedir mais de um. CPF/CNPJ é opcional, mas se informado deve ser válido e único.
+            tipo padrão é FORNECEDOR. Confirme a lista com o usuário antes de executar.
+            """)
+    public String registrarParceiros(
+            @ToolParam(description = "Lista de parceiros a cadastrar") List<NovoParceiro> parceiros) {
+        if (parceiros == null || parceiros.isEmpty()) return "Nenhum parceiro informado.";
+        log.info("[CHAT-AUDIT] user={} tool=registrarParceiros qtd={}",
+                securityCtx.getUsuarioId(), parceiros.size());
+        auditoria.registrar("registrarParceiros", "qtd=" + parceiros.size());
+
+        int criados = 0, falhas = 0;
+        List<String> erros = new ArrayList<>();
+        for (NovoParceiro p : parceiros) {
+            if (p == null || p.razaoSocial() == null || p.razaoSocial().isBlank()) continue;
+            TipoParceiro tipo;
+            try {
+                tipo = (p.tipo() == null || p.tipo().isBlank())
+                        ? TipoParceiro.FORNECEDOR : TipoParceiro.valueOf(p.tipo().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                tipo = TipoParceiro.FORNECEDOR;
+            }
+            try {
+                ParceiroRequestDto dto = new ParceiroRequestDto(
+                        p.razaoSocial().strip(), p.nomeFantasia(), p.cpfCnpj(), tipo,
+                        null, null, null, null, null, null, null, null, null);
+                parceiroService.criar(dto);
+                criados++;
+            } catch (Exception e) {
+                falhas++; erros.add(p.razaoSocial() + " (" + e.getMessage() + ")");
+            }
+        }
+        StringBuilder sb = new StringBuilder(criados + " parceiro(s) criado(s)");
+        if (falhas > 0) sb.append(", ").append(falhas).append(" com erro: ").append(String.join("; ", erros));
+        return sb.append(".").toString();
+    }
+
+    /**
+     * Escolhe um ícone (Lucide) adequado à descrição da categoria. Os nomes correspondem ao
+     * conjunto suportado pelo frontend (IconDropdown). Padrão: "Receipt" (conta/boleto genérico).
+     */
+    private static String iconePara(String descricao) {
+        String d = Normalizer.normalize(descricao, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
+        if (d.contains("aliment") || d.contains("restaurante") || d.contains("comida")) return "Utensils";
+        if (d.contains("mercado") || d.contains("supermerc")) return "ShoppingCart";
+        if (d.contains("combust") || d.contains("gasolin") || d.contains("posto")) return "Fuel";
+        if (d.contains("estacion")) return "CarFront";
+        if (d.contains("transporte") || d.contains("uber") || d.contains("99") || d.contains("app")) return "Car";
+        if (d.contains("condomin")) return "Building2";
+        if (d.contains("agua")) return "Home";
+        if (d.contains("energia") || d.contains("luz") || d.contains("eletric")) return "Zap";
+        if (d.contains("gas")) return "Flame";
+        if (d.contains("iptu")) return "Home";
+        if (d.contains("aluguel") || d.contains("locac")) return "Key";
+        if (d.contains("farmac") || d.contains("remedi")) return "Pill";
+        if (d.contains("saude") || d.contains("medic") || d.contains("hospital")) return "Stethoscope";
+        if (d.contains("internet") || d.contains("wifi") || d.contains("banda larga")) return "Wifi";
+        if (d.contains("celular") || d.contains("telefone") || d.contains("movel")) return "Smartphone";
+        if (d.contains("streaming") || d.contains("netflix") || d.contains("tv")) return "Tv";
+        if (d.contains("seguro")) return "Briefcase";
+        if (d.contains("emprest") || d.contains("financiamento")) return "Banknote";
+        if (d.contains("ipva")) return "Car";
+        if (d.contains("investiment") || d.contains("aplicac")) return "TrendingUp";
+        if (d.contains("papelaria") || d.contains("livro")) return "BookOpen";
+        if (d.contains("vestuario") || d.contains("roupa") || d.contains("calcado")) return "Shirt";
+        if (d.contains("viagem") || d.contains("hotel") || d.contains("passagem")) return "Plane";
+        if (d.contains("educac") || d.contains("escola") || d.contains("curso") || d.contains("faculdade")) return "GraduationCap";
+        if (d.contains("lazer") || d.contains("jogo") || d.contains("entreten")) return "Gamepad2";
+        if (d.contains("cafe")) return "Coffee";
+        if (d.contains("academia") || d.contains("treino")) return "Dumbbell";
+        if (d.contains("pet") || d.contains("cachorro") || d.contains("animal")) return "Dog";
+        if (d.contains("presente") || d.contains("gift")) return "Gift";
+        if (d.contains("salario") || d.contains("renda") || d.contains("receita")) return "DollarSign";
+        return "Receipt";
     }
 }
