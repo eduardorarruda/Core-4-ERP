@@ -54,6 +54,7 @@ public class ChatService {
     private final GestaoFinanceiraTools gestaoFinanceiraTools;
     private final ChatMetrics chatMetrics;
     private final ChatMemoryService memoryService;
+    private final RagService ragService;
     private final ObjectMapper objectMapper;
     private final int maxHistorico;
 
@@ -84,6 +85,7 @@ public class ChatService {
                        GestaoFinanceiraTools gestaoFinanceiraTools,
                        ChatMetrics chatMetrics,
                        ChatMemoryService memoryService,
+                       RagService ragService,
                        ObjectMapper objectMapper,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
         this.chatClient = chatClientBuilder.build();
@@ -97,8 +99,15 @@ public class ChatService {
         this.gestaoFinanceiraTools = gestaoFinanceiraTools;
         this.chatMetrics = chatMetrics;
         this.memoryService = memoryService;
+        this.ragService = ragService;
         this.objectMapper = objectMapper;
         this.maxHistorico = maxHistorico;
+    }
+
+    /** Anexa ao system prompt o material de referência (RAG) relevante à pergunta, se houver. */
+    private String comContextoRag(String systemPrompt, String pergunta) {
+        String rag = ragService.recuperarContexto(pergunta);
+        return rag.isBlank() ? systemPrompt : systemPrompt + "\n\n" + rag;
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
@@ -110,7 +119,7 @@ public class ChatService {
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
-        List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
+        List<Message> allMessages = montarMensagens(usuarioId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
         memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
         try {
@@ -148,7 +157,7 @@ public class ChatService {
         Long usuarioId = securityCtx.getUsuarioId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
-        List<Message> allMessages = montarMensagens(usuarioId, systemPrompt, mensagemUsuario);
+        List<Message> allMessages = montarMensagens(usuarioId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
         memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
 
         SecurityContext securityContext = SecurityContextHolder.getContext();

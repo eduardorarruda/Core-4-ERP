@@ -59,6 +59,8 @@ dependencies {
 	// Spring AI
 	implementation platform('org.springframework.ai:spring-ai-bom:1.1.8')
 	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	// RAG — banco vetorial Qdrant (embeddings de documentos/descrições)
+	implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
 
 	// Email
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
