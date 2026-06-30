@@ -2,9 +2,11 @@ package br.com.core4erp.chat.controller;
 
 import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
+import br.com.core4erp.chat.service.ChatAnexoService;
 import br.com.core4erp.chat.service.ChatService;
 import br.com.core4erp.chat.tools.relatorio.RelatorioExcelService;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,13 +26,16 @@ import java.nio.charset.StandardCharsets;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ChatAnexoService chatAnexoService;
     private final RelatorioExcelService relatorioService;
     private final SecurityContextUtils securityCtx;
 
     public ChatController(ChatService chatService,
+                          ChatAnexoService chatAnexoService,
                           RelatorioExcelService relatorioService,
                           SecurityContextUtils securityCtx) {
         this.chatService = chatService;
+        this.chatAnexoService = chatAnexoService;
         this.relatorioService = relatorioService;
         this.securityCtx = securityCtx;
     }
@@ -40,6 +45,12 @@ public class ChatController {
     public ResponseEntity<ChatResponseDto> enviarMensagem(
             @Valid @RequestBody ChatRequestDto request) {
         return ResponseEntity.ok(chatService.processar(request));
+    }
+
+    @Operation(summary = "Enviar arquivo (planilha/OFX) para a IA analisar e processar")
+    @PostMapping(value = "/anexo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ChatResponseDto> enviarAnexo(@RequestParam("arquivo") MultipartFile arquivo) {
+        return ResponseEntity.ok(chatAnexoService.processarAnexo(arquivo));
     }
 
     @Operation(summary = "Streaming SSE do assistente de IA")

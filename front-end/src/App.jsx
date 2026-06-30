@@ -29,6 +29,7 @@ const Assinaturas     = lazy(() => import('./views/Assinaturas'));
 const Calendario      = lazy(() => import('./views/Calendario'));
 const Categorias      = lazy(() => import('./views/Categorias'));
 const Reports         = lazy(() => import('./views/Reports'));
+const Assistente      = lazy(() => import('./views/Assistente'));
 const Audit           = lazy(() => import('./views/Audit'));
 const Parceiros       = lazy(() => import('./views/Parceiros'));
 const ContasCorrentes = lazy(() => import('./views/ContasCorrentes'));
@@ -210,6 +211,7 @@ export default function App() {
             <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
             <Route path="/calendario"       element={<ProtectedLayout><PermissaoRoute permissao="CALENDARIO_VISUALIZAR"><Calendario /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
+            <Route path="/assistente"       element={<ProtectedLayout><Assistente /></ProtectedLayout>} />
             <Route path="/audit"            element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
             <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
             <Route path="/categorias"       element={<ProtectedLayout><PermissaoRoute permissao="CATEGORIA_VISUALIZAR"><Categorias /></PermissaoRoute></ProtectedLayout>} />

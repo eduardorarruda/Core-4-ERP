@@ -62,7 +62,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private boolean isChatAiCall(HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) return false;
         String path = request.getServletPath();
-        return path.equals("/api/chat") || path.equals("/api/chat/stream");
+        return path.equals("/api/chat") || path.equals("/api/chat/stream") || path.equals("/api/chat/anexo");
     }
 
     @Override

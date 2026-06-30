@@ -328,6 +328,12 @@ export const chat = {
     request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }),
   limparHistorico: () =>
     request('/api/chat/historico', { method: 'DELETE' }),
+  // Envia um arquivo (planilha/OFX) para a IA analisar e processar. Retorna ChatResponseDto.
+  enviarAnexo: (arquivo) => {
+    const fd = new FormData();
+    fd.append('arquivo', arquivo);
+    return request('/api/chat/anexo', { method: 'POST', body: fd, timeout: 120000 });
+  },
 };
 
 // ── Conciliação Bancária ──────────────────────────────────────────────────────
