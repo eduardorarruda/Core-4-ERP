@@ -51,8 +51,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return !path.equals("/api/auth/login")
                 && !path.equals("/api/auth/registrar")
-                && !path.startsWith("/api/chat")
+                && !isChatAiCall(request)
                 && !path.equals("/api/conciliacao/upload");
+    }
+
+    /**
+     * Só as chamadas de IA (caras) contam no rate limit do chat — NÃO o clear de histórico
+     * (DELETE /api/chat/historico) nem o download de relatório (GET /api/chat/relatorios/...).
+     */
+    private boolean isChatAiCall(HttpServletRequest request) {
+        if (!"POST".equalsIgnoreCase(request.getMethod())) return false;
+        String path = request.getServletPath();
+        return path.equals("/api/chat") || path.equals("/api/chat/stream");
     }
 
     @Override
@@ -60,7 +70,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String ip = resolveClientIp(request);
         String path = request.getServletPath();
-        boolean isChat = path.startsWith("/api/chat");
+        boolean isChat = isChatAiCall(request);
         boolean isUpload = path.equals("/api/conciliacao/upload");
         Bucket bucket = isChat ? resolveChatBucket(resolveChatKey(request, ip))
                 : isUpload ? resolveUploadBucket(ip)
