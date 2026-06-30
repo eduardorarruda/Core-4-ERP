@@ -6,6 +6,7 @@ import br.com.core4erp.assinatura.entity.Assinatura;
 import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
@@ -52,6 +53,7 @@ public class AssinaturaService {
         return AssinaturaResponseDto.from(findOwned(id));
     }
 
+    @Requer("ASSINATURA_CRIAR")
     @Transactional
     public AssinaturaResponseDto criar(AssinaturaRequestDto dto) {
         Long eid = tenantCtx.getEmpresaId();
@@ -74,6 +76,7 @@ public class AssinaturaService {
         return AssinaturaResponseDto.from(assinaturaRepository.save(assinatura));
     }
 
+    @Requer("ASSINATURA_EDITAR")
     @Transactional
     public AssinaturaResponseDto atualizar(Long id, AssinaturaRequestDto dto) {
         Long eid = tenantCtx.getEmpresaId();
@@ -99,6 +102,7 @@ public class AssinaturaService {
         return AssinaturaResponseDto.from(assinaturaRepository.save(assinatura));
     }
 
+    @Requer("ASSINATURA_DELETAR")
     @Transactional
     public void deletar(Long id) {
         assinaturaRepository.delete(findOwned(id));
