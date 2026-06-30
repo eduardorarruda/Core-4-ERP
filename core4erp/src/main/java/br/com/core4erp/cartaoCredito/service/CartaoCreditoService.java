@@ -265,6 +265,7 @@ public class CartaoCreditoService {
 
     // ── Fechamento de fatura ──────────────────────────────────────────────────
 
+    @Requer("CARTAO_FECHAR_FATURA")
     @Transactional
     public ContaResponseDto fecharFatura(Long cartaoId, FechamentoFaturaRequestDto dto) {
         CartaoCredito cartao = findOwnedCartao(cartaoId);

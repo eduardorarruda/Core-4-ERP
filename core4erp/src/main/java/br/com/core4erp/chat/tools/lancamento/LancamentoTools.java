@@ -10,6 +10,7 @@ import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.dto.TransferenciaRequestDto;
 import br.com.core4erp.contaCorrente.dto.TransferenciaResponseDto;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
+import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoRequestDto;
@@ -21,6 +22,7 @@ import br.com.core4erp.config.tenant.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -195,5 +197,76 @@ public class LancamentoTools {
                 contaCorrenteOrigemId
         );
         return investimentoService.registrarTransacao(contaInvestimentoId, dto);
+    }
+
+    // ── Conta a pagar / receber (consultar, editar, excluir, estornar) ─────────
+
+    @Tool(description = """
+            Lista contas a pagar/receber, com o ID de cada uma. Filtre por tipo (PAGAR ou RECEBER)
+            e/ou status (PENDENTE, PAGO, RECEBIDO, ATRASADO). Use para obter o ID antes de editar,
+            excluir ou estornar uma conta.
+            """)
+    public List<ContaResponseDto> consultarContas(
+            @ToolParam(description = "Tipo: PAGAR ou RECEBER (opcional)") String tipo,
+            @ToolParam(description = "Status: PENDENTE, PAGO, RECEBIDO, ATRASADO (opcional)") String status) {
+        TipoConta t = parseTipo(tipo);
+        StatusConta s = parseStatus(status);
+        return contaService.listarComFiltros(t, s, null, null, null, null, null, null, null,
+                PageRequest.of(0, 100)).getContent();
+    }
+
+    @Tool(description = """
+            Edita uma conta a pagar/receber (pelo ID, obtido em consultarContas). Informe só o que
+            mudar. BLOQUEADO se a conta já estiver baixada (PAGO/RECEBIDO) — nesse caso, estorne
+            antes. Confirme antes de executar.
+            """)
+    public ContaResponseDto atualizarConta(
+            @ToolParam(description = "ID da conta (de consultarContas)") Long contaId,
+            @ToolParam(description = "Nova descrição (opcional)") String descricao,
+            @ToolParam(description = "Novo valor (opcional)") BigDecimal valor,
+            @ToolParam(description = "Nova data de vencimento YYYY-MM-DD (opcional)") LocalDate dataVencimento) {
+        tenantCtx.exigirPermissao("CONTA_EDITAR");
+        auditoria.registrar("atualizarConta", "id=" + contaId);
+        ContaResponseDto atual = contaService.buscarPorId(contaId);
+        ContaCreateDto dto = new ContaCreateDto(
+                descricao != null ? descricao : atual.descricao(),
+                valor != null ? valor : atual.valorOriginal(),
+                dataVencimento != null ? dataVencimento : atual.dataVencimento(),
+                atual.tipo(), atual.categoriaId(), atual.parceiroId(),
+                1, 1, false, atual.numeroDocumento(), atual.acrescimo(), atual.desconto());
+        return contaService.atualizar(contaId, dto);
+    }
+
+    @Tool(description = """
+            Exclui uma conta a pagar/receber (pelo ID de consultarContas). BLOQUEADO se já estiver
+            baixada. Confirme antes de executar.
+            """)
+    public String excluirConta(@ToolParam(description = "ID da conta a excluir") Long contaId) {
+        tenantCtx.exigirPermissao("CONTA_DELETAR");
+        auditoria.registrar("excluirConta", "id=" + contaId);
+        contaService.deletar(contaId);
+        return "Conta excluída com sucesso.";
+    }
+
+    @Tool(description = """
+            Estorna a baixa de uma conta (desfaz o pagamento/recebimento, revertendo o saldo da conta
+            corrente). A conta volta para PENDENTE. Use o ID de consultarContas. Confirme antes.
+            """)
+    public ContaResponseDto estornarConta(@ToolParam(description = "ID da conta a estornar") Long contaId) {
+        tenantCtx.exigirPermissao("CONTA_ESTORNAR");
+        auditoria.registrar("estornarConta", "id=" + contaId);
+        return contaService.estornar(contaId);
+    }
+
+    private TipoConta parseTipo(String tipo) {
+        if (tipo == null || tipo.isBlank()) return null;
+        try { return TipoConta.valueOf(tipo.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
+    }
+
+    private StatusConta parseStatus(String status) {
+        if (status == null || status.isBlank()) return null;
+        try { return StatusConta.valueOf(status.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
     }
 }

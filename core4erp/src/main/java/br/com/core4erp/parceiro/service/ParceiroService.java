@@ -69,6 +69,7 @@ public class ParceiroService {
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
     }
 
+    @Requer("PARCEIRO_EDITAR")
     @Transactional
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
@@ -83,6 +84,7 @@ public class ParceiroService {
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
     }
 
+    @Requer("PARCEIRO_DELETAR")
     @Transactional
     public void deletar(Long id) {
         parceiroRepository.delete(findOwned(id));

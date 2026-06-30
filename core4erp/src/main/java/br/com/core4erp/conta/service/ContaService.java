@@ -8,6 +8,7 @@ import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
+import br.com.core4erp.conta.dto.GastoContaCorrenteDto;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.entity.ContaBaixada;
 import br.com.core4erp.conta.repository.ContaBaixadaRepository;
@@ -107,6 +108,16 @@ public class ContaService {
     @Transactional(readOnly = true)
     public ContaResponseDto buscarPorId(Long id) {
         return ContaResponseDto.from(findOwned(id));
+    }
+
+    /** Total pago por conta corrente (saídas), do maior para o menor — para a IA. */
+    @Transactional(readOnly = true)
+    public List<GastoContaCorrenteDto> gastoPorContaCorrente() {
+        return baixadaRepository.gastoPorContaCorrente(tenantCtx.getEmpresaId()).stream()
+                .map(r -> new GastoContaCorrenteDto(
+                        (String) r[0],
+                        r[1] instanceof BigDecimal bd ? bd : new BigDecimal(r[1].toString())))
+                .toList();
     }
 
     /**

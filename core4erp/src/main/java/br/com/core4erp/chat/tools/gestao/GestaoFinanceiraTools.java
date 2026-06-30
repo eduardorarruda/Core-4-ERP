@@ -5,17 +5,25 @@ import br.com.core4erp.assinatura.dto.AssinaturaResponseDto;
 import br.com.core4erp.assinatura.service.AssinaturaService;
 import br.com.core4erp.cartaoCredito.dto.CartaoCreditoRequestDto;
 import br.com.core4erp.cartaoCredito.dto.CartaoCreditoResponseDto;
+import br.com.core4erp.cartaoCredito.dto.CartaoDashboardResumoDto;
+import br.com.core4erp.cartaoCredito.dto.FechamentoFaturaRequestDto;
 import br.com.core4erp.cartaoCredito.dto.LancamentoRequestDto;
 import br.com.core4erp.cartaoCredito.dto.LancamentoResponseDto;
 import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
+import br.com.core4erp.categoria.dto.CategoriaRequestDto;
 import br.com.core4erp.categoria.dto.CategoriaResponseDto;
 import br.com.core4erp.categoria.service.CategoriaService;
 import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.conta.dto.ContaResponseDto;
+import br.com.core4erp.conta.dto.GastoContaCorrenteDto;
+import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteRequestDto;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteResponseDto;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
+import br.com.core4erp.enums.TipoParceiro;
+import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.service.ParceiroService;
 import jakarta.persistence.EntityNotFoundException;
@@ -51,6 +59,7 @@ public class GestaoFinanceiraTools {
     private final AssinaturaService assinaturaService;
     private final CategoriaService categoriaService;
     private final ParceiroService parceiroService;
+    private final ContaService contaService;
     private final SecurityContextUtils securityCtx;
     private final ChatAuditoriaService auditoria;
 
@@ -59,6 +68,7 @@ public class GestaoFinanceiraTools {
                                  AssinaturaService assinaturaService,
                                  CategoriaService categoriaService,
                                  ParceiroService parceiroService,
+                                 ContaService contaService,
                                  SecurityContextUtils securityCtx,
                                  ChatAuditoriaService auditoria) {
         this.contaCorrenteService = contaCorrenteService;
@@ -66,6 +76,7 @@ public class GestaoFinanceiraTools {
         this.assinaturaService = assinaturaService;
         this.categoriaService = categoriaService;
         this.parceiroService = parceiroService;
+        this.contaService = contaService;
         this.securityCtx = securityCtx;
         this.auditoria = auditoria;
     }
@@ -291,6 +302,116 @@ public class GestaoFinanceiraTools {
         return "Assinatura '" + alvo.descricao() + "' excluída com sucesso.";
     }
 
+    // ── Fechamento de fatura ──────────────────────────────────────────────────
+
+    @Tool(description = """
+            Fecha a fatura de um cartão para um mês/ano. Gera uma conta a pagar com o total líquido
+            (SAÍDAS − ENTRADAS). Não fecha se o total for zero/negativo ou se já estiver fechada.
+            Use o NOME do cartão. Confirme com o usuário antes de executar.
+            """)
+    public ContaResponseDto fecharFatura(
+            @ToolParam(description = "Nome do cartão") String cartao,
+            @ToolParam(description = "Mês da fatura (1 a 12)") Integer mes,
+            @ToolParam(description = "Ano da fatura. Ex: 2026") Integer ano) {
+        Long cartaoId = acharCartao(cartao).id();
+        audit("fecharFatura", "cartaoId=" + cartaoId + " mes=" + mes + " ano=" + ano);
+        return cartaoCreditoService.fecharFatura(cartaoId, new FechamentoFaturaRequestDto(mes, ano));
+    }
+
+    // ── Métricas / análises ───────────────────────────────────────────────────
+
+    @Tool(description = """
+            Métricas de gastos no cartão de crédito, agrupadas por categoria no período (total gasto
+            por categoria/mês). Se omitir o período, usa os últimos 3 meses. Útil para responder
+            'quanto gastei no cartão' e 'onde gastei mais no cartão'.
+            """)
+    public List<CartaoDashboardResumoDto> consultarGastosCartao(
+            @ToolParam(description = "Mês de início (opcional)") Integer mesInicio,
+            @ToolParam(description = "Ano de início (opcional)") Integer anoInicio,
+            @ToolParam(description = "Mês de fim (opcional)") Integer mesFim,
+            @ToolParam(description = "Ano de fim (opcional)") Integer anoFim) {
+        return cartaoCreditoService.dashboardResumo(mesInicio, anoInicio, mesFim, anoFim);
+    }
+
+    @Tool(description = """
+            Total já pago (saídas) por CONTA CORRENTE, da que mais gastou para a que menos gastou.
+            Use para responder 'qual conta corrente eu mais gasto / gastei'.
+            """)
+    public List<GastoContaCorrenteDto> consultarGastosPorContaCorrente() {
+        return contaService.gastoPorContaCorrente();
+    }
+
+    // ── Categoria (editar/excluir) ────────────────────────────────────────────
+
+    @Tool(description = """
+            Edita uma categoria (pela descrição atual). Pode mudar a descrição e/ou o ícone.
+            Confirme antes de executar.
+            """)
+    public CategoriaResponseDto atualizarCategoria(
+            @ToolParam(description = "Descrição ATUAL da categoria") String categoria,
+            @ToolParam(description = "Nova descrição (opcional)") String novaDescricao,
+            @ToolParam(description = "Novo ícone (opcional)") String icone) {
+        CategoriaResponseDto atual = acharCategoria(categoria);
+        audit("atualizarCategoria", "id=" + atual.id());
+        return categoriaService.atualizar(atual.id(), new CategoriaRequestDto(
+                novaDescricao != null ? novaDescricao : atual.descricao(),
+                icone != null ? icone : atual.icone()));
+    }
+
+    @Tool(description = """
+            Exclui uma categoria (pela descrição). Bloqueado se houver lançamentos/contas usando a
+            categoria. Confirme antes de executar.
+            """)
+    public String excluirCategoria(@ToolParam(description = "Descrição da categoria a excluir") String categoria) {
+        CategoriaResponseDto alvo = acharCategoria(categoria);
+        audit("excluirCategoria", "id=" + alvo.id());
+        categoriaService.deletar(alvo.id());
+        return "Categoria '" + alvo.descricao() + "' excluída com sucesso.";
+    }
+
+    // ── Parceiro (editar/excluir) ─────────────────────────────────────────────
+
+    @Tool(description = """
+            Edita um parceiro (pelo nome/razão social atual). Pode mudar razão social, nome fantasia,
+            tipo (CLIENTE/FORNECEDOR/AMBOS), telefone e e-mail. Confirme antes de executar.
+            """)
+    public ParceiroResponseDto atualizarParceiro(
+            @ToolParam(description = "Razão social/nome ATUAL do parceiro") String parceiro,
+            @ToolParam(description = "Nova razão social (opcional)") String novaRazaoSocial,
+            @ToolParam(description = "Novo nome fantasia (opcional)") String nomeFantasia,
+            @ToolParam(description = "Novo tipo: CLIENTE, FORNECEDOR ou AMBOS (opcional)") String tipo,
+            @ToolParam(description = "Novo telefone (opcional)") String telefone,
+            @ToolParam(description = "Novo e-mail (opcional)") String email) {
+        ParceiroResponseDto a = acharParceiro(parceiro);
+        audit("atualizarParceiro", "id=" + a.id());
+        TipoParceiro tipoEnum = a.tipo();
+        if (tipo != null && !tipo.isBlank()) {
+            try {
+                tipoEnum = TipoParceiro.valueOf(tipo.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Tipo inválido: '" + tipo + "'. Use CLIENTE, FORNECEDOR ou AMBOS.");
+            }
+        }
+        return parceiroService.atualizar(a.id(), new ParceiroRequestDto(
+                novaRazaoSocial != null ? novaRazaoSocial : a.razaoSocial(),
+                nomeFantasia != null ? nomeFantasia : a.nomeFantasia(),
+                a.cpfCnpj(), tipoEnum,
+                a.logradouro(), a.numero(), a.complemento(), a.cep(), a.bairro(), a.municipio(), a.uf(),
+                telefone != null ? telefone : a.telefone(),
+                email != null ? email : a.email()));
+    }
+
+    @Tool(description = """
+            Exclui um parceiro (pelo nome/razão social). Bloqueado se houver lançamentos/contas
+            vinculados a ele. Confirme antes de executar.
+            """)
+    public String excluirParceiro(@ToolParam(description = "Razão social/nome do parceiro a excluir") String parceiro) {
+        ParceiroResponseDto alvo = acharParceiro(parceiro);
+        audit("excluirParceiro", "id=" + alvo.id());
+        parceiroService.deletar(alvo.id());
+        return "Parceiro '" + alvo.razaoSocial() + "' excluído com sucesso.";
+    }
+
     // ── Resolvers por nome ────────────────────────────────────────────────────
 
     private static boolean igual(String a, String b) {
@@ -319,18 +440,26 @@ public class GestaoFinanceiraTools {
         return unico(m, "assinatura", descricao);
     }
 
-    private Long acharCategoriaId(String nome) {
+    private CategoriaResponseDto acharCategoria(String nome) {
         List<CategoriaResponseDto> m = categoriaService.listar(PageRequest.of(0, 500)).getContent().stream()
                 .filter(c -> igual(c.descricao(), nome)).toList();
-        return unico(m, "categoria", nome).id();
+        return unico(m, "categoria", nome);
     }
 
-    /** Parceiro é opcional: null/blank devolve null (sem parceiro). */
-    private Long acharParceiroId(String nome) {
-        if (nome == null || nome.isBlank()) return null;
+    private Long acharCategoriaId(String nome) {
+        return acharCategoria(nome).id();
+    }
+
+    private ParceiroResponseDto acharParceiro(String nome) {
         List<ParceiroResponseDto> m = parceiroService.listar(PageRequest.of(0, 500)).getContent().stream()
                 .filter(p -> igual(p.razaoSocial(), nome) || igual(p.nomeFantasia(), nome)).toList();
-        return unico(m, "parceiro", nome).id();
+        return unico(m, "parceiro", nome);
+    }
+
+    /** Parceiro é opcional em vínculos: null/blank devolve null (sem parceiro). */
+    private Long acharParceiroId(String nome) {
+        if (nome == null || nome.isBlank()) return null;
+        return acharParceiro(nome).id();
     }
 
     /** Cartão opcional (para vínculo): null/blank devolve null. */
