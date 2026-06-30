@@ -43,15 +43,18 @@ public class ChatAnexoService {
 
     private final OfxParserService ofxParserService;
     private final ChatService chatService;
+    private final RagService ragService;
     private final int maxChars;
     private final String n8nWebhookUrl;
 
     public ChatAnexoService(OfxParserService ofxParserService,
                             ChatService chatService,
+                            RagService ragService,
                             @Value("${chat.anexo.max-chars:3000}") int maxChars,
                             @Value("${chat.n8n.webhook-url:}") String n8nWebhookUrl) {
         this.ofxParserService = ofxParserService;
         this.chatService = chatService;
+        this.ragService = ragService;
         this.maxChars = maxChars;
         this.n8nWebhookUrl = n8nWebhookUrl;
     }
@@ -105,6 +108,15 @@ public class ChatAnexoService {
 
         log.info("[CHAT-ANEXO] processando '{}' ({}), {} chars{}", nome, ext, conteudo.length(),
                 truncado ? " (truncado)" : "");
+
+        // RAG: indexa o conteúdo do arquivo para que o usuário possa fazer perguntas sobre ele
+        // depois (busca semântica). Não-fatal — falha aqui não impede o processamento principal.
+        try {
+            ragService.indexar(conteudo, "anexo", nome);
+        } catch (Exception e) {
+            log.warn("[CHAT-ANEXO] falha ao indexar '{}' no RAG (seguindo): {}", nome, e.getMessage());
+        }
+
         return chatService.processar(new ChatRequestDto(mensagem));
     }
 
