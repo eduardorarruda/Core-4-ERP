@@ -10,6 +10,7 @@ import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
 import br.com.core4erp.chat.tools.relatorio.RelatorioTools;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
@@ -148,13 +149,18 @@ public class ChatService {
 
         SecurityContext securityContext = SecurityContextHolder.getContext();
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        // Captura o estado do tenant (empresa/permissões) da thread da requisição, onde ele está
+        // populado. A requisição HTTP encerra antes do streaming, então não dá para depender do
+        // escopo de requisição — guardamos a referência do estado e restauramos abaixo.
+        TenantContext.State tenantState = TenantContext.currentState();
 
         streamExecutor.submit(() -> {
             try {
-                // Restaura o contexto na thread que assina o fluxo. Com
-                // spring.reactor.context-propagation=auto (ver ChatAiConfig), o SecurityContext
-                // é capturado daqui e restaurado nas threads do Reactor onde as tools executam.
+                // Restaura os contextos na thread que assina o fluxo. Com
+                // spring.reactor.context-propagation=auto (ver ChatAiConfig), eles são capturados
+                // daqui e restaurados nas threads do Reactor onde as tools executam.
                 SecurityContextHolder.setContext(securityContext);
+                TenantContext.restoreState(tenantState);
                 if (requestAttributes != null) {
                     RequestContextHolder.setRequestAttributes(requestAttributes, true);
                 }
@@ -211,6 +217,7 @@ public class ChatService {
                 chatMetrics.decrementarSessoes();
                 RelatorioDownloadHolder.clear(usuarioId);
                 RequestContextHolder.resetRequestAttributes();
+                TenantContext.removeState();
                 SecurityContextHolder.clearContext();
             }
         });
