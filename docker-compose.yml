@@ -35,6 +35,8 @@ services:
       # Ingestão RAG via n8n (pré-processamento do anexo). Aponta para o serviço n8n interno;
       # se o n8n estiver fora, o backend faz fallback e indexa o conteúdo original (best-effort).
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/rag-ingest}
+      # Eventos de domínio (cada ação da IA) → workflow 'evento' no n8n (fora do caminho crítico).
+      N8N_EVENTOS_WEBHOOK_URL: ${N8N_EVENTOS_WEBHOOK_URL:-http://n8n:5678/webhook/evento}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
