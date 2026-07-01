@@ -4,6 +4,8 @@ import br.com.core4erp.exception.AcessoNegadoException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.ai.retry.TransientAiException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
@@ -167,6 +169,21 @@ public class GlobalExceptionHandler {
                 "O assistente está temporariamente indisponível. Tente novamente em instantes.",
                 LocalDateTime.now()
         ));
+    }
+
+    // Erros da OpenAI/Spring AI (ex.: 429 limite de tokens/min, indisponibilidade) → 503 amigável,
+    // nunca 500 genérico (CLAUDE.md §21). Detecta rate limit para orientar o usuário a aguardar.
+    @ExceptionHandler({NonTransientAiException.class, TransientAiException.class})
+    public ResponseEntity<ErrorResponseDto> handleAi(Exception e) {
+        String m = e.getMessage() != null ? e.getMessage() : "";
+        boolean rate = m.contains("429") || m.contains("rate_limit") || m.contains("Rate limit");
+        log.error("[ERRO_IA] {} — rate={} — {}", e.getClass().getSimpleName(), rate,
+                m.length() > 300 ? m.substring(0, 300) : m);
+        String msg = rate
+                ? "O assistente recebeu muitas solicitações em pouco tempo. Aguarde alguns segundos e tente novamente."
+                : "O assistente está temporariamente indisponível. Tente novamente em instantes.";
+        return ResponseEntity.status(503).body(new ErrorResponseDto(
+                "ERRO_SERVICO_EXTERNO", msg, LocalDateTime.now()));
     }
 
     @ExceptionHandler(Exception.class)
