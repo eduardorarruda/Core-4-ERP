@@ -29,6 +29,13 @@ public class ChatMemoryService {
      */
     private static final Duration GAP_NOVA_CONVERSA = Duration.ofMinutes(30);
 
+    /**
+     * Teto de tamanho (caracteres) do histórico carregado como contexto. Mesmo dentro da janela de
+     * 30 min, mensagens muito grandes (ex.: um anexo antigo) inflavam o prompt e estouravam o limite
+     * de tokens/min da OpenAI (429). Mantemos as mensagens MAIS RECENTES até este teto.
+     */
+    private static final int MAX_CONTEXTO_CHARS = 8_000;
+
     private final ChatMensagemRepository repository;
 
     public ChatMemoryService(ChatMensagemRepository repository) {
@@ -85,7 +92,17 @@ public class ChatMemoryService {
         for (int i = corte - 1; i >= 0; i--) {
             ordenado.add(recentes.get(i));
         }
-        return ordenado;
+
+        // Limita o tamanho total: mantém só as mensagens mais recentes até MAX_CONTEXTO_CHARS
+        // (evita que uma mensagem antiga enorme estoure o limite de tokens/min da OpenAI).
+        int total = 0;
+        int inicio = 0;
+        for (int i = ordenado.size() - 1; i >= 0; i--) {
+            String c = ordenado.get(i).getConteudo();
+            total += c != null ? c.length() : 0;
+            if (total > MAX_CONTEXTO_CHARS) { inicio = i + 1; break; }
+        }
+        return inicio == 0 ? ordenado : new ArrayList<>(ordenado.subList(inicio, ordenado.size()));
     }
 
     @Transactional
