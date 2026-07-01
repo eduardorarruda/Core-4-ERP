@@ -18,7 +18,7 @@ class SystemPromptBuilderTest {
 
         String prompt = builder.build(usuario);
 
-        assertTrue(prompt.contains("C4 Assistant"));
+        assertTrue(prompt.contains("Áurea"));
         assertTrue(prompt.contains("Maria Silva"));
         assertTrue(prompt.contains("maria@core4erp.com"));
         assertTrue(prompt.contains("BRL"));

@@ -15,6 +15,7 @@ import br.com.core4erp.contaCorrente.entity.Transferencia;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
 import br.com.core4erp.contaCorrente.repository.TransferenciaRepository;
 import br.com.core4erp.exception.BusinessException;
+import br.com.core4erp.utils.DtoValidator;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,7 @@ public class ContaCorrenteService {
     private final CartaoCreditoRepository cartaoCreditoRepository;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public ContaCorrenteService(ContaCorrenteRepository repository,
                                 TransferenciaRepository transferenciaRepository,
@@ -40,7 +42,8 @@ public class ContaCorrenteService {
                                 ConciliacaoRepository conciliacaoRepository,
                                 CartaoCreditoRepository cartaoCreditoRepository,
                                 SecurityContextUtils securityCtx,
-                                TenantContext tenantCtx) {
+                                TenantContext tenantCtx,
+                                DtoValidator dtoValidator) {
         this.repository = repository;
         this.transferenciaRepository = transferenciaRepository;
         this.contaBaixadaRepository = contaBaixadaRepository;
@@ -48,6 +51,7 @@ public class ContaCorrenteService {
         this.cartaoCreditoRepository = cartaoCreditoRepository;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Transactional(readOnly = true)
@@ -64,6 +68,7 @@ public class ContaCorrenteService {
     @Requer("CONTA_CORRENTE_CRIAR")
     @Transactional
     public ContaCorrenteResponseDto criar(ContaCorrenteRequestDto dto) {
+        dtoValidator.validar(dto);
         Long empresaId = tenantCtx.getEmpresaId();
         if (repository.existsByNumeroContaAndEmpresaId(dto.numeroConta(), empresaId)) {
             throw new IllegalArgumentException("Número de conta já cadastrado");
@@ -79,6 +84,7 @@ public class ContaCorrenteService {
     @Requer("CONTA_CORRENTE_EDITAR")
     @Transactional
     public ContaCorrenteResponseDto atualizar(Long id, ContaCorrenteRequestDto dto) {
+        dtoValidator.validar(dto);
         ContaCorrente conta = findOwned(id);
         // S.2: o saldo é um campo calculado (soma de lançamentos/transferências/baixas) e
         // NUNCA deve ser sobrescrito por um update direto. preencherCampos não toca no saldo.

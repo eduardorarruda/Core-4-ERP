@@ -10,6 +10,7 @@ import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
+import br.com.core4erp.utils.DtoValidator;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,19 +26,22 @@ public class AssinaturaService {
     private final CartaoCreditoRepository cartaoCreditoRepository;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public AssinaturaService(AssinaturaRepository assinaturaRepository,
                              CategoriaRepository categoriaRepository,
                              ParceiroRepository parceiroRepository,
                              CartaoCreditoRepository cartaoCreditoRepository,
                              SecurityContextUtils securityCtx,
-                             TenantContext tenantCtx) {
+                             TenantContext tenantCtx,
+                             DtoValidator dtoValidator) {
         this.assinaturaRepository = assinaturaRepository;
         this.categoriaRepository = categoriaRepository;
         this.parceiroRepository = parceiroRepository;
         this.cartaoCreditoRepository = cartaoCreditoRepository;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Transactional(readOnly = true)
@@ -56,6 +60,7 @@ public class AssinaturaService {
     @Requer("ASSINATURA_CRIAR")
     @Transactional
     public AssinaturaResponseDto criar(AssinaturaRequestDto dto) {
+        dtoValidator.validar(dto);
         Long eid = tenantCtx.getEmpresaId();
         Assinatura assinatura = new Assinatura();
         assinatura.setDescricao(dto.descricao());
@@ -79,6 +84,7 @@ public class AssinaturaService {
     @Requer("ASSINATURA_EDITAR")
     @Transactional
     public AssinaturaResponseDto atualizar(Long id, AssinaturaRequestDto dto) {
+        dtoValidator.validar(dto);
         Long eid = tenantCtx.getEmpresaId();
         Assinatura assinatura = findOwned(id);
         assinatura.setDescricao(dto.descricao());

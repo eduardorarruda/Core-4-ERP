@@ -326,6 +326,9 @@ export const dashboard = {
 export const chat = {
   enviar: (mensagem) =>
     request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }),
+  // Conversa atual (mesmo histórico que a IA usa) — para a tela e o balão mostrarem o mesmo.
+  historico: () =>
+    request('/api/chat/historico', { method: 'GET' }),
   limparHistorico: () =>
     request('/api/chat/historico', { method: 'DELETE' }),
   // Envia um arquivo (planilha/OFX/PDF) + a instrução do usuário para a IA processar. Retorna ChatResponseDto.

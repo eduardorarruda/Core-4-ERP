@@ -14,7 +14,7 @@ const NAV_GROUPS = [
     label: 'Principal',
     items: [
       { id: 'dashboard',  icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard' },
-      { id: 'assistente', icon: Sparkles,        label: 'Assistente IA',    path: '/assistente' },
+      { id: 'assistente', icon: Sparkles,        label: 'Áurea',            path: '/assistente' },
     ],
   },
   {

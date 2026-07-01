@@ -42,6 +42,21 @@ public class ChatMemoryService {
      */
     @Transactional(readOnly = true)
     public List<Message> carregar(Long usuarioId, int maxMensagens) {
+        return conversaAtual(usuarioId, maxMensagens).stream()
+                .map(m -> m.getRole() == ChatMensagem.Role.USER
+                        ? (Message) new UserMessage(m.getConteudo())
+                        : new AssistantMessage(m.getConteudo()))
+                .toList();
+    }
+
+    /**
+     * Retorna, em ordem cronológica, as mensagens da conversa CORRENTE do usuário (mesma janela
+     * usada como contexto da IA). Serve tanto para montar o prompt quanto para o frontend EXIBIR o
+     * que a Áurea já "lembra" — assim a tela do assistente e o balão flutuante mostram a MESMA
+     * conversa (sem o efeito de "responder de uma conversa que não apareceu").
+     */
+    @Transactional(readOnly = true)
+    public List<ChatMensagem> conversaAtual(Long usuarioId, int maxMensagens) {
         // Vem em ordem decrescente (mais recente primeiro).
         List<ChatMensagem> recentes = repository.findByUsuarioIdOrderByCriadoEmDescIdDesc(
                 usuarioId, PageRequest.of(0, maxMensagens));
@@ -66,14 +81,11 @@ public class ChatMemoryService {
         }
 
         // Percorremos de trás para frente (até o corte) para obter a ordem cronológica.
-        List<Message> mensagens = new ArrayList<>(corte);
+        List<ChatMensagem> ordenado = new ArrayList<>(corte);
         for (int i = corte - 1; i >= 0; i--) {
-            ChatMensagem m = recentes.get(i);
-            mensagens.add(m.getRole() == ChatMensagem.Role.USER
-                    ? new UserMessage(m.getConteudo())
-                    : new AssistantMessage(m.getConteudo()));
+            ordenado.add(recentes.get(i));
         }
-        return mensagens;
+        return ordenado;
     }
 
     @Transactional

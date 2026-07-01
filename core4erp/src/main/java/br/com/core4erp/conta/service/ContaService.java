@@ -30,6 +30,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.com.core4erp.utils.DtoValidator;
 import br.com.core4erp.utils.ParcelamentoHelper;
 
 import java.math.BigDecimal;
@@ -50,6 +51,7 @@ public class ContaService {
     private final FaturaCartaoService faturaCartaoService;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public ContaService(ContaRepository contaRepository,
                         ContaBaixadaRepository baixadaRepository,
@@ -59,7 +61,8 @@ public class ContaService {
                         ContaCorrenteRepository contaCorrenteRepository,
                         FaturaCartaoService faturaCartaoService,
                         SecurityContextUtils securityCtx,
-                        TenantContext tenantCtx) {
+                        TenantContext tenantCtx,
+                        DtoValidator dtoValidator) {
         this.contaRepository = contaRepository;
         this.baixadaRepository = baixadaRepository;
         this.categoriaRepository = categoriaRepository;
@@ -69,6 +72,7 @@ public class ContaService {
         this.faturaCartaoService = faturaCartaoService;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Transactional(readOnly = true)
@@ -127,6 +131,7 @@ public class ContaService {
      */
     @Transactional
     public List<ContaResponseDto> criar(ContaCreateDto dto) {
+        dtoValidator.validar(dto);
         Usuario usuario = securityCtx.getUsuario();
         Long empresaId = tenantCtx.getEmpresaId();
 
@@ -176,6 +181,7 @@ public class ContaService {
 
     @Transactional
     public ContaResponseDto atualizar(Long id, ContaCreateDto dto) {
+        dtoValidator.validar(dto);
         Conta conta = findOwned(id);
 
         // S.1: conta já baixada é imutável (§16). Editar valor/vencimento de uma conta paga
