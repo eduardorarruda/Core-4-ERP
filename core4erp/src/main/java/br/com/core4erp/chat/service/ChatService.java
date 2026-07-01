@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.service;
 
+import br.com.core4erp.chat.dto.ChatHistoricoItemDto;
 import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
 import br.com.core4erp.chat.entity.ChatMensagem;
@@ -276,6 +277,15 @@ public class ChatService {
 
     public void limparHistorico() {
         memoryService.limpar(securityCtx.getUsuarioId());
+    }
+
+    /** Conversa atual (para o frontend exibir o mesmo histórico que a IA usa como contexto). */
+    public List<ChatHistoricoItemDto> historico() {
+        Long usuarioId = securityCtx.getUsuarioId();
+        return memoryService.conversaAtual(usuarioId, maxHistorico).stream()
+                .map(m -> new ChatHistoricoItemDto(
+                        m.getRole() == ChatMensagem.Role.USER ? "user" : "assistant", m.getConteudo()))
+                .toList();
     }
 
     private List<Message> montarMensagens(Long usuarioId, String systemPrompt, String mensagemUsuario) {

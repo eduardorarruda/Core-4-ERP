@@ -59,6 +59,14 @@ export default function Assistente() {
 
   useEffect(() => { fimRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensagens, ocupado]);
 
+  // Carrega a conversa atual ao abrir — assim a tela mostra o mesmo que a Áurea "lembra"
+  // (o mesmo histórico do balão flutuante), sem o efeito de continuar uma conversa invisível.
+  useEffect(() => {
+    chat.historico()
+      .then((h) => { if (Array.isArray(h) && h.length) setMensagens(h.map((m) => ({ role: m.role, text: m.texto }))); })
+      .catch(() => {});
+  }, []);
+
   async function enviarTexto(texto) {
     const msg = (texto ?? input).trim();
     if (!msg || ocupado) return;
@@ -155,8 +163,8 @@ export default function Assistente() {
             <Sparkles className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-text-primary font-display">Assistente IA</h1>
-            <p className="text-xs text-text-primary/50">Converse ou envie planilhas e extratos (OFX) para a IA processar</p>
+            <h1 className="text-lg font-bold text-text-primary font-display">Áurea</h1>
+            <p className="text-xs text-text-primary/50">Sua assistente financeira — converse ou envie planilhas, extratos (OFX) e PDFs</p>
           </div>
         </div>
         <button onClick={limpar} title="Limpar conversa"

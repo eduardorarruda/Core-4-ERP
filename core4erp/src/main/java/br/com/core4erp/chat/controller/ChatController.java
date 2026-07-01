@@ -79,6 +79,12 @@ public class ChatController {
         return emitter;
     }
 
+    @Operation(summary = "Obter a conversa atual (para exibir o mesmo histórico em qualquer tela)")
+    @GetMapping("/historico")
+    public ResponseEntity<java.util.List<br.com.core4erp.chat.dto.ChatHistoricoItemDto>> historico() {
+        return ResponseEntity.ok(chatService.historico());
+    }
+
     @Operation(summary = "Limpar histórico de conversa")
     @DeleteMapping("/historico")
     public ResponseEntity<Void> limparHistorico() {

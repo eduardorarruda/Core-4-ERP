@@ -7,6 +7,7 @@ import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.enums.TipoParceiro;
 import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
+import br.com.core4erp.utils.DtoValidator;
 import br.com.core4erp.utils.Utils;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.entity.Parceiro;
@@ -25,17 +26,20 @@ public class ParceiroService {
     private final SecurityContextUtils securityCtx;
     private final BrasilApiService brasilApiService;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public ParceiroService(ParceiroRepository parceiroRepository,
                            ContaRepository contaRepository,
                            SecurityContextUtils securityCtx,
                            BrasilApiService brasilApiService,
-                           TenantContext tenantCtx) {
+                           TenantContext tenantCtx,
+                           DtoValidator dtoValidator) {
         this.parceiroRepository = parceiroRepository;
         this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
         this.brasilApiService = brasilApiService;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +56,7 @@ public class ParceiroService {
     @Requer("PARCEIRO_CRIAR") // 3.1: defense-in-depth — cobre a porta do chat IA
     @Transactional
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
+        dtoValidator.validar(dto); // regras de negócio valem também p/ o chat IA (que chama o service direto)
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
         validarCpfCnpj(docNormalizado);
         Long empresaId = tenantCtx.getEmpresaId();
@@ -77,6 +82,7 @@ public class ParceiroService {
     @Requer("PARCEIRO_EDITAR")
     @Transactional
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
+        dtoValidator.validar(dto);
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
         validarCpfCnpj(docNormalizado);
         Long empresaId = tenantCtx.getEmpresaId();

@@ -45,14 +45,15 @@ public class CadastroTools {
     }
 
     @Tool(description = """
-            Cadastra um parceiro (cliente, fornecedor ou ambos). Obrigatórios: razaoSocial e tipo.
-            CPF/CNPJ é opcional, mas se informado deve ser válido e único. Se já existir parceiro
-            com o mesmo nome, o existente é reaproveitado (não duplica). Confirme antes de executar.
+            Cadastra um parceiro (cliente, fornecedor ou ambos). Obrigatórios: razaoSocial, tipo e
+            CPF/CNPJ (válido e único). Se o CPF/CNPJ não for informado, NÃO chame esta ferramenta —
+            peça o documento ao usuário antes. Se já existir parceiro com o mesmo nome, o existente é
+            reaproveitado (não duplica). Confirme antes de executar.
             """)
     public ParceiroResponseDto registrarParceiro(
             @ToolParam(description = "Razão social ou nome do parceiro") String razaoSocial,
             @ToolParam(description = "Tipo do parceiro: CLIENTE, FORNECEDOR ou AMBOS") String tipo,
-            @ToolParam(description = "CPF ou CNPJ. Opcional, pode ser null") String cpfCnpj,
+            @ToolParam(description = "CPF ou CNPJ — OBRIGATÓRIO, válido") String cpfCnpj,
             @ToolParam(description = "Nome fantasia. Opcional, pode ser null") String nomeFantasia,
             @ToolParam(description = "Telefone. Opcional, pode ser null") String telefone,
             @ToolParam(description = "E-mail. Opcional, pode ser null") String email) {
@@ -174,14 +175,15 @@ public class CadastroTools {
     /** Item de parceiro para cadastro em lote. */
     public record NovoParceiro(
             @ToolParam(description = "Razão social ou nome do parceiro") String razaoSocial,
-            @ToolParam(description = "CPF ou CNPJ (opcional, mas se informado deve ser válido)") String cpfCnpj,
+            @ToolParam(description = "CPF ou CNPJ — OBRIGATÓRIO e válido") String cpfCnpj,
             @ToolParam(description = "Tipo: CLIENTE, FORNECEDOR ou AMBOS (padrão FORNECEDOR)") String tipo,
             @ToolParam(description = "Nome fantasia (opcional)") String nomeFantasia) {}
 
     @Tool(description = """
             Cadastra VÁRIOS parceiros (fornecedores/clientes) de uma só vez (em lote). Use SEMPRE que
-            o usuário pedir mais de um. CPF/CNPJ é opcional, mas se informado deve ser válido e único.
-            tipo padrão é FORNECEDOR. Confirme a lista com o usuário antes de executar.
+            o usuário pedir mais de um. CPF/CNPJ é OBRIGATÓRIO (válido e único) para cada um — se algum
+            não tiver documento, peça ao usuário antes de cadastrar. tipo padrão é FORNECEDOR.
+            Confirme a lista com o usuário antes de executar.
             """)
     public String registrarParceiros(
             @ToolParam(description = "Lista de parceiros a cadastrar") List<NovoParceiro> parceiros) {

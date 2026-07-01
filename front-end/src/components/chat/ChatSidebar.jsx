@@ -93,8 +93,8 @@ function ChatContent({ onClose }) {
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full border-2 border-surface-low animate-pulse-dot" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-text-primary font-display">C4 Assistant</h3>
-            <p className="text-[10px] text-text-primary/40">Assistente financeiro</p>
+            <h3 className="text-sm font-bold text-text-primary font-display">Áurea</h3>
+            <p className="text-[10px] text-text-primary/40">Assistente financeira</p>
           </div>
         </div>
         <div className="flex gap-1">
@@ -177,9 +177,42 @@ function ChatContent({ onClose }) {
   );
 }
 
+// Painel do balão. Monta só quando aberto: carrega a conversa atual (mesma da tela /assistente e
+// do contexto da IA) e só então cria o runtime com initialMessages — assim o balão mostra a MESMA
+// conversa, sem "responder de uma conversa que não apareceu".
+function PainelAurea({ onClose }) {
+  const [inicial, setInicial] = useState(null); // null = carregando
+
+  useEffect(() => {
+    chat.historico()
+      .then((h) => setInicial(Array.isArray(h)
+        ? h.map((m) => ({ role: m.role, content: [{ type: "text", text: m.texto }] }))
+        : []))
+      .catch(() => setInicial([]));
+  }, []);
+
+  if (inicial === null) {
+    return (
+      <div className="h-full flex items-center justify-center text-sm text-text-primary/50">
+        Carregando conversa…
+      </div>
+    );
+  }
+  return <PainelAureaRuntime initialMessages={inicial} onClose={onClose} />;
+}
+
+function PainelAureaRuntime({ initialMessages, onClose }) {
+  const runtime = useChatRuntime(initialMessages);
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <DownloadToolUI />
+      <ChatContent onClose={onClose} />
+    </AssistantRuntimeProvider>
+  );
+}
+
 export default function ChatSidebar() {
   const [isOpen, setIsOpen] = useState(false);
-  const runtime = useChatRuntime();
   const { pathname } = useLocation();
 
   // Na tela do Assistente o usuário já está conversando com a IA em tela cheia —
@@ -191,8 +224,8 @@ export default function ChatSidebar() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          aria-label="Abrir assistente financeiro"
-          title="Assistente C4"
+          aria-label="Abrir a Áurea, assistente financeira"
+          title="Áurea"
           className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-primary-glow"
           style={{ boxShadow: 'var(--shadow-primary)' }}
         >
@@ -213,10 +246,7 @@ export default function ChatSidebar() {
               "animate-slide-in-right"
             )}
           >
-            <AssistantRuntimeProvider runtime={runtime}>
-              <DownloadToolUI />
-              <ChatContent onClose={() => setIsOpen(false)} />
-            </AssistantRuntimeProvider>
+            <PainelAurea onClose={() => setIsOpen(false)} />
           </div>
         </>
       )}

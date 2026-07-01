@@ -9,6 +9,7 @@ import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.exception.BusinessException;
+import br.com.core4erp.utils.DtoValidator;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,15 +23,18 @@ public class CategoriaService {
     private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public CategoriaService(CategoriaRepository categoriaRepository,
                             ContaRepository contaRepository,
                             SecurityContextUtils securityCtx,
-                            TenantContext tenantCtx) {
+                            TenantContext tenantCtx,
+                            DtoValidator dtoValidator) {
         this.categoriaRepository = categoriaRepository;
         this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Requer("CATEGORIA_VISUALIZAR")
@@ -49,6 +53,7 @@ public class CategoriaService {
     @Requer("CATEGORIA_CRIAR")
     @Transactional
     public CategoriaResponseDto criar(CategoriaRequestDto dto) {
+        dtoValidator.validar(dto);
         Categoria categoria = new Categoria();
         categoria.setDescricao(dto.descricao());
         categoria.setIcone(dto.icone());
@@ -59,6 +64,7 @@ public class CategoriaService {
     @Requer("CATEGORIA_EDITAR")
     @Transactional
     public CategoriaResponseDto atualizar(Long id, CategoriaRequestDto dto) {
+        dtoValidator.validar(dto);
         Categoria categoria = findOwned(id);
         categoria.setDescricao(dto.descricao());
         categoria.setIcone(dto.icone());

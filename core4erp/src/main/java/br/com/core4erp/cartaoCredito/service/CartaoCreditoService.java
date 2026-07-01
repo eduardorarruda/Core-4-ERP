@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import br.com.core4erp.utils.DtoValidator;
 import br.com.core4erp.utils.FaturaHelper;
 import br.com.core4erp.utils.ParcelamentoHelper;
 
@@ -69,6 +70,7 @@ public class CartaoCreditoService {
     private final ContaService contaService;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public CartaoCreditoService(CartaoCreditoRepository cartaoRepo,
                                 LancamentoCartaoRepository lancamentoRepo,
@@ -80,7 +82,8 @@ public class CartaoCreditoService {
                                 ContaCorrenteService contaCorrenteService,
                                 ContaService contaService,
                                 SecurityContextUtils securityCtx,
-                                TenantContext tenantCtx) {
+                                TenantContext tenantCtx,
+                                DtoValidator dtoValidator) {
         this.cartaoRepo = cartaoRepo;
         this.lancamentoRepo = lancamentoRepo;
         this.faturaRepo = faturaRepo;
@@ -92,6 +95,7 @@ public class CartaoCreditoService {
         this.contaService = contaService;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     // ── Cartões ───────────────────────────────────────────────────────────────
@@ -129,6 +133,7 @@ public class CartaoCreditoService {
     @Requer("CARTAO_CRIAR")
     @Transactional
     public CartaoCreditoResponseDto criar(CartaoCreditoRequestDto dto) {
+        dtoValidator.validar(dto);
         CartaoCredito cartao = new CartaoCredito();
         preencherCartao(cartao, dto);
         cartao.setUsuario(securityCtx.getUsuario());
@@ -139,6 +144,7 @@ public class CartaoCreditoService {
     @Requer("CARTAO_EDITAR")
     @Transactional
     public CartaoCreditoResponseDto atualizar(Long id, CartaoCreditoRequestDto dto) {
+        dtoValidator.validar(dto);
         CartaoCredito cartao = findOwnedCartao(id);
         preencherCartao(cartao, dto);
         cartao = cartaoRepo.save(cartao);
