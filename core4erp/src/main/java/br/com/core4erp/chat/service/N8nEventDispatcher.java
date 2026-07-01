@@ -65,7 +65,7 @@ public class N8nEventDispatcher {
                     .body(evento)
                     .retrieve()
                     .toBodilessEntity();
-            log.debug("[N8N-EVENTO] enviado acao={}", acao);
+            log.info("[N8N-EVENTO] enviado acao={}", acao);
         } catch (Exception e) {
             log.warn("[N8N-EVENTO] falha ao enviar acao={} (ignorado): {}", acao, e.getMessage());
         }
