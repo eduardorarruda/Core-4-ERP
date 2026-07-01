@@ -3,6 +3,7 @@ package br.com.core4erp.chat.service;
 import br.com.core4erp.chat.entity.ChatAuditoria;
 import br.com.core4erp.chat.repository.ChatAuditoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,16 +24,23 @@ public class ChatAuditoriaService {
 
     private final ChatAuditoriaRepository repository;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
+    private final N8nEventDispatcher eventos;
 
-    public ChatAuditoriaService(ChatAuditoriaRepository repository, SecurityContextUtils securityCtx) {
+    public ChatAuditoriaService(ChatAuditoriaRepository repository,
+                                SecurityContextUtils securityCtx,
+                                TenantContext tenantCtx,
+                                N8nEventDispatcher eventos) {
         this.repository = repository;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
+        this.eventos = eventos;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrar(String ferramenta, String detalhe) {
+        Long usuarioId = securityCtx.getUsuarioId();
         try {
-            Long usuarioId = securityCtx.getUsuarioId();
             String texto = detalhe != null && detalhe.length() > MAX_DETALHE
                     ? detalhe.substring(0, MAX_DETALHE)
                     : detalhe;
@@ -40,5 +48,8 @@ public class ChatAuditoriaService {
         } catch (Exception e) {
             log.warn("Falha ao persistir auditoria do chat (ferramenta={}): {}", ferramenta, e.getMessage());
         }
+        // Publica o evento para o n8n (assíncrono, fora do caminho crítico) — "tudo pela IA no n8n".
+        eventos.publicar(ferramenta, detalhe, usuarioId,
+                tenantCtx.isPopulado() ? tenantCtx.getEmpresaId() : null);
     }
 }
