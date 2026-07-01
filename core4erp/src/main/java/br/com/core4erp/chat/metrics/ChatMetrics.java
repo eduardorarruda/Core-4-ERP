@@ -15,6 +15,7 @@ public class ChatMetrics {
     private final Counter tokensPrompt;
     private final Counter tokensCompletion;
     private final Counter tokensTotal;
+    private final Counter custoUsd;
     private final Timer tempoChatTimer;
     private final AtomicInteger sessoesAtivas;
 
@@ -39,6 +40,11 @@ public class ChatMetrics {
                 .description("Total de tokens (prompt + completion) do chat IA")
                 .register(registry);
 
+        this.custoUsd = Counter.builder("chat.custo.usd.total")
+                .description("Custo estimado acumulado (USD) do chat IA — tokens × preço por milhão")
+                .baseUnit("usd")
+                .register(registry);
+
         this.tempoChatTimer = Timer.builder("chat.processamento.duracao")
                 .description("Tempo de processamento de cada mensagem do chat")
                 .publishPercentiles(0.5, 0.95, 0.99)
@@ -59,6 +65,11 @@ public class ChatMetrics {
         if (prompt > 0) tokensPrompt.increment(prompt);
         if (completion > 0) tokensCompletion.increment(completion);
         if (prompt + completion > 0) tokensTotal.increment(prompt + completion);
+    }
+
+    /** Acumula o custo estimado (USD) da requisição. */
+    public void registrarCusto(double usd) {
+        if (usd > 0) custoUsd.increment(usd);
     }
 
     public Timer.Sample iniciarTimer() {
