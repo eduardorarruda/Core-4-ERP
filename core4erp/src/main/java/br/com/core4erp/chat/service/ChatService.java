@@ -174,6 +174,9 @@ public class ChatService {
         TenantContext.State tenantState = TenantContext.currentState();
 
         streamExecutor.submit(() -> {
+            StringBuilder full = new StringBuilder();
+            AtomicReference<Usage> usageRef = new AtomicReference<>();
+            AtomicReference<String> finishRef = new AtomicReference<>();
             try {
                 // Restaura os contextos na thread que assina o fluxo. Com
                 // spring.reactor.context-propagation=auto (ver ChatAiConfig), eles são capturados
@@ -183,10 +186,6 @@ public class ChatService {
                 if (requestAttributes != null) {
                     RequestContextHolder.setRequestAttributes(requestAttributes, true);
                 }
-
-                StringBuilder full = new StringBuilder();
-                AtomicReference<Usage> usageRef = new AtomicReference<>();
-                AtomicReference<String> finishRef = new AtomicReference<>();
 
                 // .stream() emite a resposta em deltas (token a token). Cada delta é enviado ao
                 // cliente imediatamente, dando feedback incremental em vez da tela em branco até o fim.
@@ -228,7 +227,10 @@ public class ChatService {
                 chatMetrics.registrarErro();
                 log.error("[CHAT-STREAM] erro ao processar mensagem de {}: {}", email, e.getMessage(), e);
                 try {
-                    emitter.completeWithError(e);
+                    // Em vez de derrubar o stream (tela em branco), envia uma mensagem amigável —
+                    // ex.: limite de tokens/min da OpenAI (429) vira "aguarde e tente de novo".
+                    if (full.length() == 0) enviarDelta(emitter, mensagemAmigavelErro(e));
+                    emitter.complete();
                 } catch (Exception ignored) {
                     // emitter já encerrado
                 }
@@ -312,6 +314,15 @@ public class ChatService {
         chatMetrics.registrarCusto(custo);
         log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={} custoUsd={}",
                 email, prompt, completion, String.format(java.util.Locale.US, "%.6f", custo));
+    }
+
+    /** Traduz erros técnicos (ex.: 429 da OpenAI) em uma frase clara para o usuário no stream. */
+    private String mensagemAmigavelErro(Throwable e) {
+        String m = e.getMessage() != null ? e.getMessage() : "";
+        if (m.contains("429") || m.contains("rate_limit") || m.contains("Rate limit")) {
+            return "O assistente recebeu muitas solicitações em pouco tempo. Aguarde alguns segundos e tente novamente.";
+        }
+        return "O assistente está temporariamente indisponível. Tente novamente em instantes.";
     }
 
     // Remove qualquer referência a relatório que o modelo tenha escrito (markdown link com
