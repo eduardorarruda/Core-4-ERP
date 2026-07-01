@@ -118,6 +118,16 @@ public class ChatService {
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
+        return processar(request, null);
+    }
+
+    /**
+     * @param textoParaHistorico quando != null, é o que fica GRAVADO no histórico no lugar da
+     *   mensagem enviada à IA. Usado pelo anexo: a IA recebe o conteúdo completo do arquivo NESTA
+     *   requisição, mas no histórico guardamos só um resumo curto — senão o arquivo inteiro voltaria
+     *   como contexto em toda mensagem seguinte, estourando o limite de tokens/min (429).
+     */
+    public ChatResponseDto processar(ChatRequestDto request, String textoParaHistorico) {
         chatMetrics.registrarMensagem();
         Timer.Sample timer = chatMetrics.iniciarTimer();
 
@@ -127,7 +137,8 @@ public class ChatService {
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
         List<Message> allMessages = montarMensagens(usuarioId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
-        memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
+        memoryService.registrar(usuarioId, ChatMensagem.Role.USER,
+                textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
 
         try {
             ChatResponse response = chatClient.prompt()

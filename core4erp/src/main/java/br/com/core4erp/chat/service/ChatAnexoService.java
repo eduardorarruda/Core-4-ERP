@@ -175,7 +175,10 @@ public class ChatAnexoService {
             log.warn("[CHAT-ANEXO] falha ao indexar '{}' no RAG (seguindo): {}", nome, e.getMessage());
         }
 
-        return chatService.processar(new ChatRequestDto(mensagem));
+        // A IA recebe o conteúdo completo agora, mas no histórico guardamos só um resumo curto
+        // (o arquivo inteiro no histórico inflaria o prompt das próximas mensagens → 429).
+        String resumoHistorico = "[Enviei o arquivo \"" + nome + "\" e pedi: " + instrucao + "]";
+        return chatService.processar(new ChatRequestDto(mensagem), resumoHistorico);
     }
 
     // ── Extração ──────────────────────────────────────────────────────────────
