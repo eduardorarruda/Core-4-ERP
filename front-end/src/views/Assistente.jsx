@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, Send, Paperclip, Trash2, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Sparkles, Send, Paperclip, Trash2, Download, FileSpreadsheet, Loader2, X } from 'lucide-react';
 import { chat, clearAuth } from '../lib/api';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
-const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx';
+const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx,.pdf';
 
 const SUGESTOES = [
   'Qual o meu saldo?',
@@ -53,6 +53,7 @@ export default function Assistente() {
   const [input, setInput] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [processandoArquivo, setProcessandoArquivo] = useState(null);
+  const [arquivoAnexado, setArquivoAnexado] = useState(null); // File preparado, enviado só no submit
   const fimRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -112,21 +113,30 @@ export default function Assistente() {
     });
   }
 
-  async function enviarArquivo(arquivo) {
-    if (!arquivo || ocupado) return;
-    setMensagens((m) => [...m, { role: 'user', text: '', arquivo: arquivo.name }, { role: 'assistant', text: '' }]);
+  // Envia o arquivo preparado JUNTO com a instrução do usuário (nunca sem texto).
+  async function enviarComArquivo(texto, arquivo) {
+    setInput('');
+    setArquivoAnexado(null);
+    setMensagens((m) => [...m, { role: 'user', text: texto, arquivo: arquivo.name }, { role: 'assistant', text: '' }]);
     setOcupado(true);
     setProcessandoArquivo(arquivo.name);
     try {
-      const resp = await chat.enviarAnexo(arquivo);
+      const resp = await chat.enviarAnexo(arquivo, texto);
       atualizarUltima(resp?.resposta || 'Arquivo processado.');
     } catch (e) {
       atualizarUltima(e.message || 'Não foi possível processar o arquivo.');
     } finally {
       setOcupado(false);
       setProcessandoArquivo(null);
-      if (fileRef.current) fileRef.current.value = '';
     }
+  }
+
+  // Dispatcher do botão/Enter: com arquivo preparado exige texto e envia os dois; senão, texto puro.
+  function enviar() {
+    const texto = input.trim();
+    if (ocupado || !texto) return;
+    if (arquivoAnexado) enviarComArquivo(texto, arquivoAnexado);
+    else enviarTexto(texto);
   }
 
   async function limpar() {
@@ -188,18 +198,19 @@ export default function Assistente() {
               <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${m.role === 'user'
                 ? 'bg-primary/20 text-text-primary rounded-br-sm'
                 : 'bg-surface-medium text-text-primary/90 rounded-bl-sm'}`}>
-                {m.arquivo ? (
-                  <span className="inline-flex items-center gap-2 text-sm font-medium">
-                    <FileSpreadsheet className="w-4 h-4" /> {m.arquivo}
+                {m.arquivo && (
+                  <span className="flex items-center gap-2 text-sm font-medium mb-1 opacity-80">
+                    <FileSpreadsheet className="w-4 h-4 shrink-0" /> {m.arquivo}
                   </span>
-                ) : m.role === 'assistant' && !m.text && ocupado ? (
+                )}
+                {m.role === 'assistant' && !m.text && ocupado ? (
                   <span className="inline-flex items-center gap-2 text-sm text-text-primary/50">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     {processandoArquivo ? `Analisando ${processandoArquivo}…` : 'Pensando…'}
                   </span>
-                ) : (
+                ) : m.text ? (
                   <Markdown text={textoLimpo} />
-                )}
+                ) : null}
                 {url && (
                   <a href={url} download
                     className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-semibold no-underline">
@@ -213,32 +224,47 @@ export default function Assistente() {
         <div ref={fimRef} />
       </div>
 
+      {/* Chip do arquivo preparado — só é enviado junto com a instrução no submit */}
+      {arquivoAnexado && (
+        <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-sm text-text-primary w-fit max-w-full">
+          <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
+          <span className="truncate font-medium">{arquivoAnexado.name}</span>
+          <span className="text-text-primary/40 shrink-0">— escreva o que fazer e envie</span>
+          <button onClick={() => setArquivoAnexado(null)} disabled={ocupado}
+            aria-label="Remover arquivo" title="Remover arquivo"
+            className="ml-1 p-0.5 rounded hover:bg-primary/20 text-text-primary/50 hover:text-text-primary shrink-0 disabled:opacity-40">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Entrada */}
-      <div className="mt-3 flex items-end gap-2">
+      <div className="mt-2 flex items-end gap-2">
         <input ref={fileRef} type="file" accept={TIPOS_ACEITOS} className="hidden"
-          onChange={(e) => e.target.files?.[0] && enviarArquivo(e.target.files[0])} />
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoAnexado(f); e.target.value = ''; }} />
         <button onClick={() => fileRef.current?.click()} disabled={ocupado}
-          title="Anexar planilha ou OFX"
+          title="Anexar planilha, OFX ou PDF"
           className="p-3 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-40 shrink-0">
           <Paperclip className="w-5 h-5" />
         </button>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarTexto(); } }}
-          placeholder="Pergunte sobre suas finanças, ou anexe um arquivo…"
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+          placeholder={arquivoAnexado ? 'Descreva o que fazer com o arquivo (ex.: cadastre todas as contas deste extrato)…' : 'Pergunte sobre suas finanças, ou anexe um arquivo…'}
           rows={1}
           disabled={ocupado}
           className="flex-1 bg-surface border border-text-primary/10 rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-text-primary/30 resize-none max-h-32"
         />
-        <button onClick={() => enviarTexto()} disabled={ocupado || !input.trim()}
+        <button onClick={enviar} disabled={ocupado || !input.trim()}
           aria-label="Enviar"
+          title={arquivoAnexado && !input.trim() ? 'Escreva o que deseja fazer com o arquivo' : 'Enviar'}
           className="bg-primary text-on-primary p-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0">
           <Send className="w-5 h-5" />
         </button>
       </div>
       <p className="text-[11px] text-text-primary/35 mt-1.5 text-center">
-        Formatos: .xlsx, .xls, .csv, .ofx (máx. 5 MB). A IA confirma antes de operações que mexem em dinheiro.
+        Formatos: .xlsx, .xls, .csv, .ofx, .pdf (máx. 5 MB). Ao anexar, escreva o que deseja fazer. A IA confirma antes de operações que mexem em dinheiro.
       </p>
     </div>
   );

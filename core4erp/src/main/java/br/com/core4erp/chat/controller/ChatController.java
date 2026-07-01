@@ -52,10 +52,12 @@ public class ChatController {
         return ResponseEntity.ok(chatService.processar(request));
     }
 
-    @Operation(summary = "Enviar arquivo (planilha/OFX) para a IA analisar e processar")
+    @Operation(summary = "Enviar arquivo (planilha/OFX/PDF) + instrução para a IA analisar e processar")
     @PostMapping(value = "/anexo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ChatResponseDto> enviarAnexo(@RequestParam("arquivo") MultipartFile arquivo) {
-        return ResponseEntity.ok(chatAnexoService.processarAnexo(arquivo));
+    public ResponseEntity<ChatResponseDto> enviarAnexo(
+            @RequestParam("arquivo") MultipartFile arquivo,
+            @RequestParam(value = "mensagem", required = false) String mensagem) {
+        return ResponseEntity.ok(chatAnexoService.processarAnexo(arquivo, mensagem));
     }
 
     @Operation(summary = "Indexar texto na base de conhecimento (RAG) da empresa")

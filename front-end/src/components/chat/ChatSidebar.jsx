@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AssistantRuntimeProvider,
   ThreadPrimitive,
@@ -179,6 +180,11 @@ function ChatContent({ onClose }) {
 export default function ChatSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const runtime = useChatRuntime();
+  const { pathname } = useLocation();
+
+  // Na tela do Assistente o usuário já está conversando com a IA em tela cheia —
+  // o balão flutuante seria redundante, então não o exibimos ali.
+  if (pathname === "/assistente") return null;
 
   return (
     <>

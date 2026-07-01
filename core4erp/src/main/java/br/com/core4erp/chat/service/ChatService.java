@@ -57,6 +57,8 @@ public class ChatService {
     private final RagService ragService;
     private final ObjectMapper objectMapper;
     private final int maxHistorico;
+    private final double precoInputPorMilhao;   // USD por 1M tokens de entrada (prompt)
+    private final double precoOutputPorMilhao;  // USD por 1M tokens de saída (completion)
 
     /**
      * Pool dedicado para o processamento assíncrono do streaming. Cada tarefa restaura
@@ -87,7 +89,9 @@ public class ChatService {
                        ChatMemoryService memoryService,
                        RagService ragService,
                        ObjectMapper objectMapper,
-                       @Value("${chat.historico.max-mensagens:20}") int maxHistorico) {
+                       @Value("${chat.historico.max-mensagens:20}") int maxHistorico,
+                       @Value("${chat.preco.input-usd-por-milhao:2.50}") double precoInputPorMilhao,
+                       @Value("${chat.preco.output-usd-por-milhao:10.00}") double precoOutputPorMilhao) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
         this.securityCtx = securityCtx;
@@ -102,6 +106,8 @@ public class ChatService {
         this.ragService = ragService;
         this.objectMapper = objectMapper;
         this.maxHistorico = maxHistorico;
+        this.precoInputPorMilhao = precoInputPorMilhao;
+        this.precoOutputPorMilhao = precoOutputPorMilhao;
     }
 
     /** Anexa ao system prompt o material de referência (RAG) relevante à pergunta, se houver. */
@@ -301,7 +307,11 @@ public class ChatService {
         long prompt = usage.getPromptTokens() != null ? usage.getPromptTokens().longValue() : 0L;
         long completion = usage.getCompletionTokens() != null ? usage.getCompletionTokens().longValue() : 0L;
         chatMetrics.registrarTokens(prompt, completion);
-        log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={}", email, prompt, completion);
+        double custo = (prompt / 1_000_000.0) * precoInputPorMilhao
+                     + (completion / 1_000_000.0) * precoOutputPorMilhao;
+        chatMetrics.registrarCusto(custo);
+        log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={} custoUsd={}",
+                email, prompt, completion, String.format(java.util.Locale.US, "%.6f", custo));
     }
 
     // Remove qualquer referência a relatório que o modelo tenha escrito (markdown link com

@@ -1,0 +1,51 @@
+{
+  "id": "ragingestwf00001",
+  "name": "RAG Ingest - Pré-processamento",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rag-ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b1a11111-1111-4111-8111-111111111111",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "rag-ingest-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = ($input.first().json.body) || $input.first().json || {};\nlet texto = (b.texto || '').toString();\ntexto = texto.replace(/\\r\\n/g, '\\n').split('\\n').map(function(l){return l.replace(/[\\t ]+$/,'');}).join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\nreturn [{ json: { texto: texto, tipo: b.tipo || 'anexo', fonte: b.fonte || '' } }];"
+      },
+      "id": "c2a22222-2222-4222-8222-222222222222",
+      "name": "Normalizar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"texto\": $json.texto, \"tipo\": $json.tipo, \"fonte\": $json.fonte } }}",
+        "options": {}
+      },
+      "id": "d3a33333-3333-4333-8333-333333333333",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Normalizar", "type": "main", "index": 0 }]]
+    },
+    "Normalizar": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

@@ -17,13 +17,18 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -52,6 +57,7 @@ public class ChatAnexoService {
     private final RagService ragService;
     private final int maxChars;
     private final String n8nWebhookUrl;
+    private final RestClient n8nClient;
 
     public ChatAnexoService(OfxParserService ofxParserService,
                             ChatService chatService,
@@ -63,12 +69,54 @@ public class ChatAnexoService {
         this.ragService = ragService;
         this.maxChars = maxChars;
         this.n8nWebhookUrl = n8nWebhookUrl;
+        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(3_000);
+        f.setReadTimeout(15_000);
+        this.n8nClient = RestClient.builder().requestFactory(f).build();
     }
 
-    public ChatResponseDto processarAnexo(MultipartFile arquivo) {
+    /**
+     * Etapa de ingestão via n8n: quando {@code chat.n8n.webhook-url} está configurado, envia o
+     * conteúdo ao workflow de pré-processamento (limpeza/normalização) e usa o texto retornado para
+     * indexar no RAG. Best-effort — se o n8n não estiver configurado, demorar ou falhar, devolve o
+     * conteúdo original (a ingestão nunca depende do n8n estar de pé).
+     */
+    @SuppressWarnings("unchecked")
+    private String preprocessarComN8n(String conteudo, String fonte) {
+        if (n8nWebhookUrl == null || n8nWebhookUrl.isBlank()) return conteudo;
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("texto", conteudo);
+            body.put("tipo", "anexo");
+            body.put("fonte", fonte);
+            Map<String, Object> resp = n8nClient.post()
+                    .uri(n8nWebhookUrl)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+            Object texto = resp == null ? null : resp.get("texto");
+            if (texto instanceof String s && !s.isBlank()) {
+                log.info("[CHAT-ANEXO] n8n pré-processou '{}' ({} → {} chars)", fonte, conteudo.length(), s.length());
+                return s;
+            }
+            log.warn("[CHAT-ANEXO] n8n não retornou 'texto' para '{}' — indexando conteúdo original", fonte);
+            return conteudo;
+        } catch (Exception e) {
+            log.warn("[CHAT-ANEXO] falha ao chamar n8n para '{}' (indexando original): {}", fonte, e.getMessage());
+            return conteudo;
+        }
+    }
+
+    public ChatResponseDto processarAnexo(MultipartFile arquivo, String mensagemUsuario) {
         if (arquivo == null || arquivo.isEmpty()) {
             throw new IllegalArgumentException("Nenhum arquivo foi enviado.");
         }
+        if (mensagemUsuario == null || mensagemUsuario.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Descreva o que você quer que eu faça com o arquivo (ex.: \"cadastre todas as contas deste extrato\").");
+        }
+        String instrucao = mensagemUsuario.strip();
         if (arquivo.getSize() > MAX_BYTES) {
             throw new IllegalArgumentException("Arquivo muito grande (máximo 5 MB).");
         }
@@ -90,35 +138,39 @@ public class ChatAnexoService {
         boolean truncado = conteudoCompleto.length() > maxChars;
         String conteudo = truncado ? conteudoCompleto.substring(0, maxChars) : conteudoCompleto;
 
-        // Gancho n8n (processamento pesado/assíncrono) — habilitado quando a URL estiver configurada.
-        if (n8nWebhookUrl != null && !n8nWebhookUrl.isBlank()) {
-            log.info("[CHAT-ANEXO] n8n configurado — (futuro) delegar processamento de '{}' ao workflow", nome);
-            // TODO Fase 3: despachar (nome, ext, conteúdo, token/empresa) ao webhook n8n e responder assíncrono.
-        }
-
         String mensagem = """
-                O usuário enviou um arquivo para você processar.
+                O usuário enviou um arquivo com uma instrução do que fazer.
+
+                INSTRUÇÃO DO USUÁRIO (siga isto acima de tudo):
+                "%s"
+
                 Arquivo: "%s" (tipo: %s)%s
 
                 Conteúdo extraído (estruturado):
                 %s
 
-                Tarefa: analise o conteúdo e execute o que for necessário usando suas ferramentas —
+                Tarefa: cumpra a INSTRUÇÃO DO USUÁRIO usando o conteúdo acima e suas ferramentas —
                 por exemplo, cadastrar parceiros/categorias, registrar lançamentos/contas a pagar/receber,
-                ou orientar a conciliação. Reaproveite o que já existe (não duplique). Ao final, responda
-                com um RESUMO claro do que foi feito (quantos itens criados, o que ficou de fora e por quê).
+                ou orientar a conciliação. Reaproveite o que já existe (não duplique). Confirme antes de
+                operações que mexem em dinheiro, conforme suas regras. Ao final, responda com um RESUMO
+                claro do que foi feito (quantos itens criados, o que ficou de fora e por quê).
                 """.formatted(
-                        nome, ext,
+                        instrucao, nome, ext,
                         truncado ? " — ATENÇÃO: conteúdo truncado por tamanho; processe o que está abaixo e avise o usuário que parte ficou de fora." : "",
                         conteudo);
 
-        log.info("[CHAT-ANEXO] processando '{}' ({}), {} chars{}", nome, ext, conteudo.length(),
-                truncado ? " (truncado)" : "");
+        log.info("[CHAT-ANEXO] processando '{}' ({}), {} chars{} — instrucao='{}'", nome, ext, conteudo.length(),
+                truncado ? " (truncado)" : "", instrucao.length() > 80 ? instrucao.substring(0, 80) + "…" : instrucao);
 
-        // RAG: indexa o conteúdo COMPLETO do arquivo (não o truncado para a IA), para que o usuário
-        // possa perguntar sobre ele depois (busca semântica). Não-fatal — falha aqui não impede o fluxo.
+        // Ingestão no RAG: opcionalmente passa o conteúdo por um workflow n8n de pré-processamento
+        // (limpeza/normalização) antes de indexar; se o n8n não estiver configurado ou falhar, indexa
+        // o conteúdo original. Tudo dentro da requisição autenticada (tenant preservado).
+        String paraIndexar = preprocessarComN8n(conteudoCompleto, nome);
+
+        // Indexa o conteúdo COMPLETO (não o truncado para a IA), para busca semântica posterior.
+        // Não-fatal — falha aqui não impede o fluxo.
         try {
-            ragService.indexar(conteudoCompleto, "anexo", nome);
+            ragService.indexar(paraIndexar, "anexo", nome);
         } catch (Exception e) {
             log.warn("[CHAT-ANEXO] falha ao indexar '{}' no RAG (seguindo): {}", nome, e.getMessage());
         }
