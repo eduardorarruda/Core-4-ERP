@@ -48,6 +48,10 @@ public class Auditoria {
     @Column(length = 36)
     private String requestId;
 
+    /** true quando a alteração foi executada pela IA (Áurea) a pedido do usuário (usuarioId). */
+    @Column(name = "is_ai_action", nullable = false)
+    private boolean aiAction = false;
+
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime dataHora = LocalDateTime.now();
 }

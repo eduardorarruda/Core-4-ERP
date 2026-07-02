@@ -79,17 +79,28 @@ public class ChatController {
         return emitter;
     }
 
-    @Operation(summary = "Obter a conversa atual (para exibir o mesmo histórico em qualquer tela)")
+    @Operation(summary = "Obter a conversa atual do canal (tela Assistente ou balão — contextos separados)")
     @GetMapping("/historico")
-    public ResponseEntity<java.util.List<br.com.core4erp.chat.dto.ChatHistoricoItemDto>> historico() {
-        return ResponseEntity.ok(chatService.historico());
+    public ResponseEntity<java.util.List<br.com.core4erp.chat.dto.ChatHistoricoItemDto>> historico(
+            @RequestParam(value = "canal", required = false) String canal) {
+        return ResponseEntity.ok(chatService.historico(resolverCanal(canal)));
     }
 
-    @Operation(summary = "Limpar histórico de conversa")
+    @Operation(summary = "Limpar histórico de conversa do canal")
     @DeleteMapping("/historico")
-    public ResponseEntity<Void> limparHistorico() {
-        chatService.limparHistorico();
+    public ResponseEntity<Void> limparHistorico(
+            @RequestParam(value = "canal", required = false) String canal) {
+        chatService.limparHistorico(resolverCanal(canal));
         return ResponseEntity.noContent().build();
+    }
+
+    private static br.com.core4erp.chat.entity.ChatMensagem.Canal resolverCanal(String canal) {
+        if (canal == null || canal.isBlank()) return br.com.core4erp.chat.entity.ChatMensagem.Canal.ASSISTENTE;
+        try {
+            return br.com.core4erp.chat.entity.ChatMensagem.Canal.valueOf(canal.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return br.com.core4erp.chat.entity.ChatMensagem.Canal.ASSISTENTE;
+        }
     }
 
     @Operation(summary = "Download de relatório gerado pelo chat")

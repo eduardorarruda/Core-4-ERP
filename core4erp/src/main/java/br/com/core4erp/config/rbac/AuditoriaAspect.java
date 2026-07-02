@@ -17,9 +17,15 @@ public class AuditoriaAspect {
 
     private final AuditoriaService auditoriaService;
 
+    // Cobre também as operações financeiras (baixar/estornar/transferir/fecharFatura) — antes
+    // essas ações (da tela E das tools da IA) não apareciam na tela de auditoria.
     @Around("execution(* br.com.core4erp.*.service.*Service.criar(..)) || " +
             "execution(* br.com.core4erp.*.service.*Service.atualizar(..)) || " +
-            "execution(* br.com.core4erp.*.service.*Service.deletar(..))")
+            "execution(* br.com.core4erp.*.service.*Service.deletar(..)) || " +
+            "execution(* br.com.core4erp.*.service.*Service.baixar(..)) || " +
+            "execution(* br.com.core4erp.*.service.*Service.estornar(..)) || " +
+            "execution(* br.com.core4erp.*.service.*Service.transferir(..)) || " +
+            "execution(* br.com.core4erp.*.service.*Service.fecharFatura(..))")
     public Object auditarOperacao(ProceedingJoinPoint pjp) throws Throwable {
         String metodo = pjp.getSignature().getName();
         String classe = pjp.getTarget().getClass().getSimpleName();
@@ -41,10 +47,14 @@ public class AuditoriaAspect {
 
     private AcaoAuditoria resolverAcao(String metodo) {
         return switch (metodo) {
-            case "criar"     -> AcaoAuditoria.CRIAR;
-            case "atualizar" -> AcaoAuditoria.EDITAR;
-            case "deletar"   -> AcaoAuditoria.DELETAR;
-            default          -> AcaoAuditoria.EDITAR;
+            case "criar"       -> AcaoAuditoria.CRIAR;
+            case "atualizar"   -> AcaoAuditoria.EDITAR;
+            case "deletar"     -> AcaoAuditoria.DELETAR;
+            case "baixar"      -> AcaoAuditoria.BAIXAR;
+            case "estornar"    -> AcaoAuditoria.ESTORNAR;
+            case "transferir"  -> AcaoAuditoria.TRANSFERIR;
+            case "fecharFatura"-> AcaoAuditoria.FECHAR_FATURA;
+            default            -> AcaoAuditoria.EDITAR;
         };
     }
 

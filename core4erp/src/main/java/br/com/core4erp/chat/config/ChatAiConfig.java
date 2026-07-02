@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.config;
 
+import br.com.core4erp.chat.service.OrigemIaHolder;
 import br.com.core4erp.config.tenant.TenantContext;
 import io.micrometer.context.ContextRegistry;
 import jakarta.annotation.PostConstruct;
@@ -27,6 +28,7 @@ public class ChatAiConfig {
 
     static final String SECURITY_CONTEXT_KEY = "core4erp.security.context";
     static final String TENANT_CONTEXT_KEY = "core4erp.tenant.context";
+    static final String ORIGEM_IA_KEY = "core4erp.origem.ia";
 
     @PostConstruct
     void registrarPropagacaoDeContexto() {
@@ -44,5 +46,12 @@ public class ChatAiConfig {
                 TenantContext::currentState,
                 TenantContext::restoreState,
                 TenantContext::removeState);
+
+        // Propaga a marca "ação da IA" — a auditoria grava is_ai_action=true nas escritas das tools.
+        registry.registerThreadLocalAccessor(
+                ORIGEM_IA_KEY,
+                OrigemIaHolder::currentState,
+                OrigemIaHolder::restoreState,
+                OrigemIaHolder::removeState);
     }
 }

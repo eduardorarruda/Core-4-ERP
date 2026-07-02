@@ -28,7 +28,8 @@ function fmtData(ts) {
 
 function acaoLabel(acao) {
   const map = {
-    CRIAR: 'Criação', ATUALIZAR: 'Atualização', DELETAR: 'Exclusão',
+    CRIAR: 'Criação', ATUALIZAR: 'Atualização', EDITAR: 'Atualização', DELETAR: 'Exclusão',
+    BAIXAR: 'Baixa', ESTORNAR: 'Estorno', TRANSFERIR: 'Transferência', FECHAR_FATURA: 'Fechamento de Fatura',
     LOGIN: 'Login', LOGOUT: 'Logout', ACESSO_NEGADO: 'Acesso Negado', EXPORTAR: 'Exportação',
   };
   return map[acao] ?? acao;
@@ -193,7 +194,19 @@ export default function Audit() {
                   return (
                     <tr key={log.id ?? i} className="hover:bg-surface-medium/30 transition-colors">
                       <td className="px-5 py-4 text-[11px] font-mono text-text-primary/40 whitespace-nowrap">{fmtData(log.timestamp)}</td>
-                      <td className="px-5 py-4 text-sm font-bold text-text-primary font-display">{log.usuarioId ?? '—'}</td>
+                      <td className="px-5 py-4 text-sm font-bold text-text-primary font-display">
+                        <span className="inline-flex items-center gap-2">
+                          {log.usuarioId ?? '—'}
+                          {log.aiAction && (
+                            <span
+                              title={`Ação executada pela IA (Áurea) a pedido do usuário ${log.usuarioId ?? ''}`}
+                              className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest font-mono"
+                              style={{ background: 'rgba(172,199,255,.12)', color: '#ACC7FF', border: '1px solid rgba(172,199,255,.25)' }}>
+                              IA
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="px-5 py-4 text-sm text-text-primary/80">{log.entidade ?? '—'}</td>
                       <td className="px-5 py-4 text-[11px] font-mono text-text-primary/40">{log.entidadeId ?? '—'}</td>
                       <td className="px-5 py-4">

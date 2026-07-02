@@ -16,6 +16,8 @@ public record AuditoriaResponseDto(
     String valorNovo,
     String ipAddress,
     String requestId,
+    /** true = alteração executada pela IA (Áurea) a pedido do usuário (usuarioId). */
+    boolean aiAction,
     LocalDateTime timestamp
 ) {
     public static AuditoriaResponseDto from(Auditoria a) {
@@ -23,7 +25,7 @@ public record AuditoriaResponseDto(
             a.getId(), a.getEmpresaId(), a.getUsuarioId(),
             a.getEntidade(), a.getEntidadeId(), a.getAcao(),
             a.getValorAnterior(), a.getValorNovo(),
-            a.getIpAddress(), a.getRequestId(), a.getDataHora()
+            a.getIpAddress(), a.getRequestId(), a.isAiAction(), a.getDataHora()
         );
     }
 }

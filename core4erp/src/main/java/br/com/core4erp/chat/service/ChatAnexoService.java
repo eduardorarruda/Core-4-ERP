@@ -22,6 +22,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
+import br.com.core4erp.config.tenant.TenantContext;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -46,7 +47,7 @@ public class ChatAnexoService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatAnexoService.class);
 
-    private static final Set<String> EXTENSOES = Set.of("ofx", "xlsx", "xls", "csv", "pdf");
+    private static final Set<String> EXTENSOES = Set.of("ofx", "xlsx", "xls", "csv", "pdf", "md");
     private static final long MAX_BYTES = 5L * 1024 * 1024; // 5 MB
     // Teto de segurança da extração (alinhado ao limite do RAG). O conteúdo COMPLETO (até aqui) vai
     // para o RAG; para a IA enviamos no máximo {@code maxChars} (custo de tokens).
@@ -55,6 +56,7 @@ public class ChatAnexoService {
     private final OfxParserService ofxParserService;
     private final ChatService chatService;
     private final RagService ragService;
+    private final TenantContext tenantCtx;
     private final int maxChars;
     private final String n8nWebhookUrl;
     private final RestClient n8nClient;
@@ -62,11 +64,13 @@ public class ChatAnexoService {
     public ChatAnexoService(OfxParserService ofxParserService,
                             ChatService chatService,
                             RagService ragService,
+                            TenantContext tenantCtx,
                             @Value("${chat.anexo.max-chars:3000}") int maxChars,
                             @Value("${chat.n8n.webhook-url:}") String n8nWebhookUrl) {
         this.ofxParserService = ofxParserService;
         this.chatService = chatService;
         this.ragService = ragService;
+        this.tenantCtx = tenantCtx;
         this.maxChars = maxChars;
         this.n8nWebhookUrl = n8nWebhookUrl;
         SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
@@ -124,18 +128,22 @@ public class ChatAnexoService {
         String ext = extensao(nome);
         if (!EXTENSOES.contains(ext)) {
             throw new IllegalArgumentException(
-                    "Tipo de arquivo não suportado. Envie planilha (.xlsx, .xls, .csv), extrato bancário (.ofx) ou documento (.pdf).");
+                    "Tipo de arquivo não suportado. Envie planilha (.xlsx, .xls, .csv), extrato bancário (.ofx) ou documento (.pdf, .md).");
         }
 
         // Conteúdo COMPLETO extraído (até o teto de segurança) — usado para indexar no RAG.
         String conteudoCompleto = switch (ext) {
             case "ofx" -> extrairOfx(arquivo);
-            case "csv", "pdf" -> ext.equals("pdf") ? extrairPdf(arquivo) : extrairTextoSimples(arquivo);
+            case "pdf" -> extrairPdf(arquivo);
+            case "csv", "md" -> extrairTextoSimples(arquivo);
             default -> extrairExcel(arquivo);
         };
 
         // Para a IA enviamos no máximo maxChars (custo de tokens); o RAG recebe o conteúdo completo.
-        boolean truncado = conteudoCompleto.length() > maxChars;
+        // PENSAMENTO ESTENDIDO (exclusivo do Administrador do sistema): sem truncamento — a IA
+        // recebe o arquivo na íntegra e é instruída (system prompt) a processar tudo, sem resumir.
+        boolean pensamentoEstendido = isAdminSistema();
+        boolean truncado = !pensamentoEstendido && conteudoCompleto.length() > maxChars;
         String conteudo = truncado ? conteudoCompleto.substring(0, maxChars) : conteudoCompleto;
 
         String mensagem = """
@@ -156,11 +164,14 @@ public class ChatAnexoService {
                 claro do que foi feito (quantos itens criados, o que ficou de fora e por quê).
                 """.formatted(
                         instrucao, nome, ext,
-                        truncado ? " — ATENÇÃO: conteúdo truncado por tamanho; processe o que está abaixo e avise o usuário que parte ficou de fora." : "",
+                        truncado
+                                ? " — ATENÇÃO: conteúdo truncado por tamanho; processe o que está abaixo e avise o usuário que parte ficou de fora."
+                                : (pensamentoEstendido ? " — CONTEÚDO INTEGRAL: processe TODOS os itens, sem resumir e sem pular linhas." : ""),
                         conteudo);
 
-        log.info("[CHAT-ANEXO] processando '{}' ({}), {} chars{} — instrucao='{}'", nome, ext, conteudo.length(),
-                truncado ? " (truncado)" : "", instrucao.length() > 80 ? instrucao.substring(0, 80) + "…" : instrucao);
+        log.info("[CHAT-ANEXO] processando '{}' ({}), {} chars{}{} — instrucao='{}'", nome, ext, conteudo.length(),
+                truncado ? " (truncado)" : "", pensamentoEstendido ? " (pensamento-estendido)" : "",
+                instrucao.length() > 80 ? instrucao.substring(0, 80) + "…" : instrucao);
 
         // Ingestão no RAG: opcionalmente passa o conteúdo por um workflow n8n de pré-processamento
         // (limpeza/normalização) antes de indexar; se o n8n não estiver configurado ou falhar, indexa
@@ -178,7 +189,15 @@ public class ChatAnexoService {
         // A IA recebe o conteúdo completo agora, mas no histórico guardamos só um resumo curto
         // (o arquivo inteiro no histórico inflaria o prompt das próximas mensagens → 429).
         String resumoHistorico = "[Enviei o arquivo \"" + nome + "\" e pedi: " + instrucao + "]";
-        return chatService.processar(new ChatRequestDto(mensagem), resumoHistorico);
+        return chatService.processar(new ChatRequestDto(mensagem, "ASSISTENTE"), resumoHistorico);
+    }
+
+    private boolean isAdminSistema() {
+        try {
+            return tenantCtx.isAdminSistema();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // ── Extração ──────────────────────────────────────────────────────────────
