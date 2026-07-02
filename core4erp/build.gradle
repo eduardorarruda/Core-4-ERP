@@ -61,6 +61,8 @@ dependencies {
 	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 	// RAG — banco vetorial Qdrant (embeddings de documentos/descrições)
 	implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+	// MCP server — expõe as habilidades financeiras (as @Tool) pelo protocolo MCP (SSE/WebMVC)
+	implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
 
 	// Email
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
