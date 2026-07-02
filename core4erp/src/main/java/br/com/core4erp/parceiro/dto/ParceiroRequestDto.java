@@ -13,7 +13,12 @@ public record ParceiroRequestDto(
 
         @Size(max = 150) String nomeFantasia,
 
-        @NotBlank(message = "CPF/CNPJ é obrigatório")
+        /**
+         * Obrigatório NA CRIAÇÃO (regra aplicada no {@code ParceiroService.criar}, que cobre tela e
+         * IA). Não é {@code @NotBlank} porque na ATUALIZAÇÃO o documento é tratado à parte:
+         * parceiros legados sem CPF/CNPJ precisam continuar editáveis (o service preserva o
+         * documento existente e nunca o apaga).
+         */
         @Size(max = 20) String cpfCnpj,
 
         @NotNull(message = "Tipo é obrigatório")
