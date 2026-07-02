@@ -58,6 +58,11 @@ public class ParceiroService {
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
         dtoValidator.validar(dto); // regras de negócio valem também p/ o chat IA (que chama o service direto)
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
+        // CPF/CNPJ é obrigatório na criação (a anotação saiu do DTO para não travar a ATUALIZAÇÃO
+        // de parceiros legados sem documento — o service é a fonte da regra, p/ tela e IA).
+        if (docNormalizado == null) {
+            throw new IllegalArgumentException("CPF/CNPJ é obrigatório");
+        }
         validarCpfCnpj(docNormalizado);
         Long empresaId = tenantCtx.getEmpresaId();
         if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaId(docNormalizado, empresaId)) {
