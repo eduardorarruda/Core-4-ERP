@@ -11,12 +11,13 @@ import java.util.List;
 public interface ChatMensagemRepository extends JpaRepository<ChatMensagem, Long> {
 
     /**
-     * Retorna as mensagens mais recentes do usuário (ordem decrescente).
+     * Retorna as mensagens mais recentes do usuário no canal (ordem decrescente).
      * O chamador deve inverter para obter a ordem cronológica.
      */
-    List<ChatMensagem> findByUsuarioIdOrderByCriadoEmDescIdDesc(Long usuarioId, Pageable pageable);
+    List<ChatMensagem> findByUsuarioIdAndCanalOrderByCriadoEmDescIdDesc(
+            Long usuarioId, ChatMensagem.Canal canal, Pageable pageable);
 
     @Modifying
-    @Query("DELETE FROM ChatMensagem m WHERE m.usuarioId = :usuarioId")
-    void deleteByUsuarioId(Long usuarioId);
+    @Query("DELETE FROM ChatMensagem m WHERE m.usuarioId = :usuarioId AND m.canal = :canal")
+    void deleteByUsuarioIdAndCanal(Long usuarioId, ChatMensagem.Canal canal);
 }

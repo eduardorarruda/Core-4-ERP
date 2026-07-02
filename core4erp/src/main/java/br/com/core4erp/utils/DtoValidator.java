@@ -28,15 +28,25 @@ public class DtoValidator {
 
     /** Lança {@link IllegalArgumentException} (→ HTTP 400) com as mensagens das regras violadas. */
     public <T> void validar(T dto) {
+        validar(dto, Set.of());
+    }
+
+    /**
+     * Valida ignorando as propriedades informadas — para regras que dependem de contexto.
+     * Ex.: na ATUALIZAÇÃO de um parceiro legado sem CPF/CNPJ, o documento não pode travar a edição
+     * dos demais campos (o service trata o documento em separado).
+     */
+    public <T> void validar(T dto, Set<String> propriedadesIgnoradas) {
         if (dto == null) {
             throw new IllegalArgumentException("Dados não informados.");
         }
         Set<ConstraintViolation<T>> violacoes = validator.validate(dto);
-        if (!violacoes.isEmpty()) {
-            String msg = violacoes.stream()
-                    .map(ConstraintViolation::getMessage)
-                    .distinct()
-                    .collect(Collectors.joining(", "));
+        String msg = violacoes.stream()
+                .filter(v -> !propriedadesIgnoradas.contains(v.getPropertyPath().toString()))
+                .map(ConstraintViolation::getMessage)
+                .distinct()
+                .collect(Collectors.joining(", "));
+        if (!msg.isEmpty()) {
             throw new IllegalArgumentException(msg);
         }
     }

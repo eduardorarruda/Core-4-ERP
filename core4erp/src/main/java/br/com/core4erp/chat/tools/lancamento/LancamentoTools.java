@@ -203,14 +203,26 @@ public class LancamentoTools {
 
     @Tool(description = """
             Lista contas a pagar/receber, com o ID de cada uma. Filtre por tipo (PAGAR ou RECEBER)
-            e/ou status (PENDENTE, PAGO, RECEBIDO, ATRASADO). Use para obter o ID antes de editar,
-            excluir ou estornar uma conta.
+            e/ou status (PENDENTE, PAGO, RECEBIDO, ATRASADO). Ao filtrar por ATRASADO, a busca já
+            inclui as contas PENDENTE com vencimento passado (atrasadas de fato, mesmo que o status
+            ainda não tenha sido sincronizado). Use para obter o ID antes de editar, excluir ou
+            estornar uma conta.
             """)
     public List<ContaResponseDto> consultarContas(
             @ToolParam(description = "Tipo: PAGAR ou RECEBER (opcional)") String tipo,
             @ToolParam(description = "Status: PENDENTE, PAGO, RECEBIDO, ATRASADO (opcional)") String status) {
         TipoConta t = parseTipo(tipo);
         StatusConta s = parseStatus(status);
+        // "Atrasada" é um ESTADO DERIVADO: status ATRASADO ou PENDENTE com vencimento < hoje.
+        // Buscar só pelo enum devolvia vazio quando o scheduler ainda não tinha marcado — a IA
+        // respondia "não há contas atrasadas" com 22 vencidas na tela (falso negativo).
+        if (s == StatusConta.ATRASADO) {
+            LocalDate ontem = LocalDate.now().minusDays(1);
+            return contaService.listarComFiltros(t, null, null, null, ontem, null, null, null, null,
+                            PageRequest.of(0, 100)).getContent().stream()
+                    .filter(c -> c.status() == StatusConta.ATRASADO || c.status() == StatusConta.PENDENTE)
+                    .toList();
+        }
         return contaService.listarComFiltros(t, s, null, null, null, null, null, null, null,
                 PageRequest.of(0, 100)).getContent();
     }

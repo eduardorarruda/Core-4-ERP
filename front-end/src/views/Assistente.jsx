@@ -4,7 +4,8 @@ import { chat, clearAuth } from '../lib/api';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
-const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx,.pdf';
+const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx,.pdf,.md';
+const CANAL = 'ASSISTENTE'; // conversa da tela — separada da conversa do balão flutuante
 
 const SUGESTOES = [
   'Qual o meu saldo?',
@@ -62,7 +63,7 @@ export default function Assistente() {
   // Carrega a conversa atual ao abrir — assim a tela mostra o mesmo que a Áurea "lembra"
   // (o mesmo histórico do balão flutuante), sem o efeito de continuar uma conversa invisível.
   useEffect(() => {
-    chat.historico()
+    chat.historico(CANAL)
       .then((h) => { if (Array.isArray(h) && h.length) setMensagens(h.map((m) => ({ role: m.role, text: m.texto }))); })
       .catch(() => {});
   }, []);
@@ -78,7 +79,7 @@ export default function Assistente() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ mensagem: msg }),
+        body: JSON.stringify({ mensagem: msg, canal: CANAL }),
       });
       if (resp.status === 401) { clearAuth(); window.location.href = '/login'; return; }
       if (!resp.ok) {
@@ -148,7 +149,7 @@ export default function Assistente() {
   }
 
   async function limpar() {
-    try { await chat.limparHistorico(); } catch {}
+    try { await chat.limparHistorico(CANAL); } catch {}
     setMensagens([]);
   }
 
@@ -272,7 +273,7 @@ export default function Assistente() {
         </button>
       </div>
       <p className="text-[11px] text-text-primary/35 mt-1.5 text-center">
-        Formatos: .xlsx, .xls, .csv, .ofx, .pdf (máx. 5 MB). Ao anexar, escreva o que deseja fazer. A IA confirma antes de operações que mexem em dinheiro.
+        Formatos: .xlsx, .xls, .csv, .ofx, .pdf, .md (máx. 5 MB). Ao anexar, escreva o que deseja fazer. A IA confirma antes de operações que mexem em dinheiro.
       </p>
     </div>
   );

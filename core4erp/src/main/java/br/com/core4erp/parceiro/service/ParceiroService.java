@@ -82,14 +82,20 @@ public class ParceiroService {
     @Requer("PARCEIRO_EDITAR")
     @Transactional
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
-        dtoValidator.validar(dto);
+        Parceiro parceiro = findOwned(id);
+        // Na ATUALIZAÇÃO o CPF/CNPJ é tratado à parte: parceiros legados (criados quando o documento
+        // era opcional) não podem ficar impossíveis de editar. Se o DTO não trouxer documento,
+        // preserva o existente — nunca apaga.
+        dtoValidator.validar(dto, java.util.Set.of("cpfCnpj"));
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
+        if (docNormalizado == null) {
+            docNormalizado = parceiro.getCpfCnpj();
+        }
         validarCpfCnpj(docNormalizado);
         Long empresaId = tenantCtx.getEmpresaId();
         if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaIdAndIdNot(docNormalizado, empresaId, id)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
-        Parceiro parceiro = findOwned(id);
         preencherCampos(parceiro, dto, docNormalizado);
         enrichCnpj(parceiro);
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));

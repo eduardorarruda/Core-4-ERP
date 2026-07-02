@@ -13,6 +13,8 @@ import br.com.core4erp.notificacao.entity.Notificacao;
 import br.com.core4erp.notificacao.repository.NotificacaoRepository;
 import br.com.core4erp.usuario.entity.Usuario;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,8 @@ import java.util.List;
 
 @Service
 public class SincronizacaoService {
+
+    private static final Logger log = LoggerFactory.getLogger(SincronizacaoService.class);
 
     private final UsuarioRepository usuarioRepository;
     private final ContaRepository contaRepository;
@@ -66,12 +70,17 @@ public class SincronizacaoService {
     }
 
     /**
-     * Sincroniza todas as empresas (chamada administrativa).
+     * Sincroniza todas as empresas — roda diariamente às 00:10 (logo após a virada do dia, quando
+     * contas passam a estar vencidas). BUG CORRIGIDO: este método não tinha {@code @Scheduled} e a
+     * Regra 1 (PENDENTE → ATRASADO) nunca rodava automaticamente — em produção havia 22 contas
+     * vencidas há meses ainda marcadas PENDENTE.
      * S.7: sem @Transactional aqui; cada empresa é sincronizada em sua própria transação
      * (via {@code self}, para que o proxy aplique o @Transactional de {@code sincronizar}),
      * isolando falhas — uma empresa com erro não derruba as demais.
      */
+    @Scheduled(cron = "0 10 0 * * *")
     public void sincronizarTodos() {
+        log.info("[SINCRONIZACAO] iniciando sincronização diária (status ATRASADO + notificações)");
         empresaRepository.findIdsAtivas().forEach(self::sincronizar);
     }
 

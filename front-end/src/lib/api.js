@@ -2,22 +2,35 @@ import { traduzirErroPermissao } from './permissaoMessages.js';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+// Persistência de sessão em localStorage: sessionStorage é isolado POR ABA, então abrir uma nova
+// aba exigia novo login mesmo com o cookie JWT (HttpOnly) válido. O token continua APENAS no
+// cookie — aqui fica só o estado de exibição (nome, empresas, permissões), que o backend revalida
+// a cada request (TenantFilter) e o polling de permissões atualiza a cada 30s.
 export function setUsuario(u) {
-  sessionStorage.setItem('usuario', JSON.stringify(u));
+  localStorage.setItem('usuario', JSON.stringify(u));
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 export function setLoginState(result) {
-  sessionStorage.setItem('usuario', JSON.stringify(result?.usuario ?? result));
-  sessionStorage.setItem('loginState', JSON.stringify(result));
+  localStorage.setItem('usuario', JSON.stringify(result?.usuario ?? result));
+  localStorage.setItem('loginState', JSON.stringify(result));
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 export function getLoginState() {
   // CR-F6: tratar JSON corrompido sem quebrar a app
   try {
-    return JSON.parse(sessionStorage.getItem('loginState') || 'null');
+    const state = JSON.parse(localStorage.getItem('loginState') || 'null');
+    if (state) return state;
+    // Migração suave: sessões antigas (pré-localStorage) continuam válidas na aba atual.
+    const legado = JSON.parse(sessionStorage.getItem('loginState') || 'null');
+    if (legado) {
+      localStorage.setItem('loginState', JSON.stringify(legado));
+      sessionStorage.removeItem('loginState');
+    }
+    return legado;
   } catch {
+    localStorage.removeItem('loginState');
     sessionStorage.removeItem('loginState');
     return null;
   }
@@ -41,11 +54,13 @@ export function setEmpresaAtiva(id) {
   const state = getLoginState();
   if (!state) return;
   state.empresaAtivaId = id;
-  sessionStorage.setItem('loginState', JSON.stringify(state));
+  localStorage.setItem('loginState', JSON.stringify(state));
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 export function clearAuth() {
+  localStorage.removeItem('usuario');
+  localStorage.removeItem('loginState');
   sessionStorage.removeItem('usuario');
   sessionStorage.removeItem('loginState');
   window.dispatchEvent(new CustomEvent('auth-change'));
@@ -144,7 +159,11 @@ export const auth = {
 };
 
 export function getUsuario() {
-  return JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  try {
+    return JSON.parse(localStorage.getItem('usuario') || sessionStorage.getItem('usuario') || 'null');
+  } catch {
+    return null;
+  }
 }
 
 // ── Planos ────────────────────────────────────────────────────────────────────
@@ -323,15 +342,17 @@ export const dashboard = {
 };
 
 // ── Chat IA ───────────────────────────────────────────────────────────────────
+// canal: 'ASSISTENTE' (tela) ou 'BALAO' (balão flutuante). Cada canal tem conversa/contexto
+// PRÓPRIOS no backend — o assunto de um não vaza para o outro.
 export const chat = {
-  enviar: (mensagem) =>
-    request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }),
-  // Conversa atual (mesmo histórico que a IA usa) — para a tela e o balão mostrarem o mesmo.
-  historico: () =>
-    request('/api/chat/historico', { method: 'GET' }),
-  limparHistorico: () =>
-    request('/api/chat/historico', { method: 'DELETE' }),
-  // Envia um arquivo (planilha/OFX/PDF) + a instrução do usuário para a IA processar. Retorna ChatResponseDto.
+  enviar: (mensagem, canal = 'ASSISTENTE') =>
+    request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem, canal }) }),
+  // Conversa atual do canal (mesmo histórico que a IA usa como contexto naquela superfície).
+  historico: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/historico?canal=${canal}`, { method: 'GET' }),
+  limparHistorico: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/historico?canal=${canal}`, { method: 'DELETE' }),
+  // Envia um arquivo (planilha/OFX/PDF/MD) + a instrução do usuário. Retorna ChatResponseDto.
   enviarAnexo: (arquivo, mensagem) => {
     const fd = new FormData();
     fd.append('arquivo', arquivo);

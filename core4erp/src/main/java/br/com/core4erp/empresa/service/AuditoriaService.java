@@ -1,5 +1,6 @@
 package br.com.core4erp.empresa.service;
 
+import br.com.core4erp.chat.service.OrigemIaHolder;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.empresa.entity.AcaoAuditoria;
 import br.com.core4erp.empresa.entity.Auditoria;
@@ -42,6 +43,9 @@ public class AuditoriaService {
         a.setValorNovo(toJsonSanitizado(valorNovo));
         a.setIpAddress(MDC.get("ipAddress"));
         a.setRequestId(MDC.get("requestId"));
+        // Autoria: marca as alterações executadas pela IA (Áurea) a pedido do usuário —
+        // a tela de auditoria exibe "Ação executada pela IA a pedido do utilizador X".
+        a.setAiAction(OrigemIaHolder.isIa());
         a.setDataHora(LocalDateTime.now());
         auditoriaRepository.save(a);
     }

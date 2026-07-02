@@ -72,7 +72,7 @@ function ChatContent({ onClose }) {
 
   async function limparHistorico() {
     try {
-      await chat.limparHistorico();
+      await chat.limparHistorico('BALAO');
     } catch {}
   }
 
@@ -177,14 +177,14 @@ function ChatContent({ onClose }) {
   );
 }
 
-// Painel do balão. Monta só quando aberto: carrega a conversa atual (mesma da tela /assistente e
-// do contexto da IA) e só então cria o runtime com initialMessages — assim o balão mostra a MESMA
-// conversa, sem "responder de uma conversa que não apareceu".
+// Painel do balão. Monta só quando aberto: carrega a conversa do canal BALAO (separada da conversa
+// da tela /assistente — contextos isolados no backend) e só então cria o runtime com
+// initialMessages, para o balão exibir exatamente o que a IA "lembra" nesta superfície.
 function PainelAurea({ onClose }) {
   const [inicial, setInicial] = useState(null); // null = carregando
 
   useEffect(() => {
-    chat.historico()
+    chat.historico('BALAO')
       .then((h) => setInicial(Array.isArray(h)
         ? h.map((m) => ({ role: m.role, content: [{ type: "text", text: m.texto }] }))
         : []))

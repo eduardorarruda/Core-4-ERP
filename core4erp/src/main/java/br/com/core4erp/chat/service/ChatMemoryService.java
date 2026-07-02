@@ -18,6 +18,9 @@ import java.util.List;
  * Histórico de conversa persistido em banco (fonte da verdade).
  * Substitui o cache em memória, que não sobrevivia a restart nem escalava
  * horizontalmente.
+ *
+ * <p><b>Isolamento por canal:</b> a tela do Assistente e o balão flutuante são conversas
+ * SEPARADAS ({@link ChatMensagem.Canal}) — o contexto de uma nunca vaza para a outra.
  */
 @Service
 public class ChatMemoryService {
@@ -43,13 +46,12 @@ public class ChatMemoryService {
     }
 
     /**
-     * Carrega as mensagens da conversa corrente do usuário (limitadas a {@code maxMensagens}),
-     * em ordem cronológica, convertidas para mensagens do Spring AI. A conversa corrente é a
-     * sequência mais recente sem silêncios maiores que {@link #GAP_NOVA_CONVERSA}.
+     * Carrega as mensagens da conversa corrente do usuário no canal (limitadas a
+     * {@code maxMensagens}), em ordem cronológica, convertidas para mensagens do Spring AI.
      */
     @Transactional(readOnly = true)
-    public List<Message> carregar(Long usuarioId, int maxMensagens) {
-        return conversaAtual(usuarioId, maxMensagens).stream()
+    public List<Message> carregar(Long usuarioId, ChatMensagem.Canal canal, int maxMensagens) {
+        return conversaAtual(usuarioId, canal, maxMensagens).stream()
                 .map(m -> m.getRole() == ChatMensagem.Role.USER
                         ? (Message) new UserMessage(m.getConteudo())
                         : new AssistantMessage(m.getConteudo()))
@@ -57,16 +59,15 @@ public class ChatMemoryService {
     }
 
     /**
-     * Retorna, em ordem cronológica, as mensagens da conversa CORRENTE do usuário (mesma janela
-     * usada como contexto da IA). Serve tanto para montar o prompt quanto para o frontend EXIBIR o
-     * que a Áurea já "lembra" — assim a tela do assistente e o balão flutuante mostram a MESMA
-     * conversa (sem o efeito de "responder de uma conversa que não apareceu").
+     * Retorna, em ordem cronológica, as mensagens da conversa CORRENTE do usuário no canal (mesma
+     * janela usada como contexto da IA). Serve tanto para montar o prompt quanto para o frontend
+     * EXIBIR o que a Áurea "lembra" naquela superfície.
      */
     @Transactional(readOnly = true)
-    public List<ChatMensagem> conversaAtual(Long usuarioId, int maxMensagens) {
+    public List<ChatMensagem> conversaAtual(Long usuarioId, ChatMensagem.Canal canal, int maxMensagens) {
         // Vem em ordem decrescente (mais recente primeiro).
-        List<ChatMensagem> recentes = repository.findByUsuarioIdOrderByCriadoEmDescIdDesc(
-                usuarioId, PageRequest.of(0, maxMensagens));
+        List<ChatMensagem> recentes = repository.findByUsuarioIdAndCanalOrderByCriadoEmDescIdDesc(
+                usuarioId, canal, PageRequest.of(0, maxMensagens));
 
         // Se a última interação já é antiga, trata como nova conversa: não carrega contexto algum.
         // Evita que uma confirmação tardia ("isso mesmo") se ancore numa conversa encerrada.
@@ -106,15 +107,15 @@ public class ChatMemoryService {
     }
 
     @Transactional
-    public void registrar(Long usuarioId, ChatMensagem.Role role, String conteudo) {
+    public void registrar(Long usuarioId, ChatMensagem.Canal canal, ChatMensagem.Role role, String conteudo) {
         if (conteudo == null || conteudo.isBlank()) {
             return;
         }
-        repository.save(new ChatMensagem(usuarioId, role, conteudo));
+        repository.save(new ChatMensagem(usuarioId, role, conteudo, canal));
     }
 
     @Transactional
-    public void limpar(Long usuarioId) {
-        repository.deleteByUsuarioId(usuarioId);
+    public void limpar(Long usuarioId, ChatMensagem.Canal canal) {
+        repository.deleteByUsuarioIdAndCanal(usuarioId, canal);
     }
 }

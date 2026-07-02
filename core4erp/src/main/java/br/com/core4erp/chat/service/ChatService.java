@@ -57,6 +57,7 @@ public class ChatService {
     private final ChatMemoryService memoryService;
     private final RagService ragService;
     private final ObjectMapper objectMapper;
+    private final TenantContext tenantCtx;
     private final int maxHistorico;
     private final double precoInputPorMilhao;   // USD por 1M tokens de entrada (prompt)
     private final double precoOutputPorMilhao;  // USD por 1M tokens de saída (completion)
@@ -90,6 +91,7 @@ public class ChatService {
                        ChatMemoryService memoryService,
                        RagService ragService,
                        ObjectMapper objectMapper,
+                       TenantContext tenantCtx,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico,
                        @Value("${chat.preco.input-usd-por-milhao:2.50}") double precoInputPorMilhao,
                        @Value("${chat.preco.output-usd-por-milhao:10.00}") double precoOutputPorMilhao) {
@@ -106,6 +108,7 @@ public class ChatService {
         this.memoryService = memoryService;
         this.ragService = ragService;
         this.objectMapper = objectMapper;
+        this.tenantCtx = tenantCtx;
         this.maxHistorico = maxHistorico;
         this.precoInputPorMilhao = precoInputPorMilhao;
         this.precoOutputPorMilhao = precoOutputPorMilhao;
@@ -133,14 +136,16 @@ public class ChatService {
 
         String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
-        String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
+        ChatMensagem.Canal canal = request.canalResolvido();
+        String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
-        List<Message> allMessages = montarMensagens(usuarioId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
-        memoryService.registrar(usuarioId, ChatMensagem.Role.USER,
+        List<Message> allMessages = montarMensagens(usuarioId, canal, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
+        memoryService.registrar(usuarioId, canal, ChatMensagem.Role.USER,
                 textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
 
         try {
+            OrigemIaHolder.marcarIa(); // auditoria grava is_ai_action=true nas escritas das tools
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
                     .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
@@ -152,7 +157,7 @@ public class ChatService {
             respostaTexto = anexarDownload(respostaTexto, downloadUrl);
 
             registrarUsage(response, email);
-            memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, respostaTexto);
+            memoryService.registrar(usuarioId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
 
             if (downloadUrl == null) {
                 downloadUrl = extrairDownloadUrl(respostaTexto);
@@ -162,7 +167,17 @@ public class ChatService {
             chatMetrics.registrarErro();
             throw e;
         } finally {
+            OrigemIaHolder.limpar();
             chatMetrics.finalizarTimer(timer);
+        }
+    }
+
+    /** Pensamento Estendido: exclusivo do Administrador do sistema — a IA lê arquivos na íntegra. */
+    private boolean isPensamentoEstendido() {
+        try {
+            return tenantCtx.isAdminSistema();
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -173,10 +188,11 @@ public class ChatService {
         // Captura identidade e contexto na thread da requisição (HTTP), antes do hand-off.
         String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
-        String systemPrompt = promptBuilder.build(securityCtx.getUsuario());
+        ChatMensagem.Canal canal = request.canalResolvido();
+        String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
-        List<Message> allMessages = montarMensagens(usuarioId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
-        memoryService.registrar(usuarioId, ChatMensagem.Role.USER, mensagemUsuario);
+        List<Message> allMessages = montarMensagens(usuarioId, canal, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
+        memoryService.registrar(usuarioId, canal, ChatMensagem.Role.USER, mensagemUsuario);
 
         SecurityContext securityContext = SecurityContextHolder.getContext();
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
@@ -195,6 +211,7 @@ public class ChatService {
                 // daqui e restaurados nas threads do Reactor onde as tools executam.
                 SecurityContextHolder.setContext(securityContext);
                 TenantContext.restoreState(tenantState);
+                OrigemIaHolder.marcarIa(); // auditoria grava is_ai_action=true nas escritas das tools
                 if (requestAttributes != null) {
                     RequestContextHolder.setRequestAttributes(requestAttributes, true);
                 }
@@ -232,7 +249,7 @@ public class ChatService {
                 }
 
                 registrarUsage(usageRef.get(), email);
-                memoryService.registrar(usuarioId, ChatMensagem.Role.ASSISTANT, full.toString());
+                memoryService.registrar(usuarioId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
 
                 emitter.complete();
             } catch (Exception e) {
@@ -250,6 +267,7 @@ public class ChatService {
                 chatMetrics.decrementarSessoes();
                 RelatorioDownloadHolder.clear(usuarioId);
                 RequestContextHolder.resetRequestAttributes();
+                OrigemIaHolder.limpar();
                 TenantContext.removeState();
                 SecurityContextHolder.clearContext();
             }
@@ -286,21 +304,22 @@ public class ChatService {
         }
     }
 
-    public void limparHistorico() {
-        memoryService.limpar(securityCtx.getUsuarioId());
+    public void limparHistorico(ChatMensagem.Canal canal) {
+        memoryService.limpar(securityCtx.getUsuarioId(), canal);
     }
 
-    /** Conversa atual (para o frontend exibir o mesmo histórico que a IA usa como contexto). */
-    public List<ChatHistoricoItemDto> historico() {
+    /** Conversa atual do canal (para o frontend exibir o mesmo histórico que a IA usa de contexto). */
+    public List<ChatHistoricoItemDto> historico(ChatMensagem.Canal canal) {
         Long usuarioId = securityCtx.getUsuarioId();
-        return memoryService.conversaAtual(usuarioId, maxHistorico).stream()
+        return memoryService.conversaAtual(usuarioId, canal, maxHistorico).stream()
                 .map(m -> new ChatHistoricoItemDto(
                         m.getRole() == ChatMensagem.Role.USER ? "user" : "assistant", m.getConteudo()))
                 .toList();
     }
 
-    private List<Message> montarMensagens(Long usuarioId, String systemPrompt, String mensagemUsuario) {
-        List<Message> historico = memoryService.carregar(usuarioId, maxHistorico);
+    private List<Message> montarMensagens(Long usuarioId, ChatMensagem.Canal canal,
+                                          String systemPrompt, String mensagemUsuario) {
+        List<Message> historico = memoryService.carregar(usuarioId, canal, maxHistorico);
         List<Message> allMessages = new ArrayList<>(historico.size() + 2);
         allMessages.add(new SystemMessage(systemPrompt));
         allMessages.addAll(historico);

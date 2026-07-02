@@ -254,8 +254,14 @@ public class ContaService {
         if (conta.getTipo() == TipoConta.PAGAR
                 && contaCorrente.getSaldo().compareTo(valorFinal) < 0
                 && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
-            throw new BusinessException("SALDO_INSUFICIENTE",
-                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
+            // Mensagem rica: diz QUAL conta corrente, o saldo dela e o valor — evita interpretações
+            // erradas (ex.: usuário/IA achando que "não há saldo" quando outra conta tem).
+            throw new BusinessException("SALDO_INSUFICIENTE", String.format(
+                    "Saldo insuficiente na conta corrente \"%s\" (saldo R$ %s; valor da baixa R$ %s) "
+                    + "e ela não permite ficar negativa. Escolha outra conta corrente com saldo suficiente.",
+                    contaCorrente.getDescricao(),
+                    contaCorrente.getSaldo().setScale(2, RoundingMode.HALF_UP).toPlainString().replace('.', ','),
+                    valorFinal.toPlainString().replace('.', ',')));
         }
 
         ContaBaixada baixada = new ContaBaixada();

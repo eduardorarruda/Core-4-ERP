@@ -19,7 +19,8 @@ const core4ChatAdapter = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ mensagem: textContent }),
+        // canal BALAO: a conversa do balão flutuante é separada da conversa da tela /assistente.
+        body: JSON.stringify({ mensagem: textContent, canal: "BALAO" }),
         signal: abortSignal,
       });
 

@@ -59,7 +59,9 @@ function PageSkeleton() {
 }
 
 function isAuthenticated() {
-  return Boolean(sessionStorage.getItem('usuario'));
+  // localStorage: sessão compartilhada entre abas (o JWT continua só no cookie HttpOnly).
+  // Fallback ao sessionStorage cobre sessões abertas antes da migração.
+  return Boolean(localStorage.getItem('usuario') || sessionStorage.getItem('usuario'));
 }
 
 function NavigateToFirstAccessible() {

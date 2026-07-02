@@ -64,7 +64,7 @@ export default function Configuracoes() {
       }
       const dto = { nome: form.nome, novaSenha: form.novaSenha || null };
       const atualizado = await auth.atualizarPerfil(dto);
-      sessionStorage.setItem('usuario', JSON.stringify(atualizado));
+      localStorage.setItem('usuario', JSON.stringify(atualizado));
       setForm((f) => ({ ...f, novaSenha: '', confirmarSenha: '' }));
       setSavedOk(true);
       toast.success('Perfil atualizado com sucesso!');
