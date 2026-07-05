@@ -55,6 +55,7 @@ public class ChatService {
     private final GestaoFinanceiraTools gestaoFinanceiraTools;
     private final ChatMetrics chatMetrics;
     private final ChatMemoryService memoryService;
+    private final ChatConversaService conversaService;
     private final RagService ragService;
     private final ObjectMapper objectMapper;
     private final TenantContext tenantCtx;
@@ -89,6 +90,7 @@ public class ChatService {
                        GestaoFinanceiraTools gestaoFinanceiraTools,
                        ChatMetrics chatMetrics,
                        ChatMemoryService memoryService,
+                       ChatConversaService conversaService,
                        RagService ragService,
                        ObjectMapper objectMapper,
                        TenantContext tenantCtx,
@@ -106,6 +108,7 @@ public class ChatService {
         this.gestaoFinanceiraTools = gestaoFinanceiraTools;
         this.chatMetrics = chatMetrics;
         this.memoryService = memoryService;
+        this.conversaService = conversaService;
         this.ragService = ragService;
         this.objectMapper = objectMapper;
         this.tenantCtx = tenantCtx;
@@ -137,11 +140,12 @@ public class ChatService {
         String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
         ChatMensagem.Canal canal = request.canalResolvido();
+        Long conversaId = conversaService.resolverOuCriar(canal, request.conversaId()).getId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
 
-        List<Message> allMessages = montarMensagens(usuarioId, canal, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
-        memoryService.registrar(usuarioId, canal, ChatMensagem.Role.USER,
+        List<Message> allMessages = montarMensagens(conversaId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
+        memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER,
                 textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
 
         try {
@@ -157,7 +161,8 @@ public class ChatService {
             respostaTexto = anexarDownload(respostaTexto, downloadUrl);
 
             registrarUsage(response, email);
-            memoryService.registrar(usuarioId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
+            memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
+            conversaService.aposMensagem(conversaId, mensagemUsuario);
 
             if (downloadUrl == null) {
                 downloadUrl = extrairDownloadUrl(respostaTexto);
@@ -189,10 +194,11 @@ public class ChatService {
         String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
         ChatMensagem.Canal canal = request.canalResolvido();
+        Long conversaId = conversaService.resolverOuCriar(canal, request.conversaId()).getId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
-        List<Message> allMessages = montarMensagens(usuarioId, canal, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
-        memoryService.registrar(usuarioId, canal, ChatMensagem.Role.USER, mensagemUsuario);
+        List<Message> allMessages = montarMensagens(conversaId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
+        memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER, mensagemUsuario);
 
         SecurityContext securityContext = SecurityContextHolder.getContext();
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
@@ -249,7 +255,8 @@ public class ChatService {
                 }
 
                 registrarUsage(usageRef.get(), email);
-                memoryService.registrar(usuarioId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
+                memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
+                conversaService.aposMensagem(conversaId, mensagemUsuario);
 
                 emitter.complete();
             } catch (Exception e) {
@@ -304,22 +311,29 @@ public class ChatService {
         }
     }
 
+    /** Compatibilidade (UI antiga): limpar = apagar todas as conversas do canal. */
     public void limparHistorico(ChatMensagem.Canal canal) {
-        memoryService.limpar(securityCtx.getUsuarioId(), canal);
+        conversaService.limparCanal(canal);
     }
 
-    /** Conversa atual do canal (para o frontend exibir o mesmo histórico que a IA usa de contexto). */
+    /** Compatibilidade (UI antiga): conversa mais recente do canal como uma lista de mensagens. */
     public List<ChatHistoricoItemDto> historico(ChatMensagem.Canal canal) {
-        Long usuarioId = securityCtx.getUsuarioId();
-        return memoryService.conversaAtual(usuarioId, canal, maxHistorico).stream()
+        return conversaService.conversaMaisRecente(canal)
+                .map(c -> mensagensDaConversa(c.getId()))
+                .orElseGet(List::of);
+    }
+
+    /** Mensagens de UMA conversa (com dono validado) — para a tela abrir a thread. */
+    public List<ChatHistoricoItemDto> mensagensDaConversa(Long conversaId) {
+        conversaService.owned(conversaId); // valida dono (404 se não for do usuário)
+        return memoryService.mensagensDaConversa(conversaId).stream()
                 .map(m -> new ChatHistoricoItemDto(
                         m.getRole() == ChatMensagem.Role.USER ? "user" : "assistant", m.getConteudo()))
                 .toList();
     }
 
-    private List<Message> montarMensagens(Long usuarioId, ChatMensagem.Canal canal,
-                                          String systemPrompt, String mensagemUsuario) {
-        List<Message> historico = memoryService.carregar(usuarioId, canal, maxHistorico);
+    private List<Message> montarMensagens(Long conversaId, String systemPrompt, String mensagemUsuario) {
+        List<Message> historico = memoryService.carregarContexto(conversaId);
         List<Message> allMessages = new ArrayList<>(historico.size() + 2);
         allMessages.add(new SystemMessage(systemPrompt));
         allMessages.addAll(historico);

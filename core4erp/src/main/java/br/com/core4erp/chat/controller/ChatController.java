@@ -1,11 +1,18 @@
 package br.com.core4erp.chat.controller;
 
+import br.com.core4erp.chat.dto.ChatConversaResponseDto;
+import br.com.core4erp.chat.dto.ChatHistoricoItemDto;
 import br.com.core4erp.chat.dto.ChatRequestDto;
 import br.com.core4erp.chat.dto.ChatResponseDto;
 import br.com.core4erp.chat.dto.RagIndexarRequestDto;
+import br.com.core4erp.chat.dto.RenomearConversaDto;
+import br.com.core4erp.chat.entity.ChatMensagem;
 import br.com.core4erp.chat.service.ChatAnexoService;
+import br.com.core4erp.chat.service.ChatConversaService;
 import br.com.core4erp.chat.service.ChatService;
 import br.com.core4erp.chat.service.RagService;
+
+import java.util.List;
 import br.com.core4erp.chat.tools.relatorio.RelatorioExcelService;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,17 +35,20 @@ import java.nio.charset.StandardCharsets;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ChatConversaService conversaService;
     private final ChatAnexoService chatAnexoService;
     private final RagService ragService;
     private final RelatorioExcelService relatorioService;
     private final SecurityContextUtils securityCtx;
 
     public ChatController(ChatService chatService,
+                          ChatConversaService conversaService,
                           ChatAnexoService chatAnexoService,
                           RagService ragService,
                           RelatorioExcelService relatorioService,
                           SecurityContextUtils securityCtx) {
         this.chatService = chatService;
+        this.conversaService = conversaService;
         this.chatAnexoService = chatAnexoService;
         this.ragService = ragService;
         this.relatorioService = relatorioService;
@@ -56,8 +66,9 @@ public class ChatController {
     @PostMapping(value = "/anexo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ChatResponseDto> enviarAnexo(
             @RequestParam("arquivo") MultipartFile arquivo,
-            @RequestParam(value = "mensagem", required = false) String mensagem) {
-        return ResponseEntity.ok(chatAnexoService.processarAnexo(arquivo, mensagem));
+            @RequestParam(value = "mensagem", required = false) String mensagem,
+            @RequestParam(value = "conversaId", required = false) Long conversaId) {
+        return ResponseEntity.ok(chatAnexoService.processarAnexo(arquivo, mensagem, conversaId));
     }
 
     @Operation(summary = "Indexar texto na base de conhecimento (RAG) da empresa")
@@ -79,14 +90,53 @@ public class ChatController {
         return emitter;
     }
 
-    @Operation(summary = "Obter a conversa atual do canal (tela Assistente ou balão — contextos separados)")
+    // ── Conversas (threads estilo ChatGPT) ────────────────────────────────────
+
+    @Operation(summary = "Listar as conversas do usuário no canal (barra lateral)")
+    @GetMapping("/conversas")
+    public ResponseEntity<List<ChatConversaResponseDto>> listarConversas(
+            @RequestParam(value = "canal", required = false) String canal) {
+        return ResponseEntity.ok(conversaService.listar(resolverCanal(canal)));
+    }
+
+    @Operation(summary = "Criar uma nova conversa (vazia) e retornar seu id")
+    @PostMapping("/conversas")
+    public ResponseEntity<ChatConversaResponseDto> criarConversa(
+            @RequestParam(value = "canal", required = false) String canal) {
+        return ResponseEntity.status(201).body(
+                ChatConversaResponseDto.from(conversaService.criar(resolverCanal(canal), null)));
+    }
+
+    @Operation(summary = "Mensagens de uma conversa (para abrir a thread na tela)")
+    @GetMapping("/conversas/{id}/mensagens")
+    public ResponseEntity<List<ChatHistoricoItemDto>> mensagensDaConversa(@PathVariable Long id) {
+        return ResponseEntity.ok(chatService.mensagensDaConversa(id));
+    }
+
+    @Operation(summary = "Renomear uma conversa")
+    @PatchMapping("/conversas/{id}")
+    public ResponseEntity<ChatConversaResponseDto> renomearConversa(
+            @PathVariable Long id, @Valid @RequestBody RenomearConversaDto req) {
+        return ResponseEntity.ok(conversaService.renomear(id, req.titulo()));
+    }
+
+    @Operation(summary = "Excluir uma conversa (e suas mensagens)")
+    @DeleteMapping("/conversas/{id}")
+    public ResponseEntity<Void> excluirConversa(@PathVariable Long id) {
+        conversaService.excluir(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── Compatibilidade (UI antiga, por canal) ────────────────────────────────
+
+    @Operation(summary = "Obter a conversa mais recente do canal (compatibilidade)")
     @GetMapping("/historico")
-    public ResponseEntity<java.util.List<br.com.core4erp.chat.dto.ChatHistoricoItemDto>> historico(
+    public ResponseEntity<List<ChatHistoricoItemDto>> historico(
             @RequestParam(value = "canal", required = false) String canal) {
         return ResponseEntity.ok(chatService.historico(resolverCanal(canal)));
     }
 
-    @Operation(summary = "Limpar histórico de conversa do canal")
+    @Operation(summary = "Limpar histórico do canal (apaga as conversas do canal)")
     @DeleteMapping("/historico")
     public ResponseEntity<Void> limparHistorico(
             @RequestParam(value = "canal", required = false) String canal) {
@@ -94,12 +144,12 @@ public class ChatController {
         return ResponseEntity.noContent().build();
     }
 
-    private static br.com.core4erp.chat.entity.ChatMensagem.Canal resolverCanal(String canal) {
-        if (canal == null || canal.isBlank()) return br.com.core4erp.chat.entity.ChatMensagem.Canal.ASSISTENTE;
+    private static ChatMensagem.Canal resolverCanal(String canal) {
+        if (canal == null || canal.isBlank()) return ChatMensagem.Canal.ASSISTENTE;
         try {
-            return br.com.core4erp.chat.entity.ChatMensagem.Canal.valueOf(canal.trim().toUpperCase());
+            return ChatMensagem.Canal.valueOf(canal.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            return br.com.core4erp.chat.entity.ChatMensagem.Canal.ASSISTENTE;
+            return ChatMensagem.Canal.ASSISTENTE;
         }
     }
 

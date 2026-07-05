@@ -10,11 +10,18 @@ public record ChatRequestDto(
         String mensagem,
 
         /** Superfície da conversa: ASSISTENTE (tela) ou BALAO (balão flutuante). Opcional. */
-        String canal
+        String canal,
+
+        /** Conversa (thread) alvo. Opcional — se ausente, o backend resolve/cria a conversa ativa. */
+        Long conversaId
 ) {
-    /** Compatibilidade: mensagem sem canal cai na tela do Assistente. */
+    /** Compatibilidade: mensagem sem canal/conversa cai na tela do Assistente. */
     public ChatRequestDto(String mensagem) {
-        this(mensagem, null);
+        this(mensagem, null, null);
+    }
+
+    public ChatRequestDto(String mensagem, String canal) {
+        this(mensagem, canal, null);
     }
 
     /** Canal resolvido (default ASSISTENTE; valor desconhecido também cai no default). */

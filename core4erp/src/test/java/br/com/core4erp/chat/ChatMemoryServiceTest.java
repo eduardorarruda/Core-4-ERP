@@ -24,20 +24,20 @@ import static org.mockito.Mockito.when;
 class ChatMemoryServiceTest {
 
     private static final ChatMensagem.Canal CANAL = ChatMensagem.Canal.ASSISTENTE;
+    private static final long CONVERSA = 7L;
 
     private final ChatMensagemRepository repository = mock(ChatMensagemRepository.class);
     private final ChatMemoryService service = new ChatMemoryService(repository);
 
     @Test
-    void carregar_inverteParaOrdemCronologicaEMapeiaPapeis() {
+    void carregarContexto_inverteParaOrdemCronologicaEMapeiaPapeis() {
         // Repositório retorna em ordem DECRESCENTE (mais recente primeiro)
-        ChatMensagem maisRecente = new ChatMensagem(1L, ChatMensagem.Role.ASSISTANT, "resposta", CANAL);
-        ChatMensagem maisAntiga = new ChatMensagem(1L, ChatMensagem.Role.USER, "pergunta", CANAL);
-        when(repository.findByUsuarioIdAndCanalOrderByCriadoEmDescIdDesc(
-                anyLong(), eq(CANAL), any(Pageable.class)))
+        ChatMensagem maisRecente = new ChatMensagem(1L, CONVERSA, CANAL, ChatMensagem.Role.ASSISTANT, "resposta");
+        ChatMensagem maisAntiga = new ChatMensagem(1L, CONVERSA, CANAL, ChatMensagem.Role.USER, "pergunta");
+        when(repository.findByConversaIdOrderByCriadoEmDescIdDesc(eq(CONVERSA), any(Pageable.class)))
                 .thenReturn(List.of(maisRecente, maisAntiga));
 
-        List<Message> mensagens = service.carregar(1L, CANAL, 20);
+        List<Message> mensagens = service.carregarContexto(CONVERSA);
 
         assertEquals(2, mensagens.size());
         // Após inversão: a pergunta (User) vem primeiro, a resposta (Assistant) depois
@@ -47,29 +47,27 @@ class ChatMemoryServiceTest {
     }
 
     @Test
-    void carregar_canaisSaoIsolados_consultaSomenteOCanalPedido() {
-        when(repository.findByUsuarioIdAndCanalOrderByCriadoEmDescIdDesc(
-                anyLong(), eq(ChatMensagem.Canal.BALAO), any(Pageable.class)))
-                .thenReturn(List.of());
-
-        service.carregar(1L, ChatMensagem.Canal.BALAO, 20);
-
-        verify(repository).findByUsuarioIdAndCanalOrderByCriadoEmDescIdDesc(
-                eq(1L), eq(ChatMensagem.Canal.BALAO), any(Pageable.class));
-        verify(repository, never()).findByUsuarioIdAndCanalOrderByCriadoEmDescIdDesc(
-                eq(1L), eq(ChatMensagem.Canal.ASSISTENTE), any(Pageable.class));
+    void carregarContexto_conversaNula_retornaVazioSemConsultar() {
+        assertEquals(List.of(), service.carregarContexto(null));
+        verify(repository, never()).findByConversaIdOrderByCriadoEmDescIdDesc(anyLong(), any(Pageable.class));
     }
 
     @Test
     void registrar_conteudoEmBranco_naoPersiste() {
-        service.registrar(1L, CANAL, ChatMensagem.Role.USER, "   ");
-        service.registrar(1L, CANAL, ChatMensagem.Role.USER, null);
+        service.registrar(1L, CONVERSA, CANAL, ChatMensagem.Role.USER, "   ");
+        service.registrar(1L, CONVERSA, CANAL, ChatMensagem.Role.USER, null);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void registrar_semConversa_naoPersiste() {
+        service.registrar(1L, null, CANAL, ChatMensagem.Role.USER, "oi");
         verify(repository, never()).save(any());
     }
 
     @Test
     void registrar_conteudoValido_persiste() {
-        service.registrar(1L, CANAL, ChatMensagem.Role.ASSISTANT, "ok");
+        service.registrar(1L, CONVERSA, CANAL, ChatMensagem.Role.ASSISTANT, "ok");
         verify(repository).save(any(ChatMensagem.class));
     }
 }

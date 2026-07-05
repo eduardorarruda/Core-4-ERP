@@ -30,6 +30,10 @@ public class ChatMensagem {
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
 
+    /** Conversa (thread) a que a mensagem pertence. */
+    @Column(name = "conversa_id", nullable = false)
+    private Long conversaId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
@@ -44,15 +48,12 @@ public class ChatMensagem {
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 
-    public ChatMensagem(Long usuarioId, Role role, String conteudo) {
-        this(usuarioId, role, conteudo, Canal.ASSISTENTE);
-    }
-
-    public ChatMensagem(Long usuarioId, Role role, String conteudo, Canal canal) {
+    public ChatMensagem(Long usuarioId, Long conversaId, Canal canal, Role role, String conteudo) {
         this.usuarioId = usuarioId;
+        this.conversaId = conversaId;
+        this.canal = canal != null ? canal : Canal.ASSISTENTE;
         this.role = role;
         this.conteudo = conteudo;
-        this.canal = canal != null ? canal : Canal.ASSISTENTE;
         this.criadoEm = LocalDateTime.now();
     }
 }
