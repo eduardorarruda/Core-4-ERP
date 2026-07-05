@@ -13,6 +13,7 @@ import br.com.core4erp.investimento.entity.TipoInvestimentoCustom;
 import br.com.core4erp.investimento.entity.TransacaoInvestimento;
 import br.com.core4erp.investimento.repository.ContaInvestimentoRepository;
 import br.com.core4erp.investimento.repository.TransacaoInvestimentoRepository;
+import br.com.core4erp.utils.DtoValidator;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,19 +30,22 @@ public class InvestimentoService {
     private final TipoInvestimentoService tipoService;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public InvestimentoService(ContaInvestimentoRepository contaRepo,
                                TransacaoInvestimentoRepository transacaoRepo,
                                ContaCorrenteService contaCorrenteService,
                                TipoInvestimentoService tipoService,
                                SecurityContextUtils securityCtx,
-                               TenantContext tenantCtx) {
+                               TenantContext tenantCtx,
+                               DtoValidator dtoValidator) {
         this.contaRepo = contaRepo;
         this.transacaoRepo = transacaoRepo;
         this.contaCorrenteService = contaCorrenteService;
         this.tipoService = tipoService;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     // ── Contas de Investimento ────────────────────────────────────────────────
@@ -62,6 +66,7 @@ public class InvestimentoService {
     @Requer("INVESTIMENTO_CRIAR")
     @Transactional
     public ContaInvestimentoResponseDto criar(ContaInvestimentoRequestDto dto) {
+        dtoValidator.validar(dto);
         TipoInvestimentoCustom tipo = tipoService.findOwned(dto.tipoId());
         ContaInvestimento c = new ContaInvestimento();
         c.setNome(dto.nome());
@@ -74,6 +79,7 @@ public class InvestimentoService {
     @Requer("INVESTIMENTO_EDITAR")
     @Transactional
     public ContaInvestimentoResponseDto atualizar(Long id, ContaInvestimentoRequestDto dto) {
+        dtoValidator.validar(dto);
         TipoInvestimentoCustom tipo = tipoService.findOwned(dto.tipoId());
         ContaInvestimento c = findOwnedConta(id);
         c.setNome(dto.nome());
