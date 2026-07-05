@@ -113,6 +113,10 @@ public class ChatAnexoService {
     }
 
     public ChatResponseDto processarAnexo(MultipartFile arquivo, String mensagemUsuario) {
+        return processarAnexo(arquivo, mensagemUsuario, null);
+    }
+
+    public ChatResponseDto processarAnexo(MultipartFile arquivo, String mensagemUsuario, Long conversaId) {
         if (arquivo == null || arquivo.isEmpty()) {
             throw new IllegalArgumentException("Nenhum arquivo foi enviado.");
         }
@@ -189,7 +193,7 @@ public class ChatAnexoService {
         // A IA recebe o conteúdo completo agora, mas no histórico guardamos só um resumo curto
         // (o arquivo inteiro no histórico inflaria o prompt das próximas mensagens → 429).
         String resumoHistorico = "[Enviei o arquivo \"" + nome + "\" e pedi: " + instrucao + "]";
-        return chatService.processar(new ChatRequestDto(mensagem, "ASSISTENTE"), resumoHistorico);
+        return chatService.processar(new ChatRequestDto(mensagem, "ASSISTENTE", conversaId), resumoHistorico);
     }
 
     private boolean isAdminSistema() {
