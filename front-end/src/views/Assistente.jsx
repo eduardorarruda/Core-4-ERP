@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Sparkles, Send, Paperclip, Trash2, Download, FileSpreadsheet, Loader2, X } from 'lucide-react';
+import {
+  Sparkles, Send, Paperclip, Trash2, Download, FileSpreadsheet, Loader2, X,
+  Plus, MessageSquare, Search, Pencil, Check, PanelLeft, Copy,
+} from 'lucide-react';
 import { chat, clearAuth } from '../lib/api';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
 const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx,.pdf,.md';
-const CANAL = 'ASSISTENTE'; // conversa da tela — separada da conversa do balão flutuante
+const CANAL = 'ASSISTENTE';
 
 const SUGESTOES = [
   'Qual o meu saldo?',
@@ -14,7 +17,7 @@ const SUGESTOES = [
   'Resumo das minhas finanças',
 ];
 
-/** Renderiza markdown simples (negrito, listas, quebras) de forma segura (React escapa o texto). */
+/** Markdown simples (negrito, listas, quebras) — seguro (React escapa o texto). */
 function Markdown({ text }) {
   const linhas = (text || '').split('\n');
   const out = [];
@@ -30,48 +33,122 @@ function Markdown({ text }) {
   };
   linhas.forEach((l, idx) => {
     const m = l.match(/^\s*[-*]\s+(.*)$/);
-    if (m) {
-      bullets = bullets || [];
-      bullets.push(<li key={idx}>{inline(m[1])}</li>);
-    } else {
-      flush();
-      if (l.trim() === '') out.push(<div key={idx} className="h-2" />);
-      else out.push(<p key={idx} className="my-0.5">{inline(l)}</p>);
-    }
+    if (m) { bullets = bullets || []; bullets.push(<li key={idx}>{inline(m[1])}</li>); }
+    else { flush(); if (l.trim() === '') out.push(<div key={idx} className="h-2" />); else out.push(<p key={idx} className="my-0.5">{inline(l)}</p>); }
   });
   flush();
-  return <div className="text-sm leading-relaxed">{out}</div>;
+  return <div className="text-[15px] leading-relaxed">{out}</div>;
 }
 
-/** Extrai um eventual link de relatório (.xlsx) da resposta para mostrar como botão de download. */
 function downloadDaResposta(texto) {
   const m = (texto || '').match(RELATORIO_PATH);
   return m ? m[0] : null;
 }
 
+/** Agrupa conversas por data (Hoje / Ontem / 7 dias / Anteriores). */
+function agrupar(list) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const ontem = new Date(hoje); ontem.setDate(ontem.getDate() - 1);
+  const semana = new Date(hoje); semana.setDate(semana.getDate() - 7);
+  const grupos = [['Hoje', []], ['Ontem', []], ['Últimos 7 dias', []], ['Anteriores', []]];
+  list.forEach((c) => {
+    const d = new Date(c.atualizadoEm);
+    if (d >= hoje) grupos[0][1].push(c);
+    else if (d >= ontem) grupos[1][1].push(c);
+    else if (d >= semana) grupos[2][1].push(c);
+    else grupos[3][1].push(c);
+  });
+  return grupos.filter(([, items]) => items.length);
+}
+
 export default function Assistente() {
-  const [mensagens, setMensagens] = useState([]); // { role: 'user'|'assistant', text, arquivo? }
+  const [conversas, setConversas] = useState([]);
+  const [conversaAtiva, setConversaAtiva] = useState(null);
+  const [mensagens, setMensagens] = useState([]);
   const [input, setInput] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [carregandoMsgs, setCarregandoMsgs] = useState(false);
   const [processandoArquivo, setProcessandoArquivo] = useState(null);
-  const [arquivoAnexado, setArquivoAnexado] = useState(null); // File preparado, enviado só no submit
+  const [arquivoAnexado, setArquivoAnexado] = useState(null);
+  const [busca, setBusca] = useState('');
+  const [editando, setEditando] = useState(false);
+  const [tituloEdit, setTituloEdit] = useState('');
+  const [listaAberta, setListaAberta] = useState(false); // drawer no mobile
+  const [copiado, setCopiado] = useState(null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(null); // id aguardando confirmação
+
   const fimRef = useRef(null);
   const fileRef = useRef(null);
+  const textareaRef = useRef(null);
 
   useEffect(() => { fimRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensagens, ocupado]);
 
-  // Carrega a conversa atual ao abrir — assim a tela mostra o mesmo que a Áurea "lembra"
-  // (o mesmo histórico do balão flutuante), sem o efeito de continuar uma conversa invisível.
+  // Auto-expande o textarea conforme o conteúdo (até max-h-40).
   useEffect(() => {
-    chat.historico(CANAL)
-      .then((h) => { if (Array.isArray(h) && h.length) setMensagens(h.map((m) => ({ role: m.role, text: m.texto }))); })
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
+
+  async function copiar(texto, i) {
+    try {
+      await navigator.clipboard.writeText(texto || '');
+      setCopiado(i);
+      setTimeout(() => setCopiado((c) => (c === i ? null : c)), 1500);
+    } catch {}
+  }
+
+  useEffect(() => {
+    chat.conversas(CANAL)
+      .then((list) => { setConversas(list || []); if (list?.length) selecionar(list[0].id); })
       .catch(() => {});
   }, []);
+
+  function refreshConversas() {
+    chat.conversas(CANAL).then((l) => setConversas(l || [])).catch(() => {});
+  }
+
+  async function selecionar(id) {
+    setConversaAtiva(id); setListaAberta(false); setEditando(false); setConfirmandoExclusao(null);
+    setCarregandoMsgs(true);
+    try {
+      const msgs = await chat.mensagensConversa(id);
+      setMensagens((msgs || []).map((m) => ({ role: m.role, text: m.texto })));
+    } catch { setMensagens([]); }
+    finally { setCarregandoMsgs(false); }
+  }
+
+  async function novaConversa() {
+    setEditando(false);
+    try {
+      const c = await chat.criarConversa(CANAL);
+      setConversas((prev) => [c, ...prev]);
+      setConversaAtiva(c.id); setMensagens([]); setListaAberta(false);
+    } catch {}
+  }
+
+  async function garantirConversa() {
+    if (conversaAtiva) return conversaAtiva;
+    const c = await chat.criarConversa(CANAL);
+    setConversas((prev) => [c, ...prev]);
+    setConversaAtiva(c.id);
+    return c.id;
+  }
+
+  function atualizarUltima(text) {
+    setMensagens((m) => {
+      const c = [...m];
+      for (let i = c.length - 1; i >= 0; i--) { if (c[i].role === 'assistant') { c[i] = { ...c[i], text }; break; } }
+      return c;
+    });
+  }
 
   async function enviarTexto(texto) {
     const msg = (texto ?? input).trim();
     if (!msg || ocupado) return;
     setInput('');
+    const cid = await garantirConversa();
     setMensagens((m) => [...m, { role: 'user', text: msg }, { role: 'assistant', text: '' }]);
     setOcupado(true);
     try {
@@ -79,7 +156,7 @@ export default function Assistente() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ mensagem: msg, canal: CANAL }),
+        body: JSON.stringify({ mensagem: msg, canal: CANAL, conversaId: cid }),
       });
       if (resp.status === 401) { clearAuth(); window.location.href = '/login'; return; }
       if (!resp.ok) {
@@ -109,38 +186,26 @@ export default function Assistente() {
       atualizarUltima('Não foi possível conectar ao servidor. Verifique sua conexão.');
     } finally {
       setOcupado(false);
+      refreshConversas();
     }
   }
 
-  function atualizarUltima(text) {
-    setMensagens((m) => {
-      const c = [...m];
-      for (let i = c.length - 1; i >= 0; i--) {
-        if (c[i].role === 'assistant') { c[i] = { ...c[i], text }; break; }
-      }
-      return c;
-    });
-  }
-
-  // Envia o arquivo preparado JUNTO com a instrução do usuário (nunca sem texto).
   async function enviarComArquivo(texto, arquivo) {
-    setInput('');
-    setArquivoAnexado(null);
+    setInput(''); setArquivoAnexado(null);
+    const cid = await garantirConversa();
     setMensagens((m) => [...m, { role: 'user', text: texto, arquivo: arquivo.name }, { role: 'assistant', text: '' }]);
-    setOcupado(true);
-    setProcessandoArquivo(arquivo.name);
+    setOcupado(true); setProcessandoArquivo(arquivo.name);
     try {
-      const resp = await chat.enviarAnexo(arquivo, texto);
+      const resp = await chat.enviarAnexo(arquivo, texto, cid);
       atualizarUltima(resp?.resposta || 'Arquivo processado.');
     } catch (e) {
       atualizarUltima(e.message || 'Não foi possível processar o arquivo.');
     } finally {
-      setOcupado(false);
-      setProcessandoArquivo(null);
+      setOcupado(false); setProcessandoArquivo(null);
+      refreshConversas();
     }
   }
 
-  // Dispatcher do botão/Enter: com arquivo preparado exige texto e envia os dois; senão, texto puro.
   function enviar() {
     const texto = input.trim();
     if (ocupado || !texto) return;
@@ -148,133 +213,248 @@ export default function Assistente() {
     else enviarTexto(texto);
   }
 
-  async function limpar() {
-    try { await chat.limparHistorico(CANAL); } catch {}
-    setMensagens([]);
+  async function excluir(id) {
+    setConfirmandoExclusao(null);
+    try { await chat.excluirConversa(id); } catch {}
+    setConversas((prev) => prev.filter((c) => c.id !== id));
+    if (id === conversaAtiva) { setConversaAtiva(null); setMensagens([]); }
   }
 
+  function iniciarEdicao() {
+    const c = conversas.find((x) => x.id === conversaAtiva);
+    setTituloEdit(c?.titulo ?? ''); setEditando(true);
+  }
+  async function salvarTitulo() {
+    const t = tituloEdit.trim();
+    if (!t || !conversaAtiva) { setEditando(false); return; }
+    try {
+      const c = await chat.renomearConversa(conversaAtiva, t);
+      setConversas((prev) => prev.map((x) => (x.id === c.id ? c : x)));
+    } catch {}
+    setEditando(false);
+  }
+
+  const conversaObj = conversas.find((c) => c.id === conversaAtiva) || null;
+  const filtradas = busca.trim()
+    ? conversas.filter((c) => (c.titulo || '').toLowerCase().includes(busca.trim().toLowerCase()))
+    : conversas;
+  const grupos = agrupar(filtradas);
+  const semConversa = conversaAtiva == null;
   const vazio = mensagens.length === 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] max-w-4xl mx-auto w-full">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-text-primary font-display">Áurea</h1>
-            <p className="text-xs text-text-primary/50">Sua assistente financeira — converse ou envie planilhas, extratos (OFX) e PDFs</p>
-          </div>
-        </div>
-        <button onClick={limpar} title="Limpar conversa"
-          className="p-2 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium transition-colors">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Mensagens */}
-      <div className="flex-1 overflow-y-auto rounded-2xl border border-text-primary/5 bg-surface-low p-4 space-y-3">
-        {vazio && (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-4 py-10">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Sparkles className="w-7 h-7 text-primary" />
-            </div>
-            <div>
-              <p className="font-semibold text-text-primary">Como posso ajudar?</p>
-              <p className="text-sm text-text-primary/50 max-w-md mt-1">
-                Pergunte sobre suas finanças, ou anexe uma planilha (.xlsx/.csv) ou extrato bancário (.ofx)
-                e eu analiso e faço os cadastros/lançamentos necessários.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {SUGESTOES.map((s) => (
-                <button key={s} onClick={() => enviarTexto(s)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-text-primary/10 text-text-primary/60 hover:border-primary/30 hover:text-primary transition-colors">
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {mensagens.map((m, i) => {
-          const url = m.role === 'assistant' ? downloadDaResposta(m.text) : null;
-          const textoLimpo = url ? m.text.replace(RELATORIO_PATH, '').replace(/\[[^\]]*\]\(\s*\)/g, '') : m.text;
-          return (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${m.role === 'user'
-                ? 'bg-primary/20 text-text-primary rounded-br-sm'
-                : 'bg-surface-medium text-text-primary/90 rounded-bl-sm'}`}>
-                {m.arquivo && (
-                  <span className="flex items-center gap-2 text-sm font-medium mb-1 opacity-80">
-                    <FileSpreadsheet className="w-4 h-4 shrink-0" /> {m.arquivo}
-                  </span>
-                )}
-                {m.role === 'assistant' && !m.text && ocupado ? (
-                  <span className="inline-flex items-center gap-2 text-sm text-text-primary/50">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {processandoArquivo ? `Analisando ${processandoArquivo}…` : 'Pensando…'}
-                  </span>
-                ) : m.text ? (
-                  <Markdown text={textoLimpo} />
-                ) : null}
-                {url && (
-                  <a href={url} download
-                    className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-semibold no-underline">
-                    <Download className="w-4 h-4" /> Baixar Relatório (.xlsx)
-                  </a>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        <div ref={fimRef} />
-      </div>
-
-      {/* Chip do arquivo preparado — só é enviado junto com a instrução no submit */}
-      {arquivoAnexado && (
-        <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-sm text-text-primary w-fit max-w-full">
-          <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
-          <span className="truncate font-medium">{arquivoAnexado.name}</span>
-          <span className="text-text-primary/40 shrink-0">— escreva o que fazer e envie</span>
-          <button onClick={() => setArquivoAnexado(null)} disabled={ocupado}
-            aria-label="Remover arquivo" title="Remover arquivo"
-            className="ml-1 p-0.5 rounded hover:bg-primary/20 text-text-primary/50 hover:text-text-primary shrink-0 disabled:opacity-40">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="flex h-full w-full bg-surface overflow-hidden">
+      {/* Overlay mobile */}
+      {listaAberta && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden" onClick={() => setListaAberta(false)} />
       )}
 
-      {/* Entrada */}
-      <div className="mt-2 flex items-end gap-2">
-        <input ref={fileRef} type="file" accept={TIPOS_ACEITOS} className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoAnexado(f); e.target.value = ''; }} />
-        <button onClick={() => fileRef.current?.click()} disabled={ocupado}
-          title="Anexar planilha, OFX ou PDF"
-          className="p-3 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-40 shrink-0">
-          <Paperclip className="w-5 h-5" />
-        </button>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-          placeholder={arquivoAnexado ? 'Descreva o que fazer com o arquivo (ex.: cadastre todas as contas deste extrato)…' : 'Pergunte sobre suas finanças, ou anexe um arquivo…'}
-          rows={1}
-          disabled={ocupado}
-          className="flex-1 bg-surface border border-text-primary/10 rounded-xl px-4 py-3 text-sm text-text-primary outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-text-primary/30 resize-none max-h-32"
-        />
-        <button onClick={enviar} disabled={ocupado || !input.trim()}
-          aria-label="Enviar"
-          title={arquivoAnexado && !input.trim() ? 'Escreva o que deseja fazer com o arquivo' : 'Enviar'}
-          className="bg-primary text-on-primary p-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0">
-          <Send className="w-5 h-5" />
-        </button>
-      </div>
-      <p className="text-[11px] text-text-primary/35 mt-1.5 text-center">
-        Formatos: .xlsx, .xls, .csv, .ofx, .pdf, .md (máx. 5 MB). Ao anexar, escreva o que deseja fazer. A IA confirma antes de operações que mexem em dinheiro.
-      </p>
+      {/* ── Barra lateral de conversas ── */}
+      <aside className={`${listaAberta ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-40 md:z-0 h-full w-72 shrink-0 bg-surface-low border-r border-text-primary/5 flex flex-col transition-transform duration-200`}>
+        <div className="p-3">
+          <button onClick={novaConversa}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:opacity-90 transition-opacity">
+            <Plus className="w-4 h-4" /> Nova conversa
+          </button>
+        </div>
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-text-primary/10 text-text-primary/60 focus-within:border-primary/30">
+            <Search className="w-4 h-4 shrink-0" />
+            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar conversa"
+              className="bg-transparent outline-none text-sm w-full placeholder:text-text-primary/30 text-text-primary" />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-3 space-y-3">
+          {conversas.length === 0 && (
+            <p className="text-xs text-text-primary/40 text-center mt-6 px-4">Nenhuma conversa ainda. Comece uma nova.</p>
+          )}
+          {grupos.map(([label, items]) => (
+            <div key={label}>
+              <p className="text-[10px] uppercase tracking-widest text-text-primary/30 px-3 mb-1">{label}</p>
+              <div className="space-y-0.5">
+                {items.map((c) => (
+                  <div key={c.id}
+                    className={`group flex items-center gap-2 pl-3 pr-2 py-2 rounded-lg cursor-pointer transition-colors ${
+                      c.id === conversaAtiva ? 'bg-surface-medium' : 'hover:bg-surface-medium/50'}`}
+                    onClick={() => selecionar(c.id)}>
+                    <MessageSquare className={`w-4 h-4 shrink-0 ${c.id === conversaAtiva ? 'text-primary' : 'text-text-primary/40'}`} />
+                    <span className="flex-1 text-sm text-text-primary/80 truncate">{c.titulo}</span>
+                    {confirmandoExclusao === c.id ? (
+                      <span className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[11px] text-text-primary/50 mr-0.5">Excluir?</span>
+                        <button onClick={(e) => { e.stopPropagation(); excluir(c.id); }} aria-label="Confirmar exclusão"
+                          className="p-1 rounded text-red-400 hover:bg-red-400/10"><Check className="w-3.5 h-3.5" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setConfirmandoExclusao(null); }} aria-label="Cancelar exclusão"
+                          className="p-1 rounded text-text-primary/40 hover:bg-surface-medium"><X className="w-3.5 h-3.5" /></button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setConfirmandoExclusao(c.id); }}
+                        aria-label="Excluir conversa"
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-primary/40 hover:text-red-400 transition-opacity shrink-0">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* ── Área da conversa ── */}
+      <section className="flex-1 flex flex-col min-w-0 h-full">
+        {/* Cabeçalho */}
+        <header className="flex items-center gap-2 px-4 py-3 border-b border-text-primary/5 shrink-0">
+          <button onClick={() => setListaAberta(true)} className="md:hidden p-1.5 rounded-lg text-text-primary/50 hover:bg-surface-medium" aria-label="Abrir conversas">
+            <PanelLeft className="w-5 h-5" />
+          </button>
+          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-primary" />
+          </div>
+          {editando ? (
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              <input autoFocus value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') salvarTitulo(); if (e.key === 'Escape') setEditando(false); }}
+                className="flex-1 min-w-0 bg-surface border border-primary/30 rounded-lg px-2 py-1 text-sm text-text-primary outline-none" />
+              <button onClick={salvarTitulo} className="p-1.5 text-primary" aria-label="Salvar"><Check className="w-4 h-4" /></button>
+              <button onClick={() => setEditando(false)} className="p-1.5 text-text-primary/40" aria-label="Cancelar"><X className="w-4 h-4" /></button>
+            </div>
+          ) : (
+            <>
+              <h1 className="flex-1 text-[15px] font-semibold text-text-primary font-display truncate">
+                {conversaObj ? conversaObj.titulo : 'Áurea'}
+              </h1>
+              {conversaObj && (
+                <button onClick={iniciarEdicao} className="p-1.5 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium" aria-label="Renomear">
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
+            </>
+          )}
+        </header>
+
+        {/* Mensagens */}
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+            {carregandoMsgs ? (
+              <div className="flex justify-center py-10 text-text-primary/40"><Loader2 className="w-6 h-6 animate-spin" /></div>
+            ) : (semConversa || vazio) ? (
+              <div className="flex flex-col items-center justify-center text-center gap-4 py-16">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-text-primary font-display">Como posso ajudar?</p>
+                  <p className="text-sm text-text-primary/50 max-w-md mt-1">
+                    Pergunte sobre suas finanças, ou anexe uma planilha, extrato (.ofx), PDF ou .md — eu analiso e faço os cadastros e lançamentos.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                  {SUGESTOES.map((s) => (
+                    <button key={s} onClick={() => enviarTexto(s)}
+                      className="text-sm px-3.5 py-2 rounded-xl border border-text-primary/10 text-text-primary/70 hover:border-primary/30 hover:text-primary transition-colors">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : mensagens.map((m, i) => {
+              const url = m.role === 'assistant' ? downloadDaResposta(m.text) : null;
+              const textoLimpo = url ? m.text.replace(RELATORIO_PATH, '').replace(/\[[^\]]*\]\(\s*\)/g, '') : m.text;
+              if (m.role === 'user') {
+                return (
+                  <div key={i} className="flex justify-end">
+                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-surface-medium border border-text-primary/5 px-4 py-2.5">
+                      {m.arquivo && (
+                        <span className="flex items-center gap-2 text-sm font-medium mb-1 text-text-primary/70">
+                          <FileSpreadsheet className="w-4 h-4 shrink-0" /> {m.arquivo}
+                        </span>
+                      )}
+                      {m.text && <Markdown text={m.text} />}
+                    </div>
+                  </div>
+                );
+              }
+              const carregandoResposta = !m.text && ocupado;
+              return (
+                <div key={i} className="group/msg flex gap-3 items-start animate-fade-in-up">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-text-primary/90">
+                    {carregandoResposta ? (
+                      <span className="inline-flex items-center gap-2 text-sm text-text-primary/50">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {processandoArquivo ? `Analisando ${processandoArquivo}…` : 'Pensando…'}
+                      </span>
+                    ) : <Markdown text={textoLimpo} />}
+                    {url && (
+                      <a href={url} download
+                        className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-semibold no-underline">
+                        <Download className="w-4 h-4" /> Baixar Relatório (.xlsx)
+                      </a>
+                    )}
+                    {!carregandoResposta && textoLimpo && (
+                      <button onClick={() => copiar(textoLimpo, i)}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-text-primary/30 hover:text-text-primary/70 opacity-0 group-hover/msg:opacity-100 transition-opacity"
+                        aria-label="Copiar resposta">
+                        {copiado === i
+                          ? <><Check className="w-3 h-3" /> Copiado</>
+                          : <><Copy className="w-3 h-3" /> Copiar</>}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={fimRef} />
+          </div>
+        </div>
+
+        {/* Composer */}
+        <div className="shrink-0 px-4 pb-4 pt-2">
+          <div className="max-w-3xl mx-auto">
+            {arquivoAnexado && (
+              <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-sm text-text-primary w-fit max-w-full">
+                <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
+                <span className="truncate font-medium">{arquivoAnexado.name}</span>
+                <span className="text-text-primary/40 shrink-0">— escreva o que fazer e envie</span>
+                <button onClick={() => setArquivoAnexado(null)} disabled={ocupado} aria-label="Remover arquivo"
+                  className="ml-1 p-0.5 rounded hover:bg-primary/20 text-text-primary/50 hover:text-text-primary shrink-0 disabled:opacity-40">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <div className="flex items-end gap-2 border border-text-primary/10 rounded-2xl px-2 py-2 bg-surface-low focus-within:border-primary/30 transition-colors">
+              <input ref={fileRef} type="file" accept={TIPOS_ACEITOS} className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoAnexado(f); e.target.value = ''; }} />
+              <button onClick={() => fileRef.current?.click()} disabled={ocupado} title="Anexar planilha, OFX, PDF ou .md"
+                className="p-2.5 rounded-xl text-text-primary/50 hover:text-primary transition-colors disabled:opacity-40 shrink-0">
+                <Paperclip className="w-5 h-5" />
+              </button>
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
+                placeholder={arquivoAnexado ? 'Descreva o que fazer com o arquivo…' : 'Escreva para a Áurea…'}
+                rows={1} disabled={ocupado}
+                className="flex-1 bg-transparent px-1 py-2 text-[15px] text-text-primary outline-none placeholder:text-text-primary/30 resize-none max-h-40"
+              />
+              <button onClick={enviar} disabled={ocupado || !input.trim()} aria-label="Enviar"
+                className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0">
+                {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-[11px] text-text-primary/35 mt-2 text-center">
+              Enter envia · Shift+Enter quebra linha · aceita .xlsx, .csv, .ofx, .pdf, .md (máx. 5 MB)
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
