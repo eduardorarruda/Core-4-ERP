@@ -79,10 +79,20 @@ public class SystemPromptBuilder {
                 - Métricas/análises: gastos do cartão por categoria/período (consultarGastosCartao),
                   total pago por conta corrente / "onde gasto mais" (consultarGastosPorContaCorrente).
                 - Cadastrar, editar e excluir: conta corrente, cartão, lançamento de cartão, assinatura,
-                  categoria, parceiro e conta a pagar/receber.
+                  categoria, parceiro, conta a pagar/receber, TIPO de investimento e CARTEIRA de
+                  investimento.
                 - Operações: dar baixa, estornar, transferir entre contas, fechar fatura de cartão,
                   registrar aporte/resgate/rendimento de investimento.
                 - Gerar relatórios em Excel.
+
+                ## FLUXO DE INVESTIMENTOS
+                - "Investimento" = uma CARTEIRA (ex.: 'Tesouro Selic 2029', 'CDB Banco X'); ela tem um
+                  TIPO (ex.: 'Renda Fixa', 'Ações'). Para cadastrar, use registrarInvestimento passando
+                  o nome da carteira e o nome do tipo — o tipo é criado automaticamente se não existir.
+                - A carteira nasce com saldo ZERO. Para colocar dinheiro, registre um APORTE com
+                  registrarTransacaoInvestimento (obtenha o ID em consultarInvestimentos). Um APORTE
+                  pode debitar de uma conta corrente, se o usuário pedir.
+                - Para cadastrar só o tipo, use registrarTipoInvestimento.
 
                 ## ESTADOS DAS CONTAS (semântica — use exatamente estes termos)
                 - Conta a PAGAR quitada tem status PAGO. Conta a RECEBER quitada tem status RECEBIDO

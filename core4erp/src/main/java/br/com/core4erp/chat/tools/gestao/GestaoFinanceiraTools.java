@@ -23,6 +23,12 @@ import br.com.core4erp.contaCorrente.dto.ContaCorrenteRequestDto;
 import br.com.core4erp.contaCorrente.dto.ContaCorrenteResponseDto;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
 import br.com.core4erp.enums.TipoParceiro;
+import br.com.core4erp.investimento.dto.ContaInvestimentoRequestDto;
+import br.com.core4erp.investimento.dto.ContaInvestimentoResponseDto;
+import br.com.core4erp.investimento.dto.TipoInvestimentoRequestDto;
+import br.com.core4erp.investimento.dto.TipoInvestimentoResponseDto;
+import br.com.core4erp.investimento.service.InvestimentoService;
+import br.com.core4erp.investimento.service.TipoInvestimentoService;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.service.ParceiroService;
@@ -60,6 +66,8 @@ public class GestaoFinanceiraTools {
     private final CategoriaService categoriaService;
     private final ParceiroService parceiroService;
     private final ContaService contaService;
+    private final InvestimentoService investimentoService;
+    private final TipoInvestimentoService tipoInvestimentoService;
     private final SecurityContextUtils securityCtx;
     private final ChatAuditoriaService auditoria;
 
@@ -69,6 +77,8 @@ public class GestaoFinanceiraTools {
                                  CategoriaService categoriaService,
                                  ParceiroService parceiroService,
                                  ContaService contaService,
+                                 InvestimentoService investimentoService,
+                                 TipoInvestimentoService tipoInvestimentoService,
                                  SecurityContextUtils securityCtx,
                                  ChatAuditoriaService auditoria) {
         this.contaCorrenteService = contaCorrenteService;
@@ -77,6 +87,8 @@ public class GestaoFinanceiraTools {
         this.categoriaService = categoriaService;
         this.parceiroService = parceiroService;
         this.contaService = contaService;
+        this.investimentoService = investimentoService;
+        this.tipoInvestimentoService = tipoInvestimentoService;
         this.securityCtx = securityCtx;
         this.auditoria = auditoria;
     }
@@ -412,6 +424,71 @@ public class GestaoFinanceiraTools {
         return "Parceiro '" + alvo.razaoSocial() + "' excluído com sucesso.";
     }
 
+    // ── Investimentos (tipo + carteira) ───────────────────────────────────────
+
+    @Tool(description = """
+            Lista os TIPOS de investimento cadastrados (ex.: Renda Fixa, Ações, Tesouro Direto).
+            Use antes de cadastrar uma carteira, para reaproveitar um tipo existente.
+            """)
+    public List<TipoInvestimentoResponseDto> consultarTiposInvestimento() {
+        return tipoInvestimentoService.listar();
+    }
+
+    @Tool(description = """
+            Cadastra um TIPO de investimento (ex.: 'Renda Fixa', 'Ações', 'Tesouro Direto'). Se já
+            existir um tipo com o mesmo nome, reaproveita (não duplica). Confirme o nome antes.
+            """)
+    public TipoInvestimentoResponseDto registrarTipoInvestimento(
+            @ToolParam(description = "Nome do tipo de investimento. Ex: 'Renda Fixa'") String nome) {
+        audit("registrarTipoInvestimento", "nome=" + nome);
+        return acharOuCriarTipoInvestimento(nome);
+    }
+
+    @Tool(description = """
+            Cadastra uma CARTEIRA de investimento (o "investimento" em si, ex.: 'Tesouro Selic 2029',
+            'CDB Banco X'). Informe o nome e o TIPO pelo nome (ex.: 'Renda Fixa') — se o tipo ainda
+            não existir, ele é criado automaticamente. Se já existir uma carteira com o mesmo nome,
+            reaproveita (não duplica). O saldo começa em zero: para adicionar dinheiro, use depois
+            registrarTransacaoInvestimento (APORTE). Confirme os dados antes.
+            """)
+    public ContaInvestimentoResponseDto registrarInvestimento(
+            @ToolParam(description = "Nome da carteira. Ex: 'Tesouro Selic 2029'") String nome,
+            @ToolParam(description = "Nome do tipo de investimento. Ex: 'Renda Fixa'") String tipo) {
+        audit("registrarInvestimento", "nome=" + nome + " tipo=" + tipo);
+        ContaInvestimentoResponseDto existente = investimentoService.listar().stream()
+                .filter(c -> igual(c.nome(), nome)).findFirst().orElse(null);
+        if (existente != null) return existente;
+        Long tipoId = acharOuCriarTipoInvestimento(tipo).id();
+        return investimentoService.criar(new ContaInvestimentoRequestDto(nome.strip(), tipoId));
+    }
+
+    @Tool(description = """
+            Edita uma carteira de investimento (pelo nome atual). Pode mudar o nome e/ou o tipo
+            (pelo nome). Informe só o que mudar. Confirme antes de executar.
+            """)
+    public ContaInvestimentoResponseDto atualizarInvestimento(
+            @ToolParam(description = "Nome ATUAL da carteira a editar") String investimento,
+            @ToolParam(description = "Novo nome (opcional)") String novoNome,
+            @ToolParam(description = "Novo tipo, pelo nome (opcional)") String tipo) {
+        ContaInvestimentoResponseDto atual = acharInvestimento(investimento);
+        audit("atualizarInvestimento", "id=" + atual.id());
+        Long tipoId = (tipo != null && !tipo.isBlank()) ? acharOuCriarTipoInvestimento(tipo).id() : atual.tipoId();
+        return investimentoService.atualizar(atual.id(), new ContaInvestimentoRequestDto(
+                novoNome != null && !novoNome.isBlank() ? novoNome.strip() : atual.nome(), tipoId));
+    }
+
+    @Tool(description = """
+            Exclui uma carteira de investimento (pelo nome). BLOQUEADO se já houver transações
+            (aportes/resgates) registradas nela. Confirme antes de executar.
+            """)
+    public String excluirInvestimento(
+            @ToolParam(description = "Nome da carteira a excluir") String investimento) {
+        ContaInvestimentoResponseDto alvo = acharInvestimento(investimento);
+        audit("excluirInvestimento", "id=" + alvo.id());
+        investimentoService.deletar(alvo.id());
+        return "Carteira de investimento '" + alvo.nome() + "' excluída com sucesso.";
+    }
+
     // ── Resolvers por nome ────────────────────────────────────────────────────
 
     private static boolean igual(String a, String b) {
@@ -465,6 +542,22 @@ public class GestaoFinanceiraTools {
     /** Cartão opcional (para vínculo): null/blank devolve null. */
     private Long acharCartaoId(String nome) {
         return (nome == null || nome.isBlank()) ? null : acharCartao(nome).id();
+    }
+
+    private ContaInvestimentoResponseDto acharInvestimento(String nome) {
+        List<ContaInvestimentoResponseDto> m = investimentoService.listar().stream()
+                .filter(c -> igual(c.nome(), nome)).toList();
+        return unico(m, "carteira de investimento", nome);
+    }
+
+    /** Resolve o tipo pelo nome; se não existir, cria (evita erro por tipo inexistente). */
+    private TipoInvestimentoResponseDto acharOuCriarTipoInvestimento(String nome) {
+        if (nome == null || nome.isBlank()) {
+            throw new IllegalArgumentException("Informe o tipo do investimento (ex.: 'Renda Fixa').");
+        }
+        return tipoInvestimentoService.listar().stream()
+                .filter(t -> igual(t.nome(), nome)).findFirst()
+                .orElseGet(() -> tipoInvestimentoService.criar(new TipoInvestimentoRequestDto(nome.strip())));
     }
 
     private <T> T unico(List<T> matches, String tipo, String nome) {
