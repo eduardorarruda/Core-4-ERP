@@ -352,11 +352,25 @@ export const chat = {
     request(`/api/chat/historico?canal=${canal}`, { method: 'GET' }),
   limparHistorico: (canal = 'ASSISTENTE') =>
     request(`/api/chat/historico?canal=${canal}`, { method: 'DELETE' }),
-  // Envia um arquivo (planilha/OFX/PDF/MD) + a instrução do usuário. Retorna ChatResponseDto.
-  enviarAnexo: (arquivo, mensagem) => {
+
+  // ── Conversas (threads estilo ChatGPT) ──
+  conversas: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/conversas?canal=${canal}`, { method: 'GET' }),
+  criarConversa: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/conversas?canal=${canal}`, { method: 'POST' }),
+  mensagensConversa: (conversaId) =>
+    request(`/api/chat/conversas/${conversaId}/mensagens`, { method: 'GET' }),
+  renomearConversa: (conversaId, titulo) =>
+    request(`/api/chat/conversas/${conversaId}`, { method: 'PATCH', body: JSON.stringify({ titulo }) }),
+  excluirConversa: (conversaId) =>
+    request(`/api/chat/conversas/${conversaId}`, { method: 'DELETE' }),
+
+  // Envia um arquivo (planilha/OFX/PDF/MD) + a instrução do usuário, na conversa indicada.
+  enviarAnexo: (arquivo, mensagem, conversaId) => {
     const fd = new FormData();
     fd.append('arquivo', arquivo);
     fd.append('mensagem', mensagem ?? '');
+    if (conversaId != null) fd.append('conversaId', String(conversaId));
     return request('/api/chat/anexo', { method: 'POST', body: fd, timeout: 120000 });
   },
 };

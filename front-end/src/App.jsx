@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useCallback, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import ChatSidebar from './components/chat/ChatSidebar';
@@ -118,6 +118,10 @@ function ProtectedLayout({ children }) {
   const [showSenhaModal, setShowSenhaModal] = useState(false);
   const { senhaProvisoria } = useAuth();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // Rotas "tela cheia": ocupam toda a área (sem padding/max-width) — ex.: a tela da Áurea, que
+  // precisa dos 2 painéis do tamanho da janela, estilo ChatGPT.
+  const fullBleed = pathname === '/assistente';
 
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
@@ -154,12 +158,21 @@ function ProtectedLayout({ children }) {
           onMenuClick={() => setIsSidebarOpen(true)}
           onCommandPaletteOpen={openCmd}
         />
-        <main id="main-content" className="flex-1 p-4 lg:p-8 overflow-y-auto no-scrollbar animate-fade-in">
-          <div className="max-w-7xl mx-auto">
+        <main id="main-content" className={cn(
+          'flex-1 min-h-0 animate-fade-in',
+          fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 overflow-y-auto no-scrollbar'
+        )}>
+          {fullBleed ? (
             <Suspense fallback={<PageSkeleton />}>
               {children}
             </Suspense>
-          </div>
+          ) : (
+            <div className="max-w-7xl mx-auto">
+              <Suspense fallback={<PageSkeleton />}>
+                {children}
+              </Suspense>
+            </div>
+          )}
         </main>
       </div>
 
