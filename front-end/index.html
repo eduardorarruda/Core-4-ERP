@@ -16,6 +16,19 @@
         else document.documentElement.classList.remove('dark');
       })();
     </script>
+    <!-- Captura o evento de instalação do PWA o mais cedo possível: no Chrome/Android ele
+         costuma disparar antes do React montar. Guardamos no window e avisamos o app. -->
+    <script>
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.deferredInstallPrompt = e;
+        window.dispatchEvent(new Event('pwa-installable'));
+      });
+      window.addEventListener('appinstalled', function () {
+        window.deferredInstallPrompt = null;
+        window.dispatchEvent(new Event('pwa-installed'));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
