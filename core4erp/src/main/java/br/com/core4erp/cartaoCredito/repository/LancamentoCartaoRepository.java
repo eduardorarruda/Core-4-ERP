@@ -1,6 +1,7 @@
 package br.com.core4erp.cartaoCredito.repository;
 
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,9 +19,19 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
 
     Optional<LancamentoCartao> findByIdAndCartaoCreditoIdAndEmpresaId(Long id, Long cartaoId, Long empresaId);
 
+    Optional<LancamentoCartao> findByIdAndEmpresaId(Long id, Long empresaId);
+
     boolean existsByCartaoCreditoId(Long cartaoId);
 
     boolean existsByAssinaturaIdAndMesFaturaAndAnoFatura(Long assinaturaId, Integer mes, Integer ano);
+
+    /** Busca global: lançamentos de cartão cuja descrição contém o termo. */
+    @Query("""
+            SELECT l FROM LancamentoCartao l
+            WHERE l.empresaId = :eid
+              AND LOWER(l.descricao) LIKE LOWER(CONCAT('%', :q, '%'))
+            """)
+    List<LancamentoCartao> buscarPorDescricao(@Param("eid") Long eid, @Param("q") String q, Pageable pageable);
 
     @Query("""
         SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
@@ -115,16 +126,20 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                                          @Param("dataMin") java.time.LocalDate dataMin,
                                                          @Param("dataMax") java.time.LocalDate dataMax);
 
+    // Roll-up de subcategorias no total da categoria-pai (COALESCE). LEFT JOIN no pai
+    // preserva lançamentos em categorias raiz (join implícito em categoriaPai os excluiria).
     @Query("""
-        SELECT l.categoria.descricao, l.mesFatura, l.anoFatura,
+        SELECT COALESCE(pai.descricao, cat.descricao), l.mesFatura, l.anoFatura,
                COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
              - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
         FROM LancamentoCartao l
+        JOIN l.categoria cat
+        LEFT JOIN cat.categoriaPai pai
         WHERE l.empresaId = :eid
         AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
         AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
-        GROUP BY l.categoria.descricao, l.mesFatura, l.anoFatura
-        ORDER BY l.anoFatura, l.mesFatura, l.categoria.descricao
+        GROUP BY COALESCE(pai.descricao, cat.descricao), l.mesFatura, l.anoFatura
+        ORDER BY l.anoFatura, l.mesFatura, COALESCE(pai.descricao, cat.descricao)
     """)
     List<Object[]> resumoDashboardPorCategoria(@Param("eid") Long eid,
                                                @Param("mesInicio") Integer mesInicio,

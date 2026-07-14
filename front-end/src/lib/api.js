@@ -233,10 +233,13 @@ export const pagamentos = {
 // ── Categorias ────────────────────────────────────────────────────────────────
 export const categorias = {
   listar: () => request('/api/categorias').then(p => p.content),
+  arvore: () => request('/api/categorias/arvore'),
   buscar: (id) => request(`/api/categorias/${id}`),
   criar: (dto) => request('/api/categorias', { method: 'POST', body: JSON.stringify(dto) }),
   atualizar: (id, dto) => request(`/api/categorias/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/categorias/${id}`, { method: 'DELETE' }),
+  reativar: (id) => request(`/api/categorias/${id}/reativar`, { method: 'PATCH' }),
+  sugerir: (dto) => request('/api/categorias/sugerir', { method: 'POST', body: JSON.stringify(dto) }),
 };
 
 // ── Parceiros ─────────────────────────────────────────────────────────────────
@@ -297,6 +300,11 @@ export const cartoes = {
   },
   dashboard: (qs) => request(`/api/cartoes/dashboard/resumo${qs ? `?${qs}` : ''}`),
   dashboardBI: (qs) => request(`/api/cartoes/dashboard/bi${qs ? `?${qs}` : ''}`),
+};
+
+// ── Busca global ──────────────────────────────────────────────────────────────
+export const busca = {
+  global: (q) => request(`/api/busca?q=${encodeURIComponent(q)}`),
 };
 
 // ── Notificações ──────────────────────────────────────────────────────────────

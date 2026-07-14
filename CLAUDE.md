@@ -351,7 +351,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V37** (V36 `add_tipo_lancamento_cartao` já aplicada em 2026-06).
+- **Próxima migration disponível: V45** (V44 `create_tb_rag_sync` já aplicada em 2026-07).
 
 **Sequência de migrations:**
 ```
@@ -389,9 +389,37 @@ V33     add_empresa_id_to_tipo_investimento
 V34     add_audit_columns_to_tipo_investimento
 V35     fix_conta_corrente_unique_numero_por_empresa
 V36     add_tipo_lancamento_cartao
+V37     create_tb_chat_mensagem
+V38     create_tb_chat_auditoria
+V39     add_version_to_conta_corrente
+V40     add_canal_chat_e_ia_auditoria
+V41     create_tb_chat_conversa
+V42     add_categoria_pai_e_soft_delete   (subcategorias: categoria_pai_id + ativo)
+V43     add_classificacao_ia              (flags classificada_por_ia/confianca_ia em conta e lançamento)
+V44     create_tb_rag_sync                (estado incremental da vetorização RAG)
 ```
 
 Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
+
+### Categorias hierárquicas + classificação por IA (V42–V44, 2026-07)
+
+- `tb_categoria` agora é **hierárquica** (`categoria_pai_id`, self-FK, **máx. 2 níveis** validado no
+  `CategoriaService`) e tem **soft delete** (`ativo`; deletar inativa em cascata as subcategorias).
+  Endpoint de árvore: `GET /api/categorias/arvore`. Reativar: `PATCH /api/categorias/{id}/reativar`.
+- **Roll-up obrigatório**: toda agregação por categoria soma a subcategoria no total da categoria-pai
+  via `COALESCE(categoria_pai_id, id)` (com **LEFT JOIN** no pai — inner join derrubaria as raízes).
+  Aplicado em `ContaRepository.despesasPorCategoria`, `LancamentoCartaoRepository.resumoDashboardPorCategoria`,
+  `RelatorioService` (DRE + assinaturas) e `ContaSpec.categoriaId` (filtrar pelo pai inclui as filhas).
+- **Classificação por IA** (`ClassificacaoIaService`): sugere categoria a partir da descrição/parceiro,
+  com saída estruturada; o id devolvido é **revalidado contra o catálogo ativo da empresa** (IA não
+  burla tenant) e confiança < 0,5 é descartada. Falha da OpenAI → sem categoria, nunca 500.
+  Fluxo chat: `LancamentoTools` classifica quando `categoriaId` é null. Fluxo tela: `POST /api/categorias/sugerir`.
+  ⚠️ `ClassificacaoIaService` injeta `@Lazy ChatClient.Builder` e builda o cliente sob demanda —
+  construir no construtor fecha um **ciclo de dependência** (builder → tools → CategoriaService → este).
+- **RAG de resumos** (`RagSincronizacaoService`, scheduler diário): vetoriza resumos financeiros mensais
+  agregados + perfis (categorias/parceiros) por empresa, upsert determinístico no Qdrant (mesma coleção,
+  metadado `empresaId`). Usa `empresaId` explícito (nunca `TenantContext` — vazio em scheduler). Backfill
+  de 12 meses na 1ª execução. Re-sync manual: `POST /api/chat/rag/sincronizar` (`@Requer("CONFIGURACAO_EDITAR")`).
 
 ---
 

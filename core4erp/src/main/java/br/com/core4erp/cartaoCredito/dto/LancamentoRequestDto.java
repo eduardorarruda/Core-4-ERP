@@ -23,7 +23,8 @@ public record LancamentoRequestDto(
         @NotNull(message = "Categoria é obrigatória")
         Long categoriaId,
 
-        /** S.9: parceiro é opcional (ex.: compras sem fornecedor cadastrado, lançamentos pela IA). */
+        /** Parceiro é obrigatório em todo lançamento de cartão (manual ou via IA) — regra de negócio. */
+        @NotNull(message = "Informe o parceiro (fornecedor/cliente) do lançamento")
         Long parceiroId,
 
         /** Número de parcelas (>= 1). */

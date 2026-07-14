@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { NavLink, useMatch } from 'react-router-dom';
 import {
   LayoutDashboard, BarChart3, Gavel,
-  Users, Landmark, FileText, CreditCard, TrendingUp, Bell,
+  Users, Landmark, FileText, CreditCard, TrendingUp,
   LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge,
-  ChevronRight, UserCog, Layers, ShieldCheck, Sparkles,
+  ChevronRight, UserCog, ShieldCheck, Sparkles,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -33,7 +33,6 @@ const NAV_GROUPS = [
   {
     label: 'Análises',
     items: [
-      { id: 'notificacoes', icon: Bell,         label: 'Notificações', path: '/notificacoes' },
       { id: 'calendario',   icon: CalendarDays, label: 'Calendário',   path: '/calendario', permissao: 'CALENDARIO_VISUALIZAR' },
       { id: 'reports',      icon: BarChart3,    label: 'Relatórios',   path: '/reports' },
     ],
@@ -44,7 +43,6 @@ const NAV_GROUPS = [
       { id: 'audit',       icon: Gavel,    label: 'Auditoria',       path: '/audit',              permissao: 'AUDITORIA_VISUALIZAR', empresaOnly: true },
       { id: 'operadores',  icon: UserCog,  label: 'Operadores',      path: '/empresa/operadores', permissao: 'USUARIO_VISUALIZAR',   empresaOnly: true },
       { id: 'perfis',      icon: ShieldCheck, label: 'Perfis de Acesso', path: '/empresa/perfis', permissao: 'CONFIGURACAO_EDITAR',  empresaOnly: true },
-      { id: 'adm-planos',  icon: Layers,   label: 'Gestão de Planos',path: '/admin/planos',       adminSistemaOnly: true },
     ],
   },
 ];

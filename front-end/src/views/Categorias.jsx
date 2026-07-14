@@ -92,7 +92,37 @@ function IconeCategoria({ nome, className = 'w-5 h-5' }) {
   return <Icone className={className} />;
 }
 
-const empty = { descricao: '', icone: '' };
+function CategoriaLinha({ c, sub = false, onEditar, onDeletar }) {
+  const entry = ICONES.find((ic) => ic.nome === c.icone);
+  const Icone = entry ? entry.componente : Tag;
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-[12px] transition-all hover:bg-white/[.03] cursor-default">
+      <div
+        className={cn('rounded-xl flex items-center justify-center shrink-0', sub ? 'w-8 h-8' : 'w-10 h-10')}
+        style={{ background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)' }}
+      >
+        <Icone className={cn('text-primary', sub ? 'w-4 h-4' : 'w-5 h-5')} />
+      </div>
+      <span className={cn('font-bold text-text-primary flex-1 truncate font-display', sub ? 'text-xs' : 'text-sm')}>
+        {c.descricao}
+      </span>
+      <div className="flex gap-1 shrink-0">
+        <PermissaoGuard permissao="CATEGORIA_EDITAR">
+          <button onClick={() => onEditar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </PermissaoGuard>
+        <PermissaoGuard permissao="CATEGORIA_DELETAR">
+          <button onClick={() => onDeletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </PermissaoGuard>
+      </div>
+    </div>
+  );
+}
+
+const empty = { descricao: '', icone: '', categoriaPaiId: '' };
 
 export default function Categorias() {
   const toast = useToast();
@@ -113,8 +143,13 @@ export default function Categorias() {
     e.preventDefault();
     setSalvando(true);
     try {
-      if (editId) await api.atualizar(editId, form);
-      else await api.criar(form);
+      const dto = {
+        descricao: form.descricao,
+        icone: form.icone,
+        categoriaPaiId: form.categoriaPaiId ? Number(form.categoriaPaiId) : null,
+      };
+      if (editId) await api.atualizar(editId, dto);
+      else await api.criar(dto);
       setForm(empty);
       setEditId(null);
       toast.success(editId ? 'Categoria atualizada!' : 'Categoria criada!');
@@ -144,9 +179,22 @@ export default function Categorias() {
     });
   }
 
-  function editar(c) { setForm({ descricao: c.descricao, icone: c.icone || '' }); setEditId(c.id); }
+  function editar(c) {
+    setForm({ descricao: c.descricao, icone: c.icone || '', categoriaPaiId: c.categoriaPaiId ? String(c.categoriaPaiId) : '' });
+    setEditId(c.id);
+  }
 
   const PreviewIcon = ICONES.find((i) => i.nome === form.icone)?.componente ?? null;
+
+  // Só categorias ativas na tela; deletar inativa (soft delete) e some daqui.
+  const ativas = lista.filter((c) => c.ativo !== false);
+  // Raízes disponíveis como "categoria principal" (exclui subcategorias e a própria em edição).
+  const raizesDisponiveis = ativas.filter((c) => !c.categoriaPaiId && c.id !== editId);
+  const raizes = ativas.filter((c) => !c.categoriaPaiId);
+  const subsPorPai = ativas.reduce((acc, c) => {
+    if (c.categoriaPaiId) (acc[c.categoriaPaiId] ||= []).push(c);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -169,15 +217,32 @@ export default function Categorias() {
           )}
         </div>
 
-        <div className="space-y-1 max-w-sm">
-          <label className={labelCls}>Descrição *</label>
-          <input
-            className={inputCls}
-            value={form.descricao}
-            onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
-            required
-            placeholder="Ex: Alimentação"
-          />
+        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+          <div className="space-y-1">
+            <label className={labelCls}>Descrição *</label>
+            <input
+              className={inputCls}
+              value={form.descricao}
+              onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
+              required
+              placeholder="Ex: Alimentação"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className={labelCls}>Categoria principal</label>
+            <select
+              className={inputCls}
+              value={form.categoriaPaiId}
+              onChange={(e) => setForm((f) => ({ ...f, categoriaPaiId: e.target.value }))}
+            >
+              <option value="">Nenhuma (categoria principal)</option>
+              {raizesDisponiveis.map((c) => (
+                <option key={c.id} value={c.id}>{c.descricao}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-text-primary/40">Deixe em branco para criar uma categoria principal, ou escolha uma para criar uma subcategoria.</p>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -224,38 +289,26 @@ export default function Categorias() {
         </div>
       </form>
 
-      {lista.length === 0 ? (
+      {ativas.length === 0 ? (
         <EmptyState icon={Tag} title="Nenhuma categoria" description="Crie categorias para organizar seus lançamentos financeiros." />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {lista.map((c, i) => {
-            const entry = ICONES.find((ic) => ic.nome === c.icone);
-            const Icone = entry ? entry.componente : Tag;
+        <div className="space-y-3">
+          {raizes.map((c, i) => {
+            const filhas = subsPorPai[c.id] || [];
             return (
               <div
                 key={c.id}
-                className={`anim-in d${Math.min(i + 1, 6)} flex items-center gap-3 p-4 rounded-[14px] transition-all hover:scale-[1.02] cursor-default`}
+                className={`anim-in d${Math.min(i + 1, 6)} rounded-[14px] p-2`}
                 style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
               >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)' }}
-                >
-                  <Icone className="w-5 h-5 text-primary" />
-                </div>
-                <span className="font-bold text-text-primary flex-1 text-sm truncate font-display">{c.descricao}</span>
-                <div className="flex gap-1 shrink-0">
-                  <PermissaoGuard permissao="CATEGORIA_EDITAR">
-                    <button onClick={() => editar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </PermissaoGuard>
-                  <PermissaoGuard permissao="CATEGORIA_DELETAR">
-                    <button onClick={() => deletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </PermissaoGuard>
-                </div>
+                <CategoriaLinha c={c} onEditar={editar} onDeletar={deletar} />
+                {filhas.length > 0 && (
+                  <div className="mt-1 ml-6 pl-4 border-l border-text-primary/10 space-y-1">
+                    {filhas.map((sub) => (
+                      <CategoriaLinha key={sub.id} c={sub} sub onEditar={editar} onDeletar={deletar} />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

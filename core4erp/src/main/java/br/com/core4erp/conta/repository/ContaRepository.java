@@ -26,6 +26,14 @@ public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecific
 
     Optional<Conta> findByIdAndEmpresaId(Long id, Long empresaId);
 
+    /** Busca global: contas cuja descrição contém o termo. */
+    @Query("""
+            SELECT c FROM Conta c
+            WHERE c.empresaId = :eid
+              AND LOWER(c.descricao) LIKE LOWER(CONCAT('%', :q, '%'))
+            """)
+    List<Conta> buscarPorDescricao(@Param("eid") Long eid, @Param("q") String q, Pageable pageable);
+
     /** Há alguma conta usando esta categoria/parceiro? Usado para bloquear exclusão (integridade referencial). */
     boolean existsByCategoria_IdAndEmpresaId(Long categoriaId, Long empresaId);
 
@@ -65,15 +73,20 @@ public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecific
                                              @Param("statusRecebido") StatusConta statusRecebido,
                                              @Param("statuses") Collection<StatusConta> statuses);
 
+    // Roll-up de subcategorias: agrupa pela categoria-pai (COALESCE) para o gasto de uma
+    // subcategoria somar no total da categoria principal. LEFT JOIN no pai preserva as
+    // categorias raiz (um join implícito em categoriaPai excluiria toda categoria sem pai).
     @Query("""
-        SELECT c.categoria.descricao AS categoria, SUM(c.valorOriginal) AS total
+        SELECT COALESCE(pai.descricao, cat.descricao) AS categoria, SUM(c.valorOriginal) AS total
         FROM Conta c
+        JOIN c.categoria cat
+        LEFT JOIN cat.categoriaPai pai
         WHERE c.empresaId = :eid
           AND c.tipo = :tipo
           AND c.status IN :statuses
           AND EXTRACT(MONTH FROM c.dataVencimento) = :mes
           AND EXTRACT(YEAR  FROM c.dataVencimento) = :ano
-        GROUP BY c.categoria.descricao
+        GROUP BY COALESCE(pai.descricao, cat.descricao)
         ORDER BY SUM(c.valorOriginal) DESC
         """)
     List<DespesaCategoriaProjection> despesasPorCategoria(@Param("eid") Long eid,

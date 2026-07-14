@@ -2,10 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, LayoutDashboard, Users, Tag, Landmark, FileText,
-  CreditCard, TrendingUp, Repeat, Bell, CalendarDays, BarChart3,
+  CreditCard, TrendingUp, Repeat, CalendarDays, BarChart3,
   Gavel, Settings, Plus, X, Clock,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { busca } from '../../lib/api';
+
+// Ícone por tipo de registro retornado pela busca global do backend.
+const TIPO_ICON = { PARCEIRO: Users, CONTA: FileText, LANCAMENTO_CARTAO: CreditCard };
 
 const PAGES = [
   { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard',        desc: 'Visão geral financeira' },
@@ -16,7 +20,6 @@ const PAGES = [
   { id: 'cartoes',          icon: CreditCard,      label: 'Cartões',          path: '/cartoes',          desc: 'Cartões de crédito' },
   { id: 'investimentos',    icon: TrendingUp,      label: 'Investimentos',    path: '/investimentos',    desc: 'Carteira de investimentos' },
   { id: 'assinaturas',      icon: Repeat,          label: 'Assinaturas',      path: '/assinaturas',      desc: 'Assinaturas recorrentes' },
-  { id: 'notificacoes',     icon: Bell,            label: 'Notificações',     path: '/notificacoes',     desc: 'Alertas e avisos' },
   { id: 'calendario',       icon: CalendarDays,    label: 'Calendário',       path: '/calendario',       desc: 'Calendário financeiro' },
   { id: 'reports',          icon: BarChart3,       label: 'Relatórios',       path: '/reports',          desc: 'Relatórios e exportações' },
   { id: 'configuracoes',    icon: Settings,        label: 'Configurações',    path: '/configuracoes',    desc: 'Perfil e preferências' },
@@ -44,6 +47,8 @@ export default function CommandPalette({ onClose }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  const [resultados, setResultados] = useState([]);
+  const [buscando, setBuscando] = useState(false);
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const recent = getRecent();
@@ -55,18 +60,40 @@ export default function CommandPalette({ onClose }) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const allItems = query
+  // Busca de dados reais (contas, parceiros, lançamentos) no backend, com debounce.
+  useEffect(() => {
+    const termo = query.trim();
+    if (termo.length < 2) { setResultados([]); setBuscando(false); return; }
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try { setResultados(await busca.global(termo)); }
+      catch { setResultados([]); }
+      finally { setBuscando(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const dataItems = resultados.map((r) => ({
+    id: `rec-${r.tipo}-${r.id}`,
+    icon: TIPO_ICON[r.tipo] ?? FileText,
+    label: r.titulo,
+    desc: r.subtitulo,
+    path: r.rota,
+    transient: true,
+  }));
+
+  const pageActionItems = query
     ? [
         ...PAGES.filter((p) => p.label.toLowerCase().includes(query.toLowerCase()) || p.desc.toLowerCase().includes(query.toLowerCase())),
         ...ACTIONS.filter((a) => a.label.toLowerCase().includes(query.toLowerCase())),
       ]
-    : [
-        ...PAGES.filter((p) => recent.includes(p.id)),
-        ...PAGES.filter((p) => !recent.includes(p.id)),
-      ];
+    : [];
 
   const sections = query
-    ? [{ label: 'Resultados', items: allItems }]
+    ? [
+        { label: 'Registros', items: dataItems },
+        { label: 'Páginas e ações', items: pageActionItems },
+      ].filter((s) => s.items.length)
     : [
         { label: 'Recentes', items: PAGES.filter((p) => recent.includes(p.id)) },
         { label: 'Páginas', items: PAGES.filter((p) => !recent.includes(p.id)) },
@@ -76,7 +103,7 @@ export default function CommandPalette({ onClose }) {
   const flatItems = sections.flatMap((s) => s.items);
 
   const handleSelect = useCallback((item) => {
-    saveRecent(item.id);
+    if (!item.transient) saveRecent(item.id); // não guardar registros de dados como "recentes"
     navigate(item.path);
     onClose();
   }, [navigate, onClose]);
@@ -117,7 +144,7 @@ export default function CommandPalette({ onClose }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Buscar páginas e ações..."
+            placeholder="Buscar contas, parceiros, lançamentos, páginas..."
             aria-label="Busca global"
             className="flex-1 bg-transparent text-text-primary placeholder:text-text-primary/30 outline-none text-sm font-body"
           />
@@ -134,7 +161,9 @@ export default function CommandPalette({ onClose }) {
         {/* Results */}
         <div ref={listRef} className="overflow-y-auto max-h-[60vh] py-2">
           {flatItems.length === 0 && (
-            <p className="text-center text-sm text-text-primary/40 py-12">Nenhum resultado encontrado</p>
+            <p className="text-center text-sm text-text-primary/40 py-12">
+              {buscando ? 'Buscando...' : 'Nenhum resultado encontrado'}
+            </p>
           )}
           {sections.map((section) => (
             <div key={section.label}>

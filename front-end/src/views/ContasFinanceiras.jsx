@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown, Loader2, Pencil, ArrowRightLeft, History } from 'lucide-react';
+import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown, Loader2, Pencil, ArrowRightLeft, History, Sparkles } from 'lucide-react';
 import { contas as api, categorias as catApi, parceiros as parApi, contasCorrentes as ccApi, assinaturas as assinaturasApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
+import CategoriaOptions from '../components/ui/CategoriaOptions';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
 import DataTable from '../components/ui/DataTable';
+import Pagination from '../components/ui/Pagination';
 import { brl, formatDate } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
@@ -35,6 +37,10 @@ const COLUMNS = [
 export default function ContasFinanceiras() {
   const toast = useToast();
   const [contas, setContas] = useState([]);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const PAGE_SIZE = 20;
   const [cats, setCats] = useState([]);
   const [pars, setPars] = useState([]);
   const [ccs, setCcs] = useState([]);
@@ -51,6 +57,7 @@ export default function ContasFinanceiras() {
   const [showForm, setShowForm] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [salvandoBaixa, setSalvandoBaixa] = useState(false);
+  const [sugerindoCat, setSugerindoCat] = useState(false);
   const [loading, setLoading] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
@@ -77,10 +84,10 @@ export default function ContasFinanceiras() {
     carregar(emptyFiltros);
   }, []);
 
-  const carregar = useCallback(async (f = filtros) => {
+  const carregar = useCallback(async (f = filtros, pageArg = 0) => {
     setLoading(true);
     try {
-      const p = {};
+      const p = { page: pageArg, size: PAGE_SIZE };
       if (f.tipo) p.tipo = f.tipo;
       if (f.status) p.status = f.status;
       if (f.numeroDocumento.trim()) p.numeroDocumento = f.numeroDocumento.trim();
@@ -92,6 +99,9 @@ export default function ContasFinanceiras() {
       if (f.categoriaId) p.categoriaId = f.categoriaId;
       const res = await api.listar(p);
       setContas(res.content || []);
+      setPage(res.number ?? pageArg);
+      setTotalPages(res.totalPages ?? 0);
+      setTotalElements(res.totalElements ?? 0);
     } catch (e) {
       toast.error(e.message);
     } finally {
@@ -99,9 +109,10 @@ export default function ContasFinanceiras() {
     }
   }, [filtros]);
 
-  const setTipo = (tipo) => { const novo = { ...filtros, tipo }; setFiltros(novo); carregar(novo); };
-  const aplicarFiltros = () => carregar(filtros);
-  const limparFiltros = () => { setFiltros(emptyFiltros); carregar(emptyFiltros); };
+  const irParaPagina = (novaPagina) => carregar(filtros, novaPagina);
+  const setTipo = (tipo) => { const novo = { ...filtros, tipo }; setFiltros(novo); carregar(novo, 0); };
+  const aplicarFiltros = () => carregar(filtros, 0);
+  const limparFiltros = () => { setFiltros(emptyFiltros); carregar(emptyFiltros, 0); };
 
   const valorLiquido = (parseFloat(form.valorOriginal) || 0) + (parseFloat(form.acrescimo) || 0) - (parseFloat(form.desconto) || 0);
   const parsFiltered = pars.filter((p) => form.tipo === 'PAGAR' ? p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS' : p.tipo === 'CLIENTE' || p.tipo === 'AMBOS');
@@ -116,6 +127,26 @@ export default function ContasFinanceiras() {
     if (Number(form.quantidadeParcelas) < 1) errs.quantidadeParcelas = 'Mínimo 1';
     if (valorLiquido <= 0) errs.valorOriginal = 'Valor líquido inválido';
     return errs;
+  }
+
+  async function sugerirCategoria() {
+    if (!form.descricao.trim()) { toast.error('Descreva a conta antes de pedir uma sugestão.'); return; }
+    setSugerindoCat(true);
+    try {
+      const par = pars.find((p) => String(p.id) === String(form.parceiroId));
+      const nomePar = par ? (par.nomeFantasia || par.razaoSocial) : null;
+      const s = await catApi.sugerir({ descricao: form.descricao, parceiroNome: nomePar });
+      if (s.encontrou) {
+        setF('categoriaId')(String(s.categoriaId));
+        toast.success(`Sugestão: ${s.categoriaDescricao}`);
+      } else {
+        toast.info('Não consegui sugerir uma categoria com segurança. Escolha manualmente.');
+      }
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setSugerindoCat(false);
+    }
   }
 
   async function criar(e) {
@@ -501,7 +532,7 @@ export default function ContasFinanceiras() {
               <FormField label="Categoria">
                 <select className={`${inputCls} appearance-none`} value={filtros.categoriaId} onChange={(e) => setFiltros((f) => ({ ...f, categoriaId: e.target.value }))}>
                   <option value="">Todas</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                  <CategoriaOptions cats={cats} />
                 </select>
               </FormField>
             </div>
@@ -553,10 +584,22 @@ export default function ContasFinanceiras() {
                 </select>
               </FormField>
               <FormField label="Categoria" required error={errors.categoriaId}>
-                <select className={`${inputCls} appearance-none`} value={form.categoriaId} onChange={(e) => setF('categoriaId')(e.target.value)} required>
-                  <option value="">Selecione</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
-                </select>
+                <div className="flex gap-2">
+                  <select className={`${inputCls} appearance-none flex-1`} value={form.categoriaId} onChange={(e) => setF('categoriaId')(e.target.value)} required>
+                    <option value="">Selecione</option>
+                    <CategoriaOptions cats={cats} />
+                  </select>
+                  <button
+                    type="button"
+                    onClick={sugerirCategoria}
+                    disabled={sugerindoCat}
+                    title="Sugerir categoria com base na descrição"
+                    className="shrink-0 px-3 rounded-xl border border-primary/30 text-primary text-xs font-bold hover:bg-primary/10 disabled:opacity-50 flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {sugerindoCat ? '...' : 'Sugerir'}
+                  </button>
+                </div>
               </FormField>
               <FormField label={form.tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'} required error={errors.parceiroId}>
                 <select className={`${inputCls} appearance-none`} value={form.parceiroId} onChange={(e) => setF('parceiroId')(e.target.value)}>
@@ -620,7 +663,7 @@ export default function ContasFinanceiras() {
               <FormField label="Categoria" required error={editErrors.categoriaId}>
                 <select className={`${inputCls} appearance-none`} value={editForm.categoriaId ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
                   <option value="">Selecione</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                  <CategoriaOptions cats={cats} />
                 </select>
               </FormField>
               <FormField label={editForm.tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'} required error={editErrors.parceiroId}>
@@ -689,6 +732,13 @@ export default function ContasFinanceiras() {
         data={contas}
         loading={loading}
         aria-label="Lista de contas"
+      />
+
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        totalElements={totalElements}
+        onChange={irParaPagina}
       />
 
       {/* Histórico de transferências */}

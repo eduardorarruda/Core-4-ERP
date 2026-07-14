@@ -179,6 +179,23 @@ public class ContaService {
         return contaRepository.saveAll(criadas).stream().map(ContaResponseDto::from).toList();
     }
 
+    /**
+     * Marca contas como classificadas pela IA (categoria sugerida pelo assistente a pedido do
+     * usuário). Chamado pela tool do chat após criar as contas — mantém o rastreio sem acoplar a
+     * flag ao DTO de criação (reusado por fatura/conciliação, que não são ações da IA).
+     */
+    @Transactional
+    public void marcarClassificadaPorIa(List<Long> contaIds, BigDecimal confianca) {
+        if (contaIds == null || contaIds.isEmpty()) return;
+        Long empresaId = tenantCtx.getEmpresaId();
+        for (Long id : contaIds) {
+            contaRepository.findByIdAndEmpresaId(id, empresaId).ifPresent(c -> {
+                c.setClassificadaPorIa(true);
+                c.setConfiancaIa(confianca);
+            });
+        }
+    }
+
     @Transactional
     public ContaResponseDto atualizar(Long id, ContaCreateDto dto) {
         dtoValidator.validar(dto);

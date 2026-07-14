@@ -2,6 +2,7 @@ package br.com.core4erp.relatorio.service;
 
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.assinatura.entity.Assinatura;
+import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
@@ -236,7 +237,9 @@ public class RelatorioService {
         Map<String, BigDecimal> despesas = new TreeMap<>();
 
         for (Conta c : contas) {
-            String cat = c.getCategoria() != null ? c.getCategoria().getDescricao() : "Sem categoria";
+            // Roll-up: subcategoria soma no total da categoria-pai (o detalhe do relatório
+            // continua exibindo a subcategoria real; só a agregação sobe para o pai).
+            String cat = categoriaAgrupada(c.getCategoria(), "Sem categoria");
             if (c.getTipo() == TipoConta.RECEBER) receitas.merge(cat, c.getValorOriginal(), BigDecimal::add);
             else                                   despesas.merge(cat, c.getValorOriginal(), BigDecimal::add);
         }
@@ -427,14 +430,15 @@ public class RelatorioService {
         List<List<Object>> linhas = new ArrayList<>();
 
         for (Assinatura a : lista) {
-            String cat = a.getCategoria().getDescricao();
+            String catDetalhe = a.getCategoria().getDescricao();          // subcategoria real (detalhe)
+            String catGrupo = categoriaAgrupada(a.getCategoria(), "Sem categoria");  // roll-up p/ o gráfico
             String par = a.getParceiro() != null
                     ? (a.getParceiro().getNomeFantasia() != null && !a.getParceiro().getNomeFantasia().isBlank()
                         ? a.getParceiro().getNomeFantasia() : a.getParceiro().getRazaoSocial())
                     : "-";
             String status = Boolean.TRUE.equals(a.getAtiva()) ? "Ativa" : "Inativa";
-            linhas.add(List.of(a.getDescricao(), a.getValor().doubleValue(), a.getDiaVencimento(), cat, par, status));
-            porCategoria.merge(cat, a.getValor(), BigDecimal::add);
+            linhas.add(List.of(a.getDescricao(), a.getValor().doubleValue(), a.getDiaVencimento(), catDetalhe, par, status));
+            porCategoria.merge(catGrupo, a.getValor(), BigDecimal::add);
             if (Boolean.TRUE.equals(a.getAtiva())) totalAtivas = totalAtivas.add(a.getValor());
         }
 
@@ -546,5 +550,15 @@ public class RelatorioService {
 
     private String fmt(BigDecimal v) {
         return String.format("%.2f", v);
+    }
+
+    /**
+     * Nome da categoria para AGRUPAMENTO (roll-up): se for subcategoria, sobe para a
+     * categoria-pai; se for raiz, usa a própria descrição. Mantém as agregações de
+     * relatório consistentes com o dashboard (subcategoria soma no total do pai).
+     */
+    private String categoriaAgrupada(Categoria c, String semCategoria) {
+        if (c == null) return semCategoria;
+        return c.getCategoriaPai() != null ? c.getCategoriaPai().getDescricao() : c.getDescricao();
     }
 }

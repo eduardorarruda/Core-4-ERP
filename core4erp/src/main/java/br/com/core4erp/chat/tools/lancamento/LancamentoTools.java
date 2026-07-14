@@ -3,6 +3,7 @@ package br.com.core4erp.chat.tools.lancamento;
 import br.com.core4erp.cartaoCredito.dto.LancamentoRequestDto;
 import br.com.core4erp.cartaoCredito.dto.LancamentoResponseDto;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
+import br.com.core4erp.categoria.service.ClassificacaoIaService;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
@@ -37,6 +38,7 @@ public class LancamentoTools {
     private final ContaCorrenteService contaCorrenteService;
     private final CartaoCreditoService cartaoCreditoService;
     private final InvestimentoService investimentoService;
+    private final ClassificacaoIaService classificacaoIaService;
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
     private final ChatAuditoriaService auditoria;
@@ -45,6 +47,7 @@ public class LancamentoTools {
                            ContaCorrenteService contaCorrenteService,
                            CartaoCreditoService cartaoCreditoService,
                            InvestimentoService investimentoService,
+                           ClassificacaoIaService classificacaoIaService,
                            SecurityContextUtils securityCtx,
                            TenantContext tenantCtx,
                            ChatAuditoriaService auditoria) {
@@ -52,21 +55,23 @@ public class LancamentoTools {
         this.contaCorrenteService = contaCorrenteService;
         this.cartaoCreditoService = cartaoCreditoService;
         this.investimentoService = investimentoService;
+        this.classificacaoIaService = classificacaoIaService;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
         this.auditoria = auditoria;
     }
 
     @Tool(description = """
-            Registra conta a pagar ou a receber (chame só APÓS o usuário confirmar). Se não souber
-            o categoriaId, use consultarCategorias antes. Retorna as contas criadas (uma por parcela).
+            Registra conta a pagar ou a receber (chame só APÓS o usuário confirmar). O categoriaId é
+            OPCIONAL: se o usuário não informar a categoria, passe null e o sistema sugere a categoria
+            automaticamente a partir da descrição. Retorna as contas criadas (uma por parcela).
             """)
     public List<ContaResponseDto> registrarConta(
             @ToolParam(description = "Descrição da conta. Ex: 'Conta de Luz', 'Salário'") String descricao,
             @ToolParam(description = "Valor em reais. Ex: 250.00") BigDecimal valorOriginal,
             @ToolParam(description = "Data de vencimento no formato YYYY-MM-DD") LocalDate dataVencimento,
             @ToolParam(description = "PAGAR para despesas, RECEBER para receitas") String tipo,
-            @ToolParam(description = "ID da categoria. Use consultarCategorias para descobrir o ID correto") Long categoriaId,
+            @ToolParam(description = "ID da categoria. OPCIONAL — passe null para a IA classificar automaticamente") Long categoriaId,
             @ToolParam(description = "ID do parceiro/fornecedor. Opcional, pode ser null") Long parceiroId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
@@ -83,6 +88,19 @@ public class LancamentoTools {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Tipo de conta inválido: '" + tipo + "'. Use PAGAR ou RECEBER.");
         }
+
+        // Classificação automática: usuário não informou categoria → IA sugere a partir da descrição.
+        BigDecimal confiancaIa = null;
+        if (categoriaId == null) {
+            var sugestao = classificacaoIaService.sugerir(descricao, null);
+            if (sugestao.isEmpty()) {
+                throw new IllegalArgumentException("Não consegui identificar a categoria automaticamente. "
+                        + "Diga a categoria ou use consultarCategorias para escolher uma.");
+            }
+            categoriaId = sugestao.get().categoriaId();
+            confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+        }
+
         ContaCreateDto dto = new ContaCreateDto(
                 descricao,
                 valorOriginal,
@@ -95,36 +113,60 @@ public class LancamentoTools {
                 Boolean.TRUE.equals(dividirValor),
                 null, null, null
         );
-        return contaService.criar(dto);
+        List<ContaResponseDto> criadas = contaService.criar(dto);
+        if (confiancaIa != null) {
+            contaService.marcarClassificadaPorIa(criadas.stream().map(ContaResponseDto::id).toList(), confiancaIa);
+        }
+        return criadas;
     }
 
     @Tool(description = """
             Registra lançamento em cartão de crédito (suporta parcelamento). Use consultarCartoes
-            para o cartaoId e consultarCategorias para o categoriaId. A fatura é calculada pela data
-            da compra e dia de fechamento. Chame só APÓS o usuário confirmar.
+            para o cartaoId, consultarCategorias para o categoriaId e consultarParceiros para o
+            parceiroId. O parceiro (fornecedor/cliente) é OBRIGATÓRIO — se o usuário não informar,
+            pergunte ou ajude a cadastrar um antes de registrar. A fatura é calculada pela data da
+            compra e dia de fechamento. Chame só APÓS o usuário confirmar.
             """)
     public List<LancamentoResponseDto> registrarLancamentoCartao(
             @ToolParam(description = "ID do cartão de crédito. Use consultarCartoes para descobrir") Long cartaoId,
             @ToolParam(description = "Descrição da compra") String descricao,
             @ToolParam(description = "Valor da compra em reais") BigDecimal valor,
             @ToolParam(description = "Data da compra no formato YYYY-MM-DD") LocalDate dataCompra,
-            @ToolParam(description = "ID da categoria") Long categoriaId,
+            @ToolParam(description = "ID da categoria. OPCIONAL — passe null para a IA classificar automaticamente") Long categoriaId,
+            @ToolParam(description = "ID do parceiro (fornecedor/cliente). OBRIGATÓRIO. Use consultarParceiros para descobrir") Long parceiroId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={}",
-                securityCtx.getUsuarioId(), cartaoId, descricao, valor);
+        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={} parceiroId={}",
+                securityCtx.getUsuarioId(), cartaoId, descricao, valor, parceiroId);
         auditoria.registrar("registrarLancamentoCartao",
-                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor);
+                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor + " parceiroId=" + parceiroId);
+
+        // Classificação automática quando o usuário não informa a categoria.
+        BigDecimal confiancaIa = null;
+        if (categoriaId == null) {
+            var sugestao = classificacaoIaService.sugerir(descricao, null);
+            if (sugestao.isEmpty()) {
+                throw new IllegalArgumentException("Não consegui identificar a categoria automaticamente. "
+                        + "Diga a categoria ou use consultarCategorias para escolher uma.");
+            }
+            categoriaId = sugestao.get().categoriaId();
+            confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+        }
+
         LancamentoRequestDto dto = new LancamentoRequestDto(
                 descricao,
                 valor,
                 dataCompra,
                 categoriaId,
-                null,
+                parceiroId,
                 quantidadeParcelas != null ? quantidadeParcelas : 1,
                 true,
                 null
         );
-        return cartaoCreditoService.criarLancamento(cartaoId, dto);
+        List<LancamentoResponseDto> criados = cartaoCreditoService.criarLancamento(cartaoId, dto);
+        if (confiancaIa != null) {
+            cartaoCreditoService.marcarClassificadoPorIa(criados.stream().map(LancamentoResponseDto::id).toList(), confiancaIa);
+        }
+        return criados;
     }
 
     @Tool(description = """
