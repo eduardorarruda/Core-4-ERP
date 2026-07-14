@@ -67,11 +67,14 @@ public class ConsultaTools {
     }
 
     @Tool(description = """
-            Lista as categorias (id, descrição, ícone). Use ANTES de registrar um lançamento
-            para obter o categoriaId correto. Nunca invente um categoriaId.
+            Lista as categorias ATIVAS (id, descrição, ícone e a categoria principal quando for uma
+            subcategoria — campo categoriaPaiDescricao). Use ANTES de registrar um lançamento para
+            obter o categoriaId correto. Prefira a subcategoria mais específica quando existir.
+            Nunca invente um categoriaId.
             """)
     public List<CategoriaResponseDto> consultarCategorias() {
-        return categoriaService.listar(PageRequest.of(0, 200, Sort.by("descricao"))).getContent();
+        return categoriaService.listar(PageRequest.of(0, 200, Sort.by("descricao"))).getContent()
+                .stream().filter(CategoriaResponseDto::ativo).toList();
     }
 
     @Tool(description = "Lista os cartões de crédito (id, nome, limite total/usado/livre, fechamento, vencimento).")

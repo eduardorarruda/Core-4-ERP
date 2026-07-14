@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
+import PwaStatus from './components/layout/PwaStatus';
 import ChatSidebar from './components/chat/ChatSidebar';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
@@ -13,7 +14,7 @@ import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
 import { getFirstAccessibleRoute } from './lib/routeUtils';
 
-const Dashboard         = lazy(() => import('./views/Dashboard'));
+const DashboardHome     = lazy(() => import('./views/DashboardHome'));
 const Login             = lazy(() => import('./views/Login'));
 const Register          = lazy(() => import('./views/Register'));
 const RedefinirSenha    = lazy(() => import('./views/RedefinirSenha'));
@@ -36,13 +37,9 @@ const ContasCorrentes = lazy(() => import('./views/ContasCorrentes'));
 const ContasFinanceiras = lazy(() => import('./views/ContasFinanceiras'));
 const Cartoes         = lazy(() => import('./views/Cartoes'));
 const Investimentos   = lazy(() => import('./views/Investimentos'));
-const Notificacoes    = lazy(() => import('./views/Notificacoes'));
 const Configuracoes   = lazy(() => import('./views/Configuracoes'));
 const CommandPalette  = lazy(() => import('./components/ui/CommandPalette'));
-const VisualizacaoPlanos = lazy(() => import('./views/VisualizacaoPlanos'));
-const PagamentoMock      = lazy(() => import('./views/PagamentoMock'));
 const AceitarConvite     = lazy(() => import('./views/AceitarConvite'));
-const GestaoPlanos       = lazy(() => import('./views/GestaoPlanos'));
 const GestaoOperadores   = lazy(() => import('./views/GestaoOperadores'));
 const GestaoPerfis       = lazy(() => import('./views/GestaoPerfis'));
 
@@ -67,14 +64,6 @@ function isAuthenticated() {
 function NavigateToFirstAccessible() {
   const { temPermissao } = useAuth();
   return <Navigate to={getFirstAccessibleRoute(temPermissao)} replace />;
-}
-
-function AdminRoute({ children }) {
-  const { adminSistema } = useAuth();
-  if (!adminSistema) {
-    return <NavigateToFirstAccessible />;
-  }
-  return children;
 }
 
 function PermissaoRoute({ permissao, children }) {
@@ -158,6 +147,7 @@ function ProtectedLayout({ children }) {
           onMenuClick={() => setIsSidebarOpen(true)}
           onCommandPaletteOpen={openCmd}
         />
+        <PwaStatus />
         <main id="main-content" className={cn(
           'flex-1 min-h-0 animate-fade-in',
           fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 overflow-y-auto no-scrollbar'
@@ -214,11 +204,9 @@ export default function App() {
             <Route path="/login"              element={<Login />} />
             <Route path="/register"           element={<Register />} />
             <Route path="/redefinir-senha"    element={<RedefinirSenha />} />
-            <Route path="/planos"             element={<VisualizacaoPlanos />} />
-            <Route path="/pagamento"          element={<PagamentoMock />} />
             <Route path="/aceitar-convite"    element={<AceitarConvite />} />
 
-            <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><Dashboard /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><DashboardHome /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/conciliacao"              element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
             <Route path="/conciliacao/historico"   element={<ProtectedLayout><ConciliacaoHistorico /></ProtectedLayout>} />
             <Route path="/conciliacao/:id"          element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
@@ -239,9 +227,7 @@ export default function App() {
             <Route path="/cartoes/conciliacao/:id"              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/investimentos"    element={<ProtectedLayout><PermissaoRoute permissao="INVESTIMENTO_VISUALIZAR"><Investimentos /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
-            <Route path="/admin/planos"       element={<ProtectedLayout><AdminRoute><GestaoPlanos /></AdminRoute></ProtectedLayout>} />
             <Route path="/empresa/operadores" element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="USUARIO_VISUALIZAR"><GestaoOperadores /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
             <Route path="/empresa/perfis"     element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="CONFIGURACAO_EDITAR"><GestaoPerfis /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
 

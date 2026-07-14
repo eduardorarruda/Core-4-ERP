@@ -51,6 +51,14 @@ public class LancamentoCartao extends TenantEntity {
 
     private Integer totalParcelas = 1;
 
+    /** Marca que a categoria foi sugerida pela IA (a pedido do usuário). */
+    @Column(name = "classificado_por_ia", nullable = false)
+    private Boolean classificadoPorIa = false;
+
+    /** Confiança (0..1) reportada pela IA na classificação; null se não classificado por IA. */
+    @Column(name = "confianca_ia", precision = 5, scale = 4)
+    private BigDecimal confiancaIa;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assinatura_id")
     private Assinatura assinatura;

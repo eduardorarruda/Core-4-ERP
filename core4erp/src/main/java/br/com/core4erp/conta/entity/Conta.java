@@ -62,6 +62,14 @@ public class Conta extends TenantEntity {
     @Column(nullable = false)
     private Integer totalParcelas = 1;
 
+    /** Marca que a categoria foi sugerida pela IA (a pedido do usuário). */
+    @Column(name = "classificada_por_ia", nullable = false)
+    private Boolean classificadaPorIa = false;
+
+    /** Confiança (0..1) reportada pela IA na classificação; null se não classificado por IA. */
+    @Column(name = "confianca_ia", precision = 5, scale = 4)
+    private BigDecimal confiancaIa;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "categoria_id", nullable = false)
     private Categoria categoria;

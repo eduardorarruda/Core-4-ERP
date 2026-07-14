@@ -3,6 +3,7 @@ package br.com.core4erp.conta.repository;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -48,7 +49,17 @@ public final class ContaSpec {
         return (r, q, cb) -> cb.lessThanOrEqualTo(r.get("valorOriginal"), max);
     }
 
+    /**
+     * Filtra pela categoria informada OU por qualquer subcategoria dela — filtrar por uma
+     * categoria principal traz também os lançamentos das suas subcategorias.
+     */
     public static Specification<Conta> categoriaId(Long categoriaId) {
-        return (r, q, cb) -> cb.equal(r.get("categoria").get("id"), categoriaId);
+        return (r, q, cb) -> {
+            var categoria = r.join("categoria");                          // inner: categoria é obrigatória
+            var pai = categoria.join("categoriaPai", JoinType.LEFT);      // left: preserva categorias raiz
+            return cb.or(
+                    cb.equal(categoria.get("id"), categoriaId),
+                    cb.equal(pai.get("id"), categoriaId));
+        };
     }
 }

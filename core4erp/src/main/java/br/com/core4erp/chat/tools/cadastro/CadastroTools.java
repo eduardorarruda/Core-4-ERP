@@ -108,28 +108,48 @@ public class CadastroTools {
 
     @Tool(description = """
             Cadastra uma categoria de receita/despesa. Obrigatório: descricao (ícone opcional).
-            Se já existir categoria com a mesma descrição, a existente é reaproveitada (não duplica).
+            Para criar uma SUBCATEGORIA, informe categoriaPaiDescricao com o nome da categoria
+            principal (que já deve existir e não ser ela mesma uma subcategoria). Se já existir
+            categoria com a mesma descrição no mesmo nível, a existente é reaproveitada (não duplica).
             Confirme a descrição com o usuário antes de executar.
             """)
     public CategoriaResponseDto registrarCategoria(
             @ToolParam(description = "Descrição da categoria. Ex: 'Alimentação', 'Salário'") String descricao,
-            @ToolParam(description = "Nome do ícone. Opcional, pode ser null") String icone) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarCategoria descricao={}",
-                securityCtx.getUsuarioId(), descricao);
-        auditoria.registrar("registrarCategoria", "descricao=" + descricao);
+            @ToolParam(description = "Nome do ícone. Opcional, pode ser null") String icone,
+            @ToolParam(description = "Nome da categoria principal, para criar uma subcategoria. Opcional, null para categoria raiz") String categoriaPaiDescricao) {
+        log.info("[CHAT-AUDIT] user={} tool=registrarCategoria descricao={} pai={}",
+                securityCtx.getUsuarioId(), descricao, categoriaPaiDescricao);
+        auditoria.registrar("registrarCategoria", "descricao=" + descricao
+                + (categoriaPaiDescricao != null ? " pai=" + categoriaPaiDescricao : ""));
 
-        // Idempotência: evita as duplicações observadas em produção (ex.: criar "Compras" e o
-        // usuário confirmar de novo). Se já existe categoria com a mesma descrição, reaproveita.
-        CategoriaResponseDto existente = categoriaService
-                .listar(PageRequest.of(0, 500, Sort.by("descricao"))).getContent().stream()
-                .filter(c -> c.descricao() != null && c.descricao().equalsIgnoreCase(descricao.strip()))
+        List<CategoriaResponseDto> todas = categoriaService
+                .listar(PageRequest.of(0, 500, Sort.by("descricao"))).getContent();
+
+        // Resolve a categoria-pai por nome (deve existir e ser uma raiz — não subcategoria).
+        Long categoriaPaiId = null;
+        if (categoriaPaiDescricao != null && !categoriaPaiDescricao.isBlank()) {
+            CategoriaResponseDto pai = todas.stream()
+                    .filter(c -> c.ativo() && c.categoriaPaiId() == null
+                            && c.descricao() != null && c.descricao().equalsIgnoreCase(categoriaPaiDescricao.strip()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Categoria principal '" + categoriaPaiDescricao + "' não encontrada. "
+                            + "Crie a categoria principal antes de criar a subcategoria."));
+            categoriaPaiId = pai.id();
+        }
+
+        // Idempotência: reaproveita categoria existente com a mesma descrição NO MESMO nível (mesmo pai).
+        final Long paiId = categoriaPaiId;
+        CategoriaResponseDto existente = todas.stream()
+                .filter(c -> c.descricao() != null && c.descricao().equalsIgnoreCase(descricao.strip())
+                        && java.util.Objects.equals(c.categoriaPaiId(), paiId))
                 .findFirst().orElse(null);
         if (existente != null) {
             log.info("[CHAT-AUDIT] registrarCategoria: reaproveitando categoria existente id={}", existente.id());
             return existente;
         }
 
-        return categoriaService.criar(new CategoriaRequestDto(descricao, icone));
+        return categoriaService.criar(new CategoriaRequestDto(descricao, icone, categoriaPaiId));
     }
 
     // ── Cadastro em LOTE (várias de uma vez) ──────────────────────────────────
@@ -159,7 +179,7 @@ public class CadastroTools {
             String descricao = raw.strip();
             if (existentes.contains(descricao.toLowerCase())) { jaExistiam++; continue; }
             try {
-                categoriaService.criar(new CategoriaRequestDto(descricao, iconePara(descricao)));
+                categoriaService.criar(new CategoriaRequestDto(descricao, iconePara(descricao), null));
                 existentes.add(descricao.toLowerCase());
                 criadas++;
             } catch (Exception e) {

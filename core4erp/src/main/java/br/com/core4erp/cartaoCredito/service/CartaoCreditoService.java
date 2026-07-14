@@ -195,11 +195,13 @@ public class CartaoCreditoService {
 
         Categoria categoria = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
-        // S.4/S.9: parceiro é opcional (alinha com ContaService e permite lançamento pela IA)
-        Parceiro parceiro = dto.parceiroId() != null
-                ? parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
-                        .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"))
-                : null;
+        // Regra de negócio: parceiro é obrigatório em todo lançamento (manual e via IA).
+        // Validado aqui além do @Valid do controller, pois a IA chama o service direto.
+        if (dto.parceiroId() == null) {
+            throw new IllegalArgumentException("Informe o parceiro (fornecedor/cliente) do lançamento.");
+        }
+        Parceiro parceiro = parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
+                .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
 
         int parcelas = ParcelamentoHelper.normalizarParcelas(dto.quantidadeParcelas());
         boolean dividir = Boolean.TRUE.equals(dto.dividirValor());
@@ -234,6 +236,23 @@ public class CartaoCreditoService {
         return lancamentoRepo.saveAll(criados).stream().map(l -> LancamentoResponseDto.from(l, false)).toList();
     }
 
+    /**
+     * Marca lançamentos como classificados pela IA (categoria sugerida pelo assistente a pedido
+     * do usuário). Chamado pela tool do chat após criar — mantém o rastreio sem acoplar a flag ao
+     * DTO de lançamento (reusado por edição manual/assinatura).
+     */
+    @Transactional
+    public void marcarClassificadoPorIa(List<Long> lancamentoIds, BigDecimal confianca) {
+        if (lancamentoIds == null || lancamentoIds.isEmpty()) return;
+        Long eid = tenantCtx.getEmpresaId();
+        for (Long id : lancamentoIds) {
+            lancamentoRepo.findByIdAndEmpresaId(id, eid).ifPresent(l -> {
+                l.setClassificadoPorIa(true);
+                l.setConfiancaIa(confianca);
+            });
+        }
+    }
+
     @Requer("CARTAO_LANCAR")
     @Transactional
     public LancamentoResponseDto atualizarLancamento(Long cartaoId, Long lancamentoId, LancamentoRequestDto dto) {
@@ -247,10 +266,11 @@ public class CartaoCreditoService {
         Long eid = tenantCtx.getEmpresaId();
         Categoria cat = categoriaRepo.findByIdAndEmpresaId(dto.categoriaId(), eid)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
-        Parceiro par = dto.parceiroId() != null
-                ? parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
-                        .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"))
-                : null;
+        if (dto.parceiroId() == null) {
+            throw new IllegalArgumentException("Informe o parceiro (fornecedor/cliente) do lançamento.");
+        }
+        Parceiro par = parceiroRepo.findByIdAndEmpresaId(dto.parceiroId(), eid)
+                .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         l.setDescricao(dto.descricao());
         l.setValor(dto.valor());
         l.setDataCompra(dto.dataCompra());

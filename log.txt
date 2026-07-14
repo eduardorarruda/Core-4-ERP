@@ -1,0 +1,267 @@
+2026-07-13 20:15:16.027 [main] INFO  br.com.core4erp.Core4erpApplication [reqId=] - Starting Core4erpApplication using Java 17.0.19 with PID 119775 (/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main started by eduardoa in /home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp)
+2026-07-13 20:15:16.030 [main] INFO  br.com.core4erp.Core4erpApplication [reqId=] - No active profile set, falling back to 1 default profile: "default"
+2026-07-13 20:15:17.731 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate [reqId=] - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-07-13 20:15:18.117 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate [reqId=] - Finished Spring Data repository scanning in 373 ms. Found 32 JPA repository interfaces.
+2026-07-13 20:15:20.230 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker [reqId=] - Bean 'org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+2026-07-13 20:15:20.236 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker [reqId=] - Bean 'serverAnnotatedBeanRegistry' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration$ServerMcpAnnotatedBeans] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+2026-07-13 20:15:20.260 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker [reqId=] - Bean 'spring.ai.mcp.server.annotation-scanner-org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+2026-07-13 20:15:20.877 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer [reqId=] - Tomcat initialized with port 8081 (http)
+2026-07-13 20:15:20.895 [main] INFO  o.a.coyote.http11.Http11NioProtocol [reqId=] - Initializing ProtocolHandler ["http-nio-8081"]
+2026-07-13 20:15:20.899 [main] INFO  o.a.catalina.core.StandardService [reqId=] - Starting service [Tomcat]
+2026-07-13 20:15:20.899 [main] INFO  o.a.catalina.core.StandardEngine [reqId=] - Starting Servlet engine: [Apache Tomcat/10.1.26]
+2026-07-13 20:15:21.005 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] [reqId=] - Initializing Spring embedded WebApplicationContext
+2026-07-13 20:15:21.005 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext [reqId=] - Root WebApplicationContext: initialization completed in 4886 ms
+2026-07-13 20:15:24.640 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo [reqId=] - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-07-13 20:15:26.959 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean [reqId=] - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-07-13 20:15:27.440 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory [reqId=] - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-07-13 20:15:31.259 [main] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext [reqId=] - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'categoriaController' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/categoria/controller/CategoriaController.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'categoriaService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/categoria/service/CategoriaService.class]: Unsatisfied dependency expressed through constructor parameter 4: Error creating bean with name 'classificacaoIaService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/categoria/service/ClassificacaoIaService.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'chatClientBuilder' defined in class path resource [org/springframework/ai/model/chat/client/autoconfigure/ChatClientAutoConfiguration.class]: Unsatisfied dependency expressed through method 'chatClientBuilder' parameter 1: Error creating bean with name 'openAiChatModel' defined in class path resource [org/springframework/ai/model/openai/autoconfigure/OpenAiChatAutoConfiguration.class]: Unsatisfied dependency expressed through method 'openAiChatModel' parameter 2: Error creating bean with name 'toolCallingManager' defined in class path resource [org/springframework/ai/model/tool/autoconfigure/ToolCallingAutoConfiguration.class]: Unsatisfied dependency expressed through method 'toolCallingManager' parameter 0: Error creating bean with name 'toolCallbackResolver' defined in class path resource [org/springframework/ai/model/tool/autoconfigure/ToolCallingAutoConfiguration.class]: Failed to instantiate [org.springframework.ai.tool.resolution.ToolCallbackResolver]: Factory method 'toolCallbackResolver' threw exception with message: Error creating bean with name 'core4ToolCallbacks' defined in class path resource [br/com/core4erp/chat/config/McpServerConfig.class]: Unsatisfied dependency expressed through method 'core4ToolCallbacks' parameter 0: Error creating bean with name 'consultaTools' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/tools/consulta/ConsultaTools.class]: Unsatisfied dependency expressed through constructor parameter 2: Error creating bean with name 'categoriaService': Requested bean is currently in creation: Is there an unresolvable circular reference?
+2026-07-13 20:15:31.261 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean [reqId=] - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-07-13 20:15:31.271 [main] INFO  o.a.catalina.core.StandardService [reqId=] - Stopping service [Tomcat]
+2026-07-13 20:15:31.312 [main] INFO  o.s.b.a.l.ConditionEvaluationReportLogger [reqId=] - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-07-13 20:15:31.343 [main] ERROR o.s.b.d.LoggingFailureAnalysisReporter [reqId=] - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+The dependencies of some of the beans in the application context form a cycle:
+
+   categoriaController defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/categoria/controller/CategoriaController.class]
+┌─────┐
+|  categoriaService defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/categoria/service/CategoriaService.class]
+↑     ↓
+|  classificacaoIaService defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/categoria/service/ClassificacaoIaService.class]
+↑     ↓
+|  chatClientBuilder defined in class path resource [org/springframework/ai/model/chat/client/autoconfigure/ChatClientAutoConfiguration.class]
+↑     ↓
+|  openAiChatModel defined in class path resource [org/springframework/ai/model/openai/autoconfigure/OpenAiChatAutoConfiguration.class]
+↑     ↓
+|  toolCallingManager defined in class path resource [org/springframework/ai/model/tool/autoconfigure/ToolCallingAutoConfiguration.class]
+↑     ↓
+|  toolCallbackResolver defined in class path resource [org/springframework/ai/model/tool/autoconfigure/ToolCallingAutoConfiguration.class]
+↑     ↓
+|  core4ToolCallbacks defined in class path resource [br/com/core4erp/chat/config/McpServerConfig.class]
+↑     ↓
+|  consultaTools defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/tools/consulta/ConsultaTools.class]
+└─────┘
+
+
+Action:
+
+Relying upon circular references is discouraged and they are prohibited by default. Update your application to remove the dependency cycle between beans. As a last resort, it may be possible to break the cycle automatically by setting spring.main.allow-circular-references to true.
+
+2026-07-13 20:18:37.950 [main] INFO  br.com.core4erp.Core4erpApplication [reqId=] - Starting Core4erpApplication using Java 17.0.19 with PID 121322 (/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main started by eduardoa in /home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp)
+2026-07-13 20:18:37.955 [main] INFO  br.com.core4erp.Core4erpApplication [reqId=] - No active profile set, falling back to 1 default profile: "default"
+2026-07-13 20:18:39.627 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate [reqId=] - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-07-13 20:18:39.999 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate [reqId=] - Finished Spring Data repository scanning in 358 ms. Found 32 JPA repository interfaces.
+2026-07-13 20:18:41.881 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker [reqId=] - Bean 'org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+2026-07-13 20:18:41.886 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker [reqId=] - Bean 'serverAnnotatedBeanRegistry' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerAutoConfiguration$ServerMcpAnnotatedBeans] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+2026-07-13 20:18:41.911 [main] WARN  o.s.c.s.PostProcessorRegistrationDelegate$BeanPostProcessorChecker [reqId=] - Bean 'spring.ai.mcp.server.annotation-scanner-org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties' of type [org.springframework.ai.mcp.server.common.autoconfigure.annotations.McpServerAnnotationScannerProperties] is not eligible for getting processed by all BeanPostProcessors (for example: not eligible for auto-proxying). Is this bean getting eagerly injected into a currently created BeanPostProcessor [serverAnnotatedMethodBeanPostProcessor]? Check the corresponding BeanPostProcessor declaration and its dependencies.
+2026-07-13 20:18:42.567 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer [reqId=] - Tomcat initialized with port 8081 (http)
+2026-07-13 20:18:42.588 [main] INFO  o.a.coyote.http11.Http11NioProtocol [reqId=] - Initializing ProtocolHandler ["http-nio-8081"]
+2026-07-13 20:18:42.591 [main] INFO  o.a.catalina.core.StandardService [reqId=] - Starting service [Tomcat]
+2026-07-13 20:18:42.592 [main] INFO  o.a.catalina.core.StandardEngine [reqId=] - Starting Servlet engine: [Apache Tomcat/10.1.26]
+2026-07-13 20:18:42.712 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] [reqId=] - Initializing Spring embedded WebApplicationContext
+2026-07-13 20:18:42.713 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext [reqId=] - Root WebApplicationContext: initialization completed in 4669 ms
+2026-07-13 20:18:46.406 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo [reqId=] - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-07-13 20:18:48.710 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean [reqId=] - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-07-13 20:18:49.155 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory [reqId=] - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-07-13 20:18:54.426 [main] WARN  io.qdrant.client.QdrantGrpcClient [reqId=] - Qdrant client version 1.13.0 is incompatible with server version 1.18.2. Major versions should match and minor version difference must not exceed 1. Set checkCompatibility=false to skip version check.
+2026-07-13 20:18:55.885 [main] WARN  o.s.a.r.a.SpringAiRetryAutoConfiguration [reqId=] - Retry error. Retry count: 1, Exception: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+org.springframework.web.client.RestClientException: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+	at org.springframework.web.client.DefaultRestClient.readWithMessageConverters(DefaultRestClient.java:240)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.readBody(DefaultRestClient.java:685)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntityInternal(DefaultRestClient.java:655)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntity(DefaultRestClient.java:651)
+	at org.springframework.ai.openai.api.OpenAiApi.embeddings(OpenAiApi.java:323)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.lambda$call$1(OpenAiEmbeddingModel.java:175)
+	at org.springframework.retry.support.RetryTemplate.doExecute(RetryTemplate.java:344)
+	at org.springframework.retry.support.RetryTemplate.execute(RetryTemplate.java:217)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.lambda$call$3(OpenAiEmbeddingModel.java:175)
+	at io.micrometer.observation.Observation.observe(Observation.java:565)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.call(OpenAiEmbeddingModel.java:173)
+	at org.springframework.ai.embedding.EmbeddingModel.embed(EmbeddingModel.java:83)
+	at org.springframework.ai.embedding.EmbeddingModel.embed(EmbeddingModel.java:49)
+	at org.springframework.ai.embedding.AbstractEmbeddingModel.dimensions(AbstractEmbeddingModel.java:70)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.dimensions(OpenAiEmbeddingModel.java:202)
+	at org.springframework.ai.vectorstore.qdrant.QdrantVectorStore.afterPropertiesSet(QdrantVectorStore.java:319)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1853)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1802)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:600)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:971)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:625)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:335)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1363)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1352)
+	at br.com.core4erp.Core4erpApplication.main(Core4erpApplication.java:29)
+Caused by: java.net.HttpRetryException: cannot retry due to server authentication, in streaming mode
+	at java.base/sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1846)
+	at java.base/sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1641)
+	at java.base/sun.net.www.protocol.http.HttpURLConnection.getHeaderFieldKey(HttpURLConnection.java:3361)
+	at java.base/sun.net.www.protocol.https.HttpsURLConnectionImpl.getHeaderFieldKey(HttpsURLConnectionImpl.java:277)
+	at org.springframework.http.client.SimpleClientHttpResponse.getHeaders(SimpleClientHttpResponse.java:69)
+	at org.springframework.web.client.DefaultRestClient$DefaultConvertibleClientHttpResponse.getHeaders(DefaultRestClient.java:753)
+	at org.springframework.web.client.DefaultRestClient.getContentType(DefaultRestClient.java:257)
+	at org.springframework.web.client.DefaultRestClient.readWithMessageConverters(DefaultRestClient.java:197)
+	... 75 common frames omitted
+2026-07-13 20:18:55.892 [main] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext [reqId=] - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'chatController' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/controller/ChatController.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'chatService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/ChatService.class]: Unsatisfied dependency expressed through constructor parameter 12: Error creating bean with name 'ragService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/RagService.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'vectorStore' defined in class path resource [org/springframework/ai/vectorstore/qdrant/autoconfigure/QdrantVectorStoreAutoConfiguration.class]: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+2026-07-13 20:18:55.907 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean [reqId=] - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-07-13 20:18:55.916 [main] INFO  o.a.catalina.core.StandardService [reqId=] - Stopping service [Tomcat]
+2026-07-13 20:18:55.952 [main] INFO  o.s.b.a.l.ConditionEvaluationReportLogger [reqId=] - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-07-13 20:18:55.975 [main] ERROR o.s.boot.SpringApplication [reqId=] - Application run failed
+org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'chatController' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/controller/ChatController.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'chatService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/ChatService.class]: Unsatisfied dependency expressed through constructor parameter 12: Error creating bean with name 'ragService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/RagService.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'vectorStore' defined in class path resource [org/springframework/ai/vectorstore/qdrant/autoconfigure/QdrantVectorStoreAutoConfiguration.class]: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:795)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:971)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:625)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:335)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1363)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1352)
+	at br.com.core4erp.Core4erpApplication.main(Core4erpApplication.java:29)
+Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'chatService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/ChatService.class]: Unsatisfied dependency expressed through constructor parameter 12: Error creating bean with name 'ragService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/RagService.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'vectorStore' defined in class path resource [org/springframework/ai/vectorstore/qdrant/autoconfigure/QdrantVectorStoreAutoConfiguration.class]: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:795)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782)
+	... 19 common frames omitted
+Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'ragService' defined in file [/home/eduardoa/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/core4erp/build/classes/java/main/br/com/core4erp/chat/service/RagService.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'vectorStore' defined in class path resource [org/springframework/ai/vectorstore/qdrant/autoconfigure/QdrantVectorStoreAutoConfiguration.class]: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:795)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1375)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1212)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:562)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782)
+	... 33 common frames omitted
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'vectorStore' defined in class path resource [org/springframework/ai/vectorstore/qdrant/autoconfigure/QdrantVectorStoreAutoConfiguration.class]: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1806)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:600)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:522)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:337)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:335)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:200)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:904)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:782)
+	... 47 common frames omitted
+Caused by: org.springframework.web.client.RestClientException: Error while extracting response for type [org.springframework.ai.openai.api.OpenAiApi$EmbeddingList<org.springframework.ai.openai.api.OpenAiApi$Embedding>] and content type [text/plain]
+	at org.springframework.web.client.DefaultRestClient.readWithMessageConverters(DefaultRestClient.java:240)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.readBody(DefaultRestClient.java:685)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntityInternal(DefaultRestClient.java:655)
+	at org.springframework.web.client.DefaultRestClient$DefaultResponseSpec.toEntity(DefaultRestClient.java:651)
+	at org.springframework.ai.openai.api.OpenAiApi.embeddings(OpenAiApi.java:323)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.lambda$call$1(OpenAiEmbeddingModel.java:175)
+	at org.springframework.retry.support.RetryTemplate.doExecute(RetryTemplate.java:344)
+	at org.springframework.retry.support.RetryTemplate.execute(RetryTemplate.java:217)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.lambda$call$3(OpenAiEmbeddingModel.java:175)
+	at io.micrometer.observation.Observation.observe(Observation.java:565)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.call(OpenAiEmbeddingModel.java:173)
+	at org.springframework.ai.embedding.EmbeddingModel.embed(EmbeddingModel.java:83)
+	at org.springframework.ai.embedding.EmbeddingModel.embed(EmbeddingModel.java:49)
+	at org.springframework.ai.embedding.AbstractEmbeddingModel.dimensions(AbstractEmbeddingModel.java:70)
+	at org.springframework.ai.openai.OpenAiEmbeddingModel.dimensions(OpenAiEmbeddingModel.java:202)
+	at org.springframework.ai.vectorstore.qdrant.QdrantVectorStore.afterPropertiesSet(QdrantVectorStore.java:319)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1853)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1802)
+	... 58 common frames omitted
+Caused by: java.net.HttpRetryException: cannot retry due to server authentication, in streaming mode
+	at java.base/sun.net.www.protocol.http.HttpURLConnection.getInputStream0(HttpURLConnection.java:1846)
+	at java.base/sun.net.www.protocol.http.HttpURLConnection.getInputStream(HttpURLConnection.java:1641)
+	at java.base/sun.net.www.protocol.http.HttpURLConnection.getHeaderFieldKey(HttpURLConnection.java:3361)
+	at java.base/sun.net.www.protocol.https.HttpsURLConnectionImpl.getHeaderFieldKey(HttpsURLConnectionImpl.java:277)
+	at org.springframework.http.client.SimpleClientHttpResponse.getHeaders(SimpleClientHttpResponse.java:69)
+	at org.springframework.web.client.DefaultRestClient$DefaultConvertibleClientHttpResponse.getHeaders(DefaultRestClient.java:753)
+	at org.springframework.web.client.DefaultRestClient.getContentType(DefaultRestClient.java:257)
+	at org.springframework.web.client.DefaultRestClient.readWithMessageConverters(DefaultRestClient.java:197)
+	... 75 common frames omitted

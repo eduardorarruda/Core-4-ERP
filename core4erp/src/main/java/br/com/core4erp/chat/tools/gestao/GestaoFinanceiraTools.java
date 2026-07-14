@@ -367,7 +367,8 @@ public class GestaoFinanceiraTools {
         audit("atualizarCategoria", "id=" + atual.id());
         return categoriaService.atualizar(atual.id(), new CategoriaRequestDto(
                 novaDescricao != null ? novaDescricao : atual.descricao(),
-                icone != null ? icone : atual.icone()));
+                icone != null ? icone : atual.icone(),
+                atual.categoriaPaiId()));   // preserva o vínculo pai/filho ao editar
     }
 
     @Tool(description = """

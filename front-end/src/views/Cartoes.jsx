@@ -3,6 +3,7 @@ import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat } from 'luci
 import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
+import CategoriaOptions from '../components/ui/CategoriaOptions';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
 import DataTable from '../components/ui/DataTable';
@@ -154,6 +155,10 @@ export default function Cartoes() {
 
   async function salvarEdicao(e) {
     e.preventDefault();
+    if (!editForm.parceiroId) {
+      toast.error('Selecione um parceiro para o lançamento.');
+      return;
+    }
     setSalvandoEdit(true);
     try {
       await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), categoriaId: Number(editForm.categoriaId), parceiroId: Number(editForm.parceiroId) });
@@ -414,7 +419,7 @@ export default function Cartoes() {
                   <FormField label="Categoria">
                     <select className={`${inputCls} appearance-none`} value={editForm.categoriaId} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
                       <option value="">Selecione</option>
-                      {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                      <CategoriaOptions cats={cats} />
                     </select>
                   </FormField>
                   <FormField label="Parceiro / Fornecedor" required>
@@ -474,7 +479,7 @@ export default function Cartoes() {
               <FormField label="Categoria" required error={errors.categoriaId}>
                 <select className={`${inputCls} appearance-none`} value={lancForm.categoriaId} onChange={(e) => setLancForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
                   <option value="">Selecione</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                  <CategoriaOptions cats={cats} />
                 </select>
               </FormField>
               <FormField label="Parceiro / Fornecedor" required error={errors.parceiroId}>

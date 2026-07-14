@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Settings, LogOut, Sun, Moon, Search } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ThemeContext } from '../../context/ThemeContext';
+import NotificacoesPopover from './NotificacoesPopover';
 
 const ROUTE_NAMES = {
   '/dashboard': 'Dashboard',
@@ -13,7 +14,6 @@ const ROUTE_NAMES = {
   '/cartoes': 'Cartões',
   '/investimentos': 'Investimentos',
   '/assinaturas': 'Assinaturas',
-  '/notificacoes': 'Notificações',
   '/calendario': 'Calendário',
   '/reports': 'Relatórios',
   '/audit': 'Auditoria',
@@ -150,6 +150,9 @@ export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
+
+          {/* Notificações (sino) */}
+          <NotificacoesPopover />
 
           {/* Avatar */}
           <div className="relative" ref={wrapperRef}>
