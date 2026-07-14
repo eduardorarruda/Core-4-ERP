@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import PwaStatus from './components/layout/PwaStatus';
+import InstalarPwaBanner from './components/layout/InstalarPwaBanner';
 import ChatSidebar from './components/chat/ChatSidebar';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
@@ -236,6 +237,9 @@ export default function App() {
           </Routes>
           </Suspense>
           </ErrorBoundary>
+
+          {/* Convite de instalação do PWA — global (aparece inclusive na tela de login). */}
+          <InstalarPwaBanner />
         </ConfirmProvider>
       </ToastProvider>
     </BrowserRouter>
