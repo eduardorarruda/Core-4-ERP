@@ -2,6 +2,7 @@ package br.com.core4erp.chat.tools.lancamento;
 
 import br.com.core4erp.cartaoCredito.dto.LancamentoRequestDto;
 import br.com.core4erp.cartaoCredito.dto.LancamentoResponseDto;
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
 import br.com.core4erp.categoria.service.ClassificacaoIaService;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
@@ -71,7 +72,7 @@ public class LancamentoTools {
             @ToolParam(description = "Valor em reais. Ex: 250.00") BigDecimal valorOriginal,
             @ToolParam(description = "Data de vencimento no formato YYYY-MM-DD") LocalDate dataVencimento,
             @ToolParam(description = "PAGAR para despesas, RECEBER para receitas") String tipo,
-            @ToolParam(description = "ID da categoria. OPCIONAL — passe null para a IA classificar automaticamente") Long categoriaId,
+            @ToolParam(description = "ID da categoria. Se o usuário indicar a categoria, resolva com consultarCategorias e passe o ID; se ele não indicar, passe null e o sistema classifica automaticamente pela descrição") Long categoriaId,
             @ToolParam(description = "ID do parceiro/fornecedor. Opcional, pode ser null") Long parceiroId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
@@ -89,16 +90,28 @@ public class LancamentoTools {
             throw new IllegalArgumentException("Tipo de conta inválido: '" + tipo + "'. Use PAGAR ou RECEBER.");
         }
 
-        // Classificação automática: usuário não informou categoria → IA sugere a partir da descrição.
+        // Classificação automática (best-effort): usuário não informou categoria → IA tenta sugerir a
+        // partir da descrição. Nunca deve derrubar o lançamento — em qualquer falha ou confiança baixa
+        // (sugestão vazia), segue sem categoria (categoriaId = null).
         BigDecimal confiancaIa = null;
         if (categoriaId == null) {
-            var sugestao = classificacaoIaService.sugerir(descricao, null);
-            if (sugestao.isEmpty()) {
-                throw new IllegalArgumentException("Não consegui identificar a categoria automaticamente. "
-                        + "Diga a categoria ou use consultarCategorias para escolher uma.");
+            try {
+                var sugestao = classificacaoIaService.sugerir(descricao, null);
+                if (sugestao.isPresent()) {
+                    categoriaId = sugestao.get().categoriaId();
+                    confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+                }
+            } catch (Exception e) {
+                log.warn("[CHAT] classificação automática de categoria falhou — seguindo sem categoria. motivo={}",
+                        e.getMessage());
             }
-            categoriaId = sugestao.get().categoriaId();
-            confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+        }
+        // Categoria é obrigatória (regra de negócio). Se a classificação automática não resolveu,
+        // não derrube com um erro técnico — instrua a IA a pedir a categoria ao usuário.
+        if (categoriaId == null) {
+            throw new IllegalArgumentException(
+                    "Não identifiquei a categoria pela descrição. Pergunte ao usuário qual categoria usar "
+                    + "ou use consultarCategorias para localizar a categoria correta.");
         }
 
         ContaCreateDto dto = new ContaCreateDto(
@@ -123,33 +136,56 @@ public class LancamentoTools {
     @Tool(description = """
             Registra lançamento em cartão de crédito (suporta parcelamento). Use consultarCartoes
             para o cartaoId, consultarCategorias para o categoriaId e consultarParceiros para o
-            parceiroId. O parceiro (fornecedor/cliente) é OBRIGATÓRIO — se o usuário não informar,
-            pergunte ou ajude a cadastrar um antes de registrar. A fatura é calculada pela data da
-            compra e dia de fechamento. Chame só APÓS o usuário confirmar.
+            parceiroId. O parceiro é OBRIGATÓRIO em lançamento de cartão. O cartão aceita SAÍDA
+            (gasto/compra) e ENTRADA (crédito/estorno recebido); informe o campo tipo — o valor é
+            sempre POSITIVO, o tipo é que indica a direção. A fatura é calculada pela data da compra
+            e dia de fechamento. Chame só APÓS o usuário confirmar.
             """)
     public List<LancamentoResponseDto> registrarLancamentoCartao(
             @ToolParam(description = "ID do cartão de crédito. Use consultarCartoes para descobrir") Long cartaoId,
             @ToolParam(description = "Descrição da compra") String descricao,
-            @ToolParam(description = "Valor da compra em reais") BigDecimal valor,
+            @ToolParam(description = "Valor da compra em reais (sempre positivo; o tipo indica a direção)") BigDecimal valor,
             @ToolParam(description = "Data da compra no formato YYYY-MM-DD") LocalDate dataCompra,
-            @ToolParam(description = "ID da categoria. OPCIONAL — passe null para a IA classificar automaticamente") Long categoriaId,
-            @ToolParam(description = "ID do parceiro (fornecedor/cliente). OBRIGATÓRIO. Use consultarParceiros para descobrir") Long parceiroId,
-            @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={} parceiroId={}",
-                securityCtx.getUsuarioId(), cartaoId, descricao, valor, parceiroId);
+            @ToolParam(description = "ID da categoria. Se o usuário indicar a categoria, resolva com consultarCategorias e passe o ID; se ele não indicar, passe null e o sistema classifica automaticamente pela descrição") Long categoriaId,
+            @ToolParam(description = "ID do parceiro (fornecedor/cliente) — OBRIGATÓRIO em lançamento de cartão. Use consultarParceiros para descobrir; se não existir, cadastre com registrarParceiro") Long parceiroId,
+            @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
+            @ToolParam(description = "Tipo do lançamento: SAIDA para gasto/compra (padrão), ENTRADA para crédito/estorno recebido no cartão. Se o usuário não indicar, use SAIDA.") String tipo) {
+        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={} parceiroId={} tipo={}",
+                securityCtx.getUsuarioId(), cartaoId, descricao, valor, parceiroId, tipo);
         auditoria.registrar("registrarLancamentoCartao",
-                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor + " parceiroId=" + parceiroId);
+                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor + " parceiroId=" + parceiroId + " tipo=" + tipo);
 
-        // Classificação automática quando o usuário não informa a categoria.
+        // Tipo do lançamento: SAIDA (gasto) ou ENTRADA (crédito/estorno). null/valor inválido → SAIDA.
+        TipoLancamentoCartao tipoEnum = TipoLancamentoCartao.SAIDA;
+        if (tipo != null && !tipo.isBlank()) {
+            try {
+                tipoEnum = TipoLancamentoCartao.valueOf(tipo.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                tipoEnum = TipoLancamentoCartao.SAIDA;
+            }
+        }
+
+        // Classificação automática (best-effort) quando o usuário não informa a categoria. Nunca
+        // deve derrubar o lançamento — em qualquer falha ou confiança baixa, segue sem categoria.
         BigDecimal confiancaIa = null;
         if (categoriaId == null) {
-            var sugestao = classificacaoIaService.sugerir(descricao, null);
-            if (sugestao.isEmpty()) {
-                throw new IllegalArgumentException("Não consegui identificar a categoria automaticamente. "
-                        + "Diga a categoria ou use consultarCategorias para escolher uma.");
+            try {
+                var sugestao = classificacaoIaService.sugerir(descricao, null);
+                if (sugestao.isPresent()) {
+                    categoriaId = sugestao.get().categoriaId();
+                    confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+                }
+            } catch (Exception e) {
+                log.warn("[CHAT] classificação automática de categoria falhou — seguindo sem categoria. motivo={}",
+                        e.getMessage());
             }
-            categoriaId = sugestao.get().categoriaId();
-            confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+        }
+        // Categoria é obrigatória (regra de negócio). Se a classificação automática não resolveu,
+        // instrua a IA a pedir a categoria ao usuário em vez de deixar o service lançar erro técnico.
+        if (categoriaId == null) {
+            throw new IllegalArgumentException(
+                    "Não identifiquei a categoria pela descrição. Pergunte ao usuário qual categoria usar "
+                    + "ou use consultarCategorias para localizar a categoria correta.");
         }
 
         LancamentoRequestDto dto = new LancamentoRequestDto(
@@ -160,7 +196,7 @@ public class LancamentoTools {
                 parceiroId,
                 quantidadeParcelas != null ? quantidadeParcelas : 1,
                 true,
-                null
+                tipoEnum
         );
         List<LancamentoResponseDto> criados = cartaoCreditoService.criarLancamento(cartaoId, dto);
         if (confiancaIa != null) {

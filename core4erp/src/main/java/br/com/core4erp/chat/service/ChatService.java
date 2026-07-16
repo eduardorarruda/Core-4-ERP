@@ -124,7 +124,7 @@ public class ChatService {
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
-        return processar(request, null);
+        return processar(request, null, false);
     }
 
     /**
@@ -134,6 +134,18 @@ public class ChatService {
      *   como contexto em toda mensagem seguinte, estourando o limite de tokens/min (429).
      */
     public ChatResponseDto processar(ChatRequestDto request, String textoParaHistorico) {
+        return processar(request, textoParaHistorico, false);
+    }
+
+    /**
+     * @param jaSanitizado quando {@code true}, a mensagem NÃO passa pelo {@link ChatInputSanitizer}.
+     *   Usado pelo anexo: o prompt já é montado pelo servidor em {@code ChatAnexoService.processarAnexo}
+     *   e já é limitado por {@code chat.anexo.max-chars}/{@code MAX_EXTRACT_CHARS}. Re-sanitizar aqui
+     *   truncaria o conteúdo do arquivo em 4000 chars (teto do sanitizer), estrangulando extratos/
+     *   planilhas e anulando o modo Pensamento Estendido. O fluxo de texto livre do usuário (UI de
+     *   chat) SEMPRE chega com {@code false} e permanece sanitizado.
+     */
+    public ChatResponseDto processar(ChatRequestDto request, String textoParaHistorico, boolean jaSanitizado) {
         chatMetrics.registrarMensagem();
         Timer.Sample timer = chatMetrics.iniciarTimer();
 
@@ -142,7 +154,9 @@ public class ChatService {
         ChatMensagem.Canal canal = request.canalResolvido();
         Long conversaId = conversaService.resolverOuCriar(canal, request.conversaId()).getId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
-        String mensagemUsuario = sanitizer.sanitize(request.mensagem());
+        String mensagemUsuario = jaSanitizado
+                ? (request.mensagem() != null ? request.mensagem() : "")
+                : sanitizer.sanitize(request.mensagem());
 
         List<Message> allMessages = montarMensagens(conversaId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
         memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER,

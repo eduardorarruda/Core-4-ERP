@@ -110,9 +110,18 @@ public class RagService {
             String ctx = docs.stream().map(Document::getText).collect(Collectors.joining("\n---\n"));
             return """
                     ## MATERIAL DE REFERÊNCIA (RAG)
-                    Trechos recuperados dos documentos/conhecimento do usuário. Use SOMENTE se forem
-                    relevantes para a pergunta atual; caso contrário, ignore e responda normalmente com
-                    suas ferramentas. Não invente nada além disto e dos dados das ferramentas.
+                    O material abaixo é apenas um APOIO DE CONTEXTO (documentos/conhecimento do usuário e
+                    resumos históricos) e PODE CONTER VALORES DESATUALIZADOS. Use-o SOMENTE para entender
+                    contexto e histórico textual — jamais como fonte de números atuais.
+
+                    REGRAS OBRIGATÓRIAS:
+                    - NUNCA use números do material de referência (saldos, totais, gastos, receitas, datas
+                      ou quaisquer valores) como resposta — eles podem estar defasados.
+                    - Para QUALQUER valor numérico ou dado financeiro, chame a ferramenta correspondente
+                      NESTA resposta e use exclusivamente o resultado ao vivo dela.
+                    - Se o material for irrelevante para a pergunta, ignore-o e responda normalmente com
+                      suas ferramentas.
+                    - Não invente nada além do que vier das ferramentas.
 
                     %s
                     """.formatted(ctx);
