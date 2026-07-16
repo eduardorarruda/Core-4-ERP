@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat } from 'lucide-react';
 import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -34,10 +34,10 @@ export default function Cartoes() {
   const [form, setForm] = useState({ nome: '', limite: '', diaFechamento: '', diaVencimento: '', contaCorrenteId: '' });
   const [cartaoSel, setCartaoSel] = useState(null);
   const [lancamentos, setLancamentos] = useState([]);
+  const [todosLancamentos, setTodosLancamentos] = useState([]);
   const [lancForm, setLancForm] = useState(emptyLancForm);
   const [editLancId, setEditLancId] = useState(null);
   const [editForm, setEditForm] = useState({ descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '' });
-  const [fechForm, setFechForm] = useState({ mes: '', ano: '' });
   const [salvando, setSalvando] = useState(false);
   const [salvandoLanc, setSalvandoLanc] = useState(false);
   const [salvandoEdit, setSalvandoEdit] = useState(false);
@@ -59,6 +59,15 @@ export default function Cartoes() {
     if (!cartaoSel) return;
     const l = await api.lancamentos.listar(cartaoSel.id, params);
     setLancamentos(l);
+  }
+
+  // Recarrega a lista COMPLETA (sem filtro) — usada após criar/editar/excluir/fechar, pois é dela
+  // que sai o cálculo das faturas em aberto.
+  async function recarregarTudo() {
+    if (!cartaoSel) return;
+    const l = await api.lancamentos.listar(cartaoSel.id);
+    setLancamentos(l);
+    setTodosLancamentos(l);
   }
 
   function validateCartaoForm() {
@@ -126,7 +135,9 @@ export default function Cartoes() {
     setCartaoSel(c);
     setEditLancId(null);
     setErrors({});
-    setLancamentos(await api.lancamentos.listar(c.id));
+    const l = await api.lancamentos.listar(c.id);
+    setLancamentos(l);
+    setTodosLancamentos(l);
   }
 
   async function criarLancamento(e) {
@@ -137,7 +148,7 @@ export default function Cartoes() {
     setSalvandoLanc(true);
     try {
       await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor, tipo: lancForm.tipo });
-      await recarregarLancamentos();
+      await recarregarTudo();
       setLancForm(emptyLancForm);
       toast.success('Lançamento criado!');
     } catch (e) {
@@ -162,7 +173,7 @@ export default function Cartoes() {
     setSalvandoEdit(true);
     try {
       await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), categoriaId: Number(editForm.categoriaId), parceiroId: Number(editForm.parceiroId) });
-      await recarregarLancamentos();
+      await recarregarTudo();
       setEditLancId(null);
       toast.success('Lançamento atualizado!');
     } catch (e) {
@@ -181,7 +192,7 @@ export default function Cartoes() {
         setConfirmAction(null);
         try {
           await api.lancamentos.deletar(cartaoSel.id, id);
-          await recarregarLancamentos();
+          await recarregarTudo();
           toast.success('Lançamento excluído!');
         } catch (e) {
           toast.error(e.message);
@@ -190,19 +201,30 @@ export default function Cartoes() {
     });
   }
 
-  async function fecharFatura(e) {
-    e.preventDefault();
-    setSalvandoFatura(true);
-    try {
-      await api.fecharFatura(cartaoSel.id, { mes: Number(fechForm.mes), ano: Number(fechForm.ano) });
-      await recarregarLancamentos();
-      toast.success('Fatura fechada! Conta a pagar gerada.');
-      setFechForm({ mes: '', ano: '' });
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvandoFatura(false);
-    }
+  function fecharFatura(mes, ano) {
+    setConfirmAction({
+      title: 'Fechar fatura',
+      message: `Fechar a fatura de ${String(mes).padStart(2, '0')}/${ano}? Isso gera uma conta a pagar e bloqueia novos lançamentos nesta fatura.`,
+      confirmLabel: 'Fechar fatura',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        setSalvandoFatura(true);
+        try {
+          await api.fecharFatura(cartaoSel.id, { mes: Number(mes), ano: Number(ano) });
+          await recarregarTudo();
+          // Atualiza limite usado/livre exibido no cabeçalho e na lista de cartões.
+          const novaLista = await api.listar();
+          setLista(novaLista);
+          const atualizado = novaLista.find((c) => c.id === cartaoSel.id);
+          if (atualizado) setCartaoSel(atualizado);
+          toast.success('Fatura fechada! Conta a pagar gerada.');
+        } catch (e) {
+          toast.error(e.message);
+        } finally {
+          setSalvandoFatura(false);
+        }
+      },
+    });
   }
 
   const lancsFiltrados = lancamentos.filter((l) => {
@@ -210,6 +232,23 @@ export default function Cartoes() {
     if (filterAno && String(l.anoFatura) !== filterAno) return false;
     return true;
   });
+
+  // Faturas em aberto (não fechadas), agrupadas por mês/ano, com o total LÍQUIDO de cada uma
+  // (soma das SAÍDAS menos as ENTRADAS). Ordenadas da mais antiga para a mais recente — a primeira
+  // é a "atual", a próxima a ser fechada.
+  const faturasAbertas = useMemo(() => {
+    const mapa = new Map();
+    for (const l of todosLancamentos) {
+      if (l.faturaFechada) continue;
+      const chave = `${l.anoFatura}-${l.mesFatura}`;
+      const atual = mapa.get(chave) || { mes: l.mesFatura, ano: l.anoFatura, total: 0, qtd: 0 };
+      const v = Number(l.valor) || 0;
+      atual.total += l.tipo === 'ENTRADA' ? -v : v;
+      atual.qtd += 1;
+      mapa.set(chave, atual);
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  }, [todosLancamentos]);
 
   const columns = [
     {
@@ -494,20 +533,39 @@ export default function Cartoes() {
               </button>
             </form>
 
-            {/* Fechar fatura */}
-            <form onSubmit={fecharFatura} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,211,122,.04)', border: '1px solid rgba(255,211,122,.2)', backdropFilter: 'blur(8px)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: '#FFD37A' }}>Fechar Fatura</h3>
-              <FormField label="Mês (1-12)">
-                <input type="number" min="1" max="12" className={inputCls} value={fechForm.mes} onChange={(e) => setFechForm((f) => ({ ...f, mes: e.target.value }))} required />
-              </FormField>
-              <FormField label="Ano">
-                <input type="number" className={inputCls} value={fechForm.ano} onChange={(e) => setFechForm((f) => ({ ...f, ano: e.target.value }))} required />
-              </FormField>
-              <button type="submit" disabled={salvandoFatura} className="font-bold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2" style={{ background: 'rgba(255,211,122,.2)', color: '#FFD37A', border: '1px solid rgba(255,211,122,.3)' }}>
-                {salvandoFatura ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-                {salvandoFatura ? 'Fechando...' : 'Fechar Fatura'}
-              </button>
-            </form>
+            {/* Fatura em aberto */}
+            <div className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,211,122,.04)', border: '1px solid rgba(255,211,122,.2)', backdropFilter: 'blur(8px)' }}>
+              <h3 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: '#FFD37A' }}>Fatura em Aberto</h3>
+              {faturasAbertas.length === 0 ? (
+                <p className="text-sm text-text-primary/50 py-6 text-center">Nenhuma fatura em aberto neste cartão.</p>
+              ) : (
+                <div className="space-y-2">
+                  {faturasAbertas.map((f, i) => (
+                    <div key={`${f.ano}-${f.mes}`} className="flex items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(250,250,250,.06)' }}>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-text-primary/50 font-mono uppercase tracking-widest">
+                          Fatura {String(f.mes).padStart(2, '0')}/{f.ano}
+                          {i === 0 && faturasAbertas.length > 1 && <span className="text-primary/70"> · atual</span>}
+                        </p>
+                        <p className="text-xl font-bold text-text-primary font-mono">R$ {brl(f.total)}</p>
+                        <p className="text-[10px] text-text-primary/40">{f.qtd} lançamento{f.qtd > 1 ? 's' : ''}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fecharFatura(f.mes, f.ano)}
+                        disabled={salvandoFatura || f.total <= 0}
+                        title={f.total <= 0 ? 'Fatura sem valor a fechar' : 'Fechar esta fatura'}
+                        className="font-bold px-4 py-2 rounded-xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-sm flex items-center gap-2 shrink-0"
+                        style={{ background: 'rgba(255,211,122,.2)', color: '#FFD37A', border: '1px solid rgba(255,211,122,.3)' }}
+                      >
+                        {salvandoFatura ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                        Fechar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Filtro de lançamentos */}
