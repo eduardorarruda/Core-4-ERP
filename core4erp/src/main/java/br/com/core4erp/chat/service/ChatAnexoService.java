@@ -193,7 +193,10 @@ public class ChatAnexoService {
         // A IA recebe o conteúdo completo agora, mas no histórico guardamos só um resumo curto
         // (o arquivo inteiro no histórico inflaria o prompt das próximas mensagens → 429).
         String resumoHistorico = "[Enviei o arquivo \"" + nome + "\" e pedi: " + instrucao + "]";
-        return chatService.processar(new ChatRequestDto(mensagem, "ASSISTENTE", conversaId), resumoHistorico);
+        // jaSanitizado=true: o prompt do anexo já é montado pelo servidor e já limitado por
+        // maxChars/MAX_EXTRACT_CHARS. Sem isto, o ChatInputSanitizer truncaria em 4000 chars,
+        // estrangulando o conteúdo do arquivo e anulando o Pensamento Estendido do admin.
+        return chatService.processar(new ChatRequestDto(mensagem, "ASSISTENTE", conversaId), resumoHistorico, true);
     }
 
     private boolean isAdminSistema() {
@@ -245,7 +248,10 @@ public class ChatAnexoService {
                 }
                 String l = linha.toString().strip();
                 if (!l.isBlank()) sb.append(l).append("\n");
-                if (sb.length() >= maxChars) break;
+                // Acumula o conteúdo COMPLETO (até o teto de segurança), como OFX/PDF/CSV — assim o
+                // RAG recebe a planilha inteira. A truncagem para maxChars (custo de tokens) é feita
+                // depois em processarAnexo, só na cópia enviada ao modelo.
+                if (sb.length() >= MAX_EXTRACT_CHARS) break;
             }
             return sb.length() == 0 ? "(planilha sem dados)" : sb.toString();
         } catch (Exception e) {

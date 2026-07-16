@@ -8,6 +8,7 @@ import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.enums.TipoParceiro;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
+import br.com.core4erp.parceiro.service.BrasilApiService;
 import br.com.core4erp.parceiro.service.ParceiroService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -33,15 +34,18 @@ public class CadastroTools {
     private final CategoriaService categoriaService;
     private final SecurityContextUtils securityCtx;
     private final ChatAuditoriaService auditoria;
+    private final BrasilApiService brasilApiService;
 
     public CadastroTools(ParceiroService parceiroService,
                          CategoriaService categoriaService,
                          SecurityContextUtils securityCtx,
-                         ChatAuditoriaService auditoria) {
+                         ChatAuditoriaService auditoria,
+                         BrasilApiService brasilApiService) {
         this.parceiroService = parceiroService;
         this.categoriaService = categoriaService;
         this.securityCtx = securityCtx;
         this.auditoria = auditoria;
+        this.brasilApiService = brasilApiService;
     }
 
     @Tool(description = """
@@ -104,6 +108,20 @@ public class CadastroTools {
                     "Tipo de parceiro inválido: '" + tipo + "'. Use CLIENTE, FORNECEDOR ou AMBOS.");
         }
         return parceiroService.atualizarTipo(parceiroId, tipoEnum);
+    }
+
+    @Tool(description = """
+            Consulta dados públicos de uma empresa a partir do CNPJ (razão social, nome fantasia,
+            endereço, telefone). Use ANTES de registrar um parceiro quando o usuário informar apenas
+            o CNPJ, para obter a razão social automaticamente — nunca invente o nome.
+            """)
+    public BrasilApiService.CnpjData consultarCnpj(
+            @ToolParam(description = "CNPJ da empresa (com ou sem máscara)") String cnpj) {
+        log.info("[CHAT-AUDIT] user={} tool=consultarCnpj", securityCtx.getUsuarioId());
+        auditoria.registrar("consultarCnpj", "consulta CNPJ");
+        return brasilApiService.buscarCnpj(cnpj)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Não encontrei dados para este CNPJ. Confira o número informado ou digite a razão social manualmente."));
     }
 
     @Tool(description = """
