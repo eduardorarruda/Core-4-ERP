@@ -95,8 +95,8 @@ public class ChatService {
                        ObjectMapper objectMapper,
                        TenantContext tenantCtx,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico,
-                       @Value("${chat.preco.input-usd-por-milhao:2.50}") double precoInputPorMilhao,
-                       @Value("${chat.preco.output-usd-por-milhao:10.00}") double precoOutputPorMilhao) {
+                       @Value("${chat.preco.input-usd-por-milhao:0.15}") double precoInputPorMilhao,
+                       @Value("${chat.preco.output-usd-por-milhao:0.60}") double precoOutputPorMilhao) {
         this.chatClient = chatClientBuilder.build();
         this.promptBuilder = promptBuilder;
         this.securityCtx = securityCtx;
