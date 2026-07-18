@@ -179,8 +179,9 @@ services:
   # Exposto só em 127.0.0.1 (acesso ao editor via túnel SSH; n8n é poderoso e não deve ficar
   # público sem TLS). N8N_SECURE_COOKIE=false permite acesso por HTTP no túnel/localhost.
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.28.3
     container_name: n8n
+    mem_limit: 1g
     ports:
       - "127.0.0.1:5678:5678"
     environment:
@@ -198,6 +199,15 @@ services:
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
       - N8N_DIAGNOSTICS_ENABLED=false
+      # Persistência: SQLite por padrão (dev local — não quebra o `docker compose up`).
+      # Em produção o .env seta N8N_DB_TYPE=postgresdb → usa o Postgres do compose
+      # (database 'n8n', mesmo servidor/credenciais do backend) para execuções persistentes.
+      - DB_TYPE=${N8N_DB_TYPE:-sqlite}
+      - DB_POSTGRESDB_HOST=${N8N_DB_HOST:-db}
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME:-n8n}
+      - DB_POSTGRESDB_USER=${DB_USERNAME}
+      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
