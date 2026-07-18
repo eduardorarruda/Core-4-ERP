@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,19 +59,29 @@ public class RagSincronizacaoService {
     private final ContaRepository contaRepository;
     private final CategoriaRepository categoriaRepository;
     private final ParceiroRepository parceiroRepository;
+    /**
+     * Referência ao próprio bean (via proxy Spring). Necessária para que os métodos
+     * {@code @Transactional} por-empresa realmente abram uma sessão Hibernate: chamá-los
+     * com {@code this.} (self-invocation) ignoraria o proxy e o {@code @Transactional},
+     * deixando os acessos lazy (ex.: {@code categoria.getCategoriaPai()}) sem sessão →
+     * {@code LazyInitializationException}. {@code @Lazy} quebra o ciclo de construção.
+     */
+    private final RagSincronizacaoService self;
 
     public RagSincronizacaoService(VectorStore vectorStore,
                                    RagSyncRepository ragSyncRepository,
                                    EmpresaRepository empresaRepository,
                                    ContaRepository contaRepository,
                                    CategoriaRepository categoriaRepository,
-                                   ParceiroRepository parceiroRepository) {
+                                   ParceiroRepository parceiroRepository,
+                                   @Lazy RagSincronizacaoService self) {
         this.vectorStore = vectorStore;
         this.ragSyncRepository = ragSyncRepository;
         this.empresaRepository = empresaRepository;
         this.contaRepository = contaRepository;
         this.categoriaRepository = categoriaRepository;
         this.parceiroRepository = parceiroRepository;
+        this.self = self;
     }
 
     /** Roda de madrugada; itera empresas ativas (mesmo padrão do SincronizacaoService). */
@@ -105,23 +116,25 @@ public class RagSincronizacaoService {
         boolean primeiraVez = !ragSyncRepository.existsByEmpresaIdAndTipoResumo(empresaId, TIPO_RESUMO_MENSAL);
         YearMonth mesAnterior = YearMonth.now().minusMonths(1);
 
+        // Chamadas via `self` (proxy Spring) para que o @Transactional de cada método realmente
+        // abra uma sessão — indispensável para os acessos lazy a categoria/categoriaPai.
         int gravados = 0;
         if (primeiraVez) {
             for (int i = MESES_BACKFILL; i >= 1; i--) {
-                if (sincronizarMes(empresaId, YearMonth.now().minusMonths(i))) gravados++;
+                if (self.sincronizarMes(empresaId, YearMonth.now().minusMonths(i))) gravados++;
             }
         } else {
-            if (sincronizarMes(empresaId, mesAnterior)) gravados++;
+            if (self.sincronizarMes(empresaId, mesAnterior)) gravados++;
         }
         // Perfis (sem período): catálogo de categorias e parceiros da empresa.
-        if (sincronizarPerfilCategorias(empresaId)) gravados++;
-        if (sincronizarPerfilParceiros(empresaId)) gravados++;
+        if (self.sincronizarPerfilCategorias(empresaId)) gravados++;
+        if (self.sincronizarPerfilParceiros(empresaId)) gravados++;
         return gravados;
     }
 
     /** @return true se um resumo foi (re)indexado; false se o mês não tinha dados ou nada mudou. */
     @Transactional
-    boolean sincronizarMes(Long empresaId, YearMonth mes) {
+    public boolean sincronizarMes(Long empresaId, YearMonth mes) {
         String texto = montarResumoMensal(empresaId, mes);
         String periodo = mes.toString(); // 'YYYY-MM'
         return upsert(empresaId, TIPO_RESUMO_MENSAL, periodo,
@@ -130,7 +143,7 @@ public class RagSincronizacaoService {
 
     /** Perfil de categorias em uso pela empresa (dá à IA o vocabulário de classificação). */
     @Transactional
-    boolean sincronizarPerfilCategorias(Long empresaId) {
+    public boolean sincronizarPerfilCategorias(Long empresaId) {
         List<Categoria> cats = categoriaRepository.findByEmpresaIdAndAtivoTrue(empresaId);
         if (cats.isEmpty()) return false;
         String lista = cats.stream()
@@ -146,7 +159,7 @@ public class RagSincronizacaoService {
 
     /** Perfil de parceiros (fornecedores/clientes) da empresa. */
     @Transactional
-    boolean sincronizarPerfilParceiros(Long empresaId) {
+    public boolean sincronizarPerfilParceiros(Long empresaId) {
         List<Parceiro> parceiros = parceiroRepository.findAllByEmpresaId(empresaId);
         if (parceiros.isEmpty()) return false;
         String lista = parceiros.stream()
