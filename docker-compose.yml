@@ -184,11 +184,17 @@ services:
     ports:
       - "127.0.0.1:5678:5678"
     environment:
-      - N8N_HOST=localhost
+      # Público via Cloudflare Tunnel: valores reais ficam no .env do servidor (gitignored).
+      # Defaults abaixo = uso local (localhost) — não quebra o `docker compose up` de dev.
+      - N8N_HOST=${N8N_HOST:-localhost}
       - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - N8N_SECURE_COOKIE=false
-      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      # Atrás do cloudflared (1 proxy): N8N_PROXY_HOPS=1 faz o n8n confiar no X-Forwarded-Proto
+      # do túnel, para o cookie seguro (N8N_SECURE_COOKIE=true) funcionar sem falso "URL inseguro".
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-0}
+      - WEBHOOK_URL=${N8N_PUBLIC_URL:-http://localhost:5678/}
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL:-http://localhost:5678/}
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
       - N8N_DIAGNOSTICS_ENABLED=false
