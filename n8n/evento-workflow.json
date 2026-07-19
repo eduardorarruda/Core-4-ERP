@@ -1,47 +1,160 @@
 {
-  "id": "eventowf00000001",
-  "name": "Eventos Core4 (cada ação da IA)",
+  "name": "WF-EVENTOS — Automações por ação (Áurea)",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "evento",
-        "responseMode": "responseNode",
+        "responseMode": "onReceived",
+        "authentication": "headerAuth",
         "options": {}
       },
       "id": "a1111111-1111-4111-8111-111111111111",
-      "name": "Webhook",
+      "name": "Webhook Evento",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 300],
-      "webhookId": "evento-webhook"
+      "position": [160, 340],
+      "webhookId": "evento-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_HEADER_AUTH",
+          "name": "N8N Webhook Secret (X-Webhook-Secret)"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Ponto único que recebe TODA ação feita pela Áurea. A partir daqui o usuário pode ramificar\n// por 'acao' (registrarParceiro, baixarConta, gerarRelatorioExcel, ...) e disparar automações.\nconst b = ($input.first().json.body) || $input.first().json || {};\nconsole.log('[Core4][evento]', b.acao, '-', b.detalhe);\nreturn [{ json: { recebido: true, acao: b.acao || null } }];"
+        "jsCode": "// Ponto único que recebe TODA ação de escrita (tela E IA). Normaliza o payload do Anexo A.3.\nconst b = ($input.first().json.body) || $input.first().json || {};\nreturn [{\n  json: {\n    acao: b.acao || null,\n    detalhe: b.detalhe || null,\n    usuarioId: b.usuarioId || null,\n    empresaId: b.empresaId || null,\n    origemIa: b.origemIa === true,\n    timestamp: b.timestamp || new Date().toISOString()\n  }\n}];"
       },
       "id": "b2222222-2222-4222-8222-222222222222",
-      "name": "Rotear evento",
+      "name": "Normalizar evento",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [400, 340]
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"recebido\": true, \"acao\": $json.acao } }}",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "ContaService.baixar",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "conta_baixada"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "fecharFatura",
+                    "operator": { "type": "string", "operation": "contains" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fatura_fechada"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.acao }}",
+                    "rightValue": "registrar|atualizar|excluir|baixar|transferir|estornar",
+                    "operator": { "type": "string", "operation": "regex" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "escrita_relevante"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "c3333333-3333-4333-8333-333333333333",
-      "name": "Responder",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [680, 300]
+      "name": "Switch por acao",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [640, 340]
+    },
+    {
+      "parameters": {
+        "fromEmail": "aurea@core4erp.codes",
+        "toEmail": "={{ $json.destinatarioDono || 'dono@core4erp.codes' }}",
+        "subject": "=Core 4 ERP — conta baixada: {{ $json.detalhe }}",
+        "emailFormat": "text",
+        "text": "=Uma conta foi baixada pela empresa {{ $json.empresaId }}.\n\nDetalhe: {{ $json.detalhe }}\nOrigem: {{ $json.origemIa ? 'Assistente Áurea' : 'Tela' }}\nQuando: {{ $json.timestamp }}\n\n(Alerta automático — ajuste o limiar de alto valor quando o payload trouxer o valor.)",
+        "options": {}
+      },
+      "id": "d4444444-4444-4444-8444-444444444444",
+      "name": "E-mail dono (alto valor)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [940, 160],
+      "credentials": {
+        "smtp": {
+          "id": "PLACEHOLDER_SMTP",
+          "name": "SMTP Core4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8080/api/notificacoes",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"empresaId\": $json.empresaId, \"titulo\": \"Fatura fechada\", \"mensagem\": $json.detalhe } }}",
+        "options": {}
+      },
+      "id": "e5555555-5555-4555-8555-555555555555",
+      "name": "POST /api/notificacoes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Marca a empresa para re-sync incremental do RAG. Placeholder: aqui você pode\n// (a) chamar POST /api/chat/rag/sincronizar no backend (com JWT de serviço/admin), ou\n// (b) gravar a empresaId numa fila/tabela lida pelo scheduler do backend.\n// Mantido determinístico e barato — sem LLM.\nconsole.log('[Core4][RAG stale] empresaId=', $json.empresaId, 'acao=', $json.acao, 'origemIa=', $json.origemIa);\nreturn [{ json: { marcadoParaResync: true, empresaId: $json.empresaId } }];"
+      },
+      "id": "f6666666-6666-4666-8666-666666666666",
+      "name": "Marcar RAG stale",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 520]
     }
   ],
   "connections": {
-    "Webhook": { "main": [[{ "node": "Rotear evento", "type": "main", "index": 0 }]] },
-    "Rotear evento": { "main": [[{ "node": "Responder", "type": "main", "index": 0 }]] }
+    "Webhook Evento": {
+      "main": [[{ "node": "Normalizar evento", "type": "main", "index": 0 }]]
+    },
+    "Normalizar evento": {
+      "main": [[{ "node": "Switch por acao", "type": "main", "index": 0 }]]
+    },
+    "Switch por acao": {
+      "main": [
+        [{ "node": "E-mail dono (alto valor)", "type": "main", "index": 0 }],
+        [{ "node": "POST /api/notificacoes", "type": "main", "index": 0 }],
+        [{ "node": "Marcar RAG stale", "type": "main", "index": 0 }]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "notas": "WF-EVENTOS / Fase 2.4. Webhook (Header Auth, responde onReceived = fire-and-forget) -> Normaliza -> Switch por acao: [0] ContaService.baixar -> e-mail SMTP ao dono; [1] fecharFatura -> POST http://backend:8080/api/notificacoes (INTERNO); [2] escrita relevante (regex registrar|atualizar|excluir|baixar|transferir|estornar) -> marca empresa p/ re-sync RAG (placeholder). PENDENTE/ATENCAO: (1) POST /api/notificacoes NAO existe no NotificacaoController (so GET, PATCH /{id}/lida, POST /sincronizar) — criar endpoint de criacao OU trocar por /sincronizar; (2) filtro de 'alto valor' precisa do valor no payload (hoje detalhe e' texto nao-sensivel — ver LGPD §2.3); (3) bind da credencial SMTP Core4; (4) se o re-sync chamar o backend, precisa de um JWT/servico com CONFIGURACAO_EDITAR."
+  }
 }
