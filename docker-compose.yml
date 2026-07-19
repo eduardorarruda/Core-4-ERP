@@ -48,6 +48,19 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_FROM: ${MAIL_FROM}
+      # ── Traces → Painel EBPÓS (OpenTelemetry) ────────────────────────────────
+      # O -javaagent (no Dockerfile) exporta traces via OTLP/HTTP. Só métricas/logs
+      # ficam desligados aqui (o painel já coleta métricas do servidor pelo nmon-agent).
+      # Setar NMON_INGEST_KEY no .env ativa o envio; sem ela, deixe OTEL_SDK_DISABLED=true.
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-core4erp}
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${NMON_OTLP_ENDPOINT:-http://2.25.197.81:8095}
+      OTEL_EXPORTER_OTLP_HEADERS: X-NMon-Key=${NMON_INGEST_KEY:-}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=production}
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
     depends_on:
       db:
         condition: service_healthy
