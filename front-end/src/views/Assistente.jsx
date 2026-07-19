@@ -1,13 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles, Send, Paperclip, Trash2, Download, FileSpreadsheet, Loader2, X,
-  Plus, MessageSquare, Search, Pencil, Check, PanelLeft, Copy,
+  Plus, MessageSquare, Search, Pencil, Check, PanelLeft, Copy, Square, RotateCcw,
 } from 'lucide-react';
 import { chat, clearAuth } from '../lib/api';
+import { useToast } from '../hooks/useToast';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
 const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx,.pdf,.md';
+const MAX_ANEXO_MB = 5;
+const MAX_ANEXO_BYTES = MAX_ANEXO_MB * 1024 * 1024;
 const CANAL = 'ASSISTENTE';
 
 const SUGESTOES = [
@@ -76,10 +79,13 @@ export default function Assistente() {
   const [listaAberta, setListaAberta] = useState(false); // drawer no mobile
   const [copiado, setCopiado] = useState(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(null); // id aguardando confirmação
+  const [podeParar, setPodeParar] = useState(false); // true enquanto um stream abortável está ativo
 
+  const toast = useToast();
   const fimRef = useRef(null);
   const fileRef = useRef(null);
   const textareaRef = useRef(null);
+  const abortRef = useRef(null); // AbortController do stream em andamento
 
   useEffect(() => { fimRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensagens, ocupado]);
 
@@ -115,7 +121,10 @@ export default function Assistente() {
     try {
       const msgs = await chat.mensagensConversa(id);
       setMensagens((msgs || []).map((m) => ({ role: m.role, text: m.texto })));
-    } catch { setMensagens([]); }
+    } catch {
+      setMensagens([]);
+      toast.error('Não foi possível abrir esta conversa. Tente novamente.');
+    }
     finally { setCarregandoMsgs(false); }
   }
 
@@ -125,7 +134,9 @@ export default function Assistente() {
       const c = await chat.criarConversa(CANAL);
       setConversas((prev) => [c, ...prev]);
       setConversaAtiva(c.id); setMensagens([]); setListaAberta(false);
-    } catch {}
+    } catch {
+      toast.error('Não foi possível iniciar uma nova conversa. Tente novamente.');
+    }
   }
 
   async function garantirConversa() {
@@ -136,37 +147,40 @@ export default function Assistente() {
     return c.id;
   }
 
-  function atualizarUltima(text) {
+  // Atualiza o texto da última mensagem do assistente. `patch` permite marcar/limpar
+  // metadados (ex.: { erro: true, pergunta } para habilitar o botão "Tentar novamente").
+  function atualizarUltima(text, patch = {}) {
     setMensagens((m) => {
       const c = [...m];
-      for (let i = c.length - 1; i >= 0; i--) { if (c[i].role === 'assistant') { c[i] = { ...c[i], text }; break; } }
+      for (let i = c.length - 1; i >= 0; i--) { if (c[i].role === 'assistant') { c[i] = { ...c[i], text, ...patch }; break; } }
       return c;
     });
   }
 
-  async function enviarTexto(texto) {
-    const msg = (texto ?? input).trim();
-    if (!msg || ocupado) return;
-    setInput('');
-    const cid = await garantirConversa();
-    setMensagens((m) => [...m, { role: 'user', text: msg }, { role: 'assistant', text: '' }]);
-    setOcupado(true);
+  // Executa o streaming SSE sobre o último balão do assistente (que já deve existir).
+  // Encapsula fetch + abort aqui — exceção conhecida ao padrão lib/api.js.
+  async function executarStream(msg, cid) {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setOcupado(true); setPodeParar(true);
+    let acc = '';
     try {
       const resp = await fetch(`${BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ mensagem: msg, canal: CANAL, conversaId: cid }),
+        signal: controller.signal,
       });
       if (resp.status === 401) { clearAuth(); window.location.href = '/login'; return; }
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        atualizarUltima(err.mensagem || 'Não foi possível processar. Tente novamente.');
+        atualizarUltima(err.mensagem || 'Não foi possível processar sua mensagem. Tente novamente.', { erro: true, pergunta: msg });
         return;
       }
       const reader = resp.body.getReader();
       const dec = new TextDecoder();
-      let acc = '', buf = '';
+      let buf = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -182,12 +196,39 @@ export default function Assistente() {
           atualizarUltima(acc);
         }
       }
-    } catch {
-      atualizarUltima('Não foi possível conectar ao servidor. Verifique sua conexão.');
+    } catch (e) {
+      if (e?.name === 'AbortError') {
+        // Interrompido pelo usuário: mantém o que já chegou; se nada chegou, avisa.
+        if (!acc) atualizarUltima('Resposta interrompida.');
+      } else {
+        atualizarUltima('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', { erro: true, pergunta: msg });
+      }
     } finally {
-      setOcupado(false);
+      abortRef.current = null;
+      setOcupado(false); setPodeParar(false);
       refreshConversas();
     }
+  }
+
+  async function enviarTexto(texto) {
+    const msg = (texto ?? input).trim();
+    if (!msg || ocupado) return;
+    setInput('');
+    const cid = await garantirConversa();
+    setMensagens((m) => [...m, { role: 'user', text: msg }, { role: 'assistant', text: '' }]);
+    await executarStream(msg, cid);
+  }
+
+  // Reenvia a última pergunta que falhou, reaproveitando o balão do assistente com erro.
+  async function retentar(pergunta) {
+    if (ocupado || !pergunta) return;
+    const cid = await garantirConversa();
+    atualizarUltima('', { erro: false, pergunta: undefined });
+    await executarStream(pergunta, cid);
+  }
+
+  function pararStream() {
+    abortRef.current?.abort();
   }
 
   async function enviarComArquivo(texto, arquivo) {
@@ -215,9 +256,19 @@ export default function Assistente() {
 
   async function excluir(id) {
     setConfirmandoExclusao(null);
-    try { await chat.excluirConversa(id); } catch {}
+    // Remoção otimista: guarda o estado anterior para rollback caso a API falhe.
+    const anterior = conversas;
+    const eraAtiva = id === conversaAtiva;
     setConversas((prev) => prev.filter((c) => c.id !== id));
-    if (id === conversaAtiva) { setConversaAtiva(null); setMensagens([]); }
+    if (eraAtiva) { setConversaAtiva(null); setMensagens([]); }
+    try {
+      await chat.excluirConversa(id);
+    } catch {
+      // Falhou: restaura a conversa na lista e a seleção, avisando o usuário.
+      setConversas(anterior);
+      if (eraAtiva) setConversaAtiva(id);
+      toast.error('Não foi possível excluir a conversa. Tente novamente.');
+    }
   }
 
   function iniciarEdicao() {
@@ -230,7 +281,9 @@ export default function Assistente() {
     try {
       const c = await chat.renomearConversa(conversaAtiva, t);
       setConversas((prev) => prev.map((x) => (x.id === c.id ? c : x)));
-    } catch {}
+    } catch {
+      toast.error('Não foi possível renomear a conversa. Tente novamente.');
+    }
     setEditando(false);
   }
 
@@ -281,19 +334,19 @@ export default function Assistente() {
                     <MessageSquare className={`w-4 h-4 shrink-0 ${c.id === conversaAtiva ? 'text-primary' : 'text-text-primary/40'}`} />
                     <span className="flex-1 text-sm text-text-primary/80 truncate">{c.titulo}</span>
                     {confirmandoExclusao === c.id ? (
-                      <span className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <span className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <span className="text-[11px] text-text-primary/50 mr-0.5">Excluir?</span>
                         <button onClick={(e) => { e.stopPropagation(); excluir(c.id); }} aria-label="Confirmar exclusão"
-                          className="p-1 rounded text-red-400 hover:bg-red-400/10"><Check className="w-3.5 h-3.5" /></button>
+                          className="w-11 h-11 lg:w-8 lg:h-8 grid place-items-center rounded text-red-400 hover:bg-red-400/10"><Check className="w-4 h-4" /></button>
                         <button onClick={(e) => { e.stopPropagation(); setConfirmandoExclusao(null); }} aria-label="Cancelar exclusão"
-                          className="p-1 rounded text-text-primary/40 hover:bg-surface-medium"><X className="w-3.5 h-3.5" /></button>
+                          className="w-11 h-11 lg:w-8 lg:h-8 grid place-items-center rounded text-text-primary/40 hover:bg-surface-medium"><X className="w-4 h-4" /></button>
                       </span>
                     ) : (
                       <button
                         onClick={(e) => { e.stopPropagation(); setConfirmandoExclusao(c.id); }}
                         aria-label="Excluir conversa"
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-text-primary/40 hover:text-red-400 transition-opacity shrink-0">
-                        <Trash2 className="w-3.5 h-3.5" />
+                        className="w-11 h-11 lg:w-8 lg:h-8 grid place-items-center rounded text-text-primary/40 hover:text-red-400 transition-opacity shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100">
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
@@ -319,8 +372,8 @@ export default function Assistente() {
               <input autoFocus value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') salvarTitulo(); if (e.key === 'Escape') setEditando(false); }}
                 className="flex-1 min-w-0 bg-surface border border-primary/30 rounded-lg px-2 py-1 text-sm text-text-primary outline-none" />
-              <button onClick={salvarTitulo} className="p-1.5 text-primary" aria-label="Salvar"><Check className="w-4 h-4" /></button>
-              <button onClick={() => setEditando(false)} className="p-1.5 text-text-primary/40" aria-label="Cancelar"><X className="w-4 h-4" /></button>
+              <button onClick={salvarTitulo} className="w-11 h-11 grid place-items-center rounded-lg text-primary hover:bg-surface-medium shrink-0" aria-label="Salvar"><Check className="w-4 h-4" /></button>
+              <button onClick={() => setEditando(false)} className="w-11 h-11 grid place-items-center rounded-lg text-text-primary/40 hover:bg-surface-medium shrink-0" aria-label="Cancelar"><X className="w-4 h-4" /></button>
             </div>
           ) : (
             <>
@@ -328,7 +381,7 @@ export default function Assistente() {
                 {conversaObj ? conversaObj.titulo : 'Áurea'}
               </h1>
               {conversaObj && (
-                <button onClick={iniciarEdicao} className="p-1.5 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium" aria-label="Renomear">
+                <button onClick={iniciarEdicao} className="w-11 h-11 grid place-items-center rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium shrink-0" aria-label="Renomear">
                   <Pencil className="w-4 h-4" />
                 </button>
               )}
@@ -393,13 +446,20 @@ export default function Assistente() {
                     ) : <Markdown text={textoLimpo} />}
                     {url && (
                       <a href={url} download
-                        className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-sm font-semibold no-underline">
+                        className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-primary text-on-primary rounded-xl hover:opacity-90 transition-opacity text-sm font-semibold no-underline">
                         <Download className="w-4 h-4" /> Baixar Relatório (.xlsx)
                       </a>
                     )}
-                    {!carregandoResposta && textoLimpo && (
+                    {m.erro && m.pergunta && !ocupado && (
+                      <button onClick={() => retentar(m.pergunta)}
+                        className="mt-2 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-primary/30 text-primary hover:bg-primary/10 text-sm font-medium transition-colors"
+                        aria-label="Tentar enviar novamente">
+                        <RotateCcw className="w-4 h-4" /> Tentar novamente
+                      </button>
+                    )}
+                    {!carregandoResposta && textoLimpo && !m.erro && (
                       <button onClick={() => copiar(textoLimpo, i)}
-                        className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-text-primary/30 hover:text-text-primary/70 opacity-0 group-hover/msg:opacity-100 transition-opacity"
+                        className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-text-primary/30 hover:text-text-primary/70 opacity-100 lg:opacity-0 lg:group-hover/msg:opacity-100 transition-opacity"
                         aria-label="Copiar resposta">
                         {copiado === i
                           ? <><Check className="w-3 h-3" /> Copiado</>
@@ -415,7 +475,7 @@ export default function Assistente() {
         </div>
 
         {/* Composer */}
-        <div className="shrink-0 px-4 pb-4 pt-2">
+        <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
           <div className="max-w-3xl mx-auto">
             {arquivoAnexado && (
               <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-sm text-text-primary w-fit max-w-full">
@@ -430,9 +490,18 @@ export default function Assistente() {
             )}
             <div className="flex items-end gap-2 border border-text-primary/10 rounded-2xl px-2 py-2 bg-surface-low focus-within:border-primary/30 transition-colors">
               <input ref={fileRef} type="file" accept={TIPOS_ACEITOS} className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) setArquivoAnexado(f); e.target.value = ''; }} />
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (!f) return;
+                  if (f.size > MAX_ANEXO_BYTES) {
+                    toast.error(`O arquivo é muito grande. O tamanho máximo é ${MAX_ANEXO_MB} MB.`);
+                    return;
+                  }
+                  setArquivoAnexado(f);
+                }} />
               <button onClick={() => fileRef.current?.click()} disabled={ocupado} title="Anexar planilha, OFX, PDF ou .md"
-                className="p-2.5 rounded-xl text-text-primary/50 hover:text-primary transition-colors disabled:opacity-40 shrink-0">
+                className="w-11 h-11 grid place-items-center rounded-xl text-text-primary/50 hover:text-primary transition-colors disabled:opacity-40 shrink-0">
                 <Paperclip className="w-5 h-5" />
               </button>
               <textarea
@@ -441,16 +510,23 @@ export default function Assistente() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
                 placeholder={arquivoAnexado ? 'Descreva o que fazer com o arquivo…' : 'Escreva para a Áurea…'}
-                rows={1} disabled={ocupado}
+                rows={1}
                 className="flex-1 bg-transparent px-1 py-2 text-[15px] text-text-primary outline-none placeholder:text-text-primary/30 resize-none max-h-40"
               />
-              <button onClick={enviar} disabled={ocupado || !input.trim()} aria-label="Enviar"
-                className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0">
-                {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              </button>
+              {podeParar ? (
+                <button onClick={pararStream} aria-label="Parar resposta"
+                  className="w-11 h-11 rounded-xl bg-surface-medium text-text-primary flex items-center justify-center hover:bg-surface-high transition-colors shrink-0">
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
+              ) : (
+                <button onClick={enviar} disabled={ocupado || !input.trim()} aria-label="Enviar"
+                  className="w-11 h-11 rounded-xl bg-primary text-on-primary flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0">
+                  {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                </button>
+              )}
             </div>
             <p className="text-[11px] text-text-primary/35 mt-2 text-center">
-              Enter envia · Shift+Enter quebra linha · aceita .xlsx, .csv, .ofx, .pdf, .md (máx. 5 MB)
+              Enter envia · Shift+Enter quebra linha · aceita .xlsx, .xls, .csv, .ofx, .pdf, .md (máx. {MAX_ANEXO_MB} MB)
             </p>
           </div>
         </div>

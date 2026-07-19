@@ -12,6 +12,9 @@
   "dependencies": {
     "@assistant-ui/react": "^0.12.25",
     "@assistant-ui/react-markdown": "^0.12.9",
+    "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/sora": "^5.2.8",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "jspdf": "^4.2.1",

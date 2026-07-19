@@ -20,7 +20,7 @@ export default function FormatButtons({ loading = {}, onSelect, canExport = true
             onClick={() => onSelect(key)}
             disabled={isLoading || Object.values(loading).some(Boolean)}
             className={cn(
-              'flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50',
+              'flex flex-col items-center justify-center gap-1 min-h-[44px] py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50',
               className
             )}
           >

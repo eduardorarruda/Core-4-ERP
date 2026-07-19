@@ -17,7 +17,7 @@ export default function DashboardHome() {
   const podeVerCartoes = temPermissao('CARTAO_VISUALIZAR');
 
   const [aba, setAba] = useState(() => {
-    const salva = localStorage.getItem(TAB_KEY);
+    const salva = sessionStorage.getItem(TAB_KEY);
     return salva === 'cartoes' ? 'cartoes' : 'geral';
   });
 
@@ -26,7 +26,7 @@ export default function DashboardHome() {
 
   const selecionar = (nova) => {
     setAba(nova);
-    localStorage.setItem(TAB_KEY, nova);
+    sessionStorage.setItem(TAB_KEY, nova);
   };
 
   const tabs = [
@@ -39,8 +39,7 @@ export default function DashboardHome() {
       {/* Toggle de dashboards */}
       {tabs.length > 1 && (
         <div
-          className="inline-flex items-center gap-1 p-1 rounded-xl w-fit"
-          style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(250,250,250,.08)' }}
+          className="inline-flex items-center gap-1 p-1 rounded-xl w-fit bg-surface-low border border-text-primary/10"
           role="tablist"
           aria-label="Alternar entre dashboards"
         >
@@ -53,7 +52,7 @@ export default function DashboardHome() {
                 aria-selected={ativo}
                 onClick={() => selecionar(t.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest font-mono transition-colors',
+                  'flex items-center gap-2 px-4 py-2 min-h-11 rounded-lg text-xs font-bold uppercase tracking-widest font-mono transition-colors',
                   ativo
                     ? 'bg-primary/15 text-primary'
                     : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'

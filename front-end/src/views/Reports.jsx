@@ -4,6 +4,8 @@ import { relatorios, categorias, parceiros, cartoes, contasCorrentes, investimen
 import PageHeader from '../components/ui/PageHeader';
 import ReportCard from '../components/reports/ReportCard';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
+import EmptyState from '../components/ui/EmptyState';
+import { FileText as FileTextIcon } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../hooks/useAuth';
 
@@ -169,6 +171,8 @@ export default function Reports() {
   const toast = useToast();
   const { temPermissao } = useAuth();
 
+  const temAlgumRelatorio = REPORT_CARDS.some((card) => temPermissao(card.visualizarPermissao));
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -176,6 +180,13 @@ export default function Reports() {
         subtitle="Visualize online, exporte em PDF ou Excel para o período desejado."
       />
 
+      {!temAlgumRelatorio ? (
+        <EmptyState
+          icon={FileTextIcon}
+          title="Nenhum relatório disponível"
+          description="Você não tem acesso a relatórios. Fale com o administrador para solicitar permissão."
+        />
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {REPORT_CARDS.map((card) => (
           <PermissaoGuard key={card.id} permissao={card.visualizarPermissao}>
@@ -192,6 +203,7 @@ export default function Reports() {
           </PermissaoGuard>
         ))}
       </div>
+      )}
     </div>
   );
 }

@@ -21,12 +21,18 @@ export default defineConfig(({ mode }) => {
           lang: 'pt-BR',
           start_url: '/',
           display: 'standalone',
-          background_color: '#0f172a',
-          theme_color: '#0f172a',
+          background_color: '#0c0c0c',
+          theme_color: '#0c0c0c',
+          categories: ['finance', 'productivity'],
           icons: [
-            { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
-            { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
+            { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+            { src: '/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
             { src: '/pwa-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+          shortcuts: [
+            { name: 'Nova conta', url: '/contas?novo=1' },
+            { name: 'Falar com a Áurea', url: '/assistente' },
           ],
         },
         workbox: {

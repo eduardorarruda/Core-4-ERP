@@ -5,7 +5,7 @@ import { brl } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 
 const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
-const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-amber-400', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
+const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-warning', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
 
 export default function CarteiraPanel({ carteira, patrimonioTotal, carregando }) {
   return (
@@ -14,14 +14,14 @@ export default function CarteiraPanel({ carteira, patrimonioTotal, carregando })
       loading={carregando}
       title="Carteira de Investimentos"
       headerAction={
-        <Link to="/investimentos" className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
+        <Link to="/investimentos" className="text-xs font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
           Ver tudo →
         </Link>
       }
     >
       <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-0.5">Patrimônio Total</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-0.5">Patrimônio Total</p>
           <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(patrimonioTotal)}</p>
         </div>
         <PieIcon className="w-8 h-8 text-primary opacity-40" />
@@ -41,7 +41,7 @@ export default function CarteiraPanel({ carteira, patrimonioTotal, carregando })
               <div key={c.id} className="bg-surface-low rounded-lg px-3 py-2.5 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={cn('text-[9px] font-bold uppercase tracking-widest shrink-0', color)}>
+                    <span className={cn('text-xs font-bold uppercase tracking-widest shrink-0', color)}>
                       {TIPO_LABEL[c.tipo] ?? c.tipo}
                     </span>
                     <span className="text-xs text-text-primary/80 truncate font-medium">{c.nome}</span>
@@ -51,7 +51,7 @@ export default function CarteiraPanel({ carteira, patrimonioTotal, carregando })
                 <div className="h-1 w-full bg-surface-medium rounded-full overflow-hidden">
                   <div className="h-full bg-primary/60 rounded-full transition-all duration-700" style={{ width: `${pct.toFixed(1)}%` }} />
                 </div>
-                <p className="text-[10px] text-text-primary/40 text-right">{pct.toFixed(1)}% do total</p>
+                <p className="text-xs text-text-primary/40 text-right">{pct.toFixed(1)}% do total</p>
               </div>
             );
           })}

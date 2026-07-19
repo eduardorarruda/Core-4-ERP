@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { auth, setLoginState } from '../lib/api';
 import { getFirstAccessibleRoute } from '../lib/routeUtils';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
+import Button from '../components/ui/Button';
 import HeroPane, { BrandMark } from '../components/login/HeroPane';
 
 function greetingFor(h) {
@@ -30,11 +30,15 @@ export default function Login() {
   const o1Ref = useRef(null);
   const o2Ref = useRef(null);
   const o3Ref = useRef(null);
+  const navTimer = useRef(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(id);
   }, []);
+
+  // Limpa o timer de redirecionamento se o componente desmontar antes do navigate.
+  useEffect(() => () => clearTimeout(navTimer.current), []);
 
   useEffect(() => {
     const onMove = (e) => {
@@ -90,7 +94,7 @@ export default function Login() {
       setSuccess(true);
       const permSet = new Set(result.empresas?.[0]?.permissoes ?? []);
       const check = (cod) => result.adminSistema || permSet.has(cod);
-      setTimeout(() => navigate(getFirstAccessibleRoute(check)), 2400);
+      navTimer.current = setTimeout(() => navigate(getFirstAccessibleRoute(check)), 800);
     } catch (err) {
       setErro(err.message || 'Credenciais inválidas');
     } finally {
@@ -98,222 +102,185 @@ export default function Login() {
     }
   };
 
-  const S = {
-    shell: { position: 'relative', minHeight: '100vh', display: 'flex', background: '#0c0c0c', overflow: 'hidden', color: '#fafafa' },
-    bgStage: { position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' },
-    bgGrid: { position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(to right,rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.04) 1px,transparent 1px)', backgroundSize: '56px 56px', WebkitMaskImage: 'radial-gradient(ellipse 80% 70% at 50% 40%,#000 20%,transparent 80%)', maskImage: 'radial-gradient(ellipse 80% 70% at 50% 40%,#000 20%,transparent 80%)' },
-    orb1: { position: 'absolute', width: 520, height: 520, borderRadius: '50%', background: '#6EFFC0', filter: 'blur(80px)', opacity: .25, top: -140, left: -140, willChange: 'transform' },
-    orb2: { position: 'absolute', width: 620, height: 620, borderRadius: '50%', background: '#ACC7FF', filter: 'blur(80px)', opacity: .15, bottom: -180, right: -140, willChange: 'transform' },
-    orb3: { position: 'absolute', width: 340, height: 340, borderRadius: '50%', background: '#FF9D6E', filter: 'blur(80px)', opacity: .10, top: '40%', left: '35%', willChange: 'transform' },
-    bgSpot: { position: 'absolute', inset: 0, background: 'radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(110,255,192,.14), transparent 60%)', transition: 'background .12s' },
-    bgScan: { position: 'absolute', inset: 0, background: 'repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.012) 3px 4px)', mixBlendMode: 'overlay' },
-    formPane: { position: 'relative', zIndex: 1, width: '100%', maxWidth: 520, minHeight: '100vh', background: 'rgba(12,12,12,.6)', backdropFilter: 'blur(4px)', borderRight: '1px solid rgba(255,255,255,.05)' },
-    formWrap: { maxWidth: 380, width: '100%', margin: '0 auto' },
-    greetingChip: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderRadius: 999, background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', fontSize: 12, color: 'rgba(250,250,250,.6)', marginBottom: 20 },
-    submitBtn: { width: '100%', padding: '15px 24px', borderRadius: 14, background: '#6EFFC0', color: '#003824', fontSize: 15, fontWeight: 700, fontFamily: "'Sora', sans-serif", border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'opacity .15s, transform .1s', position: 'relative', overflow: 'hidden', marginTop: 20 },
-    rowBetween: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-    check: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgba(250,250,250,.6)', cursor: 'pointer' },
-    forgotLink: { fontSize: 12, color: '#6EFFC0', textDecoration: 'none', fontWeight: 500 },
-    errBanner: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 12, background: 'rgba(255,180,171,.08)', border: '1px solid rgba(255,180,171,.2)', color: '#FFB4AB', fontSize: 13, marginTop: 12 },
-    successOverlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(12,12,12,.92)', backdropFilter: 'blur(20px)', display: 'grid', placeItems: 'center', animation: 'fadeIn 300ms both' },
-    successCard: { textAlign: 'center', padding: 40, animation: 'scaleSpring 500ms cubic-bezier(.34,1.56,.64,1) both' },
-    successIcon: { width: 96, height: 96, borderRadius: '50%', background: '#6EFFC0', color: '#003824', display: 'grid', placeItems: 'center', margin: '0 auto 24px', boxShadow: '0 0 60px rgba(110,255,192,.4)' },
-  };
+  const errBanner = 'flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-error/10 border border-error/20 text-error text-[13px] mt-3';
+  const backBtn = 'flex items-center gap-1.5 text-xs text-text-primary/40 hover:text-text-primary/70 transition-colors mb-7';
+  const iconBadge = 'flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 border border-primary/20 mb-5';
 
   return (
-    <>
-      <style>{`
-        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-        @keyframes scaleSpring { from { opacity:0; transform:scale(.88) } to { opacity:1; transform:scale(1) } }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:none } }
-        @keyframes ticker { from { transform:translateX(0) } to { transform:translateX(-50%) } }
-        @keyframes pulseDot { 0%,100% { opacity:1;transform:scale(1) } 50% { opacity:.6;transform:scale(.85) } }
-        @keyframes spin { to { transform:rotate(360deg) } }
-        .ticker-scroll { animation: ticker 40s linear infinite; }
-        .live-dot { width:6px;height:6px;border-radius:50%;background:#6EFFC0;box-shadow:0 0 8px #6EFFC0;animation:pulseDot 1.6s ease-in-out infinite;display:inline-block;flex-shrink:0; }
-        .anim-in { animation: fadeUp 500ms cubic-bezier(.4,0,.2,1) both; }
-        .d1 { animation-delay:50ms } .d2 { animation-delay:120ms } .d3 { animation-delay:200ms }
-        .d4 { animation-delay:280ms } .d5 { animation-delay:360ms } .d6 { animation-delay:440ms }
-        .field-float { position:relative; margin-bottom:12px }
-        .field-float input { display:block;width:100%;padding:22px 16px 10px;background:#131313;border:1px solid rgba(250,250,250,.1);border-radius:14px;color:#fafafa;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 200ms,box-shadow 200ms; }
-        .field-float input:focus { border-color:#6EFFC0;box-shadow:0 0 0 3px rgba(110,255,192,.12); }
-        .field-float label { position:absolute;left:16px;top:8px;font-size:11px;color:rgba(250,250,250,.4);font-family:'DM Sans',sans-serif;pointer-events:none;transition:color 200ms; }
-        .field-float input:focus ~ label { color:#6EFFC0; }
-        .field-float .field-icon { position:absolute;right:14px;top:50%;transform:translateY(-50%);color:rgba(250,250,250,.4);cursor:pointer;background:none;border:none;padding:0;display:flex;align-items:center; }
-        .field-float .field-icon.valid { color:#6EFFC0; }
-      `}</style>
+    <div className="relative min-h-dvh flex bg-surface overflow-hidden text-text-primary">
+      {/* Background decorativo */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: 'linear-gradient(to right,color-mix(in srgb,var(--color-text-primary) 5%,transparent) 1px,transparent 1px),linear-gradient(to bottom,color-mix(in srgb,var(--color-text-primary) 5%,transparent) 1px,transparent 1px)',
+            backgroundSize: '56px 56px',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 70% at 50% 40%,#000 20%,transparent 80%)',
+            maskImage: 'radial-gradient(ellipse 80% 70% at 50% 40%,#000 20%,transparent 80%)',
+          }}
+        />
+        <div ref={o1Ref} className="absolute rounded-full bg-primary blur-[80px] opacity-25 -top-36 -left-36 will-change-transform" style={{ width: 520, height: 520 }} />
+        <div ref={o2Ref} className="absolute rounded-full bg-secondary blur-[80px] opacity-[.15] -bottom-44 -right-36 will-change-transform" style={{ width: 620, height: 620 }} />
+        <div ref={o3Ref} className="absolute rounded-full bg-warning blur-[80px] opacity-10 top-[40%] left-[35%] will-change-transform" style={{ width: 340, height: 340 }} />
+        <div
+          ref={spotRef}
+          className="absolute inset-0 [transition:background_.12s]"
+          style={{ background: 'radial-gradient(420px circle at var(--mx,50%) var(--my,50%), color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 60%)' }}
+        />
+      </div>
 
-      <div style={S.shell}>
-        <div style={S.bgStage}>
-          <div style={S.bgGrid} />
-          <div ref={o1Ref} style={S.orb1} />
-          <div ref={o2Ref} style={S.orb2} />
-          <div ref={o3Ref} style={S.orb3} />
-          <div ref={spotRef} style={S.bgSpot} />
-          <div style={S.bgScan} />
-        </div>
+      <section className="relative z-[1] w-full max-w-[520px] min-h-dvh bg-surface/60 backdrop-blur-sm border-r border-text-primary/5 flex flex-col justify-start lg:justify-between px-6 py-8 lg:px-12 gap-8 lg:gap-0">
+        <BrandMark />
 
-        <section style={S.formPane} className="flex flex-col justify-start lg:justify-between px-6 py-8 lg:px-12 gap-8 lg:gap-0">
-          <BrandMark />
+        <div className="w-full max-w-[380px] mx-auto">
+          {view === 'login' && (
+            <>
+              <div className="anim-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-text-primary/5 border border-text-primary/10 text-xs text-text-primary/60 mb-5">
+                <span className="live-dot" />
+                {greetingFor(now.getHours())} — pronto para entrar
+              </div>
 
-          <div style={S.formWrap}>
-            {view === 'login' && (
-              <>
-                <div className="anim-in" style={S.greetingChip}>
-                  <span className="live-dot" />
-                  {greetingFor(now.getHours())} — pronto para entrar
+              <h1 className="anim-in d1 font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
+                Acesse seu <em className="text-primary italic">workspace</em>
+              </h1>
+              <p className="anim-in d2 text-sm text-text-primary/50 mb-7">
+                Entre com sua conta corporativa para continuar.
+              </p>
+
+              <form onSubmit={handleLogin}>
+                <div className="anim-in d3 mb-3">
+                  <FloatingInput
+                    id="email"
+                    label="Email corporativo"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                    required
+                    validIcon={emailValid
+                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
+                      : null}
+                  />
+                </div>
+                <div className="anim-in d4 mb-3">
+                  <FloatingPasswordInput
+                    id="senha"
+                    label="Senha"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
                 </div>
 
-                <h1 className="anim-in d1" style={{ fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: '-0.03em', color: '#fafafa', marginBottom: 8 }}>
-                  Acesse seu <em style={{ color: '#6EFFC0', fontStyle: 'italic' }}>workspace</em>
-                </h1>
-                <p className="anim-in d2" style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', marginBottom: 28 }}>
-                  Entre com sua conta corporativa para continuar.
-                </p>
-
-                <form onSubmit={handleLogin}>
-                  <div className="anim-in d3">
-                    <FloatingInput
-                      id="email"
-                      label="Email corporativo"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      required
-                      validIcon={emailValid
-                        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
-                        : null}
-                    />
-                  </div>
-                  <div className="anim-in d4">
-                    <FloatingPasswordInput
-                      id="senha"
-                      label="Senha"
-                      value={senha}
-                      onChange={(e) => setSenha(e.target.value)}
-                      autoComplete="current-password"
-                      required
-                    />
-                  </div>
-
-                  <div style={S.rowBetween}>
-                    <label style={S.check}>
-                      <input type="checkbox" defaultChecked style={{ accentColor: '#6EFFC0' }} />
-                      Confiar neste dispositivo
-                    </label>
-                    <button type="button" style={{ ...S.forgotLink, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                      onClick={() => { setResetEmail(email); setResetErro(''); setView('forgot-email'); }}>
-                      Esqueci a senha
-                    </button>
-                  </div>
-
-                  {erro && (
-                    <div style={S.errBanner}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
-                      {erro}
-                    </div>
-                  )}
-
-                  <div className="anim-in d5">
-                    <button type="submit" disabled={carregando} style={{ ...S.submitBtn, opacity: carregando ? .7 : 1 }}>
-                      {carregando
-                        ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />Autenticando…</>
-                        : 'Entrar no Core 4'}
-                    </button>
-                  </div>
-                </form>
-
-                <div className="anim-in d6" style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'rgba(250,250,250,.4)' }}>
-                  Primeira vez no Core 4?{' '}
-                  <a href="/register" style={{ color: '#6EFFC0', fontWeight: 600, textDecoration: 'none' }}>Criar conta</a>
-                </div>
-              </>
-            )}
-
-            {view === 'forgot-email' && (
-              <div className="anim-in">
-                <button type="button" onClick={voltarParaLogin} style={{ background: 'none', border: 'none', color: 'rgba(250,250,250,.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 28, padding: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
-                  Voltar ao login
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)', marginBottom: 20 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6EFFC0" strokeWidth="1.8"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
-                </div>
-                <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#fafafa', marginBottom: 8 }}>Recuperar acesso</h1>
-                <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', marginBottom: 28, lineHeight: 1.6 }}>
-                  Informe o e-mail cadastrado. Enviaremos um código de verificação.
-                </p>
-                <form onSubmit={handleEsqueciSenha}>
-                  <FloatingInput id="reset-email" label="E-mail cadastrado" type="email" value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)} autoComplete="email" required />
-                  {resetErro && (
-                    <div style={{ ...S.errBanner, marginBottom: 12 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
-                      {resetErro}
-                    </div>
-                  )}
-                  <button type="submit" disabled={resetLoading} style={{ ...S.submitBtn, marginTop: 8, opacity: resetLoading ? .7 : 1 }}>
-                    {resetLoading ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />Enviando…</> : 'Enviar código'}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-xs text-primary font-medium py-2 hover:opacity-80 transition-opacity"
+                    onClick={() => { setResetEmail(email); setResetErro(''); setView('forgot-email'); }}
+                  >
+                    Esqueci a senha
                   </button>
-                </form>
-              </div>
-            )}
-
-            {view === 'forgot-sent' && (
-              <div className="anim-in">
-                <button type="button" onClick={voltarParaLogin} style={{ background: 'none', border: 'none', color: 'rgba(250,250,250,.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 28, padding: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
-                  Voltar ao login
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)', marginBottom: 20 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6EFFC0" strokeWidth="1.8"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
                 </div>
-                <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em', color: '#fafafa', marginBottom: 8 }}>Verifique seu e-mail</h1>
-                <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.7, marginBottom: 28 }}>
-                  Enviamos um link de recuperação para <strong style={{ color: '#fafafa' }}>{resetEmail}</strong>.<br />
-                  Clique no link do e-mail para criar sua nova senha.<br />
-                  <span style={{ fontSize: 12, color: 'rgba(250,250,250,.3)' }}>O link expira em 60 minutos.</span>
-                </p>
-                <button type="button" onClick={voltarParaLogin}
-                  style={{ width: '100%', marginTop: 12, padding: '12px', borderRadius: 14, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', fontSize: 13, cursor: 'pointer' }}>
-                  Voltar ao login
-                </button>
+
+                {erro && (
+                  <div className={errBanner}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
+                    {erro}
+                  </div>
+                )}
+
+                <div className="anim-in d5">
+                  <Button type="submit" loading={carregando} className="w-full h-12 mt-4 text-[15px] font-display font-bold">
+                    {carregando ? 'Autenticando…' : 'Entrar no Core 4'}
+                  </Button>
+                </div>
+              </form>
+
+              <div className="anim-in d6 text-center mt-6 text-[13px] text-text-primary/40">
+                Primeira vez no Core 4?{' '}
+                <Link to="/register" className="text-primary font-semibold hover:opacity-80 transition-opacity">Criar conta</Link>
               </div>
-            )}
-          </div>
+            </>
+          )}
 
-          <footer style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(250,250,250,.25)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.1em' }}>
-            <span>© 2026 Core 4 · LGPD</span>
-            <span style={{ display: 'flex', gap: 14 }}>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Termos</a>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Privacidade</a>
-            </span>
-          </footer>
-        </section>
+          {view === 'forgot-email' && (
+            <div className="anim-in">
+              <button type="button" onClick={voltarParaLogin} className={backBtn}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
+                Voltar ao login
+              </button>
+              <div className={iconBadge}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
+              </div>
+              <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">Recuperar acesso</h1>
+              <p className="text-sm text-text-primary/50 mb-7 leading-relaxed">
+                Informe o e-mail cadastrado. Enviaremos um código de verificação.
+              </p>
+              <form onSubmit={handleEsqueciSenha}>
+                <FloatingInput id="reset-email" label="E-mail cadastrado" type="email" value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)} autoComplete="email" required />
+                {resetErro && (
+                  <div className={errBanner}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
+                    {resetErro}
+                  </div>
+                )}
+                <Button type="submit" loading={resetLoading} className="w-full h-12 mt-4 text-[15px] font-display font-bold">
+                  {resetLoading ? 'Enviando…' : 'Enviar código'}
+                </Button>
+              </form>
+            </div>
+          )}
 
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', position: 'relative', zIndex: 1 }} className="hidden lg:flex">
-          <HeroPane />
+          {view === 'forgot-sent' && (
+            <div className="anim-in">
+              <button type="button" onClick={voltarParaLogin} className={backBtn}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
+                Voltar ao login
+              </button>
+              <div className={iconBadge}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
+              </div>
+              <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">Verifique seu e-mail</h1>
+              <p className="text-sm text-text-primary/50 leading-relaxed mb-7">
+                Enviamos um link de recuperação para <strong className="text-text-primary">{resetEmail}</strong>.<br />
+                Clique no link do e-mail para criar sua nova senha.<br />
+                <span className="text-xs text-text-primary/30">O link expira em 60 minutos.</span>
+              </p>
+              <Button type="button" variant="secondary" onClick={voltarParaLogin} className="w-full h-11 mt-1">
+                Voltar ao login
+              </Button>
+            </div>
+          )}
         </div>
 
-        {success && (
-          <div style={S.successOverlay}>
-            <div style={S.successCard}>
-              <div style={S.successIcon}>
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              </div>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 700, letterSpacing: '-0.025em', color: '#fafafa', marginBottom: 8 }}>
-                Bem-vindo de volta!
-              </div>
-              <div style={{ color: 'rgba(250,250,250,.55)', fontSize: 14 }}>
-                Redirecionando…
-              </div>
+        <footer className="flex justify-between text-[10px] text-text-primary/25 font-mono uppercase tracking-widest">
+          <span>© 2026 Core 4 · LGPD</span>
+        </footer>
+      </section>
+
+      <div className="hidden lg:flex flex-1 min-w-0 relative z-[1]">
+        <HeroPane />
+      </div>
+
+      {success && (
+        <div className="fixed inset-0 z-[100] bg-surface/90 backdrop-blur-xl grid place-items-center" style={{ animation: 'fadeIn 300ms both' }}>
+          <div className="text-center p-10" style={{ animation: 'scaleSpring 500ms cubic-bezier(.34,1.56,.64,1) both' }}>
+            <div className="w-24 h-24 rounded-full bg-primary text-on-primary grid place-items-center mx-auto mb-6" style={{ boxShadow: '0 0 60px color-mix(in srgb, var(--color-primary) 40%, transparent)' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </div>
+            <div className="font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
+              Bem-vindo de volta!
+            </div>
+            <div className="text-text-primary/55 text-sm">
+              Redirecionando…
             </div>
           </div>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+    </div>
   );
 }

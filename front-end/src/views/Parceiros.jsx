@@ -5,6 +5,7 @@ import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
 import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
@@ -17,6 +18,9 @@ const TIPO_VARIANT = { CLIENTE: 'info', FORNECEDOR: 'warning', AMBOS: 'success' 
 const empty = { razaoSocial: '', nomeFantasia: '', cpfCnpj: '', tipo: '', logradouro: '', numero: '', complemento: '', cep: '', bairro: '', municipio: '', uf: '', telefone: '', email: '' };
 
 const TABS_FORM = ['Dados Gerais', 'Endereço', 'Contato'];
+
+// A qual aba pertence cada campo validado — usado para levar o usuário até o primeiro erro.
+const FIELD_TAB = { cpfCnpj: 'Dados Gerais', razaoSocial: 'Dados Gerais', tipo: 'Dados Gerais', email: 'Contato' };
 
 function getInitials(nome) {
   if (!nome) return '?';
@@ -37,12 +41,51 @@ export default function Parceiros() {
   const [errors, setErrors] = useState({});
   const [autoPreenchido, setAutoPreenchido] = useState(false);
   const [camposAuto, setCamposAuto] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
+    setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
+    finally { setLoading(false); }
+  }
+
+  // Abas que contêm ao menos um campo com erro — usado para o indicador visual nas abas.
+  const tabsComErro = new Set(Object.keys(errors).map((f) => FIELD_TAB[f]).filter(Boolean));
+
+  // Fecha o formulário e limpa o estado de edição.
+  function fecharForm() {
+    setForm(empty);
+    setEditId(null);
+    setErrors({});
+    setAutoPreenchido(false);
+    setCamposAuto([]);
+    setShowForm(false);
+  }
+
+  // Alterna o formulário; ao fechar com dados digitados, confirma o descarte.
+  function toggleForm() {
+    if (showForm) {
+      const temDados = editId || Object.values(form).some((v) => String(v ?? '').trim());
+      if (temDados) {
+        setConfirmAction({
+          title: 'Descartar alterações',
+          message: 'Você tem dados que ainda não foram salvos. Deseja descartá-los e fechar o formulário?',
+          confirmLabel: 'Descartar',
+          onConfirm: () => { setConfirmAction(null); fecharForm(); },
+        });
+        return;
+      }
+      fecharForm();
+    } else {
+      setForm(empty);
+      setEditId(null);
+      setErrors({});
+      setActiveTab('Dados Gerais');
+      setShowForm(true);
+    }
   }
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -102,7 +145,14 @@ export default function Parceiros() {
   async function salvar(e) {
     e.preventDefault();
     const errs = validateForm();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      // Leva o usuário até a primeira aba que contém erro (evita falha silenciosa entre abas).
+      const abaComErro = TABS_FORM.find((t) => Object.keys(errs).some((f) => FIELD_TAB[f] === t));
+      if (abaComErro && abaComErro !== activeTab) setActiveTab(abaComErro);
+      toast.error('Verifique os campos destacados antes de salvar.');
+      return;
+    }
     setErrors({});
     setSalvando(true);
     try {
@@ -172,13 +222,13 @@ export default function Parceiros() {
       key: 'id',
       label: 'Ações',
       render: (id, row) => (
-        <div className="flex gap-2">
-          <button onClick={() => editar(row)} aria-label="Editar parceiro" className="p-1.5 text-text-primary/40 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors">
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={() => editar(row)} aria-label="Editar parceiro" className="text-text-primary/40 hover:text-primary hover:bg-primary/10">
             <Pencil className="w-4 h-4" />
-          </button>
-          <button onClick={() => deletar(id)} aria-label="Excluir parceiro" className="p-1.5 text-text-primary/40 hover:text-error rounded-lg hover:bg-error/10 transition-colors">
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => deletar(id)} aria-label="Excluir parceiro" className="text-text-primary/40 hover:text-error hover:bg-error/10">
             <Trash2 className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -191,36 +241,40 @@ export default function Parceiros() {
         subtitle="Clientes e fornecedores"
         actions={
           <PermissaoGuard permissao="PARCEIRO_CRIAR">
-            <button
-              onClick={() => { setForm(empty); setEditId(null); setErrors({}); setActiveTab('Dados Gerais'); setShowForm((v) => !v); }}
-              className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
-            >
-              <Plus className="w-4 h-4" />
+            <Button onClick={toggleForm} leftIcon={<Plus className="w-4 h-4" />} className="text-xs uppercase tracking-widest font-bold">
               Novo Parceiro
-            </button>
+            </Button>
           </PermissaoGuard>
         }
       />
 
       {/* Form com abas */}
       {showForm && (
-        <div className="rounded-[18px] p-6 space-y-5 animate-scale-in" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
+        <div className="rounded-[18px] p-6 space-y-5 animate-scale-in bg-surface-medium border border-text-primary/5 shadow-elevated">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">
             {editId ? 'Editar' : 'Novo'} Parceiro
           </h2>
 
-          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(0,0,0,.2)' }}>
+          <div className="flex gap-1 p-1 rounded-xl bg-surface">
             {TABS_FORM.map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => setActiveTab(tab)}
-                className={cn('flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all font-mono')}
-                style={activeTab === tab
-                  ? { background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }
-                  : { color: 'rgba(255,255,255,.4)' }}
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all font-mono flex items-center justify-center gap-1.5',
+                  activeTab === tab
+                    ? 'bg-gradient-primary text-on-primary'
+                    : 'text-text-primary/40 hover:text-text-primary/70'
+                )}
               >
                 {tab}
+                {tabsComErro.has(tab) && (
+                  <span
+                    className={cn('w-1.5 h-1.5 rounded-full shrink-0', activeTab === tab ? 'bg-on-primary/70' : 'bg-error animate-pulse-dot')}
+                    aria-label="Contém campos com erro"
+                  />
+                )}
               </button>
             ))}
           </div>
@@ -230,13 +284,16 @@ export default function Parceiros() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <FormField label="CPF / CNPJ" error={errors.cpfCnpj}>
                   <div className="relative">
-                    <input className={inputCls} value={form.cpfCnpj} onChange={handleCpfCnpjChange} placeholder="000.000.000-00" />
+                    <input className={cn(inputCls, buscandoCnpj && 'pr-10')} value={form.cpfCnpj} onChange={handleCpfCnpjChange} placeholder="000.000.000-00" />
                     {buscandoCnpj && (
-                      <span className="absolute right-3 top-3 flex items-center gap-1.5 text-xs text-primary">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Buscando...
-                      </span>
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-primary pointer-events-none" aria-label="Buscando dados do CNPJ" />
                     )}
                   </div>
+                  {buscandoCnpj && (
+                    <div className="flex items-center gap-1.5 mt-1.5 px-1">
+                      <span className="text-xs text-primary/80 font-medium">Buscando dados na Receita Federal...</span>
+                    </div>
+                  )}
                   {autoPreenchido && !buscandoCnpj && (
                     <div className="flex items-center gap-1.5 mt-1.5 px-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -281,7 +338,7 @@ export default function Parceiros() {
                 {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 {salvando ? 'Gravando...' : editId ? 'Salvar' : 'Criar'}
               </button>
-              <button type="button" onClick={() => { setForm(empty); setEditId(null); setShowForm(false); }} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
+              <button type="button" onClick={fecharForm} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
                 Cancelar
               </button>
             </div>
@@ -303,7 +360,7 @@ export default function Parceiros() {
       <DataTable
         columns={columns}
         data={listaFiltrada}
-        loading={false}
+        loading={loading}
         emptyState={<EmptyState icon={Users} title="Nenhum parceiro" description="Cadastre clientes e fornecedores para associar aos lançamentos." />}
         aria-label="Lista de parceiros"
       />

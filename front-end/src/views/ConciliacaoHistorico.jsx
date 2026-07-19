@@ -4,7 +4,9 @@ import { GitMerge, FileSearch, Plus } from 'lucide-react';
 import { conciliacao as api } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
+import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
 import { formatDate } from '../lib/formatters';
 
@@ -68,13 +70,15 @@ export default function ConciliacaoHistorico() {
       key: 'id',
       label: 'Ações',
       render: (id, row) => (
-        <button
+        <Button
+          size="sm"
+          variant="ghost"
+          leftIcon={<FileSearch className="w-3.5 h-3.5" />}
+          className="text-primary"
           onClick={() => navigate(row.status === 'PENDENTE' ? `/conciliacao/${id}` : `/conciliacao/${id}/relatorio`)}
-          className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
         >
-          <FileSearch className="w-3.5 h-3.5" />
           {row.status === 'PENDENTE' ? 'Retomar' : 'Ver relatório'}
-        </button>
+        </Button>
       ),
     },
   ];
@@ -100,6 +104,14 @@ export default function ConciliacaoHistorico() {
         data={lista}
         loading={loading}
         aria-label="Histórico de conciliações"
+        emptyState={
+          <EmptyState
+            icon={GitMerge}
+            title="Nenhuma conciliação ainda"
+            description="Importe um extrato bancário (OFX) para começar a conciliar suas movimentações."
+            action={{ label: 'Iniciar primeira conciliação', onClick: () => navigate('/conciliacao') }}
+          />
+        }
       />
     </div>
   );

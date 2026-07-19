@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Loader2, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { categorias as catApi, parceiros as parApi } from '../../lib/api';
 import FormField, { inputCls, FormSelect } from '../ui/FormField';
+import Button from '../ui/Button';
 import ModalCriacaoRapida from '../ui/ModalCriacaoRapida';
 
 export default function FormularioNovoLancamentoInline({ item, onConfirm, onCancel }) {
@@ -109,14 +110,13 @@ export default function FormularioNovoLancamentoInline({ item, onConfirm, onCanc
           </FormField>
         </div>
 
-        <div className="flex gap-3">
-          <button type="submit" disabled={salvando} className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity">
-            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+          <Button type="submit" loading={salvando} leftIcon={<Plus className="w-4 h-4" />} className="w-full sm:w-auto">
             {salvando ? 'Criando...' : 'Criar e Vincular'}
-          </button>
-          <button type="button" onClick={onCancel} className="px-5 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors text-xs font-bold uppercase tracking-widest">
+          </Button>
+          <Button type="button" variant="ghost" onClick={onCancel} className="w-full sm:w-auto">
             Cancelar
-          </button>
+          </Button>
         </div>
       </form>
 

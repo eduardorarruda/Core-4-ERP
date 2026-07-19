@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { User, Lock, Camera, Loader2, Check } from 'lucide-react';
-import { auth } from '../lib/api';
+import { auth, getLoginState, setLoginState } from '../lib/api';
 import { useToast } from '../hooks/useToast';
 import PageHeader from '../components/ui/PageHeader';
 import { PasswordInput } from '../components/ui/FormField';
+import PasswordRules, { senhaValida } from '../components/ui/PasswordRules';
 import { cn } from '../lib/utils';
 
 const inputCls = 'w-full bg-surface-low border border-text-primary/10 rounded-xl px-4 py-3 text-text-primary focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none text-sm font-body placeholder:text-text-primary/30';
@@ -52,6 +53,10 @@ export default function Configuracoes() {
 
   const handleSalvar = async (e) => {
     e.preventDefault();
+    if (form.novaSenha && !senhaValida(form.novaSenha)) {
+      toast.error('A nova senha não atende aos requisitos mínimos de segurança');
+      return;
+    }
     if (form.novaSenha && form.novaSenha !== form.confirmarSenha) {
       toast.error('As senhas não coincidem');
       return;
@@ -64,7 +69,13 @@ export default function Configuracoes() {
       }
       const dto = { nome: form.nome, novaSenha: form.novaSenha || null };
       const atualizado = await auth.atualizarPerfil(dto);
-      localStorage.setItem('usuario', JSON.stringify(atualizado));
+      // Atualiza o estado de login (nome/foto) para o cabeçalho e o menu refletirem
+      // imediatamente, disparando 'auth-change'. Escrever a chave 'usuario' crua não
+      // era lida pelo useAuth (que consome loginState.usuario).
+      const st = getLoginState();
+      if (st) {
+        setLoginState({ ...st, usuario: { ...st.usuario, ...atualizado } });
+      }
       setForm((f) => ({ ...f, novaSenha: '', confirmarSenha: '' }));
       setSavedOk(true);
       toast.success('Perfil atualizado com sucesso!');
@@ -199,9 +210,9 @@ export default function Configuracoes() {
               <PasswordInput
                 value={form.novaSenha}
                 onChange={set('novaSenha')}
-                placeholder="Mín. 8 chars — maiúscula, minúscula e número"
-                minLength={form.novaSenha ? 8 : undefined}
+                placeholder="Digite a nova senha"
               />
+              <PasswordRules senha={form.novaSenha} className="mt-2" />
             </div>
             <div>
               <label className={labelCls}>Confirmar Nova Senha</label>
@@ -216,14 +227,14 @@ export default function Configuracoes() {
 
         <button
           type="submit"
-          disabled={salvando}
+          disabled={salvando || (!!form.novaSenha && !senhaValida(form.novaSenha))}
           className="w-full font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 font-display text-sm"
           style={{
             background: savedOk
               ? 'linear-gradient(135deg,#6EFFC0,#2bdb96)'
               : 'linear-gradient(135deg,#6EFFC0,#2bdb96)',
             color: '#003824',
-            opacity: salvando ? 0.7 : 1,
+            opacity: (salvando || (!!form.novaSenha && !senhaValida(form.novaSenha))) ? 0.7 : 1,
           }}
         >
           {salvando ? (

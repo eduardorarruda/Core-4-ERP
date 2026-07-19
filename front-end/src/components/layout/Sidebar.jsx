@@ -4,7 +4,7 @@ import {
   LayoutDashboard, BarChart3, Gavel,
   Users, Landmark, FileText, CreditCard, TrendingUp,
   LogOut, Tag, Repeat, CalendarDays, Settings, GitMerge,
-  ChevronRight, UserCog, ShieldCheck, Sparkles,
+  ChevronRight, UserCog, ShieldCheck, Sparkles, HelpCircle,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -52,8 +52,19 @@ function getInitials(nome) {
   return nome.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 }
 
+/**
+ * Classe de visibilidade dos rótulos.
+ * - `expandido` (drawer mobile): rótulos sempre visíveis.
+ * - rail desktop: aparecem no hover E no foco por teclado (acessibilidade).
+ */
+function labelVisibility(expandido) {
+  return expandido
+    ? 'opacity-100'
+    : 'opacity-0 group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100';
+}
+
 /* BrandMark com SVG 4-grid idêntico ao Login */
-function BrandMark({ expanded }) {
+function BrandMark({ expandido }) {
   return (
     <NavLink
       to="/dashboard"
@@ -73,7 +84,7 @@ function BrandMark({ expanded }) {
           <rect x="12" y="12" width="9" height="9" rx="1.5" fill="#6EFFC0" opacity=".4"/>
         </svg>
       </div>
-      <div className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap min-w-0">
+      <div className={cn('transition-opacity duration-200 whitespace-nowrap min-w-0', labelVisibility(expandido))}>
         <div className="text-sm font-bold text-text-primary font-display leading-tight flex items-center gap-2">
           Core <span className="text-primary">4</span> ERP
           <span className="live-dot" style={{ width: 5, height: 5 }} />
@@ -90,7 +101,7 @@ const CARTAO_SUB_ITEMS = [
   { label: 'Conciliação', path: '/cartoes/conciliacao', permissao: 'CARTAO_CONCILIACAO_VISUALIZAR', icon: GitMerge },
 ];
 
-function CartaoDropdown({ onClose, temPermissao }) {
+function CartaoDropdown({ onNavigate, temPermissao, expandido }) {
   const [open, setOpen] = useState(false);
   const isActive = useMatch('/cartoes/*');
 
@@ -102,28 +113,29 @@ function CartaoDropdown({ onClose, temPermissao }) {
       <button
         onClick={() => setOpen((v) => !v)}
         title="Cartões"
+        aria-expanded={open}
         className={cn(
-          'w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
+          'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
           isActive ? 'text-text-primary' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
         )}
       >
         <CreditCard className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
-        <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono flex-1 text-left">
+        <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono flex-1 text-left', labelVisibility(expandido))}>
           Cartões
         </span>
-        <ChevronRight className={cn('w-3.5 h-3.5 opacity-0 group-hover/sidebar:opacity-100 transition-all duration-200 shrink-0', open && 'rotate-90')} />
+        <ChevronRight className={cn('w-3.5 h-3.5 transition-all duration-200 shrink-0', labelVisibility(expandido), open && 'rotate-90')} />
       </button>
       {open && (
-        <div className="pl-8 space-y-0.5 opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
+        <div className={cn('pl-8 space-y-0.5 transition-opacity duration-200', labelVisibility(expandido))}>
           {visibleSubItems.map((sub) => (
             <NavLink
               key={sub.path}
               to={sub.path}
               end={sub.path === '/cartoes'}
-              onClick={onClose}
+              onClick={onNavigate}
               title={sub.label}
               className={({ isActive: a }) => cn(
-                'w-full px-3 py-2 flex items-center gap-2 rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono',
+                'w-full min-h-11 px-3 py-2 flex items-center gap-2 rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono',
                 a ? 'text-primary' : 'text-text-primary/40 hover:text-text-primary'
               )}
             >
@@ -141,13 +153,29 @@ function CartaoDropdown({ onClose, temPermissao }) {
   );
 }
 
-export default function Sidebar({ onClose }) {
+/**
+ * Sidebar — usada em 2 contextos:
+ *  - Rail no desktop (lg+): largura w-16 que expande para w-56 no hover/foco.
+ *  - Drawer no mobile: aberto pelo App.jsx com `expandido` = true, mostrando
+ *    todos os rótulos (o drawer não tem hover).
+ *
+ * Props:
+ *  - expandido  (bool)  força o estado expandido (rótulos visíveis, w-56). Default: false.
+ *  - onNavigate (fn?)   chamado ao navegar por um item — usado pelo App para fechar o drawer.
+ *  - onClose    (fn?)   compatibilidade: fallback de onNavigate quando este não é passado.
+ */
+export default function Sidebar({ onClose, onNavigate, expandido = false }) {
   const { usuario, logout, tipoConta, adminSistema, temPermissao } = useAuth();
+  // Fecha o drawer ao navegar (no desktop rail, onNavigate/onClose costumam ser no-op).
+  const handleNav = onNavigate ?? onClose;
 
   return (
-    <aside className="group/sidebar h-screen sticky top-0 w-16 hover:w-56 transition-all duration-300 ease-in-out overflow-hidden bg-surface-low flex flex-col items-start py-6 gap-2 z-50 border-r border-text-primary/5">
+    <aside className={cn(
+      'group/sidebar h-screen sticky top-0 transition-all duration-300 ease-in-out overflow-hidden bg-surface-low flex flex-col items-start py-6 gap-2 z-50 border-r border-text-primary/5 pb-safe',
+      expandido ? 'w-56' : 'w-16 hover:w-56 focus-within:w-56'
+    )}>
       {/* Logo */}
-      <BrandMark />
+      <BrandMark expandido={expandido} />
 
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 flex-1 w-full overflow-y-auto no-scrollbar px-2">
@@ -161,22 +189,22 @@ export default function Sidebar({ onClose }) {
           if (!visibleItems.length) return null;
           return (
             <React.Fragment key={group.label}>
-              <div className="px-2 pt-3 pb-1 opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
+              <div className={cn('px-2 pt-3 pb-1 transition-opacity duration-200', labelVisibility(expandido))}>
                 <span className="text-[9px] font-bold uppercase tracking-widest text-text-primary/30 font-mono">
                   {group.label}
                 </span>
               </div>
               {visibleItems.map((item) =>
                 item.type === 'DROPDOWN'
-                  ? <CartaoDropdown key={item.id} onClose={onClose} temPermissao={temPermissao} />
+                  ? <CartaoDropdown key={item.id} onNavigate={handleNav} temPermissao={temPermissao} expandido={expandido} />
                   : (
                     <NavLink
                       key={item.id}
                       to={item.path}
-                      onClick={onClose}
+                      onClick={handleNav}
                       title={item.label}
                       className={({ isActive }) => cn(
-                        'w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200 relative',
+                        'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200 relative',
                         isActive
                           ? 'text-text-primary bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary pl-[calc(0.75rem-2px)]'
                           : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
@@ -185,7 +213,7 @@ export default function Sidebar({ onClose }) {
                       {({ isActive }) => (
                         <>
                           <item.icon className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
-                          <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono">
+                          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
                             {item.label}
                           </span>
                         </>
@@ -207,27 +235,43 @@ export default function Sidebar({ onClose }) {
       <div className="w-full px-2 space-y-1">
         <NavLink
           to="/configuracoes"
-          onClick={onClose}
+          onClick={handleNav}
           title="Configurações"
           className={({ isActive }) => cn(
-            'w-full px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
+            'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
             isActive ? 'text-text-primary bg-surface-medium' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
           )}
         >
           <Settings className="w-5 h-5 shrink-0" />
-          <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono">
+          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
             Configurações
+          </span>
+        </NavLink>
+
+        {/* Ajuda — acessível a todos (sem permissão) */}
+        <NavLink
+          to="/ajuda"
+          onClick={handleNav}
+          title="Ajuda"
+          className={({ isActive }) => cn(
+            'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
+            isActive ? 'text-text-primary bg-surface-medium' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+          )}
+        >
+          <HelpCircle className="w-5 h-5 shrink-0" />
+          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
+            Ajuda
           </span>
         </NavLink>
 
         <button
           onClick={logout}
           title="Sair"
-          className="w-full px-3 py-2.5 flex items-center gap-3 rounded-xl text-text-primary/50 hover:text-error hover:bg-error/5 transition-all duration-200"
+          className="w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl text-text-primary/50 hover:text-error hover:bg-error/5 transition-all duration-200"
           aria-label="Sair do sistema"
         >
           <LogOut className="w-5 h-5 shrink-0" />
-          <span className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono">
+          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
             Sair
           </span>
         </button>
@@ -243,7 +287,7 @@ export default function Sidebar({ onClose }) {
               </span>
             )}
           </div>
-          <div className="opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 min-w-0">
+          <div className={cn('transition-opacity duration-200 min-w-0', labelVisibility(expandido))}>
             <p className="text-[11px] font-bold text-text-primary truncate font-display">{usuario?.nome ?? 'Usuário'}</p>
             <p className="text-[9px] text-text-primary/40 truncate font-mono">{usuario?.email ?? ''}</p>
           </div>

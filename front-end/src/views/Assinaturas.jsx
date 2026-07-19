@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Repeat, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Repeat, Plus, Pencil, Trash2 } from 'lucide-react';
 import { assinaturas as api, categorias as catApi, parceiros as parApi, cartoes as cartoesApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
-import FormField, { inputCls, labelCls } from '../components/ui/FormField';
+import FormField, { inputCls, inputErrorCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
@@ -24,6 +25,7 @@ export default function Assinaturas() {
   const [confirmId, setConfirmId] = useState(null);
   const [errors, setErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     catApi.listar().then(setCats).catch(() => {});
@@ -33,8 +35,10 @@ export default function Assinaturas() {
   }, []);
 
   async function carregar() {
+    setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
+    finally { setLoading(false); }
   }
 
   function setF(k) { return (v) => setForm((f) => ({ ...f, [k]: v })); }
@@ -126,31 +130,23 @@ export default function Assinaturas() {
         title="Assinaturas"
         subtitle="Assinaturas e custos recorrentes"
         actions={
-          <button
-            onClick={() => { cancelar(); setShowForm((v) => !v); }}
-            className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" />
+          <Button onClick={() => { cancelar(); setShowForm((v) => !v); }} leftIcon={<Plus className="w-4 h-4" />} className="text-xs uppercase tracking-widest font-bold">
             Nova Assinatura
-          </button>
+          </Button>
         }
       />
 
       {/* Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Assinaturas Ativas', value: ativas.length, prefix: '', suffix: '', color: '#6EFFC0', bg: 'rgba(110,255,192,.07)', border: 'rgba(110,255,192,.2)' },
-          { label: 'Custo Mensal',       value: totalMensal,   prefix: 'R$ ', suffix: '', color: '#FFB4AB', bg: 'rgba(255,180,171,.07)', border: 'rgba(255,180,171,.2)' },
-          { label: 'Custo Anual',        value: totalMensal * 12, prefix: 'R$ ', suffix: '', color: '#FFD37A', bg: 'rgba(255,211,122,.07)', border: 'rgba(255,211,122,.2)' },
+          { label: 'Assinaturas Ativas', value: ativas.length,     currency: false, accent: 'text-primary',    card: 'bg-primary/[0.07] border-primary/20' },
+          { label: 'Custo Mensal',       value: totalMensal,       currency: true,  accent: 'text-error',      card: 'bg-error/[0.07] border-error/20' },
+          { label: 'Custo Anual',        value: totalMensal * 12,  currency: true,  accent: 'text-amber-400',  card: 'bg-amber-400/[0.07] border-amber-400/20' },
         ].map((s, i) => (
-          <div
-            key={s.label}
-            className={`anim-in d${i + 1} rounded-[18px] px-5 py-4`}
-            style={{ background: s.bg, border: `1px solid ${s.border}`, backdropFilter: 'blur(8px)' }}
-          >
-            <p className="text-[9px] font-bold uppercase tracking-widest font-mono mb-2" style={{ color: s.color }}>{s.label}</p>
-            <p className="text-2xl font-bold font-display" style={{ color: s.color }}>
-              {s.prefix}{typeof s.value === 'number' && s.prefix ? s.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : s.value}{s.suffix}
+          <div key={s.label} className={cn('anim-in rounded-[18px] px-5 py-4 border backdrop-blur-sm', `d${i + 1}`, s.card)}>
+            <p className={cn('text-[9px] font-bold uppercase tracking-widest font-mono mb-2', s.accent)}>{s.label}</p>
+            <p className={cn('text-2xl font-bold font-display', s.accent)}>
+              {s.currency ? `R$ ${brl(s.value)}` : s.value}
             </p>
           </div>
         ))}
@@ -165,7 +161,7 @@ export default function Assinaturas() {
           <form onSubmit={salvar} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <FormField label="Descrição" required error={errors.descricao}>
               <input
-                className={errors.descricao ? 'w-full bg-surface border border-error/40 rounded-xl px-4 py-3 text-text-primary outline-none text-sm' : inputCls}
+                className={errors.descricao ? inputErrorCls : inputCls}
                 value={form.descricao}
                 onChange={(e) => setF('descricao')(e.target.value)}
                 placeholder="Ex: Netflix, Spotify..."
@@ -174,7 +170,7 @@ export default function Assinaturas() {
             <FormField label="Valor Mensal (R$)" required error={errors.valor}>
               <input
                 type="number" min="0.01" step="0.01"
-                className={errors.valor ? 'w-full bg-surface border border-error/40 rounded-xl px-4 py-3 text-text-primary outline-none text-sm' : inputCls}
+                className={errors.valor ? inputErrorCls : inputCls}
                 value={form.valor}
                 onChange={(e) => setF('valor')(e.target.value)}
                 placeholder="0,00"
@@ -183,7 +179,7 @@ export default function Assinaturas() {
             <FormField label="Dia de Vencimento" required error={errors.diaVencimento}>
               <input
                 type="number" min="1" max="31"
-                className={errors.diaVencimento ? 'w-full bg-surface border border-error/40 rounded-xl px-4 py-3 text-text-primary outline-none text-sm' : inputCls}
+                className={errors.diaVencimento ? inputErrorCls : inputCls}
                 value={form.diaVencimento}
                 onChange={(e) => setF('diaVencimento')(e.target.value)}
                 placeholder="1 a 31"
@@ -191,7 +187,7 @@ export default function Assinaturas() {
             </FormField>
             <FormField label="Categoria" required error={errors.categoriaId}>
               <select
-                className={cn(errors.categoriaId ? 'w-full bg-surface border border-error/40 rounded-xl px-4 py-3 text-text-primary outline-none text-sm appearance-none' : `${inputCls} appearance-none`)}
+                className={cn(errors.categoriaId ? inputErrorCls : inputCls, 'appearance-none')}
                 value={form.categoriaId}
                 onChange={(e) => setF('categoriaId')(e.target.value)}
               >
@@ -200,7 +196,7 @@ export default function Assinaturas() {
               </select>
             </FormField>
             <FormField label="Parceiro / Fornecedor" required error={errors.parceiroId}>
-              <select className={`${inputCls} appearance-none`} value={form.parceiroId} onChange={(e) => setF('parceiroId')(e.target.value)}>
+              <select className={cn(errors.parceiroId ? inputErrorCls : inputCls, 'appearance-none')} value={form.parceiroId} onChange={(e) => setF('parceiroId')(e.target.value)}>
                 <option value="">— Selecionar —</option>
                 {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
               </select>
@@ -218,20 +214,25 @@ export default function Assinaturas() {
               </label>
             </FormField>
             <div className="sm:col-span-2 lg:col-span-3 flex gap-3 justify-end pt-2">
-              <button type="button" onClick={cancelar} className="px-4 py-2 text-sm font-bold border border-text-primary/10 text-text-primary/60 hover:text-text-primary rounded-xl transition-colors">
+              <Button type="button" variant="ghost" onClick={cancelar} className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
                 Cancelar
-              </button>
-              <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-6 py-2.5 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2">
-                {salvando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              </Button>
+              <Button type="submit" loading={salvando} className="text-xs uppercase tracking-widest font-bold">
                 {salvando ? 'Salvando...' : editingId ? 'Salvar' : 'Criar'}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
       )}
 
       {/* Ativas */}
-      {lista.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-40 rounded-2xl bg-surface-medium border border-text-primary/5 animate-pulse" />
+          ))}
+        </div>
+      ) : lista.length === 0 ? (
         <EmptyState icon={Repeat} title="Nenhuma assinatura" description="Cadastre suas assinaturas recorrentes para controlar seus gastos." />
       ) : (
         <>
@@ -262,7 +263,7 @@ export default function Assinaturas() {
 }
 
 function AssinaturaCard({ a, onEdit, onDelete }) {
-  const custoDiario = (Number(a.valor) / 30).toFixed(2);
+  const custoDiario = Number(a.valor) / 30;
   return (
     <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-4 flex flex-col gap-3 hover:border-text-primary/10 transition-colors hover:shadow-elevated">
       <div className="flex items-start justify-between gap-2">
@@ -271,12 +272,12 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
           {a.parceiroNome && <p className="text-xs text-text-primary/40 truncate mt-0.5">{a.parceiroNome}</p>}
         </div>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => onEdit(a)} aria-label="Editar assinatura" className="p-1.5 text-text-primary/40 hover:text-primary transition-colors rounded-lg hover:bg-primary/10">
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => onDelete(a.id)} aria-label="Remover assinatura" className="p-1.5 text-text-primary/40 hover:text-error transition-colors rounded-lg hover:bg-error/10">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <Button variant="ghost" size="icon" onClick={() => onEdit(a)} aria-label="Editar assinatura" className="text-text-primary/40 hover:text-primary hover:bg-primary/10">
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => onDelete(a.id)} aria-label="Remover assinatura" className="text-text-primary/40 hover:text-error hover:bg-error/10">
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
@@ -293,7 +294,7 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
         <div className="text-right">
           <p className="text-[10px] text-text-primary/40 uppercase tracking-wider">Por mês</p>
           <p className="text-lg font-bold text-primary font-display">R$ {brl(a.valor)}</p>
-          <p className="text-[10px] text-text-primary/30">R$ {custoDiario}/dia</p>
+          <p className="text-[10px] text-text-primary/30">R$ {brl(custoDiario)}/dia</p>
         </div>
       </div>
 

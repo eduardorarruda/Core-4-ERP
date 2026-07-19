@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, AlertTriangle, Info, Search, Filter, Calendar, User, Loader2, RefreshCw } from 'lucide-react';
+import { Shield, AlertTriangle, Info, Search, Filter, User, RefreshCw } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
+import DataTable from '../components/ui/DataTable';
+import Pagination from '../components/ui/Pagination';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import { useToast } from '../hooks/useToast';
 import { auditoria } from '../lib/api';
+
+const TAMANHO_PAGINA = 20;
 
 const ACAO_SEV = {
   CRIAR:    'info',
@@ -13,10 +20,11 @@ const ACAO_SEV = {
   EXPORTAR: 'info',
 };
 
-const SEVERITY = {
-  critical: { label: 'Crítico',  color: '#FFB4AB', bg: 'rgba(255,180,171,.1)',  border: 'rgba(255,180,171,.2)' },
-  warning:  { label: 'Alerta',   color: '#FFD37A', bg: 'rgba(255,211,122,.1)',  border: 'rgba(255,211,122,.2)' },
-  info:     { label: 'Info',     color: '#6EFFC0', bg: 'rgba(110,255,192,.1)',  border: 'rgba(110,255,192,.2)' },
+// Severidade → variante do Badge de UI.
+const SEV_BADGE = {
+  critical: { variant: 'error',   label: 'Crítico' },
+  warning:  { variant: 'warning', label: 'Alerta' },
+  info:     { variant: 'info',    label: 'Info' },
 };
 
 function fmtData(ts) {
@@ -35,35 +43,59 @@ function acaoLabel(acao) {
   return map[acao] ?? acao;
 }
 
+// Rótulo amigável para o usuário — a API só devolve o id numérico.
+function usuarioLabel(id) {
+  return id == null ? 'Sistema' : `Usuário #${id}`;
+}
+
 export default function Audit() {
+  const toast = useToast();
   const [logs, setLogs] = useState([]);
-  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filtroAcao, setFiltroAcao] = useState('');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [showFiltros, setShowFiltros] = useState(false);
-  const [erro, setErro] = useState('');
 
   const carregar = useCallback(() => {
     setLoading(true);
-    setErro('');
     auditoria.listar({
       acao: filtroAcao || undefined,
       dataInicio: dataInicio || undefined,
       dataFim: dataFim || undefined,
-      page: 0,
-      size: 50,
-    }).then((page) => {
-      setLogs(page?.content ?? []);
-      setTotal(page?.totalElements ?? 0);
-    }).catch((err) => setErro(err?.message || 'Erro ao carregar auditoria.'))
-      .finally(() => setLoading(false));
-  }, [filtroAcao, dataInicio, dataFim]);
+      page,
+      size: TAMANHO_PAGINA,
+    }).then((resp) => {
+      setLogs(resp?.content ?? []);
+      setTotalPages(resp?.totalPages ?? 0);
+      setTotalElements(resp?.totalElements ?? 0);
+    }).catch((err) => {
+      setLogs([]);
+      toast.error(err?.message || 'Não foi possível carregar os registros de auditoria. Tente novamente.');
+    }).finally(() => setLoading(false));
+  }, [filtroAcao, dataInicio, dataFim, page, toast]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Ao mudar um filtro server-side, volta para a primeira página.
+  const aplicarFiltro = (setter) => (valor) => {
+    setPage(0);
+    setter(valor);
+  };
+
+  const limparFiltros = () => {
+    setPage(0);
+    setFiltroAcao('');
+    setDataInicio('');
+    setDataFim('');
+  };
+
+  // Busca textual é apenas local (a API não oferece busca por texto) — filtra
+  // somente os itens já carregados nesta página.
   const filtered = search.trim()
     ? logs.filter((l) =>
         String(l.entidade ?? '').toLowerCase().includes(search.toLowerCase()) ||
@@ -72,166 +104,198 @@ export default function Audit() {
       )
     : logs;
 
-  const criticos  = filtered.filter((l) => ACAO_SEV[l.acao] === 'critical').length;
-  const alertas   = filtered.filter((l) => ACAO_SEV[l.acao] === 'warning').length;
+  const criticosPagina = filtered.filter((l) => ACAO_SEV[l.acao] === 'critical').length;
+
+  const stats = [
+    { label: 'Total de eventos', hint: 'Todos os registros', value: totalElements, icon: Info, color: 'text-primary' },
+    { label: 'Eventos críticos', hint: 'Nesta página', value: criticosPagina, icon: AlertTriangle, color: 'text-error' },
+    { label: 'Exibindo', hint: 'Após busca local', value: filtered.length, icon: User, color: 'text-secondary', live: true },
+  ];
+
+  const columns = [
+    {
+      key: 'timestamp',
+      label: 'Data e hora',
+      render: (v) => <span className="text-[11px] font-mono text-text-primary/50 whitespace-nowrap">{fmtData(v)}</span>,
+    },
+    {
+      key: 'usuarioId',
+      label: 'Usuário',
+      render: (v, row) => (
+        <span className="inline-flex items-center gap-2">
+          <span className="text-sm font-bold text-text-primary font-display">{usuarioLabel(v)}</span>
+          {row.aiAction && (
+            <span
+              role="img"
+              aria-label={`Ação executada pela assistente de IA (Áurea) a pedido do ${usuarioLabel(v)}`}
+              className="inline-flex items-center rounded-full font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 bg-secondary/15 text-secondary border border-secondary/20"
+            >
+              <span aria-hidden="true">IA</span>
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'entidade',
+      label: 'Entidade',
+      render: (v) => <span className="text-sm text-text-primary/80">{v ?? '—'}</span>,
+    },
+    {
+      key: 'entidadeId',
+      label: 'Registro',
+      render: (v) => <span className="text-[11px] font-mono text-text-primary/40">{v ?? '—'}</span>,
+    },
+    {
+      key: 'acao',
+      label: 'Ação',
+      render: (v) => <Badge variant="neutral" size="sm">{acaoLabel(v)}</Badge>,
+    },
+    {
+      key: 'severidade',
+      label: 'Severidade',
+      render: (_v, row) => {
+        const sev = SEV_BADGE[ACAO_SEV[row.acao] ?? 'info'];
+        return <Badge variant={sev.variant} size="sm" dot>{sev.label}</Badge>;
+      },
+    },
+    {
+      key: 'ipAddress',
+      label: 'IP',
+      render: (v) => <span className="text-[11px] font-mono text-text-primary/35">{v ?? '—'}</span>,
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Auditoria"
         subtitle="Rastreabilidade total e logs de segurança em tempo real"
+        icon={<Shield />}
         actions={
-          <button onClick={carregar} className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors font-mono">
-            <RefreshCw className="w-4 h-4" /> Atualizar
-          </button>
+          <Button
+            variant="ghost"
+            size="md"
+            className="border border-text-primary/10 text-text-primary/70 font-bold text-xs uppercase tracking-widest font-mono"
+            leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}
+            onClick={carregar}
+            loading={loading}
+          >
+            Atualizar
+          </Button>
         }
       />
 
-      {erro && (
-        <div style={{ padding: '10px 16px', borderRadius: 12, background: 'rgba(255,180,171,.08)', border: '1px solid rgba(255,180,171,.2)', color: '#FFB4AB', fontSize: 13 }}>
-          {erro}
-        </div>
-      )}
-
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Total de Eventos',   value: total,    icon: Info,          color: '#6EFFC0' },
-          { label: 'Eventos Críticos',   value: criticos, icon: AlertTriangle, color: '#FFB4AB' },
-          { label: 'Exibindo',           value: filtered.length, icon: User,   color: '#ACC7FF', live: true },
-        ].map((stat, i) => (
+        {stats.map((stat, i) => (
           <div
             key={stat.label}
-            className={`anim-in d${i + 1} rounded-[18px] p-5 flex flex-col gap-3 relative overflow-hidden`}
-            style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.08)', backdropFilter: 'blur(8px)' }}
+            className={`anim-in d${i + 1} rounded-[18px] p-5 flex flex-col gap-3 relative overflow-hidden bg-surface-medium border border-text-primary/8`}
           >
-            <div className="absolute -right-3 -top-3 opacity-[0.06]" aria-hidden>
+            <div className="absolute -right-3 -top-3 opacity-[0.06] text-text-primary" aria-hidden="true">
               <stat.icon className="w-20 h-20" />
             </div>
             <div className="flex items-center gap-2">
               {stat.live && <span className="live-dot" style={{ width: 5, height: 5 }} />}
-              <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 font-mono">{stat.label}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono">{stat.label}</span>
             </div>
-            <p className="text-4xl font-bold font-display leading-none" style={{ color: stat.color }}>
+            <p className={`text-4xl font-bold font-display leading-none ${stat.color}`}>
               {loading ? '—' : stat.value}
             </p>
+            <span className="text-[10px] uppercase tracking-widest text-text-primary/30 font-mono">{stat.hint}</span>
           </div>
         ))}
       </div>
 
-      {/* Log table */}
-      <div
-        className="rounded-[18px] overflow-hidden"
-        style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
-      >
-        {/* Toolbar */}
+      {/* Toolbar */}
+      <div className="rounded-[18px] overflow-hidden bg-surface-medium border border-text-primary/8">
         <div className="p-5 border-b border-text-primary/5 flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-primary/30" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-primary/30" aria-hidden="true" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por entidade, ação ou usuário ID..."
-              className="w-full bg-surface-medium border border-text-primary/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-text-primary/30"
+              placeholder="Filtrar nesta página por entidade, ação ou usuário..."
+              aria-label="Filtrar registros exibidos nesta página"
+              className="w-full bg-surface-high border border-text-primary/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-text-primary/30"
             />
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="md"
+            className="border border-text-primary/8 text-text-primary/60 text-xs font-bold uppercase tracking-widest font-mono hover:text-primary"
+            leftIcon={<Filter className="w-3 h-3" aria-hidden="true" />}
             onClick={() => setShowFiltros((v) => !v)}
-            className="px-3 py-2 bg-surface-medium border border-text-primary/8 text-text-primary/60 text-[10px] font-bold uppercase tracking-widest rounded-xl flex items-center gap-2 hover:border-primary/20 hover:text-primary transition-all font-mono"
+            aria-expanded={showFiltros}
           >
-            <Filter className="w-3 h-3" /> Filtros
-          </button>
+            Filtros
+          </Button>
         </div>
 
         {showFiltros && (
           <div className="p-4 border-b border-text-primary/5 flex flex-wrap gap-4 items-end">
             <div>
-              <label className="block text-[10px] font-mono uppercase tracking-widest text-text-primary/40 mb-1">Ação</label>
-              <select value={filtroAcao} onChange={(e) => setFiltroAcao(e.target.value)}
-                className="bg-surface-medium border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none">
+              <label className="block text-xs font-mono uppercase tracking-widest text-text-primary/40 mb-1">Ação</label>
+              <select
+                value={filtroAcao}
+                onChange={(e) => aplicarFiltro(setFiltroAcao)(e.target.value)}
+                className="bg-surface-high border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+              >
                 <option value="">Todas</option>
-                {['CRIAR','ATUALIZAR','DELETAR','LOGIN','LOGOUT','ACESSO_NEGADO','EXPORTAR'].map((a) => (
+                {['CRIAR', 'ATUALIZAR', 'DELETAR', 'LOGIN', 'LOGOUT', 'ACESSO_NEGADO', 'EXPORTAR'].map((a) => (
                   <option key={a} value={a}>{acaoLabel(a)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-mono uppercase tracking-widest text-text-primary/40 mb-1">Data início</label>
-              <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}
-                className="bg-surface-medium border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none" />
+              <label className="block text-xs font-mono uppercase tracking-widest text-text-primary/40 mb-1">Data início</label>
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => aplicarFiltro(setDataInicio)(e.target.value)}
+                className="bg-surface-high border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+              />
             </div>
             <div>
-              <label className="block text-[10px] font-mono uppercase tracking-widest text-text-primary/40 mb-1">Data fim</label>
-              <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}
-                className="bg-surface-medium border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none" />
+              <label className="block text-xs font-mono uppercase tracking-widest text-text-primary/40 mb-1">Data fim</label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => aplicarFiltro(setDataFim)(e.target.value)}
+                className="bg-surface-high border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+              />
             </div>
-            <button onClick={() => { setFiltroAcao(''); setDataInicio(''); setDataFim(''); }}
-              className="px-3 py-2 text-text-primary/40 text-[10px] font-mono uppercase tracking-widest hover:text-text-primary transition-colors">
+            <button
+              onClick={limparFiltros}
+              className="px-3 py-2 text-text-primary/40 text-xs font-mono uppercase tracking-widest hover:text-text-primary transition-colors"
+            >
               Limpar
             </button>
           </div>
         )}
 
-        {/* Table */}
-        {loading ? (
-          <div className="flex justify-center items-center py-16">
-            <Loader2 className="w-7 h-7 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-text-primary/5">
-                  {['Timestamp', 'Usuário ID', 'Entidade', 'ID', 'Ação', 'Severidade', 'IP'].map((h) => (
-                    <th key={h} className="px-5 py-4 text-[10px] font-bold text-text-primary/40 uppercase tracking-widest font-mono whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-text-primary/5">
-                {filtered.map((log, i) => {
-                  const sevKey = ACAO_SEV[log.acao] ?? 'info';
-                  const sev = SEVERITY[sevKey];
-                  return (
-                    <tr key={log.id ?? i} className="hover:bg-surface-medium/30 transition-colors">
-                      <td className="px-5 py-4 text-[11px] font-mono text-text-primary/40 whitespace-nowrap">{fmtData(log.timestamp)}</td>
-                      <td className="px-5 py-4 text-sm font-bold text-text-primary font-display">
-                        <span className="inline-flex items-center gap-2">
-                          {log.usuarioId ?? '—'}
-                          {log.aiAction && (
-                            <span
-                              title={`Ação executada pela IA (Áurea) a pedido do usuário ${log.usuarioId ?? ''}`}
-                              className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest font-mono"
-                              style={{ background: 'rgba(172,199,255,.12)', color: '#ACC7FF', border: '1px solid rgba(172,199,255,.25)' }}>
-                              IA
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text-primary/80">{log.entidade ?? '—'}</td>
-                      <td className="px-5 py-4 text-[11px] font-mono text-text-primary/40">{log.entidadeId ?? '—'}</td>
-                      <td className="px-5 py-4">
-                        <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest font-mono" style={{ background: 'rgba(255,255,255,.05)', color: 'rgba(250,250,250,.5)' }}>
-                          {acaoLabel(log.acao)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest font-mono px-2.5 py-1 rounded-full"
-                          style={{ background: sev.bg, color: sev.color, border: `1px solid ${sev.border}` }}>
-                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: sev.color }} />
-                          {sev.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-[11px] font-mono text-text-primary/35">{log.ipAddress ?? '—'}</td>
-                    </tr>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-5 py-12 text-center text-text-primary/30 text-sm">Nenhum evento registrado.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Tabela (desktop) + cards (mobile), paginação real server-side */}
+        <div className="p-4 space-y-4">
+          <DataTable
+            columns={columns}
+            data={filtered}
+            loading={loading}
+            serverSort
+            keyExtractor={(r) => r.id}
+            emptyState={
+              <div className="py-12 text-center text-text-primary/40 text-sm">
+                Nenhum evento de auditoria encontrado para os filtros selecionados.
+              </div>
+            }
+          />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalElements={totalElements}
+            onChange={setPage}
+          />
+        </div>
       </div>
     </div>
   );
