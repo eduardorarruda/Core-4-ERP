@@ -208,6 +208,9 @@ services:
       - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME:-n8n}
       - DB_POSTGRESDB_USER=${DB_USERNAME}
       - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
+      # Segredo compartilhado backend↔n8n: os workflows validam o header X-Webhook-Secret
+      # contra este valor (via $env). Vazio = webhooks abertos (dev). Setado no .env em produção.
+      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET:-}
     volumes:
       - n8n_data:/home/node/.n8n
     networks:
