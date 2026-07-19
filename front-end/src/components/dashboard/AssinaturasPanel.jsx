@@ -3,11 +3,10 @@ import { Repeat } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import BentoCard from '../ui/BentoCard';
 import { brl } from '../../lib/formatters';
+import { chartTheme } from './chartTheme';
 
 export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, pieAssinaturas, carregando, isDark }) {
-  const tooltipBg = isDark ? '#1C1B1B' : '#FFFFFF';
-  const tooltipTextColor = isDark ? '#FAFAFA' : '#18181B';
-  const tooltipStyle = { backgroundColor: tooltipBg, border: 'none', borderRadius: '8px', fontSize: '12px', color: tooltipTextColor };
+  const { tooltipStyle } = chartTheme(isDark);
 
   return (
     <BentoCard
@@ -15,16 +14,16 @@ export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, 
       loading={carregando}
       title="Assinaturas Recorrentes"
       headerAction={
-        <Link to="/assinaturas" className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
+        <Link to="/assinaturas" className="text-xs font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
           Gerenciar →
         </Link>
       }
     >
       <div className="bg-error/10 border border-error/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4 mt-2">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-error mb-0.5">Custo Mensal</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-error mb-0.5">Custo Mensal</p>
           <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(totalMensalAssin)}</p>
-          <p className="text-[10px] text-text-primary/50 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
+          <p className="text-xs text-text-primary/50 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
         </div>
         <Repeat className="w-8 h-8 text-error opacity-40" />
       </div>
@@ -45,13 +44,13 @@ export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, 
           <div key={a.id} className="flex items-center justify-between bg-surface-low rounded-lg px-3 py-2">
             <div className="min-w-0">
               <p className="text-xs font-medium text-text-primary truncate">{a.descricao}</p>
-              <p className="text-[10px] text-text-primary/50">dia {a.diaVencimento}</p>
+              <p className="text-xs text-text-primary/50">dia {a.diaVencimento}</p>
             </div>
             <span className="text-xs font-bold text-error shrink-0 ml-2">R$ {brl(a.valor)}</span>
           </div>
         ))}
         {assinaturasAtivas.length > 4 && (
-          <p className="text-[10px] text-text-primary/40 text-center">+{assinaturasAtivas.length - 4} assinatura(s)</p>
+          <p className="text-xs text-text-primary/40 text-center">+{assinaturasAtivas.length - 4} assinatura(s)</p>
         )}
         {assinaturasAtivas.length === 0 && (
           <p className="text-sm text-text-primary/50 text-center py-4">Nenhuma assinatura ativa</p>

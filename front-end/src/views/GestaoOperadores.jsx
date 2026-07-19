@@ -1,90 +1,174 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, UserPlus, Trash2, AlertTriangle, RotateCcw, Pencil } from 'lucide-react';
+import { UserPlus, Trash2, AlertTriangle, RotateCcw, Pencil, Users, MailQuestion } from 'lucide-react';
 import { operadores, convites, perfisAcesso } from '../lib/api';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
+import PageHeader from '../components/ui/PageHeader';
+import DataTable from '../components/ui/DataTable';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import EmptyState from '../components/ui/EmptyState';
+import { useToast } from '../hooks/useToast';
+import { useConfirm } from '../hooks/useConfirm';
 
-function aba(ativo, onClick, label) {
+const INPUT_CLS =
+  'block w-full h-11 px-3.5 bg-surface border border-text-primary/10 rounded-xl text-sm text-text-primary ' +
+  'placeholder:text-text-primary/40 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition';
+const LABEL_CLS = 'block text-xs font-medium text-text-primary/60 mb-1.5';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function ErroModal({ children }) {
+  if (!children) return null;
   return (
-    <button
-      onClick={onClick}
-      style={{ padding: '8px 18px', borderRadius: 10, border: 'none', background: ativo ? 'rgba(110,255,192,.1)' : 'transparent', color: ativo ? '#6EFFC0' : 'rgba(250,250,250,.4)', cursor: 'pointer', fontSize: 13, fontWeight: ativo ? 700 : 400, fontFamily: "'DM Sans', sans-serif", transition: 'all 200ms' }}
-    >{label}</button>
+    <div
+      role="alert"
+      className="rounded-xl bg-error/10 border border-error/25 text-error text-sm px-3.5 py-2.5 leading-relaxed"
+    >
+      {children}
+    </div>
   );
 }
 
-function ModalConvite({ perfis, onClose, onSave, loading }) {
+function ModalConvite({ perfis, onClose, onSave }) {
   const [form, setForm] = useState({ email: '', perfilId: '' });
+  const [erro, setErro] = useState('');
+  const [loading, setLoading] = useState(false);
   const set = (f) => (e) => setForm((prev) => ({ ...prev, [f]: e.target.value }));
-  const S = {
-    overlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center' },
-    card: { background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 420, width: '90%' },
-    input: { display: 'block', width: '100%', padding: '12px 14px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, color: '#fafafa', fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: 'none', marginBottom: 12, boxSizing: 'border-box' },
+
+  const submit = async () => {
+    setErro('');
+    const email = form.email.trim();
+    if (!email || !form.perfilId) {
+      setErro('Informe o e-mail e selecione um perfil de acesso.');
+      return;
+    }
+    if (!EMAIL_RE.test(email)) {
+      setErro('O e-mail informado não parece válido. Verifique e tente novamente.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSave({ email, perfilId: form.perfilId });
+      // Sucesso: o componente pai fecha o modal.
+    } catch (e) {
+      setErro(e?.message || 'Não foi possível enviar o convite. Tente novamente.');
+      setLoading(false);
+    }
   };
+
   return (
-    <div style={S.overlay} onClick={onClose}>
-      <div style={S.card} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 20 }}>Convidar Operador</h2>
-        <label style={{ fontSize: 11, color: 'rgba(250,250,250,.4)', display: 'block', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>E-mail</label>
-        <input style={S.input} type="email" value={form.email} onChange={set('email')} placeholder="operador@empresa.com" />
-        <label style={{ fontSize: 11, color: 'rgba(250,250,250,.4)', display: 'block', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Perfil</label>
-        <select style={{ ...S.input, appearance: 'none' }} value={form.perfilId} onChange={set('perfilId')}>
-          <option value="">Selecione um perfil…</option>
-          {perfis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-        </select>
-        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
-          <button onClick={() => onSave(form)} disabled={loading || !form.email || !form.perfilId} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: "'Sora', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: loading || !form.email || !form.perfilId ? .6 : 1 }}>
-            {loading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-            Convidar
-          </button>
+    <Modal open onClose={onClose} title="Convidar operador" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-text-primary/60 leading-relaxed">
+          Enviaremos um convite por e-mail. A pessoa entra na empresa com o perfil de acesso que você escolher.
+        </p>
+
+        <div>
+          <label htmlFor="convite-email" className={LABEL_CLS}>E-mail</label>
+          <input
+            id="convite-email"
+            className={INPUT_CLS}
+            type="email"
+            value={form.email}
+            onChange={set('email')}
+            placeholder="operador@empresa.com"
+            autoComplete="off"
+          />
         </div>
+
+        <div>
+          <label htmlFor="convite-perfil" className={LABEL_CLS}>Perfil de acesso</label>
+          <select
+            id="convite-perfil"
+            className={`${INPUT_CLS} appearance-none`}
+            value={form.perfilId}
+            onChange={set('perfilId')}
+          >
+            <option value="">Selecione um perfil…</option>
+            {perfis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </select>
+        </div>
+
+        <ErroModal>{erro}</ErroModal>
+
+        <Modal.Footer>
+          <Button variant="ghost" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={submit} loading={loading} leftIcon={<UserPlus className="w-4 h-4" />}>
+            Convidar
+          </Button>
+        </Modal.Footer>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-function ModalEditarPerfil({ membro, perfis, onClose, onSave, loading }) {
-  const [perfilId, setPerfilId] = useState('');
+function ModalEditarPerfil({ membro, perfis, onClose, onSave }) {
   const perfisDisponiveis = perfis.filter((p) => p.nome !== 'PROPRIETARIO');
-  const S = {
-    overlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center' },
-    card: { background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 420, width: '90%' },
-    input: { display: 'block', width: '100%', padding: '12px 14px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, color: '#fafafa', fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: 'none', marginBottom: 12, boxSizing: 'border-box' },
+  const perfilAtual = perfis.find((p) => p.nome === membro.perfilNome);
+  const [perfilId, setPerfilId] = useState(perfilAtual ? String(perfilAtual.id) : '');
+  const [erro, setErro] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    setErro('');
+    if (!perfilId) {
+      setErro('Selecione um perfil de acesso.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSave(membro.usuarioId, Number(perfilId));
+    } catch (e) {
+      setErro(e?.message || 'Não foi possível alterar o perfil. Tente novamente.');
+      setLoading(false);
+    }
   };
+
   return (
-    <div style={S.overlay} onClick={onClose}>
-      <div style={S.card} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 6 }}>Alterar Perfil</h2>
-        <p style={{ fontSize: 13, color: 'rgba(250,250,250,.4)', marginBottom: 20, fontFamily: "'DM Sans', sans-serif" }}>{membro.nome}</p>
-        <label style={{ fontSize: 11, color: 'rgba(250,250,250,.4)', display: 'block', marginBottom: 4, fontFamily: "'DM Sans', sans-serif" }}>Novo perfil</label>
-        <select style={{ ...S.input, appearance: 'none' }} value={perfilId} onChange={(e) => setPerfilId(e.target.value)}>
-          <option value="">Selecione um perfil…</option>
-          {perfisDisponiveis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-        </select>
-        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
-          <button onClick={() => onSave(membro.usuarioId, Number(perfilId))} disabled={loading || !perfilId} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, cursor: 'pointer', fontSize: 13, fontFamily: "'Sora', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: loading || !perfilId ? .6 : 1 }}>
-            {loading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-            Salvar
-          </button>
+    <Modal open onClose={onClose} title="Alterar perfil de acesso" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-text-primary/60">
+          Alterando o perfil de <span className="text-text-primary font-medium">{membro.nome}</span>.
+        </p>
+
+        <div>
+          <label htmlFor="editar-perfil" className={LABEL_CLS}>Novo perfil</label>
+          <select
+            id="editar-perfil"
+            className={`${INPUT_CLS} appearance-none`}
+            value={perfilId}
+            onChange={(e) => setPerfilId(e.target.value)}
+          >
+            <option value="">Selecione um perfil…</option>
+            {perfisDisponiveis.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+          </select>
         </div>
+
+        <ErroModal>{erro}</ErroModal>
+
+        <Modal.Footer>
+          <Button variant="ghost" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={submit} loading={loading}>Salvar</Button>
+        </Modal.Footer>
       </div>
-    </div>
+    </Modal>
   );
 }
 
 export default function GestaoOperadores() {
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [tab, setTab] = useState('ativos');
   const [membros, setMembros] = useState([]);
   const [pendentes, setPendentes] = useState([]);
   const [perfis, setPerfis] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modalConvite, setModalConvite] = useState(false);
-  const [savingConvite, setSavingConvite] = useState(false);
-  const [editandoPerfil, setEditandoPerfil] = useState(null);
-  const [savingPerfil, setSavingPerfil] = useState(false);
-  const [reenvId, setReenvId] = useState(null);
   const [erro, setErro] = useState('');
+  const [modalConvite, setModalConvite] = useState(false);
+  const [editandoPerfil, setEditandoPerfil] = useState(null);
+  const [reenvId, setReenvId] = useState(null);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -97,209 +181,244 @@ export default function GestaoOperadores() {
       setMembros(Array.isArray(m) ? m : (m?.content ?? []));
       setPendentes(Array.isArray(p) ? p : (p?.content ?? []));
       setPerfis(Array.isArray(pf) ? pf : (pf?.content ?? []));
-    }).catch(() => setErro('Erro ao carregar dados.'))
+    }).catch(() => setErro('Não foi possível carregar os dados. Tente novamente em instantes.'))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // --- Ações ---
+
   const remover = async (usuarioId, nome) => {
-    if (!window.confirm(`Remover ${nome} da empresa?`)) return;
+    const ok = await confirm({
+      title: 'Desativar operador',
+      message: `Deseja desativar o acesso de ${nome}? A pessoa deixa de acessar a empresa, mas o histórico é mantido e o acesso pode ser reativado depois.`,
+      confirmLabel: 'Desativar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!ok) return;
     try {
       await operadores.remover(usuarioId);
+      toast.success(`${nome} foi desativado.`);
       carregar();
     } catch (err) {
-      setErro(err.message || 'Erro ao remover operador.');
+      toast.error(err?.message || 'Não foi possível desativar o operador.');
     }
   };
 
   const reativar = async (usuarioId, nome) => {
-    if (!window.confirm(`Reativar ${nome} na empresa?`)) return;
+    const ok = await confirm({
+      title: 'Reativar operador',
+      message: `Deseja reativar o acesso de ${nome} à empresa?`,
+      confirmLabel: 'Reativar',
+      cancelLabel: 'Cancelar',
+      variant: 'default',
+    });
+    if (!ok) return;
     try {
       await operadores.reativar(usuarioId);
+      toast.success(`${nome} foi reativado.`);
       carregar();
     } catch (err) {
-      setErro(err.message || 'Erro ao reativar operador.');
+      toast.error(err?.message || 'Não foi possível reativar o operador.');
     }
   };
 
-  const reenviarConvite = async (id) => {
+  const reenviarConvite = async (id, email) => {
     setReenvId(id);
-    setErro('');
     try {
       await convites.reenviar(id);
+      toast.success(`Convite reenviado${email ? ` para ${email}` : ''}.`);
       carregar();
     } catch (err) {
-      setErro(err.message || 'Erro ao reenviar convite.');
+      toast.error(err?.message || 'Não foi possível reenviar o convite.');
     } finally {
       setReenvId(null);
     }
   };
 
+  // Lançam erro para o modal exibir internamente; sucesso fecha o modal + toast.
   const enviarConvite = async (form) => {
-    setSavingConvite(true);
-    try {
-      await convites.convidar({ email: form.email, perfilId: Number(form.perfilId) });
-      setModalConvite(false);
-      carregar();
-    } catch (err) {
-      setErro(err.message || 'Erro ao enviar convite.');
-    } finally {
-      setSavingConvite(false);
-    }
+    await convites.convidar({ email: form.email, perfilId: Number(form.perfilId) });
+    setModalConvite(false);
+    toast.success(`Convite enviado para ${form.email}.`);
+    carregar();
   };
 
   const alterarPerfilHandler = async (usuarioId, perfilId) => {
-    setSavingPerfil(true);
-    try {
-      await operadores.alterarPerfil(usuarioId, perfilId);
-      setEditandoPerfil(null);
-      carregar();
-    } catch (err) {
-      setErro(err.message || 'Erro ao alterar perfil.');
-    } finally {
-      setSavingPerfil(false);
-    }
+    await operadores.alterarPerfil(usuarioId, perfilId);
+    setEditandoPerfil(null);
+    toast.success('Perfil de acesso atualizado.');
+    carregar();
   };
 
-  const thStyle = { padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'rgba(250,250,250,.3)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.1em' };
-  const tdStyle = { padding: '12px 16px', fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: 'rgba(250,250,250,.8)' };
+  // --- Colunas ---
+
+  const colunasAtivos = [
+    {
+      key: 'nome',
+      label: 'Nome',
+      sortable: true,
+      render: (v, m) => (
+        <div className="flex items-center gap-2">
+          {m.senhaProvisoria && (
+            <AlertTriangle
+              className="w-3.5 h-3.5 text-warning shrink-0"
+              aria-label="Senha provisória"
+            />
+          )}
+          <span className="font-semibold text-text-primary">{m.nome}</span>
+        </div>
+      ),
+    },
+    { key: 'email', label: 'E-mail', sortable: true, render: (v) => <span className="text-text-primary/60">{v}</span> },
+    { key: 'perfilNome', label: 'Perfil', render: (v) => <Badge variant="info">{v}</Badge> },
+    {
+      key: 'ativo',
+      label: 'Status',
+      render: (v) => (
+        <Badge variant={v ? 'success' : 'neutral'} dot>{v ? 'Ativo' : 'Inativo'}</Badge>
+      ),
+    },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      render: (v, m) => (
+        <div className="flex items-center gap-2">
+          {m.perfilNome !== 'PROPRIETARIO' && (
+            <PermissaoGuard permissao="USUARIO_EDITAR">
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setEditandoPerfil(m)}
+                aria-label={`Alterar perfil de ${m.nome}`}
+                title="Alterar perfil"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            </PermissaoGuard>
+          )}
+          {m.ativo ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => remover(m.usuarioId, m.nome)}
+              aria-label={`Desativar ${m.nome}`}
+              title="Desativar operador"
+              className="text-error hover:bg-error/10"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => reativar(m.usuarioId, m.nome)}
+              leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+            >
+              Reativar
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  const colunasPendentes = [
+    { key: 'emailConvidado', label: 'E-mail', sortable: true, render: (v) => <span className="font-semibold text-text-primary">{v}</span> },
+    { key: 'perfilNome', label: 'Perfil', render: (v) => <Badge variant="info">{v}</Badge> },
+    {
+      key: 'expiraEm',
+      label: 'Expira em',
+      render: (v) => <span className="text-text-primary/60">{v ? new Date(v).toLocaleString('pt-BR') : '—'}</span>,
+    },
+    { key: 'convidadoPorEmail', label: 'Convidado por', render: (v) => <span className="text-text-primary/60">{v ?? '—'}</span> },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      render: (v, c) => (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => reenviarConvite(c.id, c.emailConvidado)}
+          loading={reenvId === c.id}
+          leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
+        >
+          Reenviar
+        </Button>
+      ),
+    },
+  ];
+
+  const abas = [
+    { id: 'ativos', label: `Ativos (${membros.length})` },
+    { id: 'pendentes', label: `Convites pendentes (${pendentes.length})` },
+  ];
+
+  const colunas = tab === 'ativos' ? colunasAtivos : colunasPendentes;
+  const dados = tab === 'ativos' ? membros : pendentes;
+  const vazio = tab === 'ativos'
+    ? <EmptyState icon={Users} title="Nenhum operador ativo" description="Convide pessoas para colaborar na gestão financeira da empresa." />
+    : <EmptyState icon={MailQuestion} title="Nenhum convite pendente" description="Os convites enviados que ainda não foram aceitos aparecem aqui." />;
 
   return (
-    <>
-      <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+    <div className="space-y-6">
+      <PageHeader
+        title="Operadores"
+        subtitle="Membros e convites da empresa"
+        actions={
+          <PermissaoGuard permissao="USUARIO_CONVIDAR">
+            <Button onClick={() => setModalConvite(true)} leftIcon={<UserPlus className="w-4 h-4" />}>
+              Convidar
+            </Button>
+          </PermissaoGuard>
+        }
+      />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, color: 'var(--color-text-primary, #fafafa)', margin: 0 }}>Operadores</h1>
-          <p style={{ fontSize: 13, color: 'rgba(250,250,250,.4)', margin: '4px 0 0', fontFamily: "'DM Sans', sans-serif" }}>Gerencie membros e convites da empresa</p>
-        </div>
-        <PermissaoGuard permissao="USUARIO_CONVIDAR">
-          <button onClick={() => setModalConvite(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Sora', sans-serif" }}>
-            <UserPlus size={15} /> Convidar
-          </button>
-        </PermissaoGuard>
-      </div>
-
-      {erro && <div style={{ padding: '10px 16px', borderRadius: 12, background: 'rgba(255,180,171,.08)', border: '1px solid rgba(255,180,171,.2)', color: '#FFB4AB', fontSize: 13, marginBottom: 16 }}>{erro}</div>}
-
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-        {aba(tab === 'ativos', () => setTab('ativos'), `Ativos (${membros.length})`)}
-        {aba(tab === 'pendentes', () => setTab('pendentes'), `Convites Pendentes (${pendentes.length})`)}
-      </div>
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-          <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#6EFFC0' }} />
-        </div>
-      ) : tab === 'ativos' ? (
-        <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 16, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                <th style={thStyle}>Nome</th>
-                <th style={thStyle}>E-mail</th>
-                <th style={thStyle}>Perfil</th>
-                <th style={thStyle}>Status</th>
-                <th style={thStyle}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {membros.map((m) => (
-                <tr key={m.usuarioId} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {m.senhaProvisoria && <AlertTriangle size={13} style={{ color: '#FFD37A', flexShrink: 0 }} title="Senha provisória" />}
-                      <span style={{ fontWeight: 600, color: '#fafafa' }}>{m.nome}</span>
-                    </div>
-                  </td>
-                  <td style={{ ...tdStyle, color: 'rgba(250,250,250,.5)' }}>{m.email}</td>
-                  <td style={tdStyle}>
-                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: 'rgba(172,199,255,.1)', color: '#ACC7FF', border: '1px solid rgba(172,199,255,.2)' }}>
-                      {m.perfilNome}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: m.ativo ? 'rgba(110,255,192,.08)' : 'rgba(255,255,255,.04)', color: m.ativo ? '#6EFFC0' : 'rgba(250,250,250,.3)', border: `1px solid ${m.ativo ? 'rgba(110,255,192,.2)' : 'rgba(255,255,255,.08)'}` }}>
-                      {m.ativo ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      {m.perfilNome !== 'PROPRIETARIO' && (
-                        <PermissaoGuard permissao="USUARIO_EDITAR">
-                          <button onClick={() => setEditandoPerfil(m)} title="Alterar perfil" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(172,199,255,.06)', border: '1px solid rgba(172,199,255,.15)', color: '#ACC7FF', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                            <Pencil size={13} />
-                          </button>
-                        </PermissaoGuard>
-                      )}
-                      {m.ativo ? (
-                        <button onClick={() => remover(m.usuarioId, m.nome)} title="Remover" style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,100,100,.06)', border: '1px solid rgba(255,100,100,.15)', color: '#FFB4AB', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                          <Trash2 size={13} />
-                        </button>
-                      ) : (
-                        <button onClick={() => reativar(m.usuarioId, m.nome)} title="Reativar" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(110,255,192,.06)', border: '1px solid rgba(110,255,192,.2)', color: '#6EFFC0', cursor: 'pointer', fontSize: 12, fontFamily: "'DM Sans', sans-serif" }}>
-                          <RotateCcw size={12} /> Reativar
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {membros.length === 0 && <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', padding: 40, color: 'rgba(250,250,250,.3)' }}>Nenhum operador ativo.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 16, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                <th style={thStyle}>E-mail</th>
-                <th style={thStyle}>Perfil</th>
-                <th style={thStyle}>Expira em</th>
-                <th style={thStyle}>Convidado por</th>
-                <th style={thStyle}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pendentes.map((c, i) => (
-                <tr key={c.id ?? i} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: '#fafafa' }}>{c.emailConvidado}</td>
-                  <td style={tdStyle}>
-                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: 'rgba(172,199,255,.1)', color: '#ACC7FF', border: '1px solid rgba(172,199,255,.2)' }}>{c.perfilNome}</span>
-                  </td>
-                  <td style={{ ...tdStyle, color: 'rgba(250,250,250,.5)' }}>
-                    {c.expiraEm ? new Date(c.expiraEm).toLocaleString('pt-BR') : '—'}
-                  </td>
-                  <td style={{ ...tdStyle, color: 'rgba(250,250,250,.5)' }}>{c.convidadoPorEmail ?? '—'}</td>
-                  <td style={tdStyle}>
-                    <button
-                      onClick={() => reenviarConvite(c.id)}
-                      disabled={reenvId === c.id}
-                      title="Reenviar convite"
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(110,255,192,.06)', border: '1px solid rgba(110,255,192,.2)', color: '#6EFFC0', cursor: reenvId === c.id ? 'not-allowed' : 'pointer', fontSize: 12, fontFamily: "'DM Sans', sans-serif", opacity: reenvId === c.id ? .6 : 1 }}
-                    >
-                      {reenvId === c.id
-                        ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-                        : <RotateCcw size={12} />}
-                      Reenviar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {pendentes.length === 0 && <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', padding: 40, color: 'rgba(250,250,250,.3)' }}>Nenhum convite pendente.</td></tr>}
-            </tbody>
-          </table>
+      {erro && (
+        <div role="alert" className="rounded-xl bg-error/10 border border-error/25 text-error text-sm px-4 py-3">
+          {erro}
         </div>
       )}
+
+      {/* Abas */}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filtrar operadores">
+        {abas.map((a) => {
+          const ativo = tab === a.id;
+          return (
+            <button
+              key={a.id}
+              role="tab"
+              aria-selected={ativo}
+              onClick={() => setTab(a.id)}
+              className={
+                'h-11 px-4 rounded-xl text-sm font-medium transition focus-visible:outline-none ' +
+                'focus-visible:ring-2 focus-visible:ring-primary ' +
+                (ativo
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-surface-medium text-text-primary/50 hover:text-text-primary hover:bg-surface-high')
+              }
+            >
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tabela (desktop) + cards (mobile) — mesmo conteúdo, responsivo */}
+      <div className="hidden md:block">
+        <DataTable columns={colunas} data={dados} loading={loading} emptyState={vazio} keyExtractor={(r) => r.usuarioId ?? r.id} />
+      </div>
+      <div className="md:hidden">
+        <DataTable columns={colunas} data={dados} loading={loading} emptyState={vazio} cardView keyExtractor={(r) => r.usuarioId ?? r.id} />
+      </div>
 
       {modalConvite && (
         <ModalConvite
           perfis={perfis}
           onClose={() => setModalConvite(false)}
           onSave={enviarConvite}
-          loading={savingConvite}
         />
       )}
 
@@ -309,9 +428,8 @@ export default function GestaoOperadores() {
           perfis={perfis}
           onClose={() => setEditandoPerfil(null)}
           onSave={alterarPerfilHandler}
-          loading={savingPerfil}
         />
       )}
-    </>
+    </div>
   );
 }

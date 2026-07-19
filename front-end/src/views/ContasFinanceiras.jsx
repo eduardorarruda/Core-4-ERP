@@ -6,6 +6,7 @@ import FormField, { inputCls } from '../components/ui/FormField';
 import CategoriaOptions from '../components/ui/CategoriaOptions';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
 import Pagination from '../components/ui/Pagination';
 import { brl, formatDate } from '../lib/formatters';
@@ -284,6 +285,7 @@ export default function ContasFinanceiras() {
   const abrirEdit = useCallback((row) => {
     setEditId(row.id);
     setEditErrors({});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setEditForm({
       descricao: row.descricao,
       valorOriginal: String(row.valorOriginal),
@@ -333,52 +335,88 @@ export default function ContasFinanceiras() {
       key: 'id',
       label: 'Ações',
       render: (id, row) => (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {(row.status === 'PENDENTE' || row.status === 'ATRASADO') && (
-            <button
-              onClick={() => { setBaixaId(row.id); setBaixaForm(emptyBaixa); }}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => { setBaixaId(row.id); setBaixaForm(emptyBaixa); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               aria-label="Baixar conta"
               title="Baixar"
-              className="p-1.5 text-text-primary/40 hover:text-primary transition-colors rounded-lg hover:bg-primary/10"
+              className="text-text-primary/50 hover:text-primary"
             >
-              <CheckCircle className="w-4 h-4" />
-            </button>
+              <CheckCircle className="w-5 h-5" />
+            </Button>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => !row.conciliada && abrirEdit(row)}
             aria-label="Editar conta"
             title={row.conciliada ? 'Conta conciliada — edição bloqueada' : 'Editar'}
             disabled={row.conciliada}
-            className={`p-1.5 transition-colors rounded-lg ${row.conciliada ? 'text-text-primary/20 cursor-not-allowed' : 'text-text-primary/40 hover:text-secondary hover:bg-secondary/10'}`}
+            className="text-text-primary/50 hover:text-secondary"
           >
-            <Pencil className="w-4 h-4" />
-          </button>
+            <Pencil className="w-5 h-5" />
+          </Button>
           {(row.status === 'PAGO' || row.status === 'RECEBIDO') && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => !row.conciliada && estornar(row.id)}
               aria-label="Estornar quitação"
               title={row.conciliada ? 'Conta conciliada — estorno bloqueado' : 'Estornar'}
               disabled={row.conciliada}
-              className={`p-1.5 transition-colors rounded-lg ${row.conciliada ? 'text-text-primary/20 cursor-not-allowed' : 'text-text-primary/40 hover:text-amber-400 hover:bg-amber-400/10'}`}
+              className="text-text-primary/50 hover:text-warning"
             >
-              <RotateCcw className="w-4 h-4" />
-            </button>
+              <RotateCcw className="w-5 h-5" />
+            </Button>
           )}
-          <button onClick={() => deletar(row.id)} aria-label="Excluir conta" title="Excluir" className="p-1.5 text-text-primary/40 hover:text-error transition-colors rounded-lg hover:bg-error/10">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => deletar(row.id)}
+            aria-label="Excluir conta"
+            title="Excluir"
+            className="text-text-primary/50 hover:text-error"
+          >
+            <Trash2 className="w-5 h-5" />
+          </Button>
         </div>
       ),
     },
   ];
 
-  /* Summary por status */
+  /* Summary por status — conta apenas os itens da página atual (a API paginada não
+     retorna contagens por status). Os rótulos deixam isso explícito; o total real
+     vem de totalElements (backend). */
   const countByStatus = contas.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; }, {});
   const statusChips = [
-    { label: 'Pendentes', key: 'PENDENTE', color: '#FFD37A', bg: 'rgba(255,211,122,.1)', border: 'rgba(255,211,122,.2)' },
-    { label: 'Atrasadas', key: 'ATRASADO', color: '#FFB4AB', bg: 'rgba(255,180,171,.1)', border: 'rgba(255,180,171,.2)', pulse: true },
-    { label: 'Pagas',     key: 'PAGO',     color: '#6EFFC0', bg: 'rgba(110,255,192,.1)', border: 'rgba(110,255,192,.2)' },
-    { label: 'Recebidas', key: 'RECEBIDO', color: '#ACC7FF', bg: 'rgba(172,199,255,.1)', border: 'rgba(172,199,255,.2)' },
+    { label: 'Pendentes', key: 'PENDENTE', active: 'bg-warning text-surface', idle: 'bg-warning/10 text-warning border border-warning/20' },
+    { label: 'Atrasadas', key: 'ATRASADO', active: 'bg-error text-surface', idle: 'bg-error/10 text-error border border-error/20', pulse: true },
+    { label: 'Pagas',     key: 'PAGO',     active: 'bg-primary text-on-primary', idle: 'bg-primary/10 text-primary border border-primary/20' },
+    { label: 'Recebidas', key: 'RECEBIDO', active: 'bg-secondary text-surface', idle: 'bg-secondary/10 text-secondary border border-secondary/20' },
+  ];
+
+  const transfColumns = [
+    { key: 'dataTransferencia', label: 'Data', render: (v) => <span className="font-mono text-xs text-text-primary/60">{formatDate(v)}</span> },
+    { key: 'contaOrigemDescricao', label: 'Origem', render: (v) => <span className="font-medium text-text-primary/80">{v}</span> },
+    { key: 'contaDestinoDescricao', label: 'Destino', render: (v) => <span className="font-medium text-text-primary/80">{v}</span> },
+    { key: 'valor', label: 'Valor', render: (v) => <span className="font-bold text-primary font-mono">R$ {brl(v)}</span> },
+    {
+      key: 'id',
+      label: 'Ações',
+      render: (id, t) => (
+        <div className="flex gap-1 md:justify-end">
+          <Button variant="ghost" size="icon" onClick={() => editarTransferencia(t)} aria-label="Editar transferência" title="Editar" className="text-text-primary/50 hover:text-primary">
+            <Pencil className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => deletarTransferencia(t.id)} aria-label="Excluir transferência" title="Excluir" className="text-text-primary/50 hover:text-error">
+            <Trash2 className="w-5 h-5" />
+          </Button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -387,25 +425,26 @@ export default function ContasFinanceiras() {
         title="Lançamentos"
         subtitle="Contas a pagar e a receber"
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <PermissaoGuard permissao="CONTA_CORRENTE_TRANSFERIR">
-              <button
+              <Button
+                variant="secondary"
                 onClick={() => { setShowTransf((v) => !v); if (showTransf) cancelarTransferencia(); }}
-                className="flex items-center gap-2 border border-text-primary/10 text-text-primary/70 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl hover:bg-surface-medium transition-colors font-mono"
+                leftIcon={<ArrowRightLeft className="w-4 h-4" />}
               >
-                <ArrowRightLeft className="w-4 h-4" />
-                Nova Transferência
-              </button>
+                <span className="sm:hidden">Transferir</span>
+                <span className="hidden sm:inline">Nova Transferência</span>
+              </Button>
             </PermissaoGuard>
             <PermissaoGuard permissao="CONTA_CRIAR">
-              <button
+              <Button
                 onClick={() => setShowForm((v) => !v)}
-                className="flex items-center gap-2 font-bold text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-xl transition-all font-mono"
-                style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}
+                leftIcon={<Plus className="w-4 h-4" />}
+                className="bg-gradient-primary text-on-primary"
               >
-                <Plus className="w-4 h-4" />
-                Nova Conta
-              </button>
+                <span className="sm:hidden">Nova</span>
+                <span className="hidden sm:inline">Nova Conta</span>
+              </Button>
             </PermissaoGuard>
           </div>
         }
@@ -449,45 +488,45 @@ export default function ContasFinanceiras() {
         </form>
       )}
 
-      {/* Status summary chips */}
+      {/* Status summary chips — a contagem é da página atual (rótulo explícito);
+          o total real vem do backend (totalElements). */}
       {!loading && contas.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-widest font-mono text-text-primary/40">
+            Nesta página:
+          </span>
           {statusChips.map((s) => {
             const count = countByStatus[s.key] || 0;
             if (!count) return null;
+            const ativo = filtros.status === s.key;
             return (
               <button
                 key={s.key}
-                onClick={() => { const novo = { ...filtros, status: filtros.status === s.key ? '' : s.key }; setFiltros(novo); carregar(novo); }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest font-mono transition-all hover:scale-105"
-                style={{
-                  background: filtros.status === s.key ? s.color : s.bg,
-                  color: filtros.status === s.key ? '#003824' : s.color,
-                  border: `1px solid ${s.border}`,
-                }}
+                onClick={() => { const novo = { ...filtros, status: ativo ? '' : s.key }; setFiltros(novo); carregar(novo); }}
+                className={cn(
+                  'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono transition-all hover:scale-105',
+                  ativo ? s.active : s.idle
+                )}
               >
-                {s.pulse && count > 0 && <span className="w-1.5 h-1.5 rounded-full animate-pulse-dot" style={{ background: s.color }} />}
+                {s.pulse && count > 0 && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse-dot" />}
                 {count} {s.label}
               </button>
             );
           })}
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest font-mono text-text-primary/40" style={{ border: '1px solid rgba(250,250,250,.08)' }}>
-            {contas.length} total
+          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono text-text-primary/40 border border-text-primary/10">
+            {totalElements} no total
           </span>
         </div>
       )}
 
       {/* Filtros */}
-      <div
-        className="rounded-[18px] overflow-hidden"
-        style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
-      >
+      <div className="rounded-[18px] overflow-hidden bg-surface-medium border border-text-primary/5">
         <button
           type="button"
           onClick={() => setShowFiltros((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-medium/30 transition-colors"
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-high/40 transition-colors"
         >
-          <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50 font-mono flex items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono flex items-center gap-2">
             <Filter className="w-3.5 h-3.5" /> Filtros avançados
           </span>
           <ChevronDown className={cn('w-4 h-4 text-text-primary/40 transition-transform duration-200', showFiltros && 'rotate-180')} />
@@ -500,11 +539,12 @@ export default function ContasFinanceiras() {
                 <button
                   key={t}
                   onClick={() => setTipo(t)}
-                  className="px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest font-mono transition-all"
-                  style={filtros.tipo === t
-                    ? { background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }
-                    : { border: '1px solid rgba(250,250,250,.1)', color: 'rgba(250,250,250,.5)' }
-                  }
+                  className={cn(
+                    'px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono transition-all',
+                    filtros.tipo === t
+                      ? 'bg-gradient-primary text-on-primary'
+                      : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary'
+                  )}
                 >
                   {t || 'Todos'}
                 </button>
@@ -529,6 +569,9 @@ export default function ContasFinanceiras() {
               <FormField label="Valor de (R$)">
                 <input type="number" step="0.01" min="0" className={inputCls} value={filtros.valorMin} onChange={(e) => setFiltros((f) => ({ ...f, valorMin: e.target.value }))} placeholder="0,00" />
               </FormField>
+              <FormField label="Valor até (R$)">
+                <input type="number" step="0.01" min="0" className={inputCls} value={filtros.valorMax} onChange={(e) => setFiltros((f) => ({ ...f, valorMax: e.target.value }))} placeholder="0,00" />
+              </FormField>
               <FormField label="Categoria">
                 <select className={`${inputCls} appearance-none`} value={filtros.categoriaId} onChange={(e) => setFiltros((f) => ({ ...f, categoriaId: e.target.value }))}>
                   <option value="">Todas</option>
@@ -537,10 +580,10 @@ export default function ContasFinanceiras() {
               </FormField>
             </div>
             <div className="flex gap-3">
-              <button type="button" onClick={aplicarFiltros} className="font-bold px-5 py-2 rounded-xl flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono" style={{ background: 'linear-gradient(135deg,#6EFFC0,#2bdb96)', color: '#003824' }}>
+              <button type="button" onClick={aplicarFiltros} className="bg-gradient-primary text-on-primary font-bold px-5 py-2 rounded-xl flex items-center gap-2 text-xs uppercase tracking-widest font-mono">
                 <Filter className="w-3.5 h-3.5" /> Filtrar
               </button>
-              <button type="button" onClick={limparFiltros} className="px-5 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono transition-colors">
+              <button type="button" onClick={limparFiltros} className="px-5 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary flex items-center gap-2 text-xs uppercase tracking-widest font-mono transition-colors">
                 <RotateCcw className="w-3.5 h-3.5" /> Limpar
               </button>
             </div>
@@ -682,7 +725,7 @@ export default function ContasFinanceiras() {
               </FormField>
             </div>
             <div className="flex gap-3">
-              <button type="submit" disabled={salvandoEdit} className="font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2" style={{ background: 'linear-gradient(135deg,#ACC7FF,#6EFFC0)', color: '#003824' }}>
+              <button type="submit" disabled={salvandoEdit} className="bg-gradient-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
                 {salvandoEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
                 {salvandoEdit ? 'Salvando...' : 'Salvar'}
               </button>
@@ -746,50 +789,16 @@ export default function ContasFinanceiras() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-text-primary/40" />
-            <h2 className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/40 font-mono">
               Histórico de Transferências
             </h2>
           </div>
-          <div className="rounded-[18px] overflow-hidden" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)' }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-text-primary/5">
-                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Data</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Origem</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Destino</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">Valor</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {transferencias.map((t) => (
-                  <tr key={t.id} className="border-b border-text-primary/5 last:border-0 hover:bg-surface-medium/30 transition-colors">
-                    <td className="px-4 py-3 text-text-primary/60 font-mono text-xs">{formatDate(t.dataTransferencia)}</td>
-                    <td className="px-4 py-3 text-text-primary/80 font-medium">{t.contaOrigemDescricao}</td>
-                    <td className="px-4 py-3 text-text-primary/80 font-medium">{t.contaDestinoDescricao}</td>
-                    <td className="px-4 py-3 text-right font-bold text-primary font-mono">R$ {brl(t.valor)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1 justify-end">
-                        <button
-                          onClick={() => editarTransferencia(t)}
-                          aria-label="Editar transferência"
-                          className="p-1.5 text-text-primary/30 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deletarTransferencia(t.id)}
-                          aria-label="Excluir transferência"
-                          className="p-1.5 text-text-primary/30 hover:text-error rounded-lg hover:bg-error/10 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Cards no mobile, tabela com rolagem horizontal no desktop */}
+          <div className="md:hidden">
+            <DataTable columns={transfColumns} data={transferencias} cardView keyExtractor={(t) => t.id} />
+          </div>
+          <div className="hidden md:block">
+            <DataTable columns={transfColumns} data={transferencias} keyExtractor={(t) => t.id} />
           </div>
         </div>
       )}

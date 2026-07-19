@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { TrendingUp, Plus, X, Loader2, Pencil, Trash2, Settings2, ChevronDown, ChevronUp } from 'lucide-react';
+import { TrendingUp, Plus, X, Loader2, Pencil, Trash2, Settings2, ChevronDown, ChevronUp, ChevronLeft } from 'lucide-react';
 import { investimentos as api, contasCorrentes as ccApi } from '../lib/api';
 import { inputCls, labelCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -28,6 +29,7 @@ export default function Investimentos() {
   const [form, setForm] = useState({ nome: '', tipoId: '' });
   const [contaSel, setContaSel] = useState(null);
   const [transacoes, setTransacoes] = useState([]);
+  const [loadingTransacoes, setLoadingTransacoes] = useState(false);
   const [tForm, setTForm] = useState({ tipoTransacao: 'APORTE', valor: '', dataTransacao: '', contaCorrenteOrigemId: '' });
   const [salvando, setSalvando] = useState(false);
   const [salvandoTransacao, setSalvandoTransacao] = useState(false);
@@ -69,7 +71,11 @@ export default function Investimentos() {
   async function abrir(c) {
     setContaSel(c);
     setTransacoes([]);
-    api.transacoes.listar(c.id).then(setTransacoes).catch((e) => toast.error(e.message));
+    setLoadingTransacoes(true);
+    api.transacoes.listar(c.id)
+      .then(setTransacoes)
+      .catch((e) => toast.error(e.message))
+      .finally(() => setLoadingTransacoes(false));
   }
 
   async function registrar(e) {
@@ -142,10 +148,7 @@ export default function Investimentos() {
     <div className="space-y-6">
       <PageHeader title="Investimentos" subtitle="Carteira de investimentos e transações" />
 
-      <div
-        className="rounded-[18px] px-6 py-5 flex items-center justify-between anim-in d1"
-        style={{ background: 'rgba(172,199,255,.07)', border: '1px solid rgba(172,199,255,.2)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.25),0 4px 16px rgba(172,199,255,.06)' }}
-      >
+      <div className="rounded-[18px] px-6 py-5 flex items-center justify-between anim-in d1 bg-secondary/[0.07] border border-secondary/20 backdrop-blur-sm shadow-elevated">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="live-dot" style={{ width: 5, height: 5 }} />
@@ -179,8 +182,8 @@ export default function Investimentos() {
         {tiposAberto && (
           <div className="px-6 pb-6 space-y-4 border-t border-text-primary/5 pt-4">
             {/* Formulário de criar/editar tipo */}
-            <form onSubmit={salvarTipo} className="flex items-end gap-3">
-              <div className="flex-1 space-y-1.5">
+            <form onSubmit={salvarTipo} className="flex flex-wrap items-end gap-3">
+              <div className="flex-1 min-w-[200px] space-y-1.5">
                 <label className={labelCls}>
                   {tipoEditId ? 'Editar Tipo' : 'Novo Tipo'} *
                 </label>
@@ -237,20 +240,12 @@ export default function Investimentos() {
                       {t.nome}
                     </span>
                     <div className="flex gap-1 shrink-0">
-                      <button
-                        onClick={() => editarTipo(t)}
-                        aria-label={`Editar tipo ${t.nome}`}
-                        className="text-text-primary/40 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => deletarTipo(t.id)}
-                        aria-label={`Excluir tipo ${t.nome}`}
-                        className="text-text-primary/40 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <Button variant="ghost" size="icon" onClick={() => editarTipo(t)} aria-label={`Editar tipo ${t.nome}`} className="text-text-primary/40 hover:text-primary hover:bg-primary/10">
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => deletarTipo(t.id)} aria-label={`Excluir tipo ${t.nome}`} className="text-text-primary/40 hover:text-error hover:bg-error/10">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -320,18 +315,29 @@ export default function Investimentos() {
 
       {contaSel && (
         <div className="space-y-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setContaSel(null)}
+            leftIcon={<ChevronLeft className="w-4 h-4" />}
+            className="text-text-primary/60 hover:text-text-primary -ml-2"
+          >
+            Voltar para as contas
+          </Button>
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-text-primary font-display">{contaSel.nome}</h2>
               <p className="text-3xl font-bold text-primary mt-1 font-display">R$ {brl(contaSel.saldoAtual)}</p>
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setContaSel(null)}
               aria-label="Fechar conta"
-              className="p-2 text-text-primary/50 hover:text-text-primary hover:bg-surface-medium rounded-lg transition-colors"
+              className="text-text-primary/50 hover:text-text-primary hover:bg-surface-medium"
             >
               <X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
 
           <form onSubmit={registrar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4">
@@ -345,7 +351,7 @@ export default function Investimentos() {
               </div>
               <div className="space-y-1.5">
                 <label className={labelCls}>Valor (R$) *</label>
-                <input type="number" step="0.01" className={inputCls} value={tForm.valor} onChange={(e) => setTForm((f) => ({ ...f, valor: e.target.value }))} required />
+                <input type="number" min="0.01" step="0.01" className={inputCls} value={tForm.valor} onChange={(e) => setTForm((f) => ({ ...f, valor: e.target.value }))} required />
               </div>
               <div className="space-y-1.5">
                 <label className={labelCls}>Data *</label>
@@ -370,7 +376,7 @@ export default function Investimentos() {
           <DataTable
             columns={TRANSACAO_COLUMNS}
             data={transacoes}
-            loading={false}
+            loading={loadingTransacoes}
             aria-label="Histórico de transações"
             emptyState={<EmptyState icon={TrendingUp} title="Nenhuma transação" description="Registre seu primeiro aporte ou resgate." />}
           />

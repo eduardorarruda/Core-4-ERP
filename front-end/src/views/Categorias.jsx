@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Tag, Plus, Pencil, Trash2, Loader2,
+  Tag, Plus, Pencil, Trash2,
   ShoppingCart, Home, Car, Utensils, Heart, Zap, Wifi,
   GraduationCap, Plane, Music, Gift, Coffee, Dumbbell, Shirt,
   Briefcase, TrendingUp, DollarSign, Landmark, CreditCard, Wallet,
@@ -15,13 +15,18 @@ import {
 } from 'lucide-react';
 import { categorias as api } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
-import FormField, { inputCls, labelCls } from '../components/ui/FormField';
+import { inputCls, inputErrorCls, labelCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
+import IconDropdown from '../components/ui/IconDropdown';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
 
+// Tabela de lookup nome -> componente para RENDERIZAR o ícone salvo nas linhas da lista.
+// A SELEÇÃO do ícone é feita pelo componente compartilhado IconDropdown (grid + busca + agrupamento),
+// que mantém o mesmo catálogo — não recrie um seletor manual aqui.
 const ICONES = [
   // Compras e consumo
   { nome: 'ShoppingCart', componente: ShoppingCart },
@@ -113,7 +118,7 @@ function CategoriaLinha({ c, sub = false, onEditar, onDeletar }) {
           </button>
         </PermissaoGuard>
         <PermissaoGuard permissao="CATEGORIA_DELETAR">
-          <button onClick={() => onDeletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
+          <button onClick={() => onDeletar(c)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </PermissaoGuard>
@@ -131,16 +136,30 @@ export default function Categorias() {
   const [editId, setEditId] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
+    setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
+    finally { setLoading(false); }
+  }
+
+  function validar() {
+    const errs = {};
+    if (!form.descricao.trim()) errs.descricao = 'Informe uma descrição';
+    else if (form.descricao.trim().length < 2) errs.descricao = 'Descrição muito curta';
+    return errs;
   }
 
   async function salvar(e) {
     e.preventDefault();
+    const errs = validar();
+    if (Object.keys(errs).length) { setErrors(errs); toast.error('Verifique os campos destacados.'); return; }
+    setErrors({});
     setSalvando(true);
     try {
       const dto = {
@@ -161,15 +180,20 @@ export default function Categorias() {
     }
   }
 
-  function deletar(id) {
+  function deletar(c) {
+    const filhas = lista.filter((x) => x.categoriaPaiId === c.id && x.ativo !== false);
+    const temFilhas = filhas.length > 0;
     setConfirmAction({
       title: 'Excluir categoria',
-      message: 'Tem certeza que deseja excluir esta categoria?',
+      message: temFilhas
+        ? `A categoria "${c.descricao}" possui ${filhas.length} subcategoria${filhas.length > 1 ? 's' : ''}. Ao excluí-la, ${filhas.length > 1 ? 'elas também serão desativadas' : 'ela também será desativada'} automaticamente.`
+        : `Tem certeza que deseja excluir a categoria "${c.descricao}"?`,
+      details: temFilhas ? filhas.map((f) => f.descricao) : undefined,
       confirmLabel: 'Excluir',
       onConfirm: async () => {
         setConfirmAction(null);
         try {
-          await api.deletar(id);
+          await api.deletar(c.id);
           await carregar();
           toast.success('Categoria excluída!');
         } catch (e) {
@@ -182,6 +206,8 @@ export default function Categorias() {
   function editar(c) {
     setForm({ descricao: c.descricao, icone: c.icone || '', categoriaPaiId: c.categoriaPaiId ? String(c.categoriaPaiId) : '' });
     setEditId(c.id);
+    setErrors({});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   const PreviewIcon = ICONES.find((i) => i.nome === form.icone)?.componente ?? null;
@@ -202,8 +228,7 @@ export default function Categorias() {
 
       <form
         onSubmit={salvar}
-        className="rounded-[18px] p-6 space-y-5 anim-in"
-        style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}
+        className="rounded-[18px] p-6 space-y-5 anim-in bg-surface-medium border border-text-primary/5 shadow-elevated"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
@@ -221,12 +246,17 @@ export default function Categorias() {
           <div className="space-y-1">
             <label className={labelCls}>Descrição *</label>
             <input
-              className={inputCls}
+              className={errors.descricao ? inputErrorCls : inputCls}
               value={form.descricao}
-              onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
-              required
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({ ...f, descricao: v }));
+                if (errors.descricao) setErrors((prev) => ({ ...prev, descricao: undefined }));
+              }}
               placeholder="Ex: Alimentação"
+              aria-invalid={!!errors.descricao}
             />
+            {errors.descricao && <p className="text-error text-xs mt-1">{errors.descricao}</p>}
           </div>
 
           <div className="space-y-1">
@@ -245,51 +275,38 @@ export default function Categorias() {
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2 max-w-2xl">
           <label className={labelCls}>Ícone</label>
-          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
-            {ICONES.map(({ nome, componente: Icone }) => (
-              <button
-                key={nome}
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, icone: nome }))}
-                title={nome}
-                aria-label={nome}
-                className={cn(
-                  'p-3 rounded-xl border transition-all hover:scale-105',
-                  form.icone === nome
-                    ? 'bg-primary/20 border-primary text-primary'
-                    : 'bg-surface border-text-primary/5 text-text-primary/50 hover:border-text-primary/20 hover:text-text-primary/80'
-                )}
-              >
-                <Icone className="w-5 h-5 mx-auto" />
-              </button>
-            ))}
+          <div className="sm:max-w-xs">
+            <IconDropdown value={form.icone} onChange={(nome) => setForm((f) => ({ ...f, icone: nome }))} />
           </div>
+          <p className="text-[11px] text-text-primary/40">Use a busca para encontrar o ícone que melhor representa a categoria.</p>
         </div>
 
         <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={salvando}
-            className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-          >
-            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          <Button type="submit" loading={salvando} leftIcon={<Plus className="w-4 h-4" />}>
             {salvando ? 'Gravando...' : editId ? 'Salvar' : 'Criar'}
-          </button>
+          </Button>
           {editId && (
-            <button
+            <Button
               type="button"
-              onClick={() => { setForm(empty); setEditId(null); }}
-              className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors"
+              variant="ghost"
+              onClick={() => { setForm(empty); setEditId(null); setErrors({}); }}
+              className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary"
             >
               Cancelar
-            </button>
+            </Button>
           )}
         </div>
       </form>
 
-      {ativas.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-[14px] bg-surface-medium border border-text-primary/5 animate-pulse" />
+          ))}
+        </div>
+      ) : ativas.length === 0 ? (
         <EmptyState icon={Tag} title="Nenhuma categoria" description="Crie categorias para organizar seus lançamentos financeiros." />
       ) : (
         <div className="space-y-3">
@@ -298,12 +315,11 @@ export default function Categorias() {
             return (
               <div
                 key={c.id}
-                className={`anim-in d${Math.min(i + 1, 6)} rounded-[14px] p-2`}
-                style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
+                className={`anim-in d${Math.min(i + 1, 6)} rounded-[14px] p-2 bg-surface-medium border border-text-primary/5`}
               >
                 <CategoriaLinha c={c} onEditar={editar} onDeletar={deletar} />
                 {filhas.length > 0 && (
-                  <div className="mt-1 ml-6 pl-4 border-l border-text-primary/10 space-y-1">
+                  <div className="mt-1 ml-3 pl-3 sm:ml-6 sm:pl-4 border-l border-text-primary/10 space-y-1">
                     {filhas.map((sub) => (
                       <CategoriaLinha key={sub.id} c={sub} sub onEditar={editar} onDeletar={deletar} />
                     ))}

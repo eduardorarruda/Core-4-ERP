@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Settings, LogOut, Sun, Moon, Search } from 'lucide-react';
+import { Menu, Settings, LogOut, Sun, Moon, Search, HelpCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ThemeContext } from '../../context/ThemeContext';
 import NotificacoesPopover from './NotificacoesPopover';
+import Button from '../ui/Button';
 
 const ROUTE_NAMES = {
   '/dashboard': 'Dashboard',
@@ -18,6 +19,7 @@ const ROUTE_NAMES = {
   '/reports': 'Relatórios',
   '/audit': 'Auditoria',
   '/configuracoes': 'Configurações',
+  '/ajuda': 'Central de Ajuda',
 };
 
 const TICKER_ITEMS = [
@@ -98,13 +100,17 @@ export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
 
   return (
     <div className="sticky top-0 z-40">
-      {/* Ticker bar */}
-      <TickerBar />
+      {/*
+        TickerBar removida do render: exibia cotações fixas (USD/BRL, IBOV, SELIC…)
+        com badge "LIVE" pulsante, sugerindo dados em tempo real que não existem.
+        Num ERP financeiro isso é enganoso. A definição do componente foi mantida
+        intacta abaixo para eventual reuso quando houver uma fonte de dados real.
+      */}
 
       {/* Main header */}
-      <header className="w-full bg-surface-low/90 backdrop-blur-xl flex justify-between items-center h-14 px-4 lg:px-8 border-b border-text-primary/5">
+      <header className="w-full bg-surface-low/90 backdrop-blur-xl flex justify-between items-center h-14 px-4 lg:px-8 border-b border-text-primary/5 pt-safe">
         {/* Left */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onMenuClick}
             aria-label="Abrir menu"
@@ -112,8 +118,8 @@ export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-text-primary/80 font-display hidden sm:block">{pageName}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-bold text-text-primary/80 font-display truncate">{pageName}</span>
           </div>
         </div>
 
@@ -150,6 +156,18 @@ export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
+
+          {/* Ajuda */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate('/ajuda')}
+            aria-label="Abrir a Central de Ajuda"
+            title="Central de Ajuda"
+            className="text-text-primary/60 hover:text-text-primary"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </Button>
 
           {/* Notificações (sino) */}
           <NotificacoesPopover />

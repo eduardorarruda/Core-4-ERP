@@ -30,7 +30,7 @@ export default function AcessoRapidoPanel({ atrasadas, carregando }) {
           >
             <span className={`text-xs font-bold uppercase tracking-widest ${item.color}`}>{item.label}</span>
             {item.count && (
-              <p className="text-[10px] text-error mt-1 flex items-center gap-1">
+              <p className="text-xs text-error mt-1 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-error animate-pulse-dot" />
                 {item.count}
               </p>

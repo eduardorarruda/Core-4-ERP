@@ -5,6 +5,7 @@ import TopNav from './components/layout/TopNav';
 import PwaStatus from './components/layout/PwaStatus';
 import InstalarPwaBanner from './components/layout/InstalarPwaBanner';
 import ChatSidebar from './components/chat/ChatSidebar';
+import BottomNav from './components/layout/BottomNav';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
@@ -43,6 +44,7 @@ const CommandPalette  = lazy(() => import('./components/ui/CommandPalette'));
 const AceitarConvite     = lazy(() => import('./views/AceitarConvite'));
 const GestaoOperadores   = lazy(() => import('./views/GestaoOperadores'));
 const GestaoPerfis       = lazy(() => import('./views/GestaoPerfis'));
+const Ajuda              = lazy(() => import('./views/Ajuda'));
 
 function PageSkeleton() {
   return (
@@ -139,7 +141,16 @@ function ProtectedLayout({ children }) {
         'fixed inset-y-0 left-0 transform lg:relative lg:translate-x-0 transition duration-200 ease-in-out z-50',
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
-        <Sidebar onClose={() => setIsSidebarOpen(false)} />
+        {/*
+          expandido = drawer aberto no mobile → rótulos sempre visíveis (w-56).
+          No desktop isSidebarOpen é sempre false → mantém o rail w-16 com hover/foco.
+          onNavigate fecha o drawer ao clicar num item de menu.
+        */}
+        <Sidebar
+          expandido={isSidebarOpen}
+          onNavigate={() => setIsSidebarOpen(false)}
+          onClose={() => setIsSidebarOpen(false)}
+        />
       </div>
 
       {/* Main */}
@@ -151,7 +162,7 @@ function ProtectedLayout({ children }) {
         <PwaStatus />
         <main id="main-content" className={cn(
           'flex-1 min-h-0 animate-fade-in',
-          fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 overflow-y-auto no-scrollbar'
+          fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 pb-24 lg:pb-8 overflow-y-auto no-scrollbar'
         )}>
           {fullBleed ? (
             <Suspense fallback={<PageSkeleton />}>
@@ -168,6 +179,10 @@ function ProtectedLayout({ children }) {
       </div>
 
       <ChatSidebar />
+
+      {/* Navegação inferior — apenas mobile (lg:hidden). Abre o mesmo drawer do Sidebar. */}
+      <BottomNav onAbrirMenu={() => setIsSidebarOpen(true)} />
+
       <ToastContainer />
 
       {/* Command Palette */}
@@ -208,19 +223,19 @@ export default function App() {
             <Route path="/aceitar-convite"    element={<AceitarConvite />} />
 
             <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><DashboardHome /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/conciliacao"              element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
-            <Route path="/conciliacao/historico"   element={<ProtectedLayout><ConciliacaoHistorico /></ProtectedLayout>} />
-            <Route path="/conciliacao/:id"          element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
-            <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><ConciliacaoRelatorio /></ProtectedLayout>} />
-            <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
+            <Route path="/conciliacao"              element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao/historico"   element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><ConciliacaoHistorico /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao/:id"          element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><ConciliacaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/assinaturas"      element={<ProtectedLayout><PermissaoRoute permissao="ASSINATURA_VISUALIZAR"><Assinaturas /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/calendario"       element={<ProtectedLayout><PermissaoRoute permissao="CALENDARIO_VISUALIZAR"><Calendario /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
             <Route path="/assistente"       element={<ProtectedLayout><Assistente /></ProtectedLayout>} />
             <Route path="/audit"            element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
-            <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
+            <Route path="/parceiros"        element={<ProtectedLayout><PermissaoRoute permissao="PARCEIRO_VISUALIZAR"><Parceiros /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/categorias"       element={<ProtectedLayout><PermissaoRoute permissao="CATEGORIA_VISUALIZAR"><Categorias /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
-            <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
+            <Route path="/contas-correntes" element={<ProtectedLayout><PermissaoRoute permissao="CONTA_CORRENTE_VISUALIZAR"><ContasCorrentes /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/contas"           element={<ProtectedLayout><PermissaoRoute permissao="CONTA_VISUALIZAR"><ContasFinanceiras /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/cartoes"                              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_LANCAR"><Cartoes /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/cartoes/dashboard"                    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_VISUALIZAR"><CartaoDashboard /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/cartoes/conciliacao"                  element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
@@ -229,6 +244,8 @@ export default function App() {
             <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/investimentos"    element={<ProtectedLayout><PermissaoRoute permissao="INVESTIMENTO_VISUALIZAR"><Investimentos /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
+            <Route path="/ajuda"            element={<ProtectedLayout><Ajuda /></ProtectedLayout>} />
+            <Route path="/help"             element={<Navigate to="/ajuda" replace />} />
             <Route path="/empresa/operadores" element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="USUARIO_VISUALIZAR"><GestaoOperadores /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
             <Route path="/empresa/perfis"     element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="CONFIGURACAO_EDITAR"><GestaoPerfis /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
 

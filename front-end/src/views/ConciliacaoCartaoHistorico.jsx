@@ -4,7 +4,9 @@ import { CreditCard, FileSearch, Plus } from 'lucide-react';
 import { conciliacaoCartao as api } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
+import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
 import { formatDate } from '../lib/formatters';
 
@@ -63,15 +65,17 @@ export default function ConciliacaoCartaoHistorico() {
       key: 'id',
       label: 'Ações',
       render: (id, row) => (
-        <button
+        <Button
+          size="sm"
+          variant="ghost"
+          leftIcon={<FileSearch className="w-3.5 h-3.5" />}
+          className="text-primary"
           onClick={() => navigate(row.status === 'PENDENTE'
             ? `/cartoes/conciliacao/${id}`
             : `/cartoes/conciliacao/${id}/relatorio`)}
-          className="flex items-center gap-1.5 text-xs font-bold text-primary hover:underline"
         >
-          <FileSearch className="w-3.5 h-3.5" />
           {row.status === 'PENDENTE' ? 'Retomar' : 'Ver relatório'}
-        </button>
+        </Button>
       ),
     },
   ];
@@ -97,6 +101,14 @@ export default function ConciliacaoCartaoHistorico() {
         data={lista}
         loading={loading}
         aria-label="Histórico de conciliações de cartão"
+        emptyState={
+          <EmptyState
+            icon={CreditCard}
+            title="Nenhuma conciliação ainda"
+            description="Importe a fatura do cartão (OFX) para começar a conciliar seus lançamentos."
+            action={{ label: 'Iniciar primeira conciliação', onClick: () => navigate('/cartoes/conciliacao') }}
+          />
+        }
       />
     </div>
   );

@@ -5,11 +5,10 @@ import { conciliacaoCartao as api, cartoes as cartoesApi } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import OfxCartaoUploadZone from '../components/conciliacaoCartao/OfxCartaoUploadZone';
 import ConciliacaoCartaoItemRow from '../components/conciliacaoCartao/ConciliacaoCartaoItemRow';
-import Badge from '../components/ui/Badge';
 import FormField, { inputCls } from '../components/ui/FormField';
 import { useToast } from '../hooks/useToast';
 import { useConfirm } from '../hooks/useConfirm';
-import { brl } from '../lib/formatters';
+import { formatDate } from '../lib/formatters';
 import { cn } from '../lib/utils';
 
 const FILTROS = ['Todos', 'SUGERIDO', 'NAO_IDENTIFICADO', 'IGNORADO', 'VINCULADO_MANUALMENTE', 'BAIXADO'];
@@ -17,11 +16,6 @@ const FILTROS = ['Todos', 'SUGERIDO', 'NAO_IDENTIFICADO', 'IGNORADO', 'VINCULADO
 const FILTRO_LABEL = {
   Todos: 'Todos', SUGERIDO: 'Sugeridos', NAO_IDENTIFICADO: 'Não identificados',
   IGNORADO: 'Ignorados', VINCULADO_MANUALMENTE: 'Manuais', BAIXADO: 'Baixados',
-};
-
-const FILTRO_VARIANT = {
-  Todos: 'neutral', SUGERIDO: 'warning', NAO_IDENTIFICADO: 'error',
-  IGNORADO: 'neutral', VINCULADO_MANUALMENTE: 'info', BAIXADO: 'success',
 };
 
 export default function ConciliacaoCartao() {
@@ -176,7 +170,7 @@ export default function ConciliacaoCartao() {
       )}
 
       {!sessao && !sessionId && (
-        <div className="rounded-[18px] p-6 space-y-4" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
+        <div className="rounded-[18px] p-4 sm:p-6 space-y-4 bg-surface-low border border-text-primary/10 shadow-sm">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">1. Selecione o arquivo OFX do cartão</h2>
           <OfxCartaoUploadZone onFile={setArquivo} />
 
@@ -206,7 +200,7 @@ export default function ConciliacaoCartao() {
           <button
             onClick={() => enviarArquivo(mostrarSelecaoCartao ? cartaoSelecionado : null)}
             disabled={!arquivo || enviando || (mostrarSelecaoCartao && !cartaoSelecionado)}
-            className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
+            className="flex items-center justify-center gap-2 w-full sm:w-auto min-h-11 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-6 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
           >
             {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {enviando ? 'Processando...' : mostrarSelecaoCartao ? 'Tentar novamente' : 'Processar arquivo'}
@@ -216,13 +210,13 @@ export default function ConciliacaoCartao() {
 
       {sessao && (
         <div className="space-y-4">
-          <div className="rounded-[18px] p-6" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
+          <div className="rounded-[18px] p-4 sm:p-6 bg-surface-low border border-text-primary/10">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-bold text-text-primary">{sessao.cartaoCreditoNome}</h2>
                 <p className="text-sm text-text-primary/50 mt-1">
                   {sessao.dataInicioOfx && sessao.dataFimOfx
-                    ? `Período: ${sessao.dataInicioOfx} a ${sessao.dataFimOfx} · `
+                    ? `Período: ${formatDate(sessao.dataInicioOfx)} a ${formatDate(sessao.dataFimOfx)} · `
                     : ''}
                   {sessao.totalTransacoes} transações · {sessao.totalConciliados} identificadas · {totalNaoId} não identificadas
                 </p>
@@ -231,7 +225,7 @@ export default function ConciliacaoCartao() {
                 <button
                   onClick={finalizar}
                   disabled={!podeFinalizar || finalizando}
-                  className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
+                  className="flex flex-1 sm:flex-none items-center justify-center gap-2 min-h-11 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-5 rounded-xl hover:opacity-90 disabled:opacity-40 transition-opacity"
                 >
                   {finalizando ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   {finalizando ? 'Finalizando...' : 'Finalizar'}
@@ -239,7 +233,7 @@ export default function ConciliacaoCartao() {
                 <button
                   onClick={cancelar}
                   disabled={cancelando}
-                  className="flex items-center gap-2 border border-error/30 text-error font-bold text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl hover:bg-error/5 transition-colors"
+                  className="flex flex-1 sm:flex-none items-center justify-center gap-2 min-h-11 border border-error/30 text-error font-bold text-xs uppercase tracking-widest px-5 rounded-xl hover:bg-error/5 transition-colors"
                 >
                   {cancelando ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Cancelar
@@ -258,7 +252,7 @@ export default function ConciliacaoCartao() {
                   key={f}
                   onClick={() => setFiltroAtivo(f)}
                   className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border',
+                    'flex items-center gap-1.5 px-3 min-h-11 rounded-xl text-xs font-bold transition-all border',
                     filtroAtivo === f
                       ? 'bg-primary text-on-primary border-transparent'
                       : 'border-text-primary/10 text-text-primary/50 hover:text-text-primary'
@@ -277,7 +271,7 @@ export default function ConciliacaoCartao() {
           </div>
 
           <div className="bg-surface-medium border border-text-primary/5 rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-[90px_1fr_110px_1fr_auto] gap-3 px-4 py-2.5 border-b border-text-primary/5">
+            <div className="hidden md:grid grid-cols-[90px_1fr_110px_1fr_auto] gap-3 px-4 py-2.5 border-b border-text-primary/5">
               {['Data', 'Descrição OFX', 'Valor', 'Lançamento vinculado', ''].map((h, i) => (
                 <span key={i} className="text-[10px] font-bold uppercase tracking-widest text-text-primary/30">{h}</span>
               ))}

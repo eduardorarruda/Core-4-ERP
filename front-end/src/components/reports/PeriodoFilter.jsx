@@ -8,7 +8,7 @@ export default function PeriodoFilter({ inicio, fim, onChange }) {
         <label className={labelCls}>De</label>
         <input
           type="date"
-          className={inputSmCls}
+          className={`${inputSmCls} min-h-[44px]`}
           value={inicio}
           onChange={e => onChange('inicio', e.target.value)}
         />
@@ -17,7 +17,7 @@ export default function PeriodoFilter({ inicio, fim, onChange }) {
         <label className={labelCls}>Até</label>
         <input
           type="date"
-          className={inputSmCls}
+          className={`${inputSmCls} min-h-[44px]`}
           value={fim}
           onChange={e => onChange('fim', e.target.value)}
         />

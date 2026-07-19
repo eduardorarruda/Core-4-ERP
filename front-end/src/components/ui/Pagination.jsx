@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import Button from './Button';
 
 /**
  * Paginação reutilizável para listas paginadas pelo backend (Spring Data Page).
@@ -15,37 +16,36 @@ export default function Pagination({ page, totalPages, totalElements, onChange }
   const podeVoltar = page > 0;
   const podeAvancar = page < totalPages - 1;
 
-  const btnCls =
-    'flex items-center gap-1 px-3 py-2 rounded-[12px] text-xs font-semibold transition disabled:opacity-30 disabled:cursor-not-allowed';
-  const btnStyle = { background: 'rgba(255,255,255,.04)', border: '1px solid rgba(250,250,250,.08)' };
-
   return (
     <div className="flex items-center justify-between gap-4 pt-1">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">
+      <span
+        className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono"
+        aria-current="page"
+      >
         Página {atual} de {totalPages}
         {typeof totalElements === 'number' ? ` · ${totalElements} registro${totalElements === 1 ? '' : 's'}` : ''}
       </span>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className={btnCls}
-          style={btnStyle}
+        <Button
+          variant="ghost"
+          size="md"
+          className="border border-text-primary/10 gap-1 font-semibold uppercase tracking-widest text-xs"
           disabled={!podeVoltar}
           onClick={() => podeVoltar && onChange(page - 1)}
           aria-label="Página anterior"
         >
-          <ChevronLeft className="w-4 h-4" /> Anterior
-        </button>
-        <button
-          type="button"
-          className={btnCls}
-          style={btnStyle}
+          <ChevronLeft className="w-4 h-4" aria-hidden="true" /> Anterior
+        </Button>
+        <Button
+          variant="ghost"
+          size="md"
+          className="border border-text-primary/10 gap-1 font-semibold uppercase tracking-widest text-xs"
           disabled={!podeAvancar}
           onClick={() => podeAvancar && onChange(page + 1)}
           aria-label="Próxima página"
         >
-          Próxima <ChevronRight className="w-4 h-4" />
-        </button>
+          Próxima <ChevronRight className="w-4 h-4" aria-hidden="true" />
+        </Button>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { labelCls, inputSmCls } from '../ui/FormField';
 
-export default function ReportFilters({ config = [], values, onChange, open, onToggle }) {
+export default function ReportFilters({ config = [], values, onChange, open, onToggle, onError }) {
   const [asyncOptions, setAsyncOptions] = useState({});
   const fetchedRef = useRef(false);
 
@@ -14,10 +14,14 @@ export default function ReportFilters({ config = [], values, onChange, open, onT
         try {
           const opts = await f.fetchFn();
           setAsyncOptions(prev => ({ ...prev, [f.key]: opts }));
-        } catch (_) {}
+        } catch (_) {
+          // Não engolir a falha: avisa o usuário para que ele saiba que o filtro
+          // pode estar incompleto, em vez de mostrar uma lista vazia silenciosa.
+          onError?.(`Não foi possível carregar as opções do filtro "${f.label}". Tente reabrir os filtros.`);
+        }
       }
     });
-  }, [open, config]);
+  }, [open, config, onError]);
 
   if (config.length === 0) return null;
 
@@ -41,7 +45,7 @@ export default function ReportFilters({ config = [], values, onChange, open, onT
       </button>
 
       {open && (
-        <div className="grid grid-cols-2 gap-2.5 pt-1 border-t border-text-primary/5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-text-primary/5">
           {config.map(f => {
             const opts = f.type === 'async-select' ? (asyncOptions[f.key] || []) : (f.options || []);
             return (

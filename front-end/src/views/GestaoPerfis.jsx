@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Loader2, Plus, Pencil, Trash2, ShieldCheck, Lock } from 'lucide-react';
+import { Plus, Pencil, Trash2, ShieldCheck, Lock, Info, ShieldQuestion } from 'lucide-react';
 import { perfisAcesso } from '../lib/api';
+import PageHeader from '../components/ui/PageHeader';
+import DataTable from '../components/ui/DataTable';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import EmptyState from '../components/ui/EmptyState';
+import { useToast } from '../hooks/useToast';
+import { useConfirm } from '../hooks/useConfirm';
 
 const MODULO_LABEL = {
   CONTA: 'Lançamentos',
@@ -29,6 +37,34 @@ const MODULO_LABEL = {
   DASHBOARD_CARTAO: 'Dashboard de Cartões',
 };
 
+// Rótulos amigáveis em pt-BR para as ações (evita expor o código cru ao usuário).
+const ACAO_LABEL = {
+  VISUALIZAR: 'Visualizar',
+  CRIAR: 'Criar',
+  EDITAR: 'Editar',
+  DELETAR: 'Excluir',
+  BAIXAR: 'Dar baixa',
+  ESTORNAR: 'Estornar',
+  TRANSFERIR: 'Transferir',
+  LANCAR: 'Lançar',
+  FECHAR_FATURA: 'Fechar fatura',
+  IMPORTAR: 'Importar',
+  VINCULAR: 'Vincular',
+  CONVIDAR: 'Convidar',
+  REMOVER: 'Remover',
+  EXPORTAR: 'Exportar',
+  GERENCIAR: 'Gerenciar',
+};
+
+const acaoLabel = (acao) =>
+  ACAO_LABEL[acao] ??
+  (acao ? acao.charAt(0) + acao.slice(1).toLowerCase().replace(/_/g, ' ') : acao);
+
+const INPUT_CLS =
+  'block w-full h-11 px-3.5 bg-surface border border-text-primary/10 rounded-xl text-sm text-text-primary ' +
+  'placeholder:text-text-primary/40 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition';
+const LABEL_CLS = 'block text-xs font-medium text-text-primary/60 mb-1.5';
+
 const FORM_VAZIO = { nome: '', descricao: '', permissaoIds: new Set() };
 
 function agruparPorModulo(permissoes) {
@@ -39,7 +75,7 @@ function agruparPorModulo(permissoes) {
   }, {});
 }
 
-function ModalPerfil({ perfil, todasPermissoes, onClose, onSave, loading }) {
+function ModalPerfil({ perfil, todasPermissoes, onClose, onSave }) {
   const [form, setForm] = useState(() => {
     if (perfil) {
       const ids = new Set(
@@ -49,9 +85,12 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave, loading }) {
     }
     return { ...FORM_VAZIO, permissaoIds: new Set() };
   });
+  const [erro, setErro] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const grupos = agruparPorModulo(todasPermissoes);
 
+  // --- Lógica de negócio preservada integralmente ---
   const togglePermissao = (id) => {
     setForm((prev) => {
       const ids = new Set(prev.permissaoIds);
@@ -86,58 +125,123 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave, loading }) {
     });
   };
 
-  const S = {
-    overlay: { position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', overflowY: 'auto', padding: '24px 0' },
-    card: { background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 600, width: '90%' },
-    input: { display: 'block', width: '100%', padding: '11px 14px', background: '#1a1a1a', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, color: '#fafafa', fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: 'none', marginBottom: 12, boxSizing: 'border-box' },
-    label: { fontSize: 11, color: 'rgba(250,250,250,.4)', fontFamily: "'DM Sans', sans-serif", marginBottom: 4, display: 'block' },
+  const submit = async () => {
+    setErro('');
+    if (!form.nome.trim()) {
+      setErro('Dê um nome ao perfil.');
+      return;
+    }
+    if (form.permissaoIds.size === 0) {
+      setErro('Selecione pelo menos uma permissão para o perfil.');
+      return;
+    }
+    setLoading(true);
+    try {
+      await onSave({ nome: form.nome, descricao: form.descricao, permissaoIds: [...form.permissaoIds] });
+    } catch (e) {
+      setErro(e?.message || 'Não foi possível salvar o perfil. Tente novamente.');
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={S.overlay} onClick={onClose}>
-      <div style={S.card} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 20 }}>
-          {perfil ? 'Editar Perfil' : 'Novo Perfil'}
-        </h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 }}>
+    <Modal open onClose={onClose} title={perfil ? 'Editar perfil' : 'Novo perfil'} size="lg">
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label style={S.label}>Nome do perfil</label>
-            <input style={{ ...S.input, marginBottom: 0, textTransform: 'uppercase' }} value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} placeholder="Ex: VENDEDOR" maxLength={50} />
+            <label htmlFor="perfil-nome" className={LABEL_CLS}>Nome do perfil</label>
+            <input
+              id="perfil-nome"
+              className={`${INPUT_CLS} uppercase`}
+              value={form.nome}
+              onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+              placeholder="Ex: VENDEDOR"
+              maxLength={50}
+            />
           </div>
           <div>
-            <label style={S.label}>Descrição</label>
-            <input style={{ ...S.input, marginBottom: 0 }} value={form.descricao} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o perfil" maxLength={200} />
+            <label htmlFor="perfil-descricao" className={LABEL_CLS}>Descrição</label>
+            <input
+              id="perfil-descricao"
+              className={INPUT_CLS}
+              value={form.descricao}
+              onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
+              placeholder="Descreva o perfil"
+              maxLength={200}
+            />
           </div>
         </div>
 
-        <div style={{ marginTop: 20, marginBottom: 8 }}>
-          <label style={{ ...S.label, fontSize: 12, color: 'rgba(250,250,250,.6)', marginBottom: 12 }}>Permissões</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+        <div>
+          <div className="flex items-center justify-between gap-3 mb-1.5">
+            <span className="text-sm font-semibold text-text-primary">Permissões</span>
+          </div>
+          {/* Explica a dependência automática (comportamento já existente) */}
+          <div className="flex items-start gap-2 rounded-xl bg-secondary/10 border border-secondary/20 px-3.5 py-2.5 mb-3">
+            <Info className="w-4 h-4 text-secondary shrink-0 mt-0.5" aria-hidden="true" />
+            <p className="text-xs text-text-primary/70 leading-relaxed">
+              Ao marcar qualquer ação, a permissão <strong>Visualizar</strong> do mesmo grupo é adicionada
+              automaticamente. Ao desmarcar <strong>Visualizar</strong>, as demais ações do grupo são removidas.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 max-h-[45vh] overflow-y-auto pr-1">
             {Object.entries(grupos).map(([modulo, perms]) => {
-              const todos = perms.every((p) => form.permissaoIds.has(p.id));
-              const alguns = !todos && perms.some((p) => form.permissaoIds.has(p.id));
+              const marcadas = perms.filter((p) => form.permissaoIds.has(p.id)).length;
+              const todos = marcadas === perms.length;
+              const alguns = !todos && marcadas > 0;
               return (
-                <div key={modulo} style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 12, padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }} onClick={() => toggleModulo(modulo)}>
-                    <div style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${todos ? '#6EFFC0' : alguns ? '#FFD37A' : 'rgba(255,255,255,.2)'}`, background: todos ? '#6EFFC0' : alguns ? 'rgba(255,211,122,.15)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                      {todos && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="#003824" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                      {alguns && <div style={{ width: 8, height: 2, background: '#FFD37A', borderRadius: 1 }} />}
-                    </div>
-                    <span style={{ fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 700, color: '#fafafa' }}>
+                <div key={modulo} className="bg-surface-medium border border-text-primary/5 rounded-xl p-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleModulo(modulo)}
+                    aria-pressed={todos}
+                    className="flex items-center gap-3 w-full text-left mb-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+                  >
+                    <span
+                      className={
+                        'w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 transition ' +
+                        (todos
+                          ? 'bg-primary border-primary'
+                          : alguns
+                            ? 'bg-warning/20 border-warning'
+                            : 'border-text-primary/25 bg-transparent')
+                      }
+                    >
+                      {todos && (
+                        <svg width="11" height="9" viewBox="0 0 10 8" fill="none" aria-hidden="true">
+                          <path d="M1 4l3 3 5-6" stroke="var(--color-on-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {alguns && <span className="w-2 h-0.5 rounded-full bg-warning" />}
+                    </span>
+                    <span className="text-sm font-bold text-text-primary font-display">
                       {MODULO_LABEL[modulo] ?? modulo}
                     </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(250,250,250,.3)', fontFamily: 'monospace' }}>
-                      {perms.filter((p) => form.permissaoIds.has(p.id)).length}/{perms.length}
+                    <span className="ml-auto text-xs font-mono text-text-primary/40">
+                      {marcadas}/{perms.length}
                     </span>
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  </button>
+
+                  <div className="flex flex-wrap gap-2">
                     {perms.map((p) => {
                       const marcado = form.permissaoIds.has(p.id);
                       return (
-                        <button key={p.id} onClick={() => togglePermissao(p.id)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 8, border: `1px solid ${marcado ? 'rgba(110,255,192,.3)' : 'rgba(255,255,255,.08)'}`, background: marcado ? 'rgba(110,255,192,.08)' : 'transparent', color: marcado ? '#6EFFC0' : 'rgba(250,250,250,.4)', fontSize: 11, fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', transition: 'all 150ms' }}>
-                          <div style={{ width: 6, height: 6, borderRadius: '50%', background: marcado ? '#6EFFC0' : 'rgba(255,255,255,.15)', flexShrink: 0 }} />
-                          {p.acao}
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => togglePermissao(p.id)}
+                          aria-pressed={marcado}
+                          className={
+                            'inline-flex items-center gap-2 min-h-[40px] px-3.5 rounded-lg text-xs font-medium border transition ' +
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ' +
+                            (marcado
+                              ? 'bg-primary/10 border-primary/40 text-primary'
+                              : 'bg-transparent border-text-primary/10 text-text-primary/50 hover:border-text-primary/25 hover:text-text-primary/80')
+                          }
+                        >
+                          <span className={'w-2 h-2 rounded-full shrink-0 ' + (marcado ? 'bg-primary' : 'bg-text-primary/20')} />
+                          {acaoLabel(p.acao)}
                         </button>
                       );
                     })}
@@ -148,31 +252,35 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave, loading }) {
           </div>
         </div>
 
-        {form.permissaoIds.size === 0 && (
-          <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,211,122,.08)', border: '1px solid rgba(255,211,122,.2)', color: '#FFD37A', fontSize: 12, marginTop: 8, fontFamily: "'DM Sans', sans-serif" }}>
-            É necessário selecionar pelo menos uma permissão para criar um perfil.
-          </div>
-        )}
+        <ErroBox>{erro}</ErroBox>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: 12, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: 'rgba(250,250,250,.5)', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
-          <button onClick={() => onSave({ nome: form.nome, descricao: form.descricao, permissaoIds: [...form.permissaoIds] })} disabled={loading || !form.nome.trim() || form.permissaoIds.size === 0} style={{ flex: 1, padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, cursor: loading || !form.nome.trim() || form.permissaoIds.size === 0 ? 'not-allowed' : 'pointer', fontSize: 13, fontFamily: "'Sora', sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: loading || !form.nome.trim() || form.permissaoIds.size === 0 ? .6 : 1 }}>
-            {loading && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-            Salvar
-          </button>
-        </div>
+        <Modal.Footer>
+          <Button variant="ghost" onClick={onClose} disabled={loading}>Cancelar</Button>
+          <Button onClick={submit} loading={loading}>Salvar</Button>
+        </Modal.Footer>
       </div>
+    </Modal>
+  );
+}
+
+function ErroBox({ children }) {
+  if (!children) return null;
+  return (
+    <div role="alert" className="rounded-xl bg-error/10 border border-error/25 text-error text-sm px-3.5 py-2.5 leading-relaxed">
+      {children}
     </div>
   );
 }
 
 export default function GestaoPerfis() {
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [perfis, setPerfis] = useState([]);
   const [todasPermissoes, setTodasPermissoes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editando, setEditando] = useState(null);
   const [modalAberto, setModalAberto] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
 
   const carregar = useCallback(() => {
@@ -184,7 +292,7 @@ export default function GestaoPerfis() {
     ]).then(([p, pm]) => {
       setPerfis(Array.isArray(p) ? p : []);
       setTodasPermissoes(Array.isArray(pm) ? pm : []);
-    }).catch(() => setErro('Erro ao carregar dados.'))
+    }).catch(() => setErro('Não foi possível carregar os dados. Tente novamente em instantes.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -193,108 +301,125 @@ export default function GestaoPerfis() {
   const abrirCriar = () => { setEditando(null); setModalAberto(true); };
   const abrirEditar = (p) => { setEditando(p); setModalAberto(true); };
 
+  // Lança erro para o modal exibir internamente; sucesso fecha o modal + toast.
   const salvar = async (dto) => {
-    setSaving(true);
-    try {
-      if (editando) await perfisAcesso.atualizar(editando.id, dto);
-      else await perfisAcesso.criar(dto);
-      setModalAberto(false);
-      carregar();
-    } catch (err) {
-      setErro(err.message || 'Erro ao salvar perfil.');
-    } finally {
-      setSaving(false);
-    }
+    if (editando) await perfisAcesso.atualizar(editando.id, dto);
+    else await perfisAcesso.criar(dto);
+    setModalAberto(false);
+    toast.success(editando ? 'Perfil atualizado.' : 'Perfil criado.');
+    carregar();
   };
 
   const deletar = async (p) => {
-    if (!window.confirm(`Remover o perfil "${p.nome}"? Esta ação não pode ser desfeita.`)) return;
+    const ok = await confirm({
+      title: 'Excluir perfil',
+      message: `Deseja excluir o perfil "${p.nome}"? Esta ação não pode ser desfeita. Operadores que usam este perfil precisarão ser reatribuídos a outro.`,
+      confirmLabel: 'Excluir',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await perfisAcesso.deletar(p.id);
+      toast.success(`Perfil "${p.nome}" excluído.`);
       carregar();
     } catch (err) {
-      setErro(err.message || 'Erro ao remover perfil.');
+      toast.error(err?.message || 'Não foi possível excluir o perfil.');
     }
   };
 
-  const thStyle = { padding: '10px 16px', textAlign: 'left', fontSize: 10, fontWeight: 600, color: 'rgba(250,250,250,.3)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '.1em' };
-  const tdStyle = { padding: '12px 16px', fontSize: 13, fontFamily: "'DM Sans', sans-serif", color: 'rgba(250,250,250,.8)' };
+  const colunas = [
+    {
+      key: 'nome',
+      label: 'Perfil',
+      sortable: true,
+      render: (v, p) => (
+        <div className="flex items-center gap-2">
+          <ShieldCheck className={'w-4 h-4 shrink-0 ' + (p.protegido ? 'text-warning' : 'text-primary')} aria-hidden="true" />
+          <span className="font-bold text-text-primary">{v}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'descricao',
+      label: 'Descrição',
+      render: (v) => <span className="text-text-primary/60 line-clamp-2">{v ?? '—'}</span>,
+    },
+    {
+      key: 'permissoes',
+      label: 'Permissões',
+      render: (v) => <Badge variant="info">{v?.length ?? 0} permissões</Badge>,
+    },
+    {
+      key: 'protegido',
+      label: 'Tipo',
+      render: (v) => (v
+        ? <Badge variant="neutral"><Lock className="w-3 h-3" /> Sistema</Badge>
+        : <Badge variant="success">Personalizado</Badge>),
+    },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      render: (v, p) => (
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => abrirEditar(p)}
+            disabled={p.protegido}
+            aria-label={p.protegido ? 'Perfil do sistema não pode ser editado' : `Editar perfil ${p.nome}`}
+            title={p.protegido ? 'Perfil do sistema não pode ser editado' : 'Editar'}
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => deletar(p)}
+            disabled={p.protegido}
+            aria-label={p.protegido ? 'Perfil do sistema não pode ser excluído' : `Excluir perfil ${p.nome}`}
+            title={p.protegido ? 'Perfil do sistema não pode ser excluído' : 'Excluir'}
+            className={p.protegido ? '' : 'text-error hover:bg-error/10'}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const vazio = (
+    <EmptyState
+      icon={ShieldQuestion}
+      title="Nenhum perfil encontrado"
+      description="Crie perfis para definir o que cada operador pode acessar na empresa."
+    />
+  );
 
   return (
-    <>
-      <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+    <div className="space-y-6">
+      <PageHeader
+        title="Perfis de Acesso"
+        subtitle="Perfis e permissões dos operadores"
+        actions={
+          <Button onClick={abrirCriar} leftIcon={<Plus className="w-4 h-4" />}>
+            Novo perfil
+          </Button>
+        }
+      />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 700, color: 'var(--color-text-primary, #fafafa)', margin: 0 }}>Perfis de Acesso</h1>
-          <p style={{ fontSize: 13, color: 'rgba(250,250,250,.4)', margin: '4px 0 0', fontFamily: "'DM Sans', sans-serif" }}>Gerencie perfis e permissões dos operadores</p>
-        </div>
-        <button onClick={abrirCriar} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: "'Sora', sans-serif" }}>
-          <Plus size={15} /> Novo Perfil
-        </button>
-      </div>
-
-      {erro && <div style={{ padding: '10px 16px', borderRadius: 12, background: 'rgba(255,180,171,.08)', border: '1px solid rgba(255,180,171,.2)', color: '#FFB4AB', fontSize: 13, marginBottom: 16 }}>{erro}</div>}
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-          <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', color: '#6EFFC0' }} />
-        </div>
-      ) : (
-        <div style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(255,255,255,.06)', borderRadius: 16, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
-                <th style={thStyle}>Perfil</th>
-                <th style={thStyle}>Descrição</th>
-                <th style={thStyle}>Permissões</th>
-                <th style={thStyle}>Tipo</th>
-                <th style={thStyle}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {perfis.map((p) => (
-                <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={{ ...tdStyle, fontWeight: 700, color: '#fafafa' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <ShieldCheck size={14} style={{ color: p.protegido ? '#FFD37A' : '#6EFFC0', flexShrink: 0 }} />
-                      {p.nome}
-                    </div>
-                  </td>
-                  <td style={{ ...tdStyle, color: 'rgba(250,250,250,.5)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.descricao ?? '—'}</td>
-                  <td style={tdStyle}>
-                    <span style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: 'rgba(172,199,255,.1)', color: '#ACC7FF', border: '1px solid rgba(172,199,255,.2)' }}>
-                      {p.permissoes?.length ?? 0} permissões
-                    </span>
-                  </td>
-                  <td style={tdStyle}>
-                    {p.protegido ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgba(250,250,250,.3)' }}>
-                        <Lock size={11} /> Sistema
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 11, color: '#6EFFC0' }}>Personalizado</span>
-                    )}
-                  </td>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => abrirEditar(p)} disabled={p.protegido} title={p.protegido ? 'Perfil do sistema não pode ser editado' : 'Editar'} style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', color: p.protegido ? 'rgba(250,250,250,.15)' : 'rgba(250,250,250,.6)', cursor: p.protegido ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <Pencil size={13} />
-                      </button>
-                      <button onClick={() => deletar(p)} disabled={p.protegido} title={p.protegido ? 'Perfil do sistema não pode ser removido' : 'Remover'} style={{ padding: '6px 10px', borderRadius: 8, background: p.protegido ? 'transparent' : 'rgba(255,100,100,.06)', border: `1px solid ${p.protegido ? 'rgba(255,255,255,.06)' : 'rgba(255,100,100,.15)'}`, color: p.protegido ? 'rgba(250,250,250,.15)' : '#FFB4AB', cursor: p.protegido ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center' }}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {perfis.length === 0 && (
-                <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', padding: 40, color: 'rgba(250,250,250,.3)' }}>Nenhum perfil encontrado.</td></tr>
-              )}
-            </tbody>
-          </table>
+      {erro && (
+        <div role="alert" className="rounded-xl bg-error/10 border border-error/25 text-error text-sm px-4 py-3">
+          {erro}
         </div>
       )}
+
+      <div className="hidden md:block">
+        <DataTable columns={colunas} data={perfis} loading={loading} emptyState={vazio} keyExtractor={(r) => r.id} />
+      </div>
+      <div className="md:hidden">
+        <DataTable columns={colunas} data={perfis} loading={loading} emptyState={vazio} cardView keyExtractor={(r) => r.id} />
+      </div>
 
       {modalAberto && (
         <ModalPerfil
@@ -302,9 +427,8 @@ export default function GestaoPerfis() {
           todasPermissoes={todasPermissoes}
           onClose={() => setModalAberto(false)}
           onSave={salvar}
-          loading={saving}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -5,8 +5,11 @@ import ConfirmModal from '../components/ui/ConfirmModal';
 import FormField, { inputCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
+import { cn } from '../lib/utils';
 
 const empty = { numeroConta: '', agencia: '', descricao: '', saldo: '', dataSaldoInicial: '', permitirSaldoNegativo: false };
 
@@ -16,14 +19,17 @@ export default function ContasCorrentes() {
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
+    setCarregando(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
+    finally { setCarregando(false); }
   }
 
   function validateForm() {
@@ -60,7 +66,10 @@ export default function ContasCorrentes() {
   function deletar(id) {
     setConfirmAction({
       title: 'Excluir conta corrente',
-      message: 'Tem certeza que deseja excluir esta conta corrente?',
+      message: 'Deseja excluir esta conta corrente? Esta ação não pode ser desfeita.',
+      details: [
+        'Contas que já possuem transferências ou conciliações não podem ser excluídas — nesse caso a exclusão será bloqueada.',
+      ],
       confirmLabel: 'Excluir',
       onConfirm: async () => {
         setConfirmAction(null);
@@ -92,22 +101,14 @@ export default function ContasCorrentes() {
       />
 
       {/* Saldo total */}
-      <div
-        className="rounded-[18px] px-6 py-5 flex items-center justify-between anim-in d1"
-        style={{
-          background: 'rgba(110,255,192,.07)',
-          border: '1px solid rgba(110,255,192,.2)',
-          backdropFilter: 'blur(8px)',
-          boxShadow: '0 1px 3px rgba(0,0,0,.25), 0 4px 16px rgba(110,255,192,.06)',
-        }}
-      >
+      <div className="rounded-[18px] px-6 py-5 flex items-center justify-between anim-in d1 bg-primary/10 border border-primary/20 shadow-lg">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="live-dot" style={{ width: 5, height: 5 }} />
-            <p className="text-[10px] uppercase tracking-widest text-primary font-bold font-mono">Saldo Consolidado — Todas as Contas</p>
+            <p className="text-xs uppercase tracking-widest text-primary font-bold font-mono">Saldo Consolidado — Todas as Contas</p>
           </div>
           <p className="text-3xl font-bold text-primary font-display">R$ {brl(total)}</p>
-          <p className="text-[10px] text-text-primary/35 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} cadastrada{lista.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-text-primary/40 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} cadastrada{lista.length !== 1 ? 's' : ''}</p>
         </div>
         <Landmark className="w-12 h-12 text-primary opacity-20" />
       </div>
@@ -155,7 +156,11 @@ export default function ContasCorrentes() {
       </form>
 
       {/* Lista de contas */}
-      {lista.length === 0 ? (
+      {carregando ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} rows={2} />)}
+        </div>
+      ) : lista.length === 0 ? (
         <EmptyState icon={Landmark} title="Nenhuma conta cadastrada" description="Adicione suas contas bancárias para controlar seus saldos." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -164,60 +169,44 @@ export default function ContasCorrentes() {
             return (
               <div
                 key={c.id}
-                className={`anim-in d${Math.min(i + 1, 6)} rounded-[18px] p-5 flex flex-col gap-3 transition-all hover:scale-[1.01]`}
-                style={{
-                  background: 'rgba(255,255,255,.025)',
-                  border: `1px solid ${pos ? 'rgba(110,255,192,.15)' : 'rgba(255,180,171,.15)'}`,
-                  backdropFilter: 'blur(8px)',
-                  boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2)',
-                }}
+                className={cn(
+                  `anim-in d${Math.min(i + 1, 6)}`,
+                  'rounded-[18px] p-5 flex flex-col gap-3 transition-all hover:scale-[1.01] bg-surface-medium border shadow-lg',
+                  pos ? 'border-primary/20' : 'border-error/20'
+                )}
               >
                 <div className="flex justify-between items-start">
                   <div className="min-w-0">
                     <p className="font-bold text-text-primary font-display truncate">{c.descricao}</p>
-                    <p className="text-[10px] text-text-primary/40 mt-0.5 font-mono">
+                    <p className="text-xs text-text-primary/40 mt-0.5 font-mono">
                       Ag. {c.agencia} · Cc. {c.numeroConta}
                     </p>
                   </div>
                   <div className="flex gap-1 shrink-0 ml-2">
-                    <button
-                      onClick={() => editar(c)}
-                      aria-label="Editar conta"
-                      className="p-1.5 text-text-primary/30 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => deletar(c.id)}
-                      aria-label="Excluir conta"
-                      className="p-1.5 text-text-primary/30 hover:text-error rounded-lg hover:bg-error/10 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <Button variant="ghost" size="icon" onClick={() => editar(c)} aria-label="Editar conta" title="Editar" className="text-text-primary/50 hover:text-primary">
+                      <Pencil className="w-5 h-5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deletar(c.id)} aria-label="Excluir conta" title="Excluir" className="text-text-primary/50 hover:text-error">
+                      <Trash2 className="w-5 h-5" />
+                    </Button>
                   </div>
                 </div>
 
-                <div
-                  className="rounded-xl px-4 py-3"
-                  style={{
-                    background: pos ? 'rgba(110,255,192,.07)' : 'rgba(255,180,171,.07)',
-                    border: `1px solid ${pos ? 'rgba(110,255,192,.15)' : 'rgba(255,180,171,.15)'}`,
-                  }}
-                >
-                  <p className="text-[9px] font-bold uppercase tracking-widest font-mono mb-1" style={{ color: pos ? '#6EFFC0' : '#FFB4AB' }}>
+                <div className={cn('rounded-xl px-4 py-3 border', pos ? 'bg-primary/10 border-primary/20' : 'bg-error/10 border-error/20')}>
+                  <p className={cn('text-xs font-bold uppercase tracking-widest font-mono mb-1', pos ? 'text-primary' : 'text-error')}>
                     Saldo Atual
                   </p>
-                  <p className="text-2xl font-bold font-display" style={{ color: pos ? '#6EFFC0' : '#FFB4AB' }}>
+                  <p className={cn('text-2xl font-bold font-display', pos ? 'text-primary' : 'text-error')}>
                     R$ {brl(c.saldo)}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   {c.dataSaldoInicial && (
-                    <p className="text-[10px] text-text-primary/35 font-mono">Desde {c.dataSaldoInicial}</p>
+                    <p className="text-xs text-text-primary/40 font-mono">Desde {c.dataSaldoInicial}</p>
                   )}
                   {c.permitirSaldoNegativo && (
-                    <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full font-mono" style={{ background: 'rgba(255,211,122,.1)', color: '#FFD37A', border: '1px solid rgba(255,211,122,.2)' }}>
+                    <span className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-full font-mono bg-warning/10 text-warning border border-warning/20">
                       Saldo neg. permitido
                     </span>
                   )}

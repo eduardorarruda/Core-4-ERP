@@ -13,7 +13,7 @@ export default function ResultadoMesPanel({ receitasMes, despesasMes, saldo, car
     >
       <div className="space-y-8 mt-4">
         <div className="space-y-2">
-          <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-text-primary/50">
+          <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-text-primary/50">
             <span>Receitas Recebidas</span>
             <span className="text-secondary">R$ {brl(receitasMes)}</span>
           </div>
@@ -25,7 +25,7 @@ export default function ResultadoMesPanel({ receitasMes, despesasMes, saldo, car
           </div>
         </div>
         <div className="space-y-2">
-          <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-text-primary/50">
+          <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-text-primary/50">
             <span>Despesas Pagas</span>
             <span className="text-error">R$ {brl(despesasMes)}</span>
           </div>
@@ -37,7 +37,7 @@ export default function ResultadoMesPanel({ receitasMes, despesasMes, saldo, car
           </div>
         </div>
         <div className="pt-4 border-t border-text-primary/5">
-          <p className="text-[10px] text-text-primary/50 uppercase font-bold tracking-widest">Saldo Total (Contas Correntes)</p>
+          <p className="text-xs text-text-primary/50 uppercase font-bold tracking-widest">Saldo Total (Contas Correntes)</p>
           <p className={cn('text-3xl font-bold font-display', saldo >= 0 ? 'text-primary' : 'text-error')}>
             R$ {brl(saldo)}
           </p>

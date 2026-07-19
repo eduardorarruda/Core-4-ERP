@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useMemo } from 'react';
+import React, { useEffect, useState, useContext, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, RefreshCw, Landmark, Wallet, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
@@ -12,56 +12,64 @@ import CarteiraPanel from '../components/dashboard/CarteiraPanel';
 import AssinaturasPanel from '../components/dashboard/AssinaturasPanel';
 import AcessoRapidoPanel from '../components/dashboard/AcessoRapidoPanel';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
+import Button from '../components/ui/Button';
 import { dashboard, investimentos, assinaturas as assinaturasApi } from '../lib/api';
 import { cn } from '../lib/utils';
 import { ThemeContext } from '../context/ThemeContext';
 import { MESES_ABREV } from '../lib/constants';
-
-const COLORS_DARK  = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD8A8', '#D8A8FF', '#A8FFD8'];
-const COLORS_LIGHT = ['#059669', '#2563EB', '#DC2626', '#D97706', '#7C3AED', '#0891B2'];
+import { readCssVar } from '../components/dashboard/chartTheme';
 
 export default function Dashboard() {
   const { theme } = useContext(ThemeContext);
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
   const [carteira, setCarteira] = useState([]);
   const [assinaturasLista, setAssinaturasLista] = useState([]);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  const fetchAll = () => {
+  // Carrega tudo. `signal.cancelled` evita atualizar estado após desmontar.
+  const fetchAll = useCallback((signal) => {
     setCarregando(true);
+    setErro(false);
     Promise.all([
       dashboard.resumo().catch(() => null),
       investimentos.listar().catch(() => []),
       assinaturasApi.listar().catch(() => []),
     ]).then(([d, inv, assin]) => {
-      if (d) setDados(d);
+      if (signal?.cancelled) return;
+      // Falha ao carregar o resumo principal não deve virar "R$ 0,00" silencioso.
+      if (d) {
+        setDados(d);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
       setCarteira(inv ?? []);
       setAssinaturasLista(assin ?? []);
       setLastUpdate(new Date());
-    }).finally(() => setCarregando(false));
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    setCarregando(true);
-    Promise.all([
-      dashboard.resumo().catch(() => null),
-      investimentos.listar().catch(() => []),
-      assinaturasApi.listar().catch(() => []),
-    ]).then(([d, inv, assin]) => {
-      if (cancelled) return;
-      if (d) setDados(d);
-      setCarteira(inv ?? []);
-      setAssinaturasLista(assin ?? []);
-      setLastUpdate(new Date());
-    }).finally(() => { if (!cancelled) setCarregando(false); });
-    return () => { cancelled = true; };
+    }).finally(() => {
+      if (!signal?.cancelled) setCarregando(false);
+    });
   }, []);
 
+  useEffect(() => {
+    const signal = { cancelled: false };
+    fetchAll(signal);
+    return () => { signal.cancelled = true; };
+  }, [fetchAll]);
+
   const isDark = theme === 'dark';
-  const COLORS = isDark ? COLORS_DARK : COLORS_LIGHT;
-  const emptyPieColor = isDark ? '#353534' : '#D4D4D8';
+  // Paleta categórica derivada dos tokens do tema (sem hex duplicado por tema).
+  const COLORS = useMemo(() => [
+    readCssVar('--color-primary', isDark ? '#6EFFC0' : '#059669'),
+    readCssVar('--color-secondary', isDark ? '#ACC7FF' : '#2563EB'),
+    readCssVar('--color-error', isDark ? '#FFB4AB' : '#DC2626'),
+    readCssVar('--color-warning', isDark ? '#FFD37A' : '#B45309'),
+    isDark ? '#D8A8FF' : '#7C3AED',
+    isDark ? '#A8FFD8' : '#0891B2',
+  ], [isDark]);
+  const emptyPieColor = readCssVar('--color-surface-highest', isDark ? '#353534' : '#D4D4D8');
 
   const fluxoMensal = dados?.fluxoMensal ?? [];
 
@@ -124,36 +132,56 @@ export default function Dashboard() {
         subtitle="Visão geral do seu ecossistema financeiro"
         actions={
           <div className="flex items-center gap-3">
-            <span className="text-[10px] text-text-primary/30 hidden sm:block">
+            <span className="text-xs text-text-primary/30 hidden sm:block">
               Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </span>
-            <button
-              onClick={fetchAll}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fetchAll()}
               disabled={carregando}
               aria-label="Atualizar dashboard"
-              className="p-2 rounded-xl bg-surface-medium border border-text-primary/5 text-text-primary/60 hover:text-text-primary hover:border-text-primary/10 transition-all disabled:opacity-50"
+              className="border border-text-primary/5 text-text-primary/60 hover:text-text-primary"
             >
               <RefreshCw className={cn('w-4 h-4', carregando && 'animate-spin')} />
-            </button>
+            </Button>
           </div>
         }
       />
 
+      {erro ? (
+        <div
+          role="alert"
+          className="rounded-[18px] border border-error/30 bg-error/10 p-8 flex flex-col items-center gap-4 text-center"
+        >
+          <AlertTriangle className="w-8 h-8 text-error" />
+          <div>
+            <p className="text-sm font-bold text-text-primary">Não foi possível carregar o dashboard</p>
+            <p className="text-xs text-text-primary/60 mt-1">
+              Verifique sua conexão com a internet e tente novamente.
+            </p>
+          </div>
+          <Button variant="secondary" onClick={() => fetchAll()} loading={carregando} leftIcon={RefreshCw}>
+            Tentar novamente
+          </Button>
+        </div>
+      ) : (
+      <>
       <KpiCards kpis={kpis} carregando={carregando} />
 
       {(vencendoHoje > 0 || atrasadas > 0) && (
         <div className="flex flex-wrap gap-3 animate-fade-in-up animate-stagger-1">
           {atrasadas > 0 && (
-            <Link to="/contas" className="flex items-center gap-2 px-4 py-2 bg-red-950/60 border border-red-500/30 rounded-xl text-red-300 text-xs font-bold hover:bg-red-950/80 transition-colors">
+            <Link to="/contas" className="flex items-center gap-2 px-4 py-2 min-h-11 bg-error/10 border border-error/30 rounded-xl text-error text-xs font-bold hover:bg-error/20 transition-colors">
               <AlertTriangle className="w-4 h-4" />
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse-dot" />
+                <span className="w-2 h-2 rounded-full bg-error animate-pulse-dot" />
                 {atrasadas} conta{atrasadas > 1 ? 's' : ''} atrasada{atrasadas > 1 ? 's' : ''}
               </span>
             </Link>
           )}
           {vencendoHoje > 0 && (
-            <Link to="/contas" className="flex items-center gap-2 px-4 py-2 bg-amber-950/60 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-bold hover:bg-amber-950/80 transition-colors">
+            <Link to="/contas" className="flex items-center gap-2 px-4 py-2 min-h-11 bg-warning/10 border border-warning/30 rounded-xl text-warning text-xs font-bold hover:bg-warning/20 transition-colors">
               <AlertTriangle className="w-4 h-4" />
               {vencendoHoje} conta{vencendoHoje > 1 ? 's' : ''} vencendo hoje
             </Link>
@@ -196,6 +224,8 @@ export default function Dashboard() {
 
         <AcessoRapidoPanel atrasadas={atrasadas} carregando={carregando} />
       </div>
+      </>
+      )}
     </div>
   );
 }

@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CreditCard, TrendingUp, Wallet, AlertCircle, FileText, Loader2,
-  AlertTriangle, PieChart as PieIcon, BarChart2, Calendar, SlidersHorizontal,
+  AlertTriangle, BarChart2, SlidersHorizontal,
 } from 'lucide-react';
 import { cartoes as cartoesApi } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import PeriodoSelector from '../components/ui/PeriodoSelector';
 import DateRangeModal from '../components/ui/DateRangeModal';
+import { ThemeContext } from '../context/ThemeContext';
+import { useToast } from '../hooks/useToast';
 import { brl } from '../lib/formatters';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -15,7 +17,48 @@ import {
 } from 'recharts';
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+// Paleta das séries dos gráficos. Mantida como array fixo (Recharts precisa de cores
+// concretas por série); os valores foram escolhidos para funcionar em tema claro e escuro.
+// As cores de UI dos gráficos (tooltip/eixos/grid) derivam do tema via chartTheme().
 const COLORS = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD580', '#C8A4FF', '#80E5FF', '#FF9F80'];
+
+// Cores de tooltip, eixos e grid derivadas do tema atual — alinhadas ao padrão dos
+// demais dashboards (ver useChartColors em FluxoCaixaChart).
+function chartTheme(dark) {
+  return {
+    grid: dark ? 'rgba(255,255,255,.05)' : '#E4E4E7',
+    tick: dark ? 'rgba(255,255,255,.4)' : '#71717a',
+    tickStrong: dark ? 'rgba(255,255,255,.6)' : '#52525b',
+    tooltip: {
+      background: dark ? '#1C1B1B' : '#FFFFFF',
+      border: dark ? '1px solid rgba(255,255,255,.1)' : '1px solid #E4E4E7',
+      borderRadius: 12,
+      fontSize: 12,
+      color: dark ? '#FAFAFA' : '#18181B',
+    },
+  };
+}
+
+// Filtros rápidos de período. A API só aceita mês/ano, então cada botão mapeia para uma
+// janela distinta e o rótulo descreve exatamente o intervalo (sem dois botões iguais).
+const FILTROS_RAPIDOS = [
+  { id: '0m', label: 'Este mês', meses: 0 },
+  { id: '3m', label: 'Últimos 3 meses', meses: 2 },
+  { id: '6m', label: 'Últimos 6 meses', meses: 5 },
+];
+
+// Detecta viewport < sm (640px) para adaptar gráficos no mobile.
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 639px)');
+    const handler = (e) => setIsMobile(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  return isMobile;
+}
 
 function buildChartData(resumo) {
   const meses = [...new Set(resumo.map((r) => `${r.mes}/${r.ano}`))];
@@ -49,17 +92,24 @@ function periodoMesesAtras(meses) {
 
 export default function CartaoDashboard() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const ct = chartTheme(isDark);
+  const isMobile = useIsMobile();
   const [cartoes, setCartoes] = useState([]);
   const [resumo, setResumo] = useState([]);
   const [bi, setBi] = useState(null);
+  const [erroBi, setErroBi] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingBi, setLoadingBi] = useState(false);
-  const [periodo, setPeriodo] = useState(() => periodoMesesAtras(1));
-  const [activeFilter, setActiveFilter] = useState('30d');
+  const [periodo, setPeriodo] = useState(() => periodoMesesAtras(2));
+  const [activeFilter, setActiveFilter] = useState('3m');
   const [showDateModal, setShowDateModal] = useState(false);
 
   const carregarBi = useCallback(async (p) => {
     setLoadingBi(true);
+    setErroBi(false);
     try {
       const params = new URLSearchParams();
       if (p.mesInicio) params.set('mesInicio', p.mesInicio);
@@ -68,12 +118,15 @@ export default function CartaoDashboard() {
       if (p.anoFim) params.set('anoFim', p.anoFim);
       const res = await cartoesApi.dashboardBI(params.toString());
       setBi(res);
-    } catch {
+    } catch (e) {
+      // Falha da API é erro, não "sem dados" — sinaliza para oferecer "tentar novamente".
       setBi(null);
+      setErroBi(true);
+      toast.error(e.message || 'Não foi possível carregar as análises. Tente novamente.');
     } finally {
       setLoadingBi(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     Promise.all([
@@ -81,10 +134,10 @@ export default function CartaoDashboard() {
       cartoesApi.dashboard(),
     ])
       .then(([lista, res]) => { setCartoes(lista); setResumo(res); })
-      .catch(() => {})
+      .catch((e) => toast.error(e.message || 'Não foi possível carregar os cartões.'))
       .finally(() => setLoading(false));
-    carregarBi(periodoMesesAtras(1));
-  }, [carregarBi]);
+    carregarBi(periodoMesesAtras(2));
+  }, [carregarBi, toast]);
 
   function aplicarFiltroRapido(id, novoPeriodo) {
     setActiveFilter(id);
@@ -151,10 +204,10 @@ export default function CartaoDashboard() {
         {metricas.map((m) => (
           <div key={m.label} className="rounded-2xl p-5" style={{ background: m.bg, border: `1px solid ${m.border}` }}>
             <div className="flex items-center gap-2 mb-3">
-              <m.icon className={`w-4 h-4 ${m.color}`} />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono">{m.label}</span>
+              <m.icon className={`w-4 h-4 shrink-0 ${m.color}`} />
+              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/40 font-mono truncate">{m.label}</span>
             </div>
-            <p className={`text-2xl font-bold font-mono ${m.color}`}>{m.value}</p>
+            <p className={`text-xl sm:text-2xl font-bold font-mono truncate ${m.color}`} title={String(m.value)}>{m.value}</p>
           </div>
         ))}
       </div>
@@ -188,7 +241,7 @@ export default function CartaoDashboard() {
                     <div className="h-2 bg-surface-highest rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: corBarra }} />
                     </div>
-                    <p className="text-[10px] text-text-primary/40 font-mono text-right">{pct.toFixed(1)}% utilizado</p>
+                    <p className="text-xs text-text-primary/40 font-mono text-right">{pct.toFixed(1)}% utilizado</p>
                   </div>
                   <button onClick={() => navigate('/cartoes')} className="w-full text-center text-xs font-bold uppercase tracking-widest text-primary hover:underline py-1">
                     Ver lançamentos →
@@ -206,10 +259,10 @@ export default function CartaoDashboard() {
           <h2 className={h2Cls}>Gastos por Categoria (período recente)</h2>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
-              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-              <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} formatter={(v, name) => [`R$ ${brl(v)}`, name]} />
+              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
+              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+              <Tooltip contentStyle={ct.tooltip} formatter={(v, name) => [`R$ ${brl(v)}`, name]} />
               <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'monospace', paddingTop: 12 }} />
               {cats.map((cat, idx) => (
                 <Bar key={cat} dataKey={cat} stackId="a" fill={COLORS[idx % COLORS.length]} radius={idx === cats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
@@ -227,15 +280,11 @@ export default function CartaoDashboard() {
             <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono">Análise BI</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {[
-              { id: 'today', label: 'Este mês', periodo: () => periodoMesesAtras(0) },
-              { id: '15d',   label: 'Últimos 15 dias', periodo: () => periodoMesesAtras(0) },
-              { id: '30d',   label: 'Últimos 30 dias', periodo: () => periodoMesesAtras(1) },
-            ].map(({ id, label, periodo: getPeriodo }) => (
+            {FILTROS_RAPIDOS.map(({ id, label, meses }) => (
               <button
                 key={id}
-                onClick={() => aplicarFiltroRapido(id, getPeriodo())}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                onClick={() => aplicarFiltroRapido(id, periodoMesesAtras(meses))}
+                className={`min-h-[44px] px-4 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                   activeFilter === id
                     ? 'bg-primary/20 text-primary border border-primary/30'
                     : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary hover:border-text-primary/20'
@@ -246,7 +295,7 @@ export default function CartaoDashboard() {
             ))}
             <button
               onClick={() => { setActiveFilter('custom'); setShowDateModal(true); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+              className={`flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                 activeFilter === 'custom'
                   ? 'bg-secondary/20 text-secondary border border-secondary/30'
                   : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary hover:border-text-primary/20'
@@ -274,10 +323,10 @@ export default function CartaoDashboard() {
                 <h3 className={h2Cls}>Evolução Mensal da Fatura</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={bi.evolucaoMensal.map((d) => ({ ...d, label: `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}`, total: parseFloat(d.totalLiquido) }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                    <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} formatter={(v) => [`R$ ${brl(v)}`, 'Total líquido']} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+                    <Tooltip contentStyle={ct.tooltip} formatter={(v) => [`R$ ${brl(v)}`, 'Total líquido']} />
                     <Line type="monotone" dataKey="total" stroke="#6EFFC0" strokeWidth={2} dot={{ fill: '#6EFFC0', r: 3 }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -290,12 +339,18 @@ export default function CartaoDashboard() {
               {bi.distribuicaoLimite?.length > 0 && (
                 <div>
                   <h3 className={h2Cls}>Distribuição de Limite</h3>
-                  <ResponsiveContainer width="100%" height={180}>
+                  <ResponsiveContainer width="100%" height={isMobile ? 220 : 180}>
                     <PieChart>
-                      <Pie data={bi.distribuicaoLimite.map((d) => ({ name: d.nomeCartao, value: parseFloat(d.limite) }))} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                      <Pie
+                        data={bi.distribuicaoLimite.map((d) => ({ name: d.nomeCartao, value: parseFloat(d.limite) }))}
+                        cx="50%" cy={isMobile ? '42%' : '50%'} outerRadius={70} dataKey="value"
+                        label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
                         {bi.distribuicaoLimite.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} />
+                      {isMobile && <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'monospace' }} />}
+                      <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={ct.tooltip} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -306,11 +361,14 @@ export default function CartaoDashboard() {
                 <div>
                   <h3 className={h2Cls}>Top 10 Parceiros</h3>
                   <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={bi.gastosPorParceiro.map((d) => ({ nome: d.nomeParceiro.length > 15 ? d.nomeParceiro.slice(0, 15) + '…' : d.nomeParceiro, total: parseFloat(d.total) }))} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
-                      <XAxis type="number" tick={{ fontSize: 10, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                      <YAxis type="category" dataKey="nome" width={90} tick={{ fontSize: 10, fill: 'rgba(255,255,255,.6)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} formatter={(v) => [`R$ ${brl(v)}`, 'Total']} />
+                    <BarChart data={bi.gastosPorParceiro.map((d) => {
+                      const max = isMobile ? 10 : 15;
+                      return { nome: d.nomeParceiro.length > max ? d.nomeParceiro.slice(0, max) + '…' : d.nomeParceiro, total: parseFloat(d.total) };
+                    })} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+                      <YAxis type="category" dataKey="nome" width={isMobile ? 70 : 90} tick={{ fontSize: 10, fill: ct.tickStrong, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                      <Tooltip contentStyle={ct.tooltip} formatter={(v) => [`R$ ${brl(v)}`, 'Total']} />
                       <Bar dataKey="total" fill="#ACC7FF" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -377,10 +435,10 @@ export default function CartaoDashboard() {
                 <h3 className={h2Cls}>Comprometimento Futuro por Parcelamentos</h3>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={bi.impactoParcelamentos.map((d) => ({ label: `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}`, total: parseFloat(d.totalComprometido), parcelas: d.qtdParcelas }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,.4)', fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                    <Tooltip contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} formatter={(v, name) => [name === 'total' ? `R$ ${brl(v)}` : v, name === 'total' ? 'Total comprometido' : 'Qtd parcelas']} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+                    <Tooltip contentStyle={ct.tooltip} formatter={(v, name) => [name === 'total' ? `R$ ${brl(v)}` : v, name === 'total' ? 'Total comprometido' : 'Qtd parcelas']} />
                     <Bar dataKey="total" fill="#C8A4FF" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -400,13 +458,13 @@ export default function CartaoDashboard() {
                           { name: 'Avulsos', value: parseFloat(bi.assinaturasVsAvulsos.totalAvulsos) },
                         ]}
                         cx="50%" cy="50%" outerRadius={65} dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
                         <Cell fill="#6EFFC0" />
                         <Cell fill="#ACC7FF" />
                       </Pie>
-                      <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 12, fontSize: 12 }} />
+                      <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={ct.tooltip} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-2 text-sm w-full md:w-auto">
@@ -417,6 +475,17 @@ export default function CartaoDashboard() {
               </div>
             )}
 
+          </div>
+        ) : erroBi ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <AlertTriangle className="w-8 h-8 text-error/70" />
+            <p className="text-sm text-text-primary/60">Não foi possível carregar as análises deste período.</p>
+            <button
+              onClick={() => carregarBi(periodo)}
+              className="min-h-[44px] px-5 rounded-lg text-xs font-bold uppercase tracking-widest bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-colors"
+            >
+              Tentar novamente
+            </button>
           </div>
         ) : (
           <p className="text-sm text-text-primary/40 text-center py-8">Sem dados para o período selecionado.</p>
@@ -440,7 +509,7 @@ export default function CartaoDashboard() {
             setPeriodo(p);
             carregarBi(p);
           }}
-          onCancel={() => { setShowDateModal(false); setActiveFilter('30d'); }}
+          onCancel={() => { setShowDateModal(false); setActiveFilter('3m'); }}
         />
       )}
     </div>

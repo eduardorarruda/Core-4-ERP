@@ -9,11 +9,14 @@ export const ROUTE_PRIORITY = [
   { path: '/assinaturas',      permissao: 'ASSINATURA_VISUALIZAR' },
   { path: '/conciliacao',      permissao: 'CONCILIACAO_VISUALIZAR' },
   { path: '/configuracoes',    permissao: null },
+  // Fallback universal: a Central de Ajuda é acessível a todos, então nenhum
+  // usuário fica sem ao menos uma rota disponível.
+  { path: '/ajuda',            permissao: null },
 ];
 
 export function getFirstAccessibleRoute(temPermissao) {
   for (const r of ROUTE_PRIORITY) {
     if (!r.permissao || temPermissao(r.permissao)) return r.path;
   }
-  return '/configuracoes';
+  return '/ajuda';
 }
