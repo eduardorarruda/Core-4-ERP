@@ -30,6 +30,7 @@ public class EventoN8nAspect {
     }
 
     @AfterReturning(
+            pointcut =
             "execution(* br.com.core4erp..service..*.criar(..)) || " +
             "execution(* br.com.core4erp..service..*.atualizar(..)) || " +
             "execution(* br.com.core4erp..service..*.atualizarTipo(..)) || " +
@@ -44,8 +45,9 @@ public class EventoN8nAspect {
             "execution(* br.com.core4erp..service..*.cancelar(..)) || " +
             "execution(* br.com.core4erp..service..*.aceitar(..)) || " +
             "execution(* br.com.core4erp..service..*.gerarRelatorio*(..)) || " +
-            "execution(* br.com.core4erp..service..*.gerarExcel(..))")
-    public void publicarEvento(JoinPoint jp) {
+            "execution(* br.com.core4erp..service..*.gerarExcel(..))",
+            returning = "resultado")
+    public void publicarEvento(JoinPoint jp, Object resultado) {
         Long usuarioId;
         try {
             usuarioId = securityCtx.getUsuarioId();
@@ -53,8 +55,66 @@ public class EventoN8nAspect {
             return; // sem usuário autenticado (ex.: scheduler) — não é ação do usuário
         }
         if (usuarioId == null || !tenantCtx.isPopulado()) return;
+
         String acao = jp.getSignature().getDeclaringType().getSimpleName()
                 + "." + jp.getSignature().getName();
-        eventos.publicar(acao, null, usuarioId, tenantCtx.getEmpresaId());
+
+        // Marca se a ação foi disparada pela IA (Áurea) ou pela tela (ação manual do usuário).
+        // ThreadLocal lido na própria thread de negócio (mesma thread do interceptador).
+        boolean origemIa = OrigemIaHolder.isIa();
+
+        // Resumo curto e NÃO-SENSÍVEL (LGPD): apenas nome da ação + id da entidade quando disponível.
+        String detalhe;
+        try {
+            detalhe = montarDetalhe(jp, resultado);
+        } catch (Exception e) {
+            detalhe = acao; // fallback seguro — nunca deixar o evento derrubar a operação
+        }
+
+        eventos.publicar(acao, detalhe, origemIa, usuarioId, tenantCtx.getEmpresaId());
+    }
+
+    /**
+     * Monta um resumo curto e livre de dados pessoais: {@code "<Entidade> <acao> id=<id>"}
+     * (ex.: {@code "Categoria criar id=12"}). Nunca inclui valores, CPF/CNPJ, email ou nome.
+     */
+    private String montarDetalhe(JoinPoint jp, Object resultado) {
+        String entidade = jp.getSignature().getDeclaringType().getSimpleName();
+        if (entidade.endsWith("Service")) {
+            entidade = entidade.substring(0, entidade.length() - "Service".length());
+        }
+        String acaoSimples = jp.getSignature().getName();
+        Long id = extrairId(resultado, jp.getArgs());
+        String detalhe = entidade + " " + acaoSimples + (id != null ? " id=" + id : "");
+        return detalhe.length() > 120 ? detalhe.substring(0, 120) : detalhe;
+    }
+
+    /**
+     * Extrai um id seguro (numérico) do retorno ou dos argumentos. Prioriza o retorno (útil em
+     * criações), depois procura um argumento numérico (ex.: {@code deletar(Long id)}) ou um objeto
+     * com {@code getId()}. Só aceita valores numéricos — nenhum outro getter é invocado.
+     */
+    private Long extrairId(Object resultado, Object[] args) {
+        Long id = idDe(resultado);
+        if (id != null) return id;
+        if (args != null) {
+            for (Object arg : args) {
+                if (arg instanceof Number n) return n.longValue();
+                Long viaGetter = idDe(arg);
+                if (viaGetter != null) return viaGetter;
+            }
+        }
+        return null;
+    }
+
+    private Long idDe(Object obj) {
+        if (obj == null) return null;
+        try {
+            Object valor = obj.getClass().getMethod("getId").invoke(obj);
+            if (valor instanceof Number n) return n.longValue();
+        } catch (Exception ignored) {
+            // objeto sem getId() acessível — sem id seguro a extrair
+        }
+        return null;
     }
 }
