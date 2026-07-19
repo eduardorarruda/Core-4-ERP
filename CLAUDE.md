@@ -600,6 +600,19 @@ chat/tools/
 - `LogQueueConsumer` — consome a fila e persiste em `tb_log_geral` com `saveAll()`.
 - MDC propagado: `requestId`, `usuarioId`, `empresaId`, `ipAddress`, `httpMethod`, `endpoint`.
 
+### Traces distribuídos → Painel EBPÓS (nmon) — OpenTelemetry
+
+- O backend exporta **traces** (não métricas de host) via **OTel Java agent** carregado no `-javaagent`
+  (Dockerfile) — auto-instrumenta Spring MVC, JDBC/JPA e HttpClient sem alterar código. Controlado
+  100% por envs `OTEL_*` no serviço `backend` do `docker-compose.yml`; sem chave ou com
+  `OTEL_SDK_DISABLED=true` vira no-op.
+- Destino OTLP/HTTP: `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://2.25.197.81:8095`, o SDK acrescenta
+  `/v1/traces`). Autenticação: header `X-NMon-Key` = **a mesma `key:` do `/etc/nmon/agent.yaml`** do host.
+  `OTEL_RESOURCE_ATTRIBUTES=host.name=<hostname do agent.yaml>` casa o trace com o filtro "Servidor".
+- Chave e `host.name` ficam só no `.env` do servidor (nunca versionados). Métricas/logs de app ficam
+  **desligados** (`OTEL_METRICS_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none`) — host já é coletado pelo `nmon-agent`.
+- Rollback sem rebuild: `OTEL_SDK_DISABLED=true` + `docker compose up -d backend`.
+
 ---
 
 ## 11. Fluxos de Negócio Críticos
