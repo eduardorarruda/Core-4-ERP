@@ -37,6 +37,11 @@ services:
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/rag-ingest}
       # Eventos de domínio (cada ação da IA) → workflow 'evento' no n8n (fora do caminho crítico).
       N8N_EVENTOS_WEBHOOK_URL: ${N8N_EVENTOS_WEBHOOK_URL:-http://n8n:5678/webhook/evento}
+      # Orquestrador do chat: interno (default) | shadow (só admin) | n8n (todos). Delega ao WF-AUREA.
+      CHAT_ORQUESTRADOR: ${CHAT_ORQUESTRADOR:-interno}
+      N8N_AUREA_WEBHOOK_URL: ${N8N_AUREA_WEBHOOK_URL:-http://n8n:5678/webhook/aurea}
+      # Segredo assinado no header X-Webhook-Secret das chamadas ao n8n (vazio = não envia).
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
