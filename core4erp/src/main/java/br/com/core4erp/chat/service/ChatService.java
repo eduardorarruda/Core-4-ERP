@@ -139,7 +139,11 @@ public class ChatService {
      * (Spring AI in-process) roda exatamente como antes.
      */
     private boolean usarN8n() {
-        return "n8n".equalsIgnoreCase(orquestrador);
+        // 'n8n' → todos os usuários; 'shadow' → só admin do sistema (validação em produção sem
+        // afetar os demais); 'interno' (default) ou qualquer outro → ninguém (pipeline in-process).
+        if ("n8n".equalsIgnoreCase(orquestrador)) return true;
+        if ("shadow".equalsIgnoreCase(orquestrador)) return tenantCtx.isAdminSistema();
+        return false;
     }
 
     /**
