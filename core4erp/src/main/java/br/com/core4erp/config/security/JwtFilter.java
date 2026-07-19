@@ -35,8 +35,10 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             populateMdc(request);
 
-            String token = extractToken(request);
-            if (token == null || !jwtService.isTokenValid(token)) {
+            // Resolve o token pela fonte de maior prioridade que seja VÁLIDA:
+            // 1º cookie httpOnly (método primário), 2º header Authorization: Bearer (fallback).
+            String token = resolveToken(request);
+            if (token == null) {
                 chain.doFilter(request, response);
                 return;
             }
@@ -71,17 +73,47 @@ public class JwtFilter extends OncePerRequestFilter {
         MDC.put("endpoint", request.getRequestURI());
     }
 
-    private String extractToken(HttpServletRequest request) {
+    /**
+     * Seleciona o token JWT da fonte de maior prioridade que passe pela validação
+     * do {@link JwtService} (assinatura + expiração).
+     *
+     * <p>Prioridade: (1) cookie httpOnly {@code access_token} — método primário e
+     * imune a XSS; (2) header {@code Authorization: Bearer <token>} — fallback para
+     * clientes sem cookie (ex.: n8n chamando a API REST). O header só é considerado
+     * quando não há cookie válido, de modo que o cookie sempre tem prioridade e o
+     * Bearer não cria bypass: ambos passam pela MESMA validação.</p>
+     */
+    private String resolveToken(HttpServletRequest request) {
+        String cookieToken = extractCookieToken(request);
+        if (cookieToken != null && jwtService.isTokenValid(cookieToken)) {
+            return cookieToken;
+        }
+
+        String headerToken = extractBearerToken(request);
+        if (headerToken != null && jwtService.isTokenValid(headerToken)) {
+            return headerToken;
+        }
+
+        return null;
+    }
+
+    private String extractCookieToken(HttpServletRequest request) {
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("access_token".equals(cookie.getName())) {
-                    return cookie.getValue();
+                    String value = cookie.getValue();
+                    return (value == null || value.isBlank()) ? null : value;
                 }
             }
         }
+        return null;
+    }
+
+    private String extractBearerToken(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
+            String value = authHeader.substring(7).trim();
+            return value.isEmpty() ? null : value;
         }
         return null;
     }

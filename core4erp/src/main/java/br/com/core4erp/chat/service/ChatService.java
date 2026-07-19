@@ -15,6 +15,8 @@ import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Timer;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -29,10 +31,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,6 +63,8 @@ public class ChatService {
     private final RagService ragService;
     private final ObjectMapper objectMapper;
     private final TenantContext tenantCtx;
+    private final N8nChatOrquestradorService n8nOrquestrador;
+    private final String orquestrador;
     private final int maxHistorico;
     private final double precoInputPorMilhao;   // USD por 1M tokens de entrada (prompt)
     private final double precoOutputPorMilhao;  // USD por 1M tokens de saída (completion)
@@ -94,6 +100,8 @@ public class ChatService {
                        RagService ragService,
                        ObjectMapper objectMapper,
                        TenantContext tenantCtx,
+                       N8nChatOrquestradorService n8nOrquestrador,
+                       @Value("${chat.orquestrador:interno}") String orquestrador,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico,
                        @Value("${chat.preco.input-usd-por-milhao:0.15}") double precoInputPorMilhao,
                        @Value("${chat.preco.output-usd-por-milhao:0.60}") double precoOutputPorMilhao) {
@@ -112,6 +120,8 @@ public class ChatService {
         this.ragService = ragService;
         this.objectMapper = objectMapper;
         this.tenantCtx = tenantCtx;
+        this.n8nOrquestrador = n8nOrquestrador;
+        this.orquestrador = orquestrador;
         this.maxHistorico = maxHistorico;
         this.precoInputPorMilhao = precoInputPorMilhao;
         this.precoOutputPorMilhao = precoOutputPorMilhao;
@@ -121,6 +131,48 @@ public class ChatService {
     private String comContextoRag(String systemPrompt, String pergunta) {
         String rag = ragService.recuperarContexto(pergunta);
         return rag.isBlank() ? systemPrompt : systemPrompt + "\n\n" + rag;
+    }
+
+    /**
+     * {@code true} apenas quando {@code chat.orquestrador=n8n}. Enquanto for {@code interno}
+     * (padrão), TODO o comportamento de delegação ao n8n fica dormente — o pipeline interno
+     * (Spring AI in-process) roda exatamente como antes.
+     */
+    private boolean usarN8n() {
+        return "n8n".equalsIgnoreCase(orquestrador);
+    }
+
+    /**
+     * Extrai o JWT bruto da requisição HTTP em andamento, para repassar ao n8n (que o usa no
+     * header {@code Authorization: Bearer} ao chamar as tools de volta na API). Segue a MESMA
+     * prioridade do {@link br.com.core4erp.config.security.JwtFilter}: 1º cookie httpOnly
+     * {@code access_token}; 2º header {@code Authorization: Bearer}. Retorna {@code null} se não
+     * houver requisição/token — nesse caso o chamador cai no pipeline interno.
+     */
+    private String jwtDaRequisicao() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
+            return null;
+        }
+        HttpServletRequest request = servletAttrs.getRequest();
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("access_token".equals(cookie.getName())) {
+                    String value = cookie.getValue();
+                    if (value != null && !value.isBlank()) {
+                        return value;
+                    }
+                }
+            }
+        }
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String value = authHeader.substring(7).trim();
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
@@ -157,6 +209,31 @@ public class ChatService {
         String mensagemUsuario = jaSanitizado
                 ? (request.mensagem() != null ? request.mensagem() : "")
                 : sanitizer.sanitize(request.mensagem());
+
+        // Ramo n8n (DORMENTE por padrão): só entra quando chat.orquestrador=n8n E há JWT na
+        // requisição. Delega a orquestração ao WF-ROUTER; em qualquer falha/ausência de JWT cai
+        // no pipeline interno abaixo (fallback). Com orquestrador=interno, nada aqui executa.
+        if (usarN8n()) {
+            String jwt = jwtDaRequisicao();
+            if (jwt != null) {
+                Optional<String> respN8n = n8nOrquestrador.orquestrar(conversaId, usuarioId,
+                        tenantCtx.getEmpresaId(), canal.name(), mensagemUsuario, isPensamentoEstendido(), jwt);
+                if (respN8n.isPresent()) {
+                    // A resposta do n8n já é markdown final (inclusive eventual link de download);
+                    // não passa por anexarDownload — este removeria links legítimos vindos do fluxo.
+                    String respostaTexto = respN8n.get();
+                    memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER,
+                            textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
+                    memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
+                    conversaService.aposMensagem(conversaId, mensagemUsuario);
+                    chatMetrics.finalizarTimer(timer);
+                    return new ChatResponseDto(respostaTexto, extrairDownloadUrl(respostaTexto), List.of());
+                }
+                log.warn("[CHAT-N8N] orquestrador n8n indisponível, usando pipeline interno");
+            } else {
+                log.warn("[CHAT-N8N] orquestrador n8n habilitado mas sem JWT na requisição, usando pipeline interno");
+            }
+        }
 
         List<Message> allMessages = montarMensagens(conversaId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
         memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER,
@@ -221,6 +298,15 @@ public class ChatService {
         // escopo de requisição — guardamos a referência do estado e restauramos abaixo.
         TenantContext.State tenantState = TenantContext.currentState();
 
+        // Ramo n8n (DORMENTE por padrão): captura o que o orquestrador precisa AINDA na thread da
+        // requisição (JWT via cookie/header, empresaId, pensamento estendido), pois o
+        // HttpServletRequest não é confiável após o hand-off. Com orquestrador=interno tudo fica
+        // null/false e o streaming interno abaixo roda idêntico ao comportamento atual.
+        boolean delegarN8n = usarN8n();
+        String jwtN8n = delegarN8n ? jwtDaRequisicao() : null;
+        Long empresaIdN8n = delegarN8n ? tenantCtx.getEmpresaId() : null;
+        boolean pensamentoEstendidoN8n = delegarN8n && isPensamentoEstendido();
+
         streamExecutor.submit(() -> {
             StringBuilder full = new StringBuilder();
             AtomicReference<Usage> usageRef = new AtomicReference<>();
@@ -234,6 +320,27 @@ public class ChatService {
                 OrigemIaHolder.marcarIa(); // auditoria grava is_ai_action=true nas escritas das tools
                 if (requestAttributes != null) {
                     RequestContextHolder.setRequestAttributes(requestAttributes, true);
+                }
+
+                // Ramo n8n (dormente): resposta ÚNICA (não-streaming, Plano B do plano). Em sucesso,
+                // emite o texto como um único delta pelo mesmo mecanismo do streaming e completa.
+                // Em falha/empty (ou sem JWT), cai no streaming interno abaixo (fallback). O finally
+                // desta task faz o cleanup dos contextos de qualquer forma.
+                if (delegarN8n && jwtN8n != null) {
+                    Optional<String> respN8n = n8nOrquestrador.orquestrar(conversaId, usuarioId,
+                            empresaIdN8n, canal.name(), mensagemUsuario, pensamentoEstendidoN8n, jwtN8n);
+                    if (respN8n.isPresent()) {
+                        String respostaTexto = respN8n.get();
+                        full.append(respostaTexto);
+                        enviarDelta(emitter, respostaTexto);
+                        memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
+                        conversaService.aposMensagem(conversaId, mensagemUsuario);
+                        emitter.complete();
+                        return;
+                    }
+                    log.warn("[CHAT-N8N] orquestrador n8n indisponível, usando pipeline interno");
+                } else if (delegarN8n) {
+                    log.warn("[CHAT-N8N] orquestrador n8n habilitado mas sem JWT na requisição, usando pipeline interno");
                 }
 
                 // .stream() emite a resposta em deltas (token a token). Cada delta é enviado ao
