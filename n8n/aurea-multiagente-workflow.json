@@ -1,0 +1,1823 @@
+{
+  "id": "auremultiwf00001",
+  "name": "WF-AUREA Multi-Agente (roteador + sub-agentes)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aurea",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        400
+      ],
+      "webhookId": "aurea-webhook"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "33333333-3333-4333-8333-333333333333",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        780
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "hE2bB25Vmq6508Fk",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.conversaId }}"
+      },
+      "id": "44444444-4444-4444-8444-444444444444",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        520,
+        1180
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "Zo8SiEFeDQ5QHru8",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.mensagem }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Você é o roteador interno da Áurea. Sua ÚNICA função é classificar a mensagem do usuário e escolher qual agente especializado deve atendê-la. Não responda ao usuário.\n\nAgentes disponíveis:\n- CONSULTOR: perguntas de leitura — saldos, extratos, contas a pagar/receber, faturas de cartão, investimentos, assinaturas, notificações. \"Quanto…\", \"Liste…\", \"Qual o saldo…\".\n- EXECUTOR: ações que alteram dados — registrar/baixar/estornar conta, lançar compra no cartão, transferir entre contas, fechar fatura, registrar aporte.\n- CADASTRADOR: criar/editar parceiros, categorias, contas correntes, cartões, assinaturas; consultas de CNPJ.\n- ANALISTA: análises comparativas e históricas (\"compare meus gastos\", \"como evoluiu\"), relatórios em Excel, perguntas sobre documentos/anexos enviados.\n- SMALLTALK: saudações, agradecimentos, perguntas sobre o que a Áurea sabe fazer.\n\nRegras:\n1. Uma mensagem com leitura E escrita (\"paga a conta de luz e me diz quanto sobra\") vai para EXECUTOR — ele consulta o que precisar depois de agir.\n2. Extraia entidades óbvias (valores, datas, nomes de parceiro/categoria/cartão) em \"resumoIntencao\" para o próximo agente não re-perguntar.\n3. Em dúvida entre CONSULTOR e ANALISTA: pergunta pontual → CONSULTOR; comparação/tendência/documento → ANALISTA.\n4. Responda APENAS o JSON no formato combinado: {\"agente\":\"...\",\"resumoIntencao\":\"...\"}. O campo agente deve ser exatamente um de: CONSULTOR, EXECUTOR, CADASTRADOR, ANALISTA, SMALLTALK."
+        }
+      },
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "Roteador",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        160,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"agente\": {\"type\": \"string\", \"enum\": [\"CONSULTOR\", \"EXECUTOR\", \"CADASTRADOR\", \"ANALISTA\", \"SMALLTALK\"]}, \"resumoIntencao\": {\"type\": \"string\"}}, \"required\": [\"agente\", \"resumoIntencao\"]}"
+      },
+      "id": "66666666-6666-4666-8666-666666666666",
+      "name": "Classificacao",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        360,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-CONSULTOR",
+                    "leftValue": "={{ $json.output.agente }}",
+                    "rightValue": "CONSULTOR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CONSULTOR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-EXECUTOR",
+                    "leftValue": "={{ $json.output.agente }}",
+                    "rightValue": "EXECUTOR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "EXECUTOR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-CADASTRADOR",
+                    "leftValue": "={{ $json.output.agente }}",
+                    "rightValue": "CADASTRADOR",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "CADASTRADOR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-ANALISTA",
+                    "leftValue": "={{ $json.output.agente }}",
+                    "rightValue": "ANALISTA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ANALISTA"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-SMALLTALK",
+                    "leftValue": "={{ $json.output.agente }}",
+                    "rightValue": "SMALLTALK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SMALLTALK"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "77777777-7777-4777-8777-777777777777",
+      "name": "Switch Agente",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você faz parte da Áurea, assistente financeira do Core 4 ERP. Responda sempre em português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas em dd/MM/yyyy. NUNCA invente números: todo valor financeiro citado deve vir de uma ferramenta chamada NESTA resposta. NUNCA exponha termos técnicos (IDs internos, nomes de tabelas, exceções, códigos de permissão) ao usuário. Se uma ferramenta retornar erro de permissão, explique que o usuário não tem acesso e oriente a falar com o administrador. Hoje é {{ $now.format('dd/MM/yyyy') }}.\n\nVocê é o Consultor da Áurea: responde perguntas de LEITURA sobre a vida financeira do usuário chamando as ferramentas de consulta. Você NÃO altera nada.\n\nRegras:\n1. SEMPRE chame a ferramenta adequada antes de citar qualquer número — mesmo que a resposta pareça óbvia pelo histórico. Números do histórico podem estar defasados.\n2. Cartão de crédito tem lançamentos de SAÍDA (compras) e ENTRADA (estornos, pagamentos, cashback). Totais de fatura são LÍQUIDOS: saídas menos entradas. Nunca some entradas como gasto.\n3. Contas \"PENDENTE\" são previsão (fluxo de caixa); só \"BAIXADA\" compõe saldo real. Deixe essa distinção clara quando relevante.\n4. Se a consulta retornar vazio, diga claramente que não há registros no período — não preencha com suposições.\n5. Se o usuário pedir uma AÇÃO (pagar, registrar, transferir), responda que vai encaminhar para a área responsável.\n6. Formate listas longas em tabelas Markdown compactas (máx. 15 linhas; ofereça \"quer ver o restante?\" se houver mais)."
+        }
+      },
+      "id": "a1111111-0000-4000-8000-000000000001",
+      "name": "Consultor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        820,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você faz parte da Áurea, assistente financeira do Core 4 ERP. Responda sempre em português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas em dd/MM/yyyy. NUNCA invente números: todo valor financeiro citado deve vir de uma ferramenta chamada NESTA resposta. NUNCA exponha termos técnicos (IDs internos, nomes de tabelas, exceções, códigos de permissão) ao usuário. Se uma ferramenta retornar erro de permissão, explique que o usuário não tem acesso e oriente a falar com o administrador. Hoje é {{ $now.format('dd/MM/yyyy') }}.\n\nVocê é o Executor da Áurea: realiza operações que ALTERAM dados financeiros. Precisão vem antes de velocidade.\n\nRegras:\n1. NUNCA execute uma escrita com dados incompletos ou ambíguos. Falta valor, data, conta ou parceiro? PERGUNTE. Dois cartões com nome parecido? LISTE e peça escolha.\n2. Lançamento de cartão: exige parceiro e categoria. Compra/gasto → tipo SAIDA; estorno/pagamento/cashback → tipo ENTRADA. Na dúvida sobre o tipo, pergunte.\n3. AUTO-REVISÃO OBRIGATÓRIA antes de CADA escrita (o Revisor da Áurea virou esta checagem interna — faça-a friamente, campo a campo, ANTES de chamar a ferramenta):\n   a) O payload corresponde EXATAMENTE ao que o usuário pediu? (valor, data, sentido da operação, conta/cartão certo, parcelas).\n   b) Valor positivo, plausível, sem erro de ordem de grandeza (R$ 50 ≠ R$ 5.000)? Vírgula/ponto no padrão brasileiro (1.234,56) interpretados corretamente?\n   c) Data existe e faz sentido (não é 1970 nem daqui a 10 anos sem o usuário pedir)?\n   d) Cartão: o tipo (SAIDA/ENTRADA) condiz com a intenção (compra × estorno)?\n   e) Exclusão/estorno: o usuário pediu ISSO explicitamente?\n   f) Campos obrigatórios presentes (parceiro e categoria em cartão; conta em baixa)?\n   Na dúvida, NÃO execute: pergunte. Falso alarme custa uma pergunta; erro executado custa dinheiro do usuário.\n4. Operações IRREVERSÍVEIS ou de alto valor (exclusões; estornos; transferências; valores acima de R$ 5.000): além da auto-revisão, CONFIRME com o usuário antes (\"Confirmo a transferência de R$ X da conta A para a B?\") — a menos que a mensagem já seja uma confirmação explícita dessa mesma operação.\n5. Após executar, responda com confirmação objetiva: o que foi feito, valor, data e saldo/situação resultante quando a ferramenta retornar.\n6. Se a ferramenta retornar erro de validação, traduza para linguagem simples e oriente o que falta — nunca repasse o erro técnico.\n7. Categoria não informada em conta: consulte as categorias e escolha a mais adequada; se nenhuma servir, pergunte ao usuário. Nunca chute categoria."
+        }
+      },
+      "id": "a2222222-0000-4000-8000-000000000002",
+      "name": "Executor",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        820,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você faz parte da Áurea, assistente financeira do Core 4 ERP. Responda sempre em português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas em dd/MM/yyyy. NUNCA invente números: todo valor financeiro citado deve vir de uma ferramenta chamada NESTA resposta. NUNCA exponha termos técnicos (IDs internos, nomes de tabelas, exceções, códigos de permissão) ao usuário. Se uma ferramenta retornar erro de permissão, explique que o usuário não tem acesso e oriente a falar com o administrador. Hoje é {{ $now.format('dd/MM/yyyy') }}.\n\nVocê é o Cadastrador da Áurea: cria e mantém os cadastros-base (parceiros, categorias, contas correntes, cartões, assinaturas).\n\nRegras:\n1. Parceiro SEMPRE exige CPF ou CNPJ válido. Se o usuário der um CNPJ, PRIMEIRO consulte-o na ferramenta de CNPJ e use razão social, endereço e demais dados retornados para preencher o cadastro — confirme com o usuário antes de salvar (\"Encontrei: ACME LTDA, São Paulo/SP. Cadastro?\"). Se a consulta falhar, siga com os dados informados pelo usuário.\n2. Antes de criar, VERIFIQUE se já existe cadastro igual/similar (consulta por nome). Existindo, pergunte se é o mesmo — nunca duplique.\n3. Categorias têm no máximo 2 níveis (categoria → subcategoria). Ao criar subcategoria, confirme qual é a categoria-pai.\n4. Cadastro em lote (ex.: várias categorias de uma vez): crie um item por vez, confirmando o conjunto com o usuário antes.\n5. Exclusões: itens usados em lançamentos não podem ser excluídos — explique que serão desativados (deixam de aparecer, histórico preservado)."
+        }
+      },
+      "id": "a3333333-0000-4000-8000-000000000003",
+      "name": "Cadastrador",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        820,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você faz parte da Áurea, assistente financeira do Core 4 ERP. Responda sempre em português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas em dd/MM/yyyy. NUNCA invente números: todo valor financeiro citado deve vir de uma ferramenta chamada NESTA resposta. NUNCA exponha termos técnicos (IDs internos, nomes de tabelas, exceções, códigos de permissão) ao usuário. Se uma ferramenta retornar erro de permissão, explique que o usuário não tem acesso e oriente a falar com o administrador. Hoje é {{ $now.format('dd/MM/yyyy') }}.\n\nVocê é o Analista da Áurea: responde análises comparativas, tendências e perguntas sobre documentos enviados, e gera relatórios.\n\nRegras:\n1. O material recuperado da base de conhecimento (RAG) serve para CONTEXTO HISTÓRICO e conteúdo de documentos — NUNCA como fonte de números atuais. Qualquer valor corrente citado deve vir de uma ferramenta de consulta chamada NESTA resposta.\n2. Comparações: explicite o critério (regime de competência × caixa; período exato comparado) para o usuário saber o que está vendo.\n3. Relatório: gere apenas quando o usuário pedir arquivo/planilha/exportação. Entregue os dados retornados pela ferramenta — NUNCA invente ou reescreva URLs.\n4. Análises devem terminar com 1-2 insights acionáveis (\"Sua maior alta foi X, +32% — puxada por Y\"), não só números.\n5. Documento anexado que não estiver na base ainda: avise que está processando e peça para perguntar novamente em instantes."
+        }
+      },
+      "id": "a4444444-0000-4000-8000-000000000004",
+      "name": "Analista",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        820,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você faz parte da Áurea, assistente financeira do Core 4 ERP. Responda sempre em português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas em dd/MM/yyyy. NUNCA invente números: todo valor financeiro citado deve vir de uma ferramenta chamada NESTA resposta. NUNCA exponha termos técnicos (IDs internos, nomes de tabelas, exceções, códigos de permissão) ao usuário. Se uma ferramenta retornar erro de permissão, explique que o usuário não tem acesso e oriente a falar com o administrador. Hoje é {{ $now.format('dd/MM/yyyy') }}.\n\nVocê é a linha de frente da Áurea para conversa leve: saudações, agradecimentos e perguntas sobre o que você sabe fazer. Responda diretamente, com simpatia, SEM chamar nenhuma ferramenta e SEM citar números financeiros.\n\nQuando perguntarem o que você faz, explique em linguagem simples: você ajuda a consultar saldos, contas a pagar e receber, faturas de cartão, investimentos e assinaturas; registrar e baixar contas; lançar compras no cartão; transferir entre contas; cadastrar fornecedores, categorias, contas e cartões; e analisar/compare gastos e gerar relatórios. Convide o usuário a pedir uma dessas coisas."
+        }
+      },
+      "id": "a5555555-0000-4000-8000-000000000005",
+      "name": "SmallTalk",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        820,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ ({ resposta: $json.output, agente: $('Roteador').item.json.output.agente, acoes: [] }) }}",
+        "options": {}
+      },
+      "id": "55555555-5555-4555-8555-555555555555",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Consulta o painel financeiro geral (dashboard): saldo total, receitas e despesas do mês, projeção de vencimentos. Aceita mesInicio/anoInicio/mesFim/anoFim opcionais.",
+        "url": "http://backend:8080/api/dashboard",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "mesInicio",
+              "value": "{mesInicio}"
+            },
+            {
+              "name": "anoInicio",
+              "value": "{anoInicio}"
+            },
+            {
+              "name": "mesFim",
+              "value": "{mesFim}"
+            },
+            {
+              "name": "anoFim",
+              "value": "{anoFim}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000001-0000-4000-8000-000000000001",
+      "name": "consultarDashboard",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista contas a pagar/receber. Filtros opcionais na query: tipo (PAGAR ou RECEBER) e status (PENDENTE, BAIXADA, VENCIDA).",
+        "url": "http://backend:8080/api/contas",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "tipo",
+              "value": "{tipo}"
+            },
+            {
+              "name": "status",
+              "value": "{status}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000002-0000-4000-8000-000000000002",
+      "name": "consultarContas",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista as contas correntes (bancárias) do usuário com seus saldos. Use para descobrir o ID de uma conta pelo nome.",
+        "url": "http://backend:8080/api/contas-correntes",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000003-0000-4000-8000-000000000003",
+      "name": "consultarContasCorrentes",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista os cartões de crédito do usuário. Use para descobrir o ID de um cartão pelo nome.",
+        "url": "http://backend:8080/api/cartoes",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000004-0000-4000-8000-000000000004",
+      "name": "consultarCartoes",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista as categorias de receita e despesa do usuário. Use para descobrir o ID de uma categoria pelo nome.",
+        "url": "http://backend:8080/api/categorias",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000005-0000-4000-8000-000000000005",
+      "name": "consultarCategorias",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista os parceiros (fornecedores e clientes). Use para verificar se um parceiro já existe e descobrir o ID pelo nome.",
+        "url": "http://backend:8080/api/parceiros",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000006-0000-4000-8000-000000000006",
+      "name": "consultarParceiros",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista as carteiras de investimento do usuário e suas posições.",
+        "url": "http://backend:8080/api/investimentos",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000007-0000-4000-8000-000000000007",
+      "name": "consultarInvestimentos",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista as assinaturas recorrentes do usuário (ativas e inativas).",
+        "url": "http://backend:8080/api/assinaturas",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000008-0000-4000-8000-000000000008",
+      "name": "consultarAssinaturas",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista as notificações não lidas do usuário.",
+        "url": "http://backend:8080/api/notificacoes",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000009-0000-4000-8000-000000000009",
+      "name": "consultarNotificacoes",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Resumo de gastos por cartão no período. Query: mesInicio, anoInicio, mesFim, anoFim.",
+        "url": "http://backend:8080/api/cartoes/dashboard/resumo",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "mesInicio",
+              "value": "{mesInicio}"
+            },
+            {
+              "name": "anoInicio",
+              "value": "{anoInicio}"
+            },
+            {
+              "name": "mesFim",
+              "value": "{mesFim}"
+            },
+            {
+              "name": "anoFim",
+              "value": "{anoFim}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000010-0000-4000-8000-000000000010",
+      "name": "consultarGastosCartao",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista os lançamentos de um cartão numa fatura. Informe o cartaoId (obtido por consulta prévia) e, na query, mes e ano.",
+        "url": "http://backend:8080/api/cartoes/{cartaoId}/lancamentos",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "mes",
+              "value": "{mes}"
+            },
+            {
+              "name": "ano",
+              "value": "{ano}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000011-0000-4000-8000-000000000011",
+      "name": "consultarLancamentosCartao",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Registra uma nova conta a pagar ou a receber. Campos: descricao, valor (número), tipo (PAGAR ou RECEBER), dataVencimento e dataCompetencia (AAAA-MM-DD), parceiroId e categoriaId (números). Confirme os dados antes de chamar.",
+        "url": "http://backend:8080/api/contas",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"descricao\": \"{descricao}\",\n  \"valor\": {valor},\n  \"tipo\": \"{tipo}\",\n  \"dataVencimento\": \"{dataVencimento}\",\n  \"dataCompetencia\": \"{dataCompetencia}\",\n  \"parceiroId\": {parceiroId},\n  \"categoriaId\": {categoriaId}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000012-0000-4000-8000-000000000012",
+      "name": "registrarConta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Atualiza uma conta existente (somente PENDENTE ou VENCIDA). Informe o id na URL e os campos a alterar no corpo.",
+        "url": "http://backend:8080/api/contas/{id}",
+        "options": {},
+        "method": "PUT",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"descricao\": \"{descricao}\",\n  \"valor\": {valor},\n  \"dataVencimento\": \"{dataVencimento}\",\n  \"dataCompetencia\": \"{dataCompetencia}\",\n  \"parceiroId\": {parceiroId},\n  \"categoriaId\": {categoriaId}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000013-0000-4000-8000-000000000013",
+      "name": "atualizarConta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Exclui uma conta a pagar/receber. Informe o id na URL. Operação irreversível — confirme com o usuário antes.",
+        "url": "http://backend:8080/api/contas/{id}",
+        "options": {},
+        "method": "DELETE",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000014-0000-4000-8000-000000000014",
+      "name": "excluirConta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Baixa (marca como paga) uma conta existente. Informe o id na URL e, no corpo, contaCorrenteId e dataPagamento (AAAA-MM-DD). Confirme antes de baixar.",
+        "url": "http://backend:8080/api/contas/{id}/baixa",
+        "options": {},
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"contaCorrenteId\": {contaCorrenteId},\n  \"dataPagamento\": \"{dataPagamento}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000015-0000-4000-8000-000000000015",
+      "name": "baixarConta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Estorna a baixa de uma conta (desfaz o pagamento). Informe o id na URL. Operação sensível — confirme com o usuário antes.",
+        "url": "http://backend:8080/api/contas/{id}/baixa",
+        "options": {},
+        "method": "DELETE",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000016-0000-4000-8000-000000000016",
+      "name": "estornarConta",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Registra um lançamento (compra ou estorno) num cartão. Informe o cartaoId na URL e, no corpo: descricao, valor (número), tipo (SAIDA para compra, ENTRADA para estorno/cashback), parceiroId e categoriaId (obrigatórios), dataCompra (AAAA-MM-DD).",
+        "url": "http://backend:8080/api/cartoes/{cartaoId}/lancamentos",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"descricao\": \"{descricao}\",\n  \"valor\": {valor},\n  \"tipo\": \"{tipo}\",\n  \"parceiroId\": {parceiroId},\n  \"categoriaId\": {categoriaId},\n  \"dataCompra\": \"{dataCompra}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000017-0000-4000-8000-000000000017",
+      "name": "registrarLancamentoCartao",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Transfere valor entre duas contas correntes. Corpo: contaCorrenteOrigemId, contaCorrenteDestinoId, valor (número), data (AAAA-MM-DD), descricao. Alto valor: confirme com o usuário antes.",
+        "url": "http://backend:8080/api/contas-correntes/transferir",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"contaCorrenteOrigemId\": {contaCorrenteOrigemId},\n  \"contaCorrenteDestinoId\": {contaCorrenteDestinoId},\n  \"valor\": {valor},\n  \"data\": \"{data}\",\n  \"descricao\": \"{descricao}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000018-0000-4000-8000-000000000018",
+      "name": "transferirEntreContas",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1020
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Fecha a fatura de um cartão. Informe o cartaoId na URL e, no corpo, mes e ano. Fatura com total líquido <= 0 não fecha.",
+        "url": "http://backend:8080/api/cartoes/{cartaoId}/fechar-fatura",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"mes\": {mes},\n  \"ano\": {ano}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000019-0000-4000-8000-000000000019",
+      "name": "fecharFatura",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1140
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Registra uma transação numa carteira de investimento. Informe o contaInvestimentoId na URL e, no corpo: tipo (APORTE, RESGATE ou RENDIMENTO), valor (número), data (AAAA-MM-DD).",
+        "url": "http://backend:8080/api/investimentos/{contaInvestimentoId}/transacoes",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"tipo\": \"{tipo}\",\n  \"valor\": {valor},\n  \"data\": \"{data}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000020-0000-4000-8000-000000000020",
+      "name": "registrarTransacaoInvestimento",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1260
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cadastra um novo parceiro (fornecedor ou cliente). Campos: nome, cpfCnpj (obrigatório, somente dígitos), tipo (FORNECEDOR ou CLIENTE). Nunca cadastre sem CPF/CNPJ.",
+        "url": "http://backend:8080/api/parceiros",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"nome\": \"{nome}\",\n  \"cpfCnpj\": \"{cpfCnpj}\",\n  \"tipo\": \"{tipo}\"\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000021-0000-4000-8000-000000000021",
+      "name": "registrarParceiro",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Consulta dados públicos de um CNPJ (razão social, endereço, situação) na Receita Federal via BrasilAPI. Informe apenas os 14 dígitos do CNPJ. Use antes de cadastrar um fornecedor por CNPJ.",
+        "url": "https://brasilapi.com.br/api/cnpj/v1/{cnpj}",
+        "options": {}
+      },
+      "id": "t00000022-0000-4000-8000-000000000022",
+      "name": "consultarCnpj",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cadastra uma nova categoria. Campos: nome, tipo (RECEITA ou DESPESA). Para subcategoria, informe categoriaPaiId (máx. 2 níveis).",
+        "url": "http://backend:8080/api/categorias",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"nome\": \"{nome}\",\n  \"tipo\": \"{tipo}\",\n  \"categoriaPaiId\": {categoriaPaiId}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000023-0000-4000-8000-000000000023",
+      "name": "registrarCategoria",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        940
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cadastra uma nova conta corrente (bancária). Campos: nome, banco, saldoInicial (número).",
+        "url": "http://backend:8080/api/contas-correntes",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"nome\": \"{nome}\",\n  \"banco\": \"{banco}\",\n  \"saldoInicial\": {saldoInicial}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000024-0000-4000-8000-000000000024",
+      "name": "registrarContaCorrente",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1060
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cadastra um novo cartão de crédito. Campos: nome, limite (número), diaFechamento, diaVencimento, contaCorrenteId (vinculada, obtida por consulta prévia).",
+        "url": "http://backend:8080/api/cartoes",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"nome\": \"{nome}\",\n  \"limite\": {limite},\n  \"diaFechamento\": {diaFechamento},\n  \"diaVencimento\": {diaVencimento},\n  \"contaCorrenteId\": {contaCorrenteId}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000025-0000-4000-8000-000000000025",
+      "name": "registrarCartaoCredito",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1180
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cadastra uma nova assinatura recorrente. Campos: descricao, valor (número), diaVencimento, categoriaId, parceiroId (obtidos por consulta prévia).",
+        "url": "http://backend:8080/api/assinaturas",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"descricao\": \"{descricao}\",\n  \"valor\": {valor},\n  \"diaVencimento\": {diaVencimento},\n  \"categoriaId\": {categoriaId},\n  \"parceiroId\": {parceiroId}\n}",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000026-0000-4000-8000-000000000026",
+      "name": "registrarAssinatura",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Dados do DRE (demonstrativo de resultados) por período, em JSON. Query: dataInicio e dataFim (AAAA-MM-DD).",
+        "url": "http://backend:8080/api/relatorios/dre/dados",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "dataInicio",
+              "value": "{dataInicio}"
+            },
+            {
+              "name": "dataFim",
+              "value": "{dataFim}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000027-0000-4000-8000-000000000027",
+      "name": "dadosDre",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Dados do fluxo de caixa por período, em JSON. Query: dataInicio e dataFim (AAAA-MM-DD).",
+        "url": "http://backend:8080/api/relatorios/fluxo-caixa/dados",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "dataInicio",
+              "value": "{dataInicio}"
+            },
+            {
+              "name": "dataFim",
+              "value": "{dataFim}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            }
+          ]
+        }
+      },
+      "id": "t00000028-0000-4000-8000-000000000028",
+      "name": "dadosFluxoCaixa",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        1420
+      ]
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "e0000000-0000-4000-8000-000000000099",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1560,
+        1560
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "hE2bB25Vmq6508Fk",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "baseConhecimento",
+        "toolDescription": "Busca semantica na base de conhecimento (documentos anexados e resumos financeiros historicos) da empresa. Use para contexto historico e conteudo de anexos; NUNCA para numeros atuais.",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "core4erp_rag"
+        },
+        "topK": 5,
+        "includeDocumentMetadata": true,
+        "options": {
+          "contentPayloadKey": "doc_content",
+          "searchFilterJson": "={\n  \"must\": [\n    {\n      \"key\": \"empresaId\",\n      \"match\": {\n        \"value\": \"{{ $('Webhook').item.json.body.empresaId }}\"\n      }\n    }\n  ]\n}"
+        }
+      },
+      "id": "q0000000-0000-4000-8000-000000000098",
+      "name": "baseConhecimento",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        1780,
+        1420
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "1IQxvQqxWElGqMM9",
+          "name": "Qdrant account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "consultarDashboard": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analista",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarContas": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarContasCorrentes": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarCartoes": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarCategorias": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarParceiros": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarInvestimentos": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarAssinaturas": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarNotificacoes": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarGastosCartao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Analista",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarLancamentosCartao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarConta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "atualizarConta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "excluirConta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "baixarConta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "estornarConta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarLancamentoCartao": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "transferirEntreContas": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fecharFatura": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarTransacaoInvestimento": {
+      "ai_tool": [
+        [
+          {
+            "node": "Executor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarParceiro": {
+      "ai_tool": [
+        [
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarCnpj": {
+      "ai_tool": [
+        [
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarCategoria": {
+      "ai_tool": [
+        [
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarContaCorrente": {
+      "ai_tool": [
+        [
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarCartaoCredito": {
+      "ai_tool": [
+        [
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "registrarAssinatura": {
+      "ai_tool": [
+        [
+          {
+            "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dadosDre": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analista",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dadosFluxoCaixa": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analista",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "baseConhecimento",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "baseConhecimento": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analista",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Roteador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Roteador",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Consultor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Cadastrador",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Analista",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "SmallTalk",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Consultor",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Executor",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Cadastrador",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Analista",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "SmallTalk",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classificacao": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Roteador",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Roteador": {
+      "main": [
+        [
+          {
+            "node": "Switch Agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Agente": {
+      "main": [
+        [
+          {
+            "node": "Consultor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Executor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cadastrador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analista",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SmallTalk",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SmallTalk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultor": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executor": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cadastrador": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analista": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SmallTalk": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "notas": "WF-AUREA multi-agente co-localizado: Webhook POST /aurea -> Roteador (AI Agent, saida estruturada agente/resumoIntencao, sem tools) -> Switch por agente -> 5 sub-agentes (Consultor/Executor/Cadastrador/Analista/SmallTalk), cada um AI Agent gpt-4o-mini temp0.1 com prompt exato da Parte 4, memoria Postgres compartilhada (sessionKey=conversaId) e subconjunto de tools HTTP (Bearer do jwt do payload). Revisor (§4.4) incorporado como regra de auto-revisao no prompt do Executor (nao e no separado). Analista com retrieval Qdrant (colecao core4erp_rag) filtrado por empresaId. Convergem em 1 Respond to Webhook {resposta,agente,acoes}."
+  }
+}
