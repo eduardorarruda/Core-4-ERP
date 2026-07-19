@@ -1,51 +1,157 @@
 {
-  "id": "ragingestwf00001",
-  "name": "RAG Ingest - Pré-processamento",
+  "name": "WF-DOC — RAG Ingest (anexos → Qdrant)",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "rag-ingest",
         "responseMode": "responseNode",
+        "authentication": "headerAuth",
         "options": {}
       },
       "id": "b1a11111-1111-4111-8111-111111111111",
-      "name": "Webhook",
+      "name": "Webhook Ingest",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 300],
-      "webhookId": "rag-ingest-webhook"
+      "position": [160, 320],
+      "webhookId": "rag-ingest-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_HEADER_AUTH",
+          "name": "N8N Webhook Secret (X-Webhook-Secret)"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const b = ($input.first().json.body) || $input.first().json || {};\nlet texto = (b.texto || '').toString();\ntexto = texto.replace(/\\r\\n/g, '\\n').split('\\n').map(function(l){return l.replace(/[\\t ]+$/,'');}).join('\\n').replace(/\\n{3,}/g, '\\n\\n').trim();\nreturn [{ json: { texto: texto, tipo: b.tipo || 'anexo', fonte: b.fonte || '' } }];"
+        "jsCode": "// Normaliza o payload e VALIDA empresaId (obrigatório na Fase 2.1 — isolamento multi-tenant).\nconst b = ($input.first().json.body) || $input.first().json || {};\n\nconst empresaId = b.empresaId;\nif (empresaId === undefined || empresaId === null || empresaId === '') {\n  throw new Error('empresaId obrigatório — recusando ingest sem tenant (vazamento cross-tenant).');\n}\n\nlet texto = (b.texto || '').toString();\ntexto = texto\n  .replace(/\\r\\n/g, '\\n')\n  .split('\\n').map(function (l) { return l.replace(/[\\t ]+$/, ''); }).join('\\n')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\nif (!texto) {\n  throw new Error('texto vazio — nada para indexar.');\n}\n\nreturn [{ json: { texto: texto, tipo: b.tipo || 'anexo', fonte: b.fonte || '', empresaId: empresaId } }];"
       },
       "id": "c2a22222-2222-4222-8222-222222222222",
-      "name": "Normalizar",
+      "name": "Normalizar e Validar",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [400, 320]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "list",
+          "value": "core4erp_rag",
+          "cachedResultName": "core4erp_rag"
+        },
+        "options": {}
+      },
+      "id": "e4a44444-4444-4444-8444-444444444444",
+      "name": "Qdrant Insert (core4erp_rag)",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.1,
+      "position": [660, 320],
+      "credentials": {
+        "qdrantApi": {
+          "id": "PLACEHOLDER_QDRANT",
+          "name": "Qdrant Core4 (http://qdrant:6333)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "f5a55555-5555-4555-8555-555555555555",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [560, 560],
+      "credentials": {
+        "openAiApi": {
+          "id": "PLACEHOLDER_OPENAI",
+          "name": "OpenAI Core4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $('Normalizar e Validar').item.json.texto }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              { "name": "empresaId", "value": "={{ $('Normalizar e Validar').item.json.empresaId }}" },
+              { "name": "tipo", "value": "={{ $('Normalizar e Validar').item.json.tipo }}" },
+              { "name": "fonte", "value": "={{ $('Normalizar e Validar').item.json.fonte }}" }
+            ]
+          }
+        }
+      },
+      "id": "a6a66666-6666-4666-8666-666666666666",
+      "name": "Data Loader (metadado empresaId)",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [760, 560]
+    },
+    {
+      "parameters": {
+        "chunkSize": 1000,
+        "chunkOverlap": 100,
+        "options": {}
+      },
+      "id": "b7a77777-7777-4777-8777-777777777777",
+      "name": "Text Splitter (1000)",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [960, 760]
+    },
+    {
+      "parameters": {
+        "jsCode": "// O nó de insert do vector store devolve os documentos inseridos. Conta os chunks.\nconst n = $input.all().length;\nreturn [{ json: { ok: true, chunks: n } }];"
+      },
+      "id": "c8a88888-8888-4888-8888-888888888888",
+      "name": "Contar Chunks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 320]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { \"texto\": $json.texto, \"tipo\": $json.tipo, \"fonte\": $json.fonte } }}",
+        "responseBody": "={{ { \"ok\": true, \"chunks\": $json.chunks } }}",
         "options": {}
       },
-      "id": "d3a33333-3333-4333-8333-333333333333",
+      "id": "d9a99999-9999-4999-8999-999999999999",
       "name": "Responder",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [680, 300]
+      "position": [1180, 320]
     }
   ],
   "connections": {
-    "Webhook": {
-      "main": [[{ "node": "Normalizar", "type": "main", "index": 0 }]]
+    "Webhook Ingest": {
+      "main": [[{ "node": "Normalizar e Validar", "type": "main", "index": 0 }]]
     },
-    "Normalizar": {
+    "Normalizar e Validar": {
+      "main": [[{ "node": "Qdrant Insert (core4erp_rag)", "type": "main", "index": 0 }]]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [[{ "node": "Qdrant Insert (core4erp_rag)", "type": "ai_embedding", "index": 0 }]]
+    },
+    "Data Loader (metadado empresaId)": {
+      "ai_document": [[{ "node": "Qdrant Insert (core4erp_rag)", "type": "ai_document", "index": 0 }]]
+    },
+    "Text Splitter (1000)": {
+      "ai_textSplitter": [[{ "node": "Data Loader (metadado empresaId)", "type": "ai_textSplitter", "index": 0 }]]
+    },
+    "Qdrant Insert (core4erp_rag)": {
+      "main": [[{ "node": "Contar Chunks", "type": "main", "index": 0 }]]
+    },
+    "Contar Chunks": {
       "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
     }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "notas": "WF-DOC / Fase 2.1. Pipeline: Webhook (Header Auth) -> Normalizar/Validar (empresaId obrigatório) -> Qdrant Insert (core4erp_rag) alimentado por Embeddings text-embedding-3-small + Data Loader (metadado empresaId) + Text Splitter chunk 1000 -> conta chunks -> responde {ok,chunks}. Credenciais NOMEADAS (placeholders): OpenAI Core4, Qdrant Core4, N8N Webhook Secret. VALIDAR na UI: (1) typeVersions dos nós langchain conforme a build 2.28.3; (2) binding real das 3 credenciais; (3) que o metadado empresaId está presente em cada ponto inserido (regra de ouro anti cross-tenant)."
+  }
 }
