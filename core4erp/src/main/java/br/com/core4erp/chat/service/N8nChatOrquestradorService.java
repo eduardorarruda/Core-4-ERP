@@ -39,14 +39,20 @@ public class N8nChatOrquestradorService {
 
     public N8nChatOrquestradorService(
             @Value("${chat.n8n.aurea-webhook-url:http://n8n:5678/webhook/aurea}") String webhookUrl,
-            @Value("${chat.n8n.webhook-secret:}") String webhookSecret) {
+            @Value("${chat.n8n.webhook-secret:}") String webhookSecret,
+            @Value("${chat.n8n.read-timeout-seconds:60}") int readTimeoutSeconds) {
         this.webhookUrl = webhookUrl;
         this.webhookSecret = webhookSecret;
-        // Timeout explícito (CLAUDE.md §21): conexão curta; leitura ~60s — o roteador do n8n
-        // encadeia agente + tools + memória Postgres antes de responder (Respond to Webhook).
+        // Timeout explícito (CLAUDE.md §21): conexão curta; leitura configurável — o roteador do n8n
+        // encadeia agente + tools + memória Postgres antes de responder (Respond to Webhook). O ramo
+        // LOTE (multi-agente: extrator→verificador→revisor→executor→redator) precisa de mais folga,
+        // por isso em produção usamos 90s (< teto ~100s do Cloudflare free). Deixe SEMPRE este valor
+        // MAIOR que o orçamento interno do pipeline no n8n: se o backend desistir antes de o n8n
+        // terminar, o fallback interno REEXECUTA a mensagem — e num LOTE de escrita isso duplicaria
+        // cadastros. Ver Fase A do plano multi-agente.
         SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
         f.setConnectTimeout(5_000);
-        f.setReadTimeout(60_000);
+        f.setReadTimeout(Math.max(1, readTimeoutSeconds) * 1_000);
         this.client = RestClient.builder().requestFactory(f).build();
     }
 
