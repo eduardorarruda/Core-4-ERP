@@ -344,19 +344,23 @@
           "values": [
             {
               "name": "mesInicio",
-              "value": "{mesInicio}"
+              "value": "{mesInicio}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "anoInicio",
-              "value": "{anoInicio}"
+              "value": "{anoInicio}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "mesFim",
-              "value": "{mesFim}"
+              "value": "{mesFim}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "anoFim",
-              "value": "{anoFim}"
+              "value": "{anoFim}",
+              "valueProvider": "modelOptional"
             }
           ]
         },
@@ -392,11 +396,13 @@
           "values": [
             {
               "name": "tipo",
-              "value": "{tipo}"
+              "value": "{tipo}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "status",
-              "value": "{status}"
+              "value": "{status}",
+              "valueProvider": "modelOptional"
             }
           ]
         },
@@ -614,19 +620,23 @@
           "values": [
             {
               "name": "mesInicio",
-              "value": "{mesInicio}"
+              "value": "{mesInicio}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "anoInicio",
-              "value": "{anoInicio}"
+              "value": "{anoInicio}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "mesFim",
-              "value": "{mesFim}"
+              "value": "{mesFim}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "anoFim",
-              "value": "{anoFim}"
+              "value": "{anoFim}",
+              "valueProvider": "modelOptional"
             }
           ]
         },
@@ -662,11 +672,13 @@
           "values": [
             {
               "name": "mes",
-              "value": "{mes}"
+              "value": "{mes}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "ano",
-              "value": "{ano}"
+              "value": "{ano}",
+              "valueProvider": "modelOptional"
             }
           ]
         },
@@ -1131,11 +1143,13 @@
           "values": [
             {
               "name": "dataInicio",
-              "value": "{dataInicio}"
+              "value": "{dataInicio}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "dataFim",
-              "value": "{dataFim}"
+              "value": "{dataFim}",
+              "valueProvider": "modelOptional"
             }
           ]
         },
@@ -1171,11 +1185,13 @@
           "values": [
             {
               "name": "dataInicio",
-              "value": "{dataInicio}"
+              "value": "{dataInicio}",
+              "valueProvider": "modelOptional"
             },
             {
               "name": "dataFim",
-              "value": "{dataFim}"
+              "value": "{dataFim}",
+              "valueProvider": "modelOptional"
             }
           ]
         },
