@@ -61,8 +61,10 @@ services:
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
       OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${NMON_OTLP_ENDPOINT:-http://2.25.197.81:8095}
-      OTEL_EXPORTER_OTLP_HEADERS: X-NMon-Key=${NMON_INGEST_KEY:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${NMON_OTLP_ENDPOINT:-https://monitoramento.ebpos.digital}
+      # Nome do header de ingestão parametrizável: o Painel EBPÓS novo usa X-Painel-Key;
+      # o nmon clássico usava X-NMon-Key (setar OTEL_INGEST_HEADER=X-NMon-Key p/ voltar).
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_INGEST_HEADER:-X-Painel-Key}=${NMON_INGEST_KEY:-}
       OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=production}
       OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
     depends_on:
