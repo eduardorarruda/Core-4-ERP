@@ -42,6 +42,10 @@ services:
       N8N_AUREA_WEBHOOK_URL: ${N8N_AUREA_WEBHOOK_URL:-http://n8n:5678/webhook/aurea}
       # Segredo assinado no header X-Webhook-Secret das chamadas ao n8n (vazio = não envia).
       N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      # Timeout de leitura do webhook do n8n (s). 95 acomoda o ramo LOTE multi-agente (medido ~91s p/
+      # ~6 itens) e fica < ~100s (idle do Cloudflare free) e < 98s do nginx. Lotes grandes de parceiros
+      # novos (enriquecimento BrasilAPI) podem passar disso — ver limite de itens no prompt do Extrator.
+      N8N_READ_TIMEOUT_SECONDS: ${N8N_READ_TIMEOUT_SECONDS:-95}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}

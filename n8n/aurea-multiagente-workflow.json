@@ -67,7 +67,7 @@
         "text": "={{ $json.body.mensagem }}",
         "hasOutputParser": true,
         "options": {
-          "systemMessage": "Você é o roteador interno da Áurea. Sua ÚNICA função é classificar a mensagem do usuário e escolher qual agente especializado deve atendê-la. Não responda ao usuário.\n\nAgentes disponíveis:\n- CONSULTOR: perguntas de leitura — saldos, extratos, contas a pagar/receber, faturas de cartão, investimentos, assinaturas, notificações. \"Quanto…\", \"Liste…\", \"Qual o saldo…\".\n- EXECUTOR: ações que alteram dados — registrar/baixar/estornar conta, lançar compra no cartão, transferir entre contas, fechar fatura, registrar aporte.\n- CADASTRADOR: criar/editar parceiros, categorias, contas correntes, cartões, assinaturas; consultas de CNPJ.\n- ANALISTA: análises comparativas e históricas (\"compare meus gastos\", \"como evoluiu\"), relatórios em Excel, perguntas sobre documentos/anexos enviados.\n- SMALLTALK: saudações, agradecimentos, perguntas sobre o que a Áurea sabe fazer.\n\nRegras:\n1. Uma mensagem com leitura E escrita (\"paga a conta de luz e me diz quanto sobra\") vai para EXECUTOR — ele consulta o que precisar depois de agir.\n2. Extraia entidades óbvias (valores, datas, nomes de parceiro/categoria/cartão) em \"resumoIntencao\" para o próximo agente não re-perguntar.\n3. Em dúvida entre CONSULTOR e ANALISTA: pergunta pontual → CONSULTOR; comparação/tendência/documento → ANALISTA.\n4. Responda APENAS o JSON no formato combinado: {\"agente\":\"...\",\"resumoIntencao\":\"...\"}. O campo agente deve ser exatamente um de: CONSULTOR, EXECUTOR, CADASTRADOR, ANALISTA, SMALLTALK."
+          "systemMessage": "Você é o roteador interno da Áurea. Sua ÚNICA função é classificar a mensagem do usuário e escolher qual agente especializado deve atendê-la. Não responda ao usuário.\n\nAgentes disponíveis:\n- CONSULTOR: perguntas de leitura — saldos, extratos, contas a pagar/receber, faturas de cartão, investimentos, assinaturas, notificações. \"Quanto…\", \"Liste…\", \"Qual o saldo…\".\n- EXECUTOR: ações que alteram dados — registrar/baixar/estornar conta, lançar compra no cartão, transferir entre contas, fechar fatura, registrar aporte.\n- CADASTRADOR: criar/editar parceiros, categorias, contas correntes, cartões, assinaturas; consultas de CNPJ.\n- ANALISTA: análises comparativas e históricas (\"compare meus gastos\", \"como evoluiu\"), relatórios em Excel, perguntas sobre documentos/anexos enviados.\n- SMALLTALK: saudações, agradecimentos, perguntas sobre o que a Áurea sabe fazer.\n- LOTE: cadastro EM MASSA a partir de arquivo(s)/anexo(s) — quando a mensagem traz conteúdo de arquivo E pede para cadastrar/importar VÁRIAS categorias e/ou parceiros de uma vez. Ex.: \"cadastre as categorias e parceiros desses arquivos\". É um pipeline multi-etapa (extrai → verifica duplicados → revisa → cadastra → relata).\n\nRegras:\n1. Uma mensagem com leitura E escrita (\"paga a conta de luz e me diz quanto sobra\") vai para EXECUTOR — ele consulta o que precisar depois de agir.\n2. Extraia entidades óbvias (valores, datas, nomes de parceiro/categoria/cartão) em \"resumoIntencao\" para o próximo agente não re-perguntar.\n3. Em dúvida entre CONSULTOR e ANALISTA: pergunta pontual → CONSULTOR; comparação/tendência/documento → ANALISTA.\n4. Responda APENAS o JSON no formato combinado: {\"agente\":\"...\",\"resumoIntencao\":\"...\"}. O campo agente deve ser exatamente um de: CONSULTOR, EXECUTOR, CADASTRADOR, ANALISTA, SMALLTALK, LOTE."
         }
       },
       "id": "22222222-2222-4222-8222-222222222222",
@@ -82,7 +82,7 @@
     {
       "parameters": {
         "schemaType": "manual",
-        "inputSchema": "{\"type\": \"object\", \"properties\": {\"agente\": {\"type\": \"string\", \"enum\": [\"CONSULTOR\", \"EXECUTOR\", \"CADASTRADOR\", \"ANALISTA\", \"SMALLTALK\"]}, \"resumoIntencao\": {\"type\": \"string\"}}, \"required\": [\"agente\", \"resumoIntencao\"]}"
+        "inputSchema": "{\"type\": \"object\", \"properties\": {\"agente\": {\"type\": \"string\", \"enum\": [\"CONSULTOR\", \"EXECUTOR\", \"CADASTRADOR\", \"ANALISTA\", \"SMALLTALK\", \"LOTE\"]}, \"resumoIntencao\": {\"type\": \"string\"}}, \"required\": [\"agente\", \"resumoIntencao\"]}"
       },
       "id": "66666666-6666-4666-8666-666666666666",
       "name": "Classificacao",
@@ -217,6 +217,30 @@
               },
               "renameOutput": true,
               "outputKey": "SMALLTALK"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-LOTE",
+                    "leftValue": "={{ $json.output.agente }}",
+                    "rightValue": "LOTE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "LOTE"
             }
           ]
         },
@@ -969,13 +993,13 @@
     },
     {
       "parameters": {
-        "toolDescription": "Cadastra um novo parceiro (fornecedor ou cliente). Campos: nome, cpfCnpj (obrigatório, somente dígitos), tipo (FORNECEDOR ou CLIENTE). Nunca cadastre sem CPF/CNPJ.",
+        "toolDescription": "Cria um parceiro (cliente/fornecedor). Campos: razaoSocial (nome/razão social, obrigatório), cpfCnpj (só dígitos, obrigatório e validado), tipo (CLIENTE, FORNECEDOR ou AMBOS).",
         "url": "http://backend:8080/api/parceiros",
         "options": {},
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"nome\": \"{nome}\",\n  \"cpfCnpj\": \"{cpfCnpj}\",\n  \"tipo\": \"{tipo}\"\n}",
+        "jsonBody": "{\n  \"razaoSocial\": \"{razaoSocial}\",\n  \"cpfCnpj\": \"{cpfCnpj}\",\n  \"tipo\": \"{tipo}\"\n}",
         "sendHeaders": true,
         "specifyHeaders": "keypair",
         "parametersHeaders": {
@@ -1014,13 +1038,13 @@
     },
     {
       "parameters": {
-        "toolDescription": "Cadastra uma nova categoria. Campos: nome, tipo (RECEITA ou DESPESA). Para subcategoria, informe categoriaPaiId (máx. 2 níveis).",
+        "toolDescription": "Cria uma categoria (raiz). Campo obrigatório: descricao (o nome da categoria).",
         "url": "http://backend:8080/api/categorias",
         "options": {},
         "method": "POST",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"nome\": \"{nome}\",\n  \"tipo\": \"{tipo}\",\n  \"categoriaPaiId\": {categoriaPaiId}\n}",
+        "jsonBody": "{\n  \"descricao\": \"{descricao}\"\n}",
         "sendHeaders": true,
         "specifyHeaders": "keypair",
         "parametersHeaders": {
@@ -1267,6 +1291,87 @@
           "name": "Qdrant account"
         }
       }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você é o EXTRATOR do modo LOTE da Áurea. A mensagem contém o conteúdo de um ou mais arquivos anexados (planilha, texto, PDF). Sua tarefa: extrair TODAS as categorias e parceiros presentes. NÃO use ferramentas. NÃO invente itens que não estejam nos arquivos. LIMITE: no máximo 15 itens no total (categorias + parceiros somados); se houver mais, extraia os 15 primeiros e acrescente um campo \"aviso\" no JSON dizendo quantos ficaram de fora para o usuário reenviar depois. Uma categoria tem APENAS um nome (campo 'descricao'). Um parceiro tem 'razaoSocial' (nome/razão social), 'cpfCnpj' (só dígitos, sem máscara, ou vazio se não houver) e 'tipo' (CLIENTE, FORNECEDOR ou AMBOS — infira pelo contexto; na dúvida use FORNECEDOR). Responda ESTRITAMENTE com um JSON, sem texto antes ou depois, no formato: {\"categorias\":[{\"descricao\":\"...\"}],\"parceiros\":[{\"razaoSocial\":\"...\",\"cpfCnpj\":\"somente digitos ou vazio\",\"tipo\":\"CLIENTE|FORNECEDOR|AMBOS\"}]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        464,
+        1180
+      ],
+      "name": "Lote-Extrator"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Lista extraída dos arquivos:\n\n{{ $json.output }}",
+        "options": {
+          "systemMessage": "Você é o VERIFICADOR do modo LOTE da Áurea. Recebe uma lista de categorias e parceiros extraídos de arquivos. Sua tarefa: descobrir o que JÁ EXISTE na empresa para evitar duplicatas. Chame a ferramenta consultarCategorias e a ferramenta consultarParceiros para obter os cadastros atuais. Para cada item recebido defina jaExiste=true se houver correspondência (categoria pela descricao, ignorando maiúsculas/acentos; parceiro pelo cpfCnpj quando houver, senão pela razaoSocial). Senão jaExiste=false. NÃO cadastre nada. Responda ESTRITAMENTE com JSON no formato: {\"categorias\":[{\"descricao\":\"...\",\"jaExiste\":true|false}],\"parceiros\":[{\"razaoSocial\":\"...\",\"cpfCnpj\":\"...\",\"tipo\":\"...\",\"jaExiste\":true|false}]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        864,
+        1180
+      ],
+      "name": "Lote-Verificador"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Itens verificados (com jaExiste):\n\n{{ $json.output }}",
+        "options": {
+          "systemMessage": "Você é o REVISOR do modo LOTE da Áurea. Você NÃO tem ferramentas e NÃO cadastra nada — sua função é controle de qualidade. Recebe os itens já verificados. Regras de validação: (a) categoria: 'descricao' não pode ser vazia; (b) parceiro: 'razaoSocial' não pode ser vazia, 'tipo' deve ser CLIENTE, FORNECEDOR ou AMBOS, e 'cpfCnpj' deve ter 11 dígitos (CPF) ou 14 (CNPJ) — parceiro sem cpfCnpj com essa contagem é REJEITADO (o cadastro exige documento; o backend ainda valida o dígito verificador). Classifique cada item: se jaExiste=true → 'ignorados'; se inválido → 'rejeitados' com motivo claro em linguagem simples; senão → 'aprovados'. Responda ESTRITAMENTE com JSON: {\"aprovados\":{\"categorias\":[{\"descricao\":\"...\"}],\"parceiros\":[{\"razaoSocial\":\"...\",\"cpfCnpj\":\"...\",\"tipo\":\"...\"}]},\"ignorados\":[\"nome (já existe)\"],\"rejeitados\":[{\"item\":\"nome\",\"motivo\":\"...\"}]}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        1264,
+        1180
+      ],
+      "name": "Lote-Revisor"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Plano de cadastro aprovado:\n\n{{ $json.output }}",
+        "options": {
+          "systemMessage": "Você é o EXECUTOR do modo LOTE da Áurea. Cadastre SOMENTE os itens que estão em 'aprovados'. Para cada categoria aprovada chame registrarCategoria (campo descricao). Para cada parceiro aprovado chame registrarParceiro (campos razaoSocial, cpfCnpj, tipo). Pode e DEVE chamar as ferramentas várias vezes (uma por item) — faça o máximo em paralelo. NÃO cadastre itens de 'ignorados' nem de 'rejeitados'. Se uma ferramenta falhar para um item, registre esse item em 'falhas' com o motivo (em linguagem simples) e CONTINUE com os demais — nunca aborte o lote inteiro. Ao terminar, responda ESTRITAMENTE com JSON: {\"criados\":{\"categorias\":[\"nome\"],\"parceiros\":[\"nome\"]},\"falhas\":[{\"item\":\"nome\",\"motivo\":\"...\"}]}",
+          "maxIterations": 25
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        1664,
+        1180
+      ],
+      "name": "Lote-Executor"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Resultado da revisão:\n{{ $('Lote-Revisor').item.json.output }}\n\nResultado da execução:\n{{ $json.output }}",
+        "options": {
+          "systemMessage": "Você é o REDATOR do modo LOTE da Áurea. Monte a resposta final ao usuário em português brasileiro, tom amigável e claro, SEM termos técnicos, SEM IDs internos, SEM nomes de tabela/coluna. Você recebe o resultado da REVISÃO (ignorados, rejeitados) e o resultado da EXECUÇÃO (criados, falhas). Estruture com tabelas markdown compactas e estas seções, omitindo as vazias: '✅ Cadastrados', '↩️ Já existiam' (ignorados), '⚠️ Não cadastrados' (rejeitados + motivo), '❌ Falhas' (se houver). Comece com uma frase-resumo (ex.: \"Cadastrei 4 itens; 2 já existiam e 1 foi ignorado\"). Se nada foi cadastrado, explique o porquê de forma gentil."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        2064,
+        1180
+      ],
+      "name": "Lote-Redator"
     }
   ],
   "connections": {
@@ -1361,6 +1466,11 @@
             "node": "Cadastrador",
             "type": "ai_tool",
             "index": 0
+          },
+          {
+            "node": "Lote-Verificador",
+            "type": "ai_tool",
+            "index": 0
           }
         ]
       ]
@@ -1380,6 +1490,11 @@
           },
           {
             "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Lote-Verificador",
             "type": "ai_tool",
             "index": 0
           }
@@ -1552,6 +1667,11 @@
             "node": "Cadastrador",
             "type": "ai_tool",
             "index": 0
+          },
+          {
+            "node": "Lote-Executor",
+            "type": "ai_tool",
+            "index": 0
           }
         ]
       ]
@@ -1563,6 +1683,11 @@
             "node": "Cadastrador",
             "type": "ai_tool",
             "index": 0
+          },
+          {
+            "node": "Lote-Executor",
+            "type": "ai_tool",
+            "index": 0
           }
         ]
       ]
@@ -1572,6 +1697,11 @@
         [
           {
             "node": "Cadastrador",
+            "type": "ai_tool",
+            "index": 0
+          },
+          {
+            "node": "Lote-Executor",
             "type": "ai_tool",
             "index": 0
           }
@@ -1698,6 +1828,31 @@
             "node": "SmallTalk",
             "type": "ai_languageModel",
             "index": 0
+          },
+          {
+            "node": "Lote-Extrator",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Lote-Verificador",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Lote-Revisor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Lote-Executor",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Lote-Redator",
+            "type": "ai_languageModel",
+            "index": 0
           }
         ]
       ]
@@ -1794,6 +1949,13 @@
         ],
         [
           {
+            "node": "Lote-Extrator",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "SmallTalk",
             "type": "main",
             "index": 0
@@ -1846,6 +2008,61 @@
       ]
     },
     "SmallTalk": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lote-Extrator": {
+      "main": [
+        [
+          {
+            "node": "Lote-Verificador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lote-Verificador": {
+      "main": [
+        [
+          {
+            "node": "Lote-Revisor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lote-Revisor": {
+      "main": [
+        [
+          {
+            "node": "Lote-Executor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lote-Executor": {
+      "main": [
+        [
+          {
+            "node": "Lote-Redator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lote-Redator": {
       "main": [
         [
           {

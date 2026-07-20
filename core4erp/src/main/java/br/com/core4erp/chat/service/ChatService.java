@@ -39,6 +39,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -78,6 +81,15 @@ public class ChatService {
      */
     private final ExecutorService streamExecutor = Executors.newFixedThreadPool(16, r -> {
         Thread t = new Thread(r, "chat-stream");
+        t.setDaemon(true);
+        return t;
+    });
+
+    // Envia comentários SSE de keepalive enquanto a thread de streaming fica bloqueada esperando a
+    // resposta (única) do orquestrador n8n — sem isso o Cloudflare (idle ~100s) e o nginx derrubam a
+    // conexão durante o pipeline LOTE multi-agente, que pode levar dezenas de segundos.
+    private final ScheduledExecutorService keepaliveScheduler = Executors.newScheduledThreadPool(2, r -> {
+        Thread t = new Thread(r, "chat-keepalive");
         t.setDaemon(true);
         return t;
     });
@@ -331,12 +343,16 @@ public class ChatService {
                 // Em falha/empty (ou sem JWT), cai no streaming interno abaixo (fallback). O finally
                 // desta task faz o cleanup dos contextos de qualquer forma.
                 if (delegarN8n && jwtN8n != null) {
-                    Optional<String> respN8n = n8nOrquestrador.orquestrar(conversaId, usuarioId,
+                    Optional<String> respN8n = orquestrarComKeepalive(emitter, conversaId, usuarioId,
                             empresaIdN8n, canal.name(), mensagemUsuario, pensamentoEstendidoN8n, jwtN8n);
                     if (respN8n.isPresent()) {
                         String respostaTexto = respN8n.get();
                         full.append(respostaTexto);
-                        enviarDelta(emitter, respostaTexto);
+                        // synchronized: garante que um keepalive em voo (do agendador) já terminou
+                        // antes de escrever o delta real — sem intercalar bytes no mesmo emitter.
+                        synchronized (emitter) {
+                            enviarDelta(emitter, respostaTexto);
+                        }
                         memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
                         conversaService.aposMensagem(conversaId, mensagemUsuario);
                         emitter.complete();
@@ -404,6 +420,33 @@ public class ChatService {
                 SecurityContextHolder.clearContext();
             }
         });
+    }
+
+    /**
+     * Chama o orquestrador n8n (bloqueante, até {@code chat.n8n.read-timeout-seconds}) emitindo um
+     * comentário SSE de keepalive a cada 15s enquanto espera. Sem isso, o pipeline LOTE multi-agente
+     * ficaria em silêncio por dezenas de segundos e o Cloudflare (idle ~100s)/nginx derrubariam a
+     * conexão. O keepalive é serializado com o delta real via {@code synchronized(emitter)} no
+     * chamador; falha ao enviar keepalive (cliente desconectado) é ignorada — o cancelamento no
+     * {@code finally} encerra o agendador e a chamada ao n8n segue seu curso.
+     */
+    private Optional<String> orquestrarComKeepalive(SseEmitter emitter, Long conversaId, Long usuarioId,
+            Long empresaId, String canal, String mensagem, boolean pensamentoEstendido, String jwt) {
+        ScheduledFuture<?> heartbeat = keepaliveScheduler.scheduleAtFixedRate(() -> {
+            synchronized (emitter) {
+                try {
+                    emitter.send(SseEmitter.event().comment("keepalive"));
+                } catch (Exception ignored) {
+                    // emitter encerrado ou cliente desconectado — nada a fazer aqui.
+                }
+            }
+        }, 15, 15, TimeUnit.SECONDS);
+        try {
+            return n8nOrquestrador.orquestrar(conversaId, usuarioId, empresaId, canal, mensagem,
+                    pensamentoEstendido, jwt);
+        } finally {
+            heartbeat.cancel(false);
+        }
     }
 
     /**
