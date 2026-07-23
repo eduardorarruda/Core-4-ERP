@@ -22,6 +22,10 @@ public interface CategoriaRepository extends JpaRepository<Categoria, Long> {
     /** Categorias ativas da empresa — usado pelo classificador de IA e pelos dropdowns. */
     List<Categoria> findByEmpresaIdAndAtivoTrue(Long empresaId);
 
+    /** Casa categoria por NOME (case-insensitive) — usado no import de planilha para reaproveitar
+     *  a categoria existente antes de criar uma nova. findFirst evita erro se houver homônimas. */
+    Optional<Categoria> findFirstByEmpresaIdAndDescricaoIgnoreCaseAndAtivoTrue(Long empresaId, String descricao);
+
     /** Filhas diretas de uma categoria (cascata de inativação / verificação de subníveis). */
     List<Categoria> findByCategoriaPai_IdAndEmpresaId(Long categoriaPaiId, Long empresaId);
 

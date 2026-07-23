@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat } from 'lucide-react';
+import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
 import Button from '../components/ui/Button';
@@ -53,6 +53,10 @@ export default function Cartoes() {
   const [filterMes, setFilterMes] = useState('');
   const [filterAno, setFilterAno] = useState('');
   const [busca, setBusca] = useState('');
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -89,6 +93,36 @@ export default function Cartoes() {
     } finally {
       setCarregandoLancamentos(false);
     }
+  }
+
+  async function importarPlanilha() {
+    if (!importFile || !cartaoSel) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await api.lancamentos.importar(cartaoSel.id, importFile);
+      setImportResult(res);
+      if (res.lancamentosCriados > 0) {
+        toast.success(`${res.lancamentosCriados} lançamento(s) importado(s)`);
+        // Atualiza lançamentos, limite do cartão e os dropdowns (categorias/parceiros novos).
+        await recarregarTudo();
+        const [l, ca, ps] = await Promise.all([api.listar(), catApi.listar(), parApi.listar()]);
+        setLista(l);
+        setCats(ca);
+        setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'));
+        setCartaoSel((prev) => l.find((x) => x.id === prev?.id) || prev);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Não foi possível importar a planilha.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function abrirImport() {
+    setImportFile(null);
+    setImportResult(null);
+    setShowImport(true);
   }
 
   function validateCartaoForm() {
@@ -486,15 +520,25 @@ export default function Cartoes() {
                 <span>Livre <span className="text-primary/80">R$ {brl(cartaoSel.limiteLivre)}</span></span>
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={fecharCartao}
-              aria-label="Fechar cartão"
-              className="self-end sm:self-auto shrink-0 text-text-primary/40 hover:text-text-primary bg-surface-high/40"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <Button
+                variant="ghost"
+                onClick={abrirImport}
+                leftIcon={<Upload className="w-3.5 h-3.5" />}
+                className="border border-primary/25 text-primary/90 hover:text-primary hover:bg-primary/10"
+              >
+                Importar planilha
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={fecharCartao}
+                aria-label="Fechar cartão"
+                className="text-text-primary/40 hover:text-text-primary bg-surface-high/40"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Formulário de edição inline */}
@@ -675,6 +719,93 @@ export default function Cartoes() {
             aria-label="Lançamentos do cartão"
             emptyState={<EmptyState icon={CreditCard} title="Nenhum lançamento" description="Adicione o primeiro lançamento neste cartão." />}
           />
+        </div>
+      )}
+
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+             onClick={() => !importing && setShowImport(false)}>
+          <div className="w-full max-w-lg rounded-[20px] p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-scale-in"
+               style={{ background: 'rgba(20,20,22,.96)', border: '1px solid rgba(250,250,250,.09)' }}
+               onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-text-primary">Importar planilha</h3>
+                  <p className="text-xs text-text-primary/40 mt-0.5">Cartão {cartaoSel?.nome}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => !importing && setShowImport(false)} aria-label="Fechar"
+                      className="text-text-primary/40 hover:text-text-primary">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!importResult ? (
+              <>
+                <div className="text-xs text-text-primary/55 leading-relaxed rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
+                  A planilha (.xlsx) deve ter as colunas: <span className="text-text-primary/80 font-medium">Data da Compra, Descrição, Valor, Categoria, CGC PARCEIRO, Número de Parcelas</span>.
+                  <br />Categorias e parceiros que não existirem são criados automaticamente (parceiro pelo CNPJ, com dados da Receita).
+                </div>
+                <label className="block rounded-xl border border-dashed border-text-primary/20 hover:border-primary/40 transition-colors p-6 text-center cursor-pointer">
+                  <input type="file" accept=".xlsx,.xls" className="hidden"
+                         onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                  <Upload className="w-6 h-6 mx-auto text-text-primary/40 mb-2" />
+                  <span className="text-sm text-text-primary/70">
+                    {importFile ? importFile.name : 'Clique para escolher a planilha'}
+                  </span>
+                </label>
+                <div className="flex gap-3 justify-end">
+                  <Button variant="ghost" onClick={() => setShowImport(false)} disabled={importing}
+                          className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
+                    Cancelar
+                  </Button>
+                  <Button onClick={importarPlanilha} loading={importing} disabled={!importFile}
+                          leftIcon={<Upload className="w-3.5 h-3.5" />}>
+                    {importing ? 'Importando...' : 'Importar'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3 bg-primary/10 border border-primary/20">
+                    <p className="text-2xl font-bold text-primary">{importResult.lancamentosCriados}</p>
+                    <p className="text-xs text-text-primary/50">lançamentos criados</p>
+                  </div>
+                  <div className="rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
+                    <p className="text-2xl font-bold text-text-primary/80">{importResult.linhasImportadas}<span className="text-sm text-text-primary/40">/{importResult.totalLinhas}</span></p>
+                    <p className="text-xs text-text-primary/50">linhas importadas</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-primary/55">
+                  {importResult.categoriasCriadas > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.categoriasCriadas} categoria(s) nova(s)</span>}
+                  {importResult.parceirosCriados > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.parceirosCriados} parceiro(s) novo(s)</span>}
+                  {importResult.ignorados > 0 && <span>{importResult.ignorados} já existiam (ignoradas)</span>}
+                </div>
+                {importResult.erros?.length > 0 && (
+                  <div className="rounded-xl p-3 bg-error/8 border border-error/20 max-h-48 overflow-y-auto">
+                    <p className="text-xs font-bold uppercase tracking-wider text-error/80 mb-2 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />{importResult.erros.length} linha(s) com erro
+                    </p>
+                    <ul className="space-y-1 text-xs text-text-primary/60">
+                      {importResult.erros.map((er, i) => (
+                        <li key={i}><span className="text-text-primary/40">Linha {er.linha}:</span> {er.motivo}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex gap-3 justify-end">
+                  <Button variant="ghost" onClick={() => { setImportFile(null); setImportResult(null); }}
+                          className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
+                    Importar outra
+                  </Button>
+                  <Button onClick={() => setShowImport(false)}>Concluir</Button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

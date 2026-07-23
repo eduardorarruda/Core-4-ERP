@@ -2,6 +2,7 @@ package br.com.core4erp.cartaoCredito.controller;
 
 import br.com.core4erp.cartaoCredito.dto.*;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
+import br.com.core4erp.cartaoCredito.service.ImportacaoLancamentoCartaoService;
 import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.conta.dto.ContaResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,8 +12,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -23,9 +26,12 @@ import java.util.Map;
 public class CartaoCreditoController {
 
     private final CartaoCreditoService service;
+    private final ImportacaoLancamentoCartaoService importacaoService;
 
-    public CartaoCreditoController(CartaoCreditoService service) {
+    public CartaoCreditoController(CartaoCreditoService service,
+                                   ImportacaoLancamentoCartaoService importacaoService) {
         this.service = service;
+        this.importacaoService = importacaoService;
     }
 
     // ── Cartões ───────────────────────────────────────────────────────────────
@@ -88,6 +94,17 @@ public class CartaoCreditoController {
             @PathVariable Long id,
             @Valid @RequestBody LancamentoRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.criarLancamento(id, dto));
+    }
+
+    @Operation(summary = "Importar lançamentos de uma planilha (.xlsx) para o cartão",
+            description = "Colunas: Data da Compra, Descrição, Valor, Categoria, CGC PARCEIRO, Número de Parcelas. "
+                    + "Casa/cria categoria (por nome) e parceiro (por CNPJ, com BrasilAPI) automaticamente.")
+    @PostMapping(value = "/{id}/lancamentos/importar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Requer("CARTAO_LANCAR")
+    public ResponseEntity<ImportarLancamentosResponseDto> importarLancamentos(
+            @PathVariable Long id,
+            @RequestPart("arquivo") MultipartFile arquivo) {
+        return ResponseEntity.ok(importacaoService.importar(id, arquivo));
     }
 
     @Operation(summary = "Atualizar lançamento")

@@ -297,6 +297,12 @@ export const cartoes = {
     criar: (cartaoId, dto) => request(`/api/cartoes/${cartaoId}/lancamentos`, { method: 'POST', body: JSON.stringify(dto) }),
     atualizar: (cartaoId, id, dto) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     deletar: (cartaoId, id) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'DELETE' }),
+    // Importa lançamentos de uma planilha (.xlsx). Backend casa/cria categoria e parceiro.
+    importar: (cartaoId, arquivo) => {
+      const fd = new FormData();
+      fd.append('arquivo', arquivo);
+      return request(`/api/cartoes/${cartaoId}/lancamentos/importar`, { method: 'POST', body: fd, timeout: 120000 });
+    },
   },
   dashboard: (qs) => request(`/api/cartoes/dashboard/resumo${qs ? `?${qs}` : ''}`),
   dashboardBI: (qs) => request(`/api/cartoes/dashboard/bi${qs ? `?${qs}` : ''}`),
