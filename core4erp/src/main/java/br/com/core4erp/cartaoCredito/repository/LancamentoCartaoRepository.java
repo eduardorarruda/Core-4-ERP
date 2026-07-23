@@ -25,6 +25,13 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
 
     boolean existsByAssinaturaIdAndMesFaturaAndAnoFatura(Long assinaturaId, Integer mes, Integer ano);
 
+    /** Dedupe do import de planilha: evita relançar a mesma linha em reimportações. Checa a 1ª
+     *  parcela (numeroParcela=1) por cartão+data+descrição — sem valor, pois em parcelamento o
+     *  valor armazenado é o da parcela (total/N), o que quebraria o re-import de parcelas. */
+    boolean existsByCartaoCreditoIdAndEmpresaIdAndDataCompraAndDescricaoAndNumeroParcela(
+            Long cartaoId, Long empresaId, java.time.LocalDate dataCompra, String descricao,
+            Integer numeroParcela);
+
     /** Busca global: lançamentos de cartão cuja descrição contém o termo. */
     @Query("""
             SELECT l FROM LancamentoCartao l

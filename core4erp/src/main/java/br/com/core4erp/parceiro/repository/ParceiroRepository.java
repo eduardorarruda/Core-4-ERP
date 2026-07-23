@@ -17,6 +17,10 @@ public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
     boolean existsByCpfCnpjAndEmpresaId(String cpfCnpj, Long empresaId);
     boolean existsByCpfCnpjAndEmpresaIdAndIdNot(String cpfCnpj, Long empresaId, Long id);
 
+    /** Casa parceiro por CPF/CNPJ (só dígitos) — usado no import de planilha para reaproveitar
+     *  o parceiro existente antes de criar um novo. */
+    Optional<Parceiro> findFirstByCpfCnpjAndEmpresaId(String cpfCnpj, Long empresaId);
+
     /** Busca global: razão social, nome fantasia ou CPF/CNPJ contendo o termo. */
     @Query("""
             SELECT p FROM Parceiro p
