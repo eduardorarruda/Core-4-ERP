@@ -1,4 +1,18 @@
 .env
 front-end/.env
 front-end/node_modules
-Skill/
+
+# Python
+.venv/
+.venv_tmp/
+__pycache__/
+*.pyc
+
+
+# EBPOS QA pipeline local state
+.qa/
+
+# Logs locais da aplicação
+log.txt
+log.*.txt
+*.log
