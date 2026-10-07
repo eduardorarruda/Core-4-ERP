@@ -11,3 +11,8 @@ __pycache__/
 
 # EBPOS QA pipeline local state
 .qa/
+
+# Logs locais da aplicação
+log.txt
+log.*.txt
+*.log
