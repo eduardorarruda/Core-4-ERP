@@ -33,7 +33,7 @@ public class ContaController {
         this.contaService = contaService;
     }
 
-    @Operation(summary = "Listar contas com filtros opcionais (tipo, status, datas, parceiro, valor, categoria)")
+    @Operation(summary = "Listar contas com filtros opcionais (tipo, status, datas, parceiro, valor, categoria, busca livre)")
     @GetMapping
     @Requer("CONTA_VISUALIZAR")
     public ResponseEntity<Page<ContaResponseDto>> listar(
@@ -46,12 +46,13 @@ public class ContaController {
             @RequestParam(required = false) BigDecimal valorMin,
             @RequestParam(required = false) BigDecimal valorMax,
             @RequestParam(required = false) Long categoriaId,
+            @RequestParam(required = false) String busca,
             @PageableDefault(size = 20, sort = "dataVencimento") Pageable pageable) {
         return ResponseEntity.ok(contaService.listarComFiltros(
                 tipo, status, numeroDocumento,
                 vencimentoInicio, vencimentoFim,
                 parceiroId, valorMin, valorMax,
-                categoriaId, pageable));
+                categoriaId, busca, pageable));
     }
 
     @Operation(summary = "Buscar conta por ID")

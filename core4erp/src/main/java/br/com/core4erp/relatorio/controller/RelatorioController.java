@@ -226,19 +226,19 @@ public class RelatorioController {
 
     // ── Assinaturas ─────────────────────────────────────────────────────────
 
-    @Operation(summary = "Dados JSON de Assinaturas Recorrentes")
+    @Operation(summary = "Dados JSON de Assinaturas Recorrentes (ativas: omitido=todas, true=ativas, false=inativas)")
     @GetMapping("/assinaturas/dados")
     @Requer("RELATORIO_ASSINATURAS_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> assinaturasDados(
-            @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
+            @RequestParam(required = false) Boolean ativas) {
         return ResponseEntity.ok(relatorioService.getDadosAssinaturas(ativas));
     }
 
-    @Operation(summary = "Download XLSX de Assinaturas Recorrentes")
+    @Operation(summary = "Download XLSX de Assinaturas Recorrentes (ativas: omitido=todas, true=ativas, false=inativas)")
     @GetMapping("/assinaturas")
     @Requer("RELATORIO_ASSINATURAS_EXPORTAR")
     public ResponseEntity<Resource> assinaturasExcel(
-            @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
+            @RequestParam(required = false) Boolean ativas) {
         RelatorioResponseDto dados = relatorioService.getDadosAssinaturas(ativas);
         if (dados.linhas().isEmpty()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Nenhum dado encontrado para os filtros informados");
         Resource resource = relatorioService.gerarExcel(dados, "Assinaturas Recorrentes", null, null);

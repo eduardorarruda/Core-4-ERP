@@ -8,10 +8,60 @@ import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Locale;
 
 public final class ContaSpec {
 
+    /** Tamanho máximo do termo de busca livre (o excedente é descartado). */
+    public static final int BUSCA_MAX = 100;
+
+    /** Caractere de escape usado nos LIKE de busca livre. */
+    public static final char ESCAPE_LIKE = '\\';
+
     private ContaSpec() {}
+
+    /**
+     * Normaliza o termo de busca livre: {@code trim}, limita a {@link #BUSCA_MAX} caracteres e
+     * devolve {@code null} quando vazio/branco (sem filtro).
+     */
+    public static String normalizarBusca(String busca) {
+        if (busca == null) return null;
+        String t = busca.trim();
+        if (t.isEmpty()) return null;
+        return t.length() > BUSCA_MAX ? t.substring(0, BUSCA_MAX) : t;
+    }
+
+    /** Escapa os curingas do LIKE ({@code \\}, {@code %}, {@code _}) para que o termo seja literal. */
+    public static String escaparLike(String termo) {
+        StringBuilder sb = new StringBuilder(termo.length() + 8);
+        for (char c : termo.toCharArray()) {
+            if (c == ESCAPE_LIKE || c == '%' || c == '_') sb.append(ESCAPE_LIKE);
+            sb.append(c);
+        }
+        return sb.toString();
+    }
+
+    /** Padrão {@code %termo%} em minúsculas, com curingas do usuário escapados. */
+    public static String padraoContem(String termo) {
+        return "%" + escaparLike(termo.toLowerCase(Locale.ROOT)) + "%";
+    }
+
+    /**
+     * Busca livre: descrição, razão social/nome fantasia do parceiro (LEFT JOIN — contas sem
+     * parceiro continuam elegíveis) ou número do documento. Nenhuma dessas colunas é cifrada.
+     * O termo deve vir já normalizado ({@link #normalizarBusca}).
+     */
+    public static Specification<Conta> busca(String termo) {
+        String padrao = padraoContem(termo);
+        return (r, q, cb) -> {
+            var parceiro = r.join("parceiro", JoinType.LEFT);
+            return cb.or(
+                    cb.like(cb.lower(r.get("descricao")), padrao, ESCAPE_LIKE),
+                    cb.like(cb.lower(parceiro.get("razaoSocial")), padrao, ESCAPE_LIKE),
+                    cb.like(cb.lower(parceiro.get("nomeFantasia")), padrao, ESCAPE_LIKE),
+                    cb.like(cb.lower(r.get("numeroDocumento")), padrao, ESCAPE_LIKE));
+        };
+    }
 
     public static Specification<Conta> empresaId(Long eid) {
         return (r, q, cb) -> cb.equal(r.get("empresaId"), eid);
@@ -26,7 +76,7 @@ public final class ContaSpec {
     }
 
     public static Specification<Conta> numeroDocumentoContains(String term) {
-        return (r, q, cb) -> cb.like(cb.lower(r.get("numeroDocumento")), "%" + term.toLowerCase() + "%");
+        return (r, q, cb) -> cb.like(cb.lower(r.get("numeroDocumento")), padraoContem(term.trim()), ESCAPE_LIKE);
     }
 
     public static Specification<Conta> vencimentoApartirDe(LocalDate inicio) {

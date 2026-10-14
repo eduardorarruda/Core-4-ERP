@@ -711,6 +711,12 @@ chat/tools/
   - `fecharFatura` usa o total líquido; fatura com total ≤ 0 não pode ser fechada.
 - Regra de alocação de fatura: `FaturaHelper.calcularFatura(dataCompra, diaFechamento)` — se `dia >= diaFechamento`, vai para o mês seguinte. Usada em `CartaoCreditoService` e `ConciliacaoCartaoService`.
 
+### Listagem de contas (`GET /api/contas`)
+- Filtros opcionais: `tipo`, `status`, `numeroDocumento`, `vencimentoInicio`/`vencimentoFim`, `parceiroId`,
+  `valorMin`/`valorMax`, `categoriaId` e `busca` (texto livre: `LOWER(descricao)`, razão social/nome fantasia do
+  parceiro via **LEFT JOIN** ou `numeroDocumento` — nenhuma é coluna cifrada). `busca` sofre trim, é cortada em 100
+  caracteres, é ignorada se em branco e tem `% _ \` escapados (`ContaSpec.escaparLike`, `ESCAPE '\'`).
+
 ### Transferências entre Contas
 - Uma transferência gera dois lançamentos: débito na origem, crédito no destino.
 - Ambos vinculados pelo `transferencia_id`.
@@ -763,6 +769,9 @@ fechamento (`FaturaHelper.dataVencimento`: fatura do mês M vence no `diaVencime
 - `RelatorioService` agrega dados financeiros (contas, categorias, parceiros) por período.
 - `ExcelRelatorioService` gera arquivo `.xlsx` via Apache POI — retorna `byte[]` no controller com `Content-Disposition: attachment`.
 - Toda query de relatório DEVE filtrar por `empresaId` (via `tenantCtx.getEmpresaId()`) e pelo intervalo de datas (`data_competencia` ou `data_pagamento` — especificar qual).
+- R07 Assinaturas (`GET /api/relatorios/assinaturas/dados` e `GET /api/relatorios/assinaturas` XLSX): `ativas` é
+  **opcional** — omitido = todas (ativas e inativas); `true` = só ativas; `false` = só inativas. (Antes o default era
+  `true` e `false` trazia todas.)
 
 ### Dashboard (`dashboard/`)
 - `DashboardService` fornece saldo total, saldo por conta corrente, receitas/despesas do mês e projeção de vencimentos.

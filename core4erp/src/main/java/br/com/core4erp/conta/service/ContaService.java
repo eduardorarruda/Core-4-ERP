@@ -96,6 +96,21 @@ public class ContaService {
             LocalDate vencimentoInicio, LocalDate vencimentoFim,
             Long parceiroId, BigDecimal valorMin, BigDecimal valorMax,
             Long categoriaId, Pageable pageable) {
+        return listarComFiltros(tipo, status, numeroDocumento, vencimentoInicio, vencimentoFim,
+                parceiroId, valorMin, valorMax, categoriaId, null, pageable);
+    }
+
+    /**
+     * Igual ao anterior, com {@code busca} livre (descrição, parceiro ou nº do documento; trim,
+     * máx. 100 caracteres, ignorada se em branco; curingas do LIKE escapados).
+     */
+    @Requer("CONTA_VISUALIZAR")
+    @Transactional(readOnly = true)
+    public Page<ContaResponseDto> listarComFiltros(
+            TipoConta tipo, StatusConta status, String numeroDocumento,
+            LocalDate vencimentoInicio, LocalDate vencimentoFim,
+            Long parceiroId, BigDecimal valorMin, BigDecimal valorMax,
+            Long categoriaId, String busca, Pageable pageable) {
 
         Specification<Conta> spec = ContaSpec.empresaId(tenantCtx.getEmpresaId());
         if (tipo != null)               spec = spec.and(ContaSpec.tipo(tipo));
@@ -108,6 +123,8 @@ public class ContaService {
         if (valorMin != null)           spec = spec.and(ContaSpec.valorMinimo(valorMin));
         if (valorMax != null)           spec = spec.and(ContaSpec.valorMaximo(valorMax));
         if (categoriaId != null)        spec = spec.and(ContaSpec.categoriaId(categoriaId));
+        String termo = ContaSpec.normalizarBusca(busca);
+        if (termo != null)              spec = spec.and(ContaSpec.busca(termo));
 
         return contaRepository.findAll(spec, pageable).map(ContaResponseDto::from);
     }
