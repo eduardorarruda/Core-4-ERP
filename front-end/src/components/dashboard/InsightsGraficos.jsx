@@ -4,7 +4,7 @@ import { CalendarRange, TrendingUp } from 'lucide-react';
 import Card from '../ui/Card';
 import ChartTooltip, { BrilhoLinha, GradienteArea, PontoFinal } from '../ui/ChartTooltip';
 import GraficoAcessivel from '../ui/GraficoAcessivel';
-import { CORES_GRAFICO, areaProps, barraProps, eixoXProps, eixoYProps, formatarEixoMoeda, gradeProps, tooltipProps } from '../../lib/chartTheme';
+import { areaProps, barraProps, eixoXProps, eixoYProps, formatarEixoMoeda, gradeProps, tooltipProps } from '../../lib/chartTheme';
 import { formatarMoeda, formatarNumero } from '../../lib/formatters';
 
 /**
@@ -43,7 +43,7 @@ export function RitmoDoMes({ ritmo, diaReferencia, className }) {
     media3Meses: p.media3Meses == null ? null : Number(p.media3Meses),
   }));
   const ultimoAtual = curva.filter((p) => p.atual != null).length;
-  const cores = { atual: CORES_GRAFICO.primaria, mesAnterior: 'var(--color-silver)', media3Meses: 'var(--color-chart-2)' };
+  const cores = { atual: 'var(--color-chart-1)', mesAnterior: 'var(--color-chart-3)', media3Meses: 'var(--color-chart-2)' };
 
   return (
     <Card
@@ -130,7 +130,7 @@ export function GastoPorDiaDaSemana({ dias = [], className }) {
                 ) : null)}
               >
                 {dados.map((d) => (
-                  <Cell key={d.diaSemana} fill={d.maior ? CORES_GRAFICO.primaria : 'var(--color-chart-6)'} fillOpacity={d.maior ? 1 : 0.45} />
+                  <Cell key={d.diaSemana} fill={d.maior ? 'var(--color-chart-1)' : 'var(--color-chart-6)'} fillOpacity={d.maior ? 1 : 0.45} />
                 ))}
               </Bar>
             </BarChart>

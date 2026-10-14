@@ -49,14 +49,14 @@ export default function GroupedList({ grupos = [], renderItem, keyItem = (i) => 
         const idTitulo = `grupo-${g.id}`;
         return (
           <section key={g.id} aria-labelledby={idTitulo} className={cn('rounded-2xl', tom.caixa && cn('border p-2 sm:p-3', tom.caixa))}>
-            <header className="flex items-center justify-between gap-3 px-2 pb-2">
+            <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2 pb-2">
               <Titulo id={idTitulo} className={cn('flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] font-body', tom.titulo)}>
                 <IconeGrupo icon={g.icon} />
                 {g.titulo}
                 <span className="ml-1 text-text-primary/65 tabular-nums">· {g.itens?.length ?? 0}</span>
               </Titulo>
               {g.total != null && (
-                <span className="text-sm font-semibold tabular-nums valor-privado">{formatoTotal(g.total)}</span>
+                <span className="ml-auto text-sm font-semibold tabular-nums valor-privado">{formatoTotal(g.total)}</span>
               )}
             </header>
             <Stagger as="ul" aoRolar className="space-y-1.5">

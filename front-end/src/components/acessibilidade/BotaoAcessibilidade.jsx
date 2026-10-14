@@ -25,7 +25,7 @@ export default function BotaoAcessibilidade({ variante = 'icone', className }) {
         'inline-flex items-center justify-center gap-2 rounded-xl transition-colors',
         'text-text-primary/75 hover:text-text-primary hover:bg-text-primary/[0.06]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-        comRotulo ? 'min-h-11 px-3 text-sm font-medium border border-border-strong' : 'w-11 h-11',
+        comRotulo ? 'min-h-11 px-3 text-sm font-medium border border-border-strong' : 'w-[44px] h-[44px]',
         className
       )}
     >

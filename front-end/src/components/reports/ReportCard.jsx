@@ -8,7 +8,6 @@ import ReportModal from './ReportModal';
 import ReportPreview from './ReportPreview';
 import { useCarga } from '../../hooks/useCarga';
 import { useToast } from '../../hooks/useToast';
-import { paraIsoLocal } from '../dashboard/datasVisaoGeral';
 
 /**
  * Cartão de um relatório. O período vem da página (um seletor só para todos); o cartão tem
@@ -17,8 +16,6 @@ import { paraIsoLocal } from '../dashboard/datasVisaoGeral';
  *
  * A prévia só carrega quando o cartão aparece na tela (8 relatórios não disparam 8 consultas de uma vez).
  */
-const hojeIso = () => paraIsoLocal(new Date());
-
 function baixarArquivo(blob, nome) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -48,7 +45,6 @@ export default function ReportCard({
   );
   const inicio = semPeriodo ? '' : periodo.inicio;
   const fim = semPeriodo ? '' : periodo.fim;
-  const periodoDoArquivo = semPeriodo ? { inicio: hojeIso(), fim: hojeIso() } : periodo;
 
   const previa = useCarga(() => onGetData(inicio, fim, params), [title, inicio, fim, params], { ativo: visto });
 
@@ -62,7 +58,7 @@ export default function ReportCard({
       } else if (acao === 'pdf') {
         const dados = previa.dados && !previa.carregando ? previa.dados : await onGetData(inicio, fim, params);
         const { gerarPDF } = await import('../../lib/pdfUtils');
-        gerarPDF(title, periodoDoArquivo, dados);
+        gerarPDF(title, semPeriodo ? null : periodo, dados);
         toast.success('PDF gerado.');
       } else {
         const blob = await onDownloadXlsx(inicio, fim, params);

@@ -326,7 +326,7 @@ export default function GestaoOperadores() {
           onChange={setAba}
           label="Operadores"
           idBase={ID_ABAS}
-          className="[&>[role=tab]]:shrink-0"
+         
           items={[
             { value: 'membros', label: 'Membros', icon: Users, badge: membros.length || undefined },
             { value: 'pendentes', label: 'Convites pendentes', icon: MailQuestion, badge: pendentes.length || undefined },

@@ -61,7 +61,7 @@ export default function RedefinirSenha() {
           >
             <Check className="w-10 h-10" strokeWidth={2.75} />
           </motion.span>
-          <h1 className="font-display text-[1.75rem] font-semibold tracking-tight mb-2">Senha redefinida</h1>
+          <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-tight mb-2">Senha redefinida</h1>
           <p className="text-sm text-text-primary/65 leading-relaxed" role="status">
             Tudo certo. Levando você para o login…
           </p>
@@ -84,7 +84,7 @@ export default function RedefinirSenha() {
         <span aria-hidden="true" className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-5">
           <KeyRound className="w-6 h-6" />
         </span>
-        <h1 className="font-display text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Criar senha nova</h1>
+        <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Criar senha nova</h1>
         <p className="text-sm text-text-primary/65 mb-7 leading-relaxed">
           Escolha uma senha que você não usa em outros sites.
         </p>

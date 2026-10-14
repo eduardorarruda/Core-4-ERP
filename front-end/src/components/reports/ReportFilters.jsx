@@ -10,8 +10,9 @@ import { cn } from '../../lib/utils';
  * Filtros extras de um relatório (o período fica no topo da página, um só para todos).
  * Recolhidos em "Filtros (n)"; as opções assíncronas só carregam ao abrir.
  *
- * config: [{ key, label, type: 'select' | 'async-select', options?, fetchFn?, semTodos?, padrao? }]
+ * config: [{ key, label, type: 'select' | 'async-select', options?, fetchFn?, semTodos?, padrao?, rotuloTodos? }]
  *  - semTodos: não oferece "Todos" (o backend não aceita vazio) — usa `padrao`
+ *  - rotuloTodos: texto da opção vazia (padrão "Todos"; ex.: "Todas")
  */
 function OpcoesAssincronas({ campo, value, onChange, idBase }) {
   const { dados, erro, carregando, recarregar } = useCarga(() => campo.fetchFn(), [campo.key], { inicial: [] });
@@ -65,7 +66,7 @@ export default function ReportFilters({ config = [], values, onChange, idBase })
                 value={values[f.key] ?? f.padrao ?? ''}
                 onChange={(e) => onChange(f.key, e.target.value || undefined)}
               >
-                {!f.semTodos && <option value="">Todos</option>}
+                {!f.semTodos && <option value="">{f.rotuloTodos ?? 'Todos'}</option>}
                 {(f.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </FormSelect>
             </FormField>

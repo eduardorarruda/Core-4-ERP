@@ -135,7 +135,7 @@ export default function NotificacoesPopover() {
         animate={graves && !open ? { rotate: [0, -14, 12, -8, 5, 0] } : { rotate: 0 }}
         transition={graves && !open ? { duration: 0.9, repeat: Infinity, repeatDelay: 6 } : { duration: 0.2 }}
         style={{ transformOrigin: '50% 20%' }}
-        className="relative w-11 h-11 grid place-items-center rounded-xl transition-colors text-text-primary/65 hover:text-text-primary hover:bg-text-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="relative w-[44px] h-[44px] grid place-items-center rounded-xl transition-colors text-text-primary/65 hover:text-text-primary hover:bg-text-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <Bell className="w-5 h-5" aria-hidden="true" />
         {naoLidas > 0 && (

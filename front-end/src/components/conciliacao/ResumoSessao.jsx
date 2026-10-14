@@ -42,7 +42,7 @@ export default function ResumoSessao({
             </h2>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-text-primary/65">
               {periodo && (
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex flex-wrap items-center gap-1">
                   <CalendarRange className="w-3.5 h-3.5" aria-hidden="true" />
                   <span className="sr-only">Período do extrato: </span>{periodo}
                 </span>

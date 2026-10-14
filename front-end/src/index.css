@@ -114,6 +114,22 @@
   /* Seta dos <select> do FormSelect (cor neutra que funciona nos dois temas) */
   --c4-seta-select: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238FA3AB' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
   color-scheme: dark;
+
+  /* Prévias fixas das paletas no painel de acessibilidade (deuteranopia usa a de protanopia) */
+  --amostra-padrao-1: #14E29C; --amostra-padrao-2: #7CC7FF; --amostra-padrao-3: #F5B83D; --amostra-padrao-4: #FF7A85; --amostra-padrao-5: #B9A2FF; --amostra-padrao-6: #C9D6DD;
+  --amostra-protanopia-1: #56B4E9; --amostra-protanopia-2: #E69F00; --amostra-protanopia-3: #009E73; --amostra-protanopia-4: #F0E442; --amostra-protanopia-5: #CC79A7; --amostra-protanopia-6: #4A9BD9;
+  --amostra-tritanopia-1: #3FCFC0; --amostra-tritanopia-2: #FF6B7D; --amostra-tritanopia-3: #F2F2F2; --amostra-tritanopia-4: #FF9FC3; --amostra-tritanopia-5: #8C8C8C; --amostra-tritanopia-6: #D77BE0;
+  --amostra-monocromia-1: #FFFFFF; --amostra-monocromia-2: #B3B3B3; --amostra-monocromia-3: #7A7A7A; --amostra-monocromia-4: #DDDDDD; --amostra-monocromia-5: #5E5E5E; --amostra-monocromia-6: #9A9A9A;
+
+  /* Brilhos e sombras de acabamento (botão, plástico do cartão, chips) — iguais nos dois temas */
+  --c4-brilho-botao: inset 0 1px 0 rgb(255 255 255 / 0.28);
+  --c4-brilho-botao-forte: inset 0 1px 0 rgb(255 255 255 / 0.3);
+  --c4-brilho-sutil: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  --c4-sombra-chip: 0 2px 10px -4px rgb(0 0 0 / 0.5);
+  --c4-sombra-plastico: 0 24px 48px -24px rgb(0 0 0 / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  --c4-listra-clara: rgb(255 255 255 / 0.22);
+  --c4-aura-esmeralda: rgb(20 226 156 / 0.18);
+  --c4-aura-petroleo: rgb(27 74 80 / 0.55);
 }
 
 @layer base {
@@ -1010,11 +1026,13 @@ html[data-contraste="alto"] a:not([role]) { text-underline-offset: 0.2em; }
 }
 
 /* Texto ampliado: selos e rótulos curtos quebram linha em vez de vazar da tela (1.4.10) */
-html[data-texto] .c4-badge { white-space: normal; overflow-wrap: anywhere; }
+/* break-word (e não anywhere): só parte a palavra se ela sozinha não couber na linha */
+html[data-texto] .c4-badge { white-space: normal; overflow-wrap: break-word; hyphens: auto; }
 @media (max-width: 30rem) {
   html[data-texto] :is(main, [role="dialog"]) :is(.truncate, .whitespace-nowrap):not(svg *, .sr-only) {
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    hyphens: auto;
     text-overflow: clip;
   }
 }

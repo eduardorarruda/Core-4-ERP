@@ -24,7 +24,7 @@ import ImportarPlanilhaModal from '../components/cartoes/ImportarPlanilhaModal';
 import LinhaDoTempoFaturas from '../components/cartoes/LinhaDoTempoFaturas';
 import FaturaResumo from '../components/cartoes/FaturaResumo';
 import LancamentosTabela from '../components/cartoes/LancamentosTabela';
-import { useValorAtrasado } from '../components/cartoes/useValorAtrasado';
+import { useValorAtrasado } from '../hooks/useValorAtrasado';
 import { agruparFaturas, chaveFatura, rotuloFatura } from '../components/cartoes/faturas';
 
 /*

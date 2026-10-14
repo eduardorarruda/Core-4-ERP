@@ -38,14 +38,14 @@ export default function FaixaAlertas({ alertas = [] }) {
               <Link
                 to={a.to}
                 className={cn(
-                  'group flex items-center gap-3 min-h-14 rounded-2xl border px-3.5 py-2.5 transition-colors',
+                  'group flex items-center gap-3 min-h-14 rounded-2xl border px-3 sm:px-3.5 py-2.5 transition-colors',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   e.caixa,
                 )}
               >
                 <motion.span
                   aria-hidden="true"
-                  className={cn('grid place-items-center w-9 h-9 rounded-xl shrink-0', e.icone)}
+                  className={cn('grid place-items-center w-[36px] h-[36px] rounded-xl shrink-0', e.icone)}
                   animate={!reduzir && temCritico && i === 0 ? { rotate: [0, -12, 10, -6, 4, 0] } : undefined}
                   transition={{ duration: 0.9, repeat: 2, repeatDelay: 5 }}
                 >
@@ -56,7 +56,7 @@ export default function FaixaAlertas({ alertas = [] }) {
                   <span className="block text-sm font-semibold text-text-primary truncate">{a.titulo}</span>
                   {a.detalhe && <span className="block text-xs text-text-primary/65 truncate">{a.detalhe}</span>}
                 </span>
-                <ChevronRight className="w-4 h-4 text-text-primary/45 group-hover:translate-x-0.5 transition-transform shrink-0" aria-hidden="true" />
+                <ChevronRight className="w-[16px] h-[16px] text-text-primary/45 group-hover:translate-x-0.5 transition-transform shrink-0" aria-hidden="true" />
               </Link>
             </StaggerItem>
           );

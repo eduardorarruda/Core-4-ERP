@@ -19,7 +19,7 @@ export default function AuthLayout({ children, heroTitulo, heroSubtitulo, largur
       <div className="lg:hidden"><FundoVivo /></div>
 
       <div className="relative z-[1] w-full lg:w-[min(46%,600px)] lg:shrink-0 min-h-dvh flex flex-col px-5 sm:px-10 lg:px-14 pt-safe pb-safe">
-        <header className="flex items-center justify-between py-6 sm:py-8">
+        <header className="flex flex-wrap items-center justify-between gap-3 py-6 sm:py-8">
           <Link to="/login" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <BrandLogo size="sm" as="span" />
             <span className="sr-only">, ir para o login</span>

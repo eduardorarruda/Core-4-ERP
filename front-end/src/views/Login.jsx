@@ -126,7 +126,7 @@ export default function Login() {
                 <p className="c4-eyebrow mb-3">{saudacao(hora)}</p>
               </StaggerItem>
               <StaggerItem>
-                <h1 className="font-display text-[2rem] sm:text-[2.25rem] font-semibold tracking-[-0.03em] leading-tight">
+                <h1 className="font-display break-words hyphens-auto text-[2rem] sm:text-[2.25rem] font-semibold tracking-[-0.03em] leading-tight">
                   Entre no <span className="c4-text-emerald">Core 4</span>
                 </h1>
               </StaggerItem>
@@ -191,7 +191,7 @@ export default function Login() {
             <span aria-hidden="true" className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-5">
               <Mail className="w-6 h-6" />
             </span>
-            <h1 className="font-display text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Recuperar acesso</h1>
+            <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Recuperar acesso</h1>
             <p className="text-sm text-text-primary/65 mb-7 leading-relaxed">
               Informe o e-mail da sua conta. Enviamos um link para você criar uma senha nova.
             </p>
@@ -222,7 +222,7 @@ export default function Login() {
             <span aria-hidden="true" className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-5">
               <MailCheck className="w-6 h-6" />
             </span>
-            <h1 className="font-display text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Confira seu e-mail</h1>
+            <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Confira seu e-mail</h1>
             <p className="text-sm text-text-primary/65 leading-relaxed mb-7" role="status">
               Se houver uma conta com <strong className="text-text-primary">{resetEmail}</strong>, enviamos um link para
               criar uma senha nova. O link vale por 60 minutos.
@@ -252,7 +252,7 @@ export default function Login() {
               >
                 <BrandMark size={56} />
               </motion.div>
-              <p className="font-display text-[1.75rem] font-semibold tracking-tight">Bem-vindo de volta</p>
+              <p className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-tight">Bem-vindo de volta</p>
               <p className="mt-1 text-sm text-text-primary/65" role="status">Abrindo o Core 4…</p>
             </FadeIn>
           </motion.div>

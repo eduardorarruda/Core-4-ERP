@@ -7,7 +7,7 @@ import GraficoAcessivel from '../ui/GraficoAcessivel';
 import ChartTooltip, { BrilhoLinha, GradienteArea, PontoFinal } from '../ui/ChartTooltip';
 import { usePadroesGrafico } from '../acessibilidade/padroesGrafico';
 import {
-  CORES_GRAFICO, barraProps, areaProps, eixoXProps, eixoYProps, formatarEixoMoeda, gradeProps, tooltipProps,
+  barraProps, areaProps, corSerie, eixoXProps, eixoYProps, formatarEixoMoeda, gradeProps, tooltipProps,
 } from '../../lib/chartTheme';
 import { formatarMoeda, formatarNumero } from '../../lib/formatters';
 import { rotuloFatura } from './faturas';
@@ -31,7 +31,7 @@ export function EvolucaoFatura({ dados = [] }) {
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={serie} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
           <defs>
-            <GradienteArea id={`g${id}`} cor={CORES_GRAFICO.primaria} opacidade={0.34} />
+            <GradienteArea id={`g${id}`} cor={corSerie(0)} opacidade={0.34} />
             <BrilhoLinha id={`b${id}`} />
           </defs>
           <CartesianGrid {...gradeProps} />
@@ -40,13 +40,13 @@ export function EvolucaoFatura({ dados = [] }) {
           <Tooltip {...tooltipProps} content={<ChartTooltip formato="currency" nomes={{ total: 'Total da fatura' }} />} />
           <Area
             dataKey="total"
-            stroke={CORES_GRAFICO.primaria}
+            stroke={corSerie(0)}
             fill={`url(#g${id})`}
             filter={`url(#b${id})`}
             {...areaProps}
             strokeWidth={2.5}
             animationDuration={1300}
-            dot={<PontoFinal total={serie.length} cor={CORES_GRAFICO.primaria} />}
+            dot={<PontoFinal total={serie.length} cor={corSerie(0)} />}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -102,7 +102,7 @@ export function GastosPorCategoria({ resumo = [], maxCategorias = 5 }) {
       </GraficoAcessivel>
       <ul className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Legenda das categorias">
         {series.map((s, i) => (
-          <li key={s} className="flex items-center gap-2 text-xs text-text-primary/75">
+          <li key={s} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 text-xs text-text-primary/75">
             <span aria-hidden="true" className="w-2.5 h-2.5 rounded-sm" style={padroes.estiloAmostra(i)} />
             {s}
             <span className="tabular-nums text-text-primary/55 valor-privado">{formatarMoeda(s === 'Outras' ? ordem.slice(principais.length).reduce((t, n) => t + totais.get(n), 0) : totais.get(s), { casas: 0 })}</span>
@@ -122,7 +122,7 @@ export function Ranking({ itens = [], rotulo = 'Ranking' }) {
     <ol aria-label={rotulo} className="space-y-3">
       {itens.map((item, i) => (
         <li key={item.nome} className="space-y-1.5">
-          <div className="flex items-baseline justify-between gap-3 text-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
             <span className="flex items-baseline gap-2 min-w-0">
               <span className="w-4 text-xs tabular-nums text-text-primary/50">{i + 1}</span>
               <span className="truncate text-text-primary/85">{item.nome}</span>

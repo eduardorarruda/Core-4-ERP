@@ -29,7 +29,7 @@ export function FrasesInsight({ frases = [], className }) {
           {frases.map((f, i) => {
             const t = TIPO_FRASE[f.tipo] ?? TIPO_FRASE.INFO;
             return (
-              <StaggerItem as="li" key={`${f.tipo}-${i}`} className="flex items-start gap-3 rounded-2xl border border-border bg-surface-medium/40 p-3.5">
+              <StaggerItem as="li" key={`${f.tipo}-${i}`} className="min-w-0 flex items-start gap-3 rounded-2xl border border-border bg-surface-medium/40 p-3.5">
                 <span
                   aria-hidden="true"
                   className="grid place-items-center w-9 h-9 rounded-xl shrink-0 border"
@@ -37,7 +37,7 @@ export function FrasesInsight({ frases = [], className }) {
                 >
                   <t.Icone className="w-[1.125rem] h-[1.125rem]" />
                 </span>
-                <p className="text-sm leading-relaxed text-text-primary/90 pt-1.5">
+                <p className="min-w-0 break-words text-sm leading-relaxed text-text-primary/90 pt-1.5">
                   <span className="sr-only">{t.rotulo}: </span>{f.texto}
                 </p>
               </StaggerItem>
@@ -68,11 +68,11 @@ export function ProjecaoMes({ projecao, diasNoMes, diaReferencia, className }) {
         </div>
         {!encerrado && (
           <dl className="divide-y divide-border text-sm">
-            <div className="flex justify-between gap-3 py-2"><dt className="text-text-primary/70">Já gasto até hoje</dt><dd className="tabular-nums font-medium valor-privado">{formatarMoeda(p.gastoAteHoje)}</dd></div>
-            <div className="flex justify-between gap-3 py-2"><dt className="text-text-primary/70">Contas que ainda vencem</dt><dd className="tabular-nums font-medium valor-privado">{formatarMoeda(p.agendadoRestante)}</dd></div>
-            <div className="flex justify-between gap-3 py-2">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 py-2"><dt className="text-text-primary/70">Já gasto até hoje</dt><dd className="ml-auto tabular-nums font-medium valor-privado">{formatarMoeda(p.gastoAteHoje)}</dd></div>
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 py-2"><dt className="text-text-primary/70">Contas que ainda vencem</dt><dd className="ml-auto tabular-nums font-medium valor-privado">{formatarMoeda(p.agendadoRestante)}</dd></div>
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-0.5 py-2">
               <dt className="text-text-primary/70">Cartão no ritmo atual <span className="block text-xs text-text-primary/55">{formatarMoeda(p.ritmoDiario)}/dia × {restantes} dias</span></dt>
-              <dd className="tabular-nums font-medium valor-privado">{formatarMoeda(variavel)}</dd>
+              <dd className="ml-auto tabular-nums font-medium valor-privado">{formatarMoeda(variavel)}</dd>
             </div>
           </dl>
         )}

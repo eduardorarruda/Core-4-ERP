@@ -81,6 +81,13 @@ function estadoInicial(inicial, tipo) {
 }
 
 /** Parceiros compatíveis com o tipo (fornecedor paga, cliente recebe; "ambos" serve aos dois). */
+/** Lista base + itens novos, sem repetir id. */
+function juntarPorId(base, novos) {
+  if (!novos.length) return base;
+  const ids = new Set(base.map((i) => i.id));
+  return [...base, ...novos.filter((n) => !ids.has(n.id))];
+}
+
 function parceirosDoTipo(lista, tipo) {
   const aceitos = tipo === 'RECEBER' ? ['CLIENTE', 'AMBOS'] : ['FORNECEDOR', 'AMBOS'];
   return lista.filter((p) => p.ativo !== false && (!p.tipo || aceitos.includes(p.tipo)));
@@ -153,8 +160,14 @@ export default function ContaForm({
   const [sugerindo, setSugerindo] = useState(false);
   const [maisAberto, setMaisAberto] = useState(false);
   const [criacaoRapida, setCriacaoRapida] = useState(null);
-  const [cats, setCats] = useState(categorias ?? []);
-  const [pars, setPars] = useState(parceiros ?? []);
+  // Listas: as das props (que podem chegar depois de o form abrir) ou as carregadas aqui,
+  // mais o que for criado na hora pelo "+" (criação rápida).
+  const [catsCarregadas, setCatsCarregadas] = useState([]);
+  const [parsCarregados, setParsCarregados] = useState([]);
+  const [catsNovas, setCatsNovas] = useState([]);
+  const [parsNovos, setParsNovos] = useState([]);
+  const cats = useMemo(() => juntarPorId(categorias ?? catsCarregadas, catsNovas), [categorias, catsCarregadas, catsNovas]);
+  const pars = useMemo(() => juntarPorId(parceiros ?? parsCarregados, parsNovos), [parceiros, parsCarregados, parsNovos]);
   const [assinaturasAtivas, setAssinaturasAtivas] = useState([]);
 
   const podeVerAssinaturas = completo && pode('ASSINATURA_VISUALIZAR');
@@ -162,8 +175,8 @@ export default function ContaForm({
   // Carrega listas que não vieram por props (respostas descartadas se o form fechar antes)
   useEffect(() => {
     let vigente = true;
-    if (!categorias) catApi.listar().then((l) => vigente && setCats(l ?? []), () => {});
-    if (!parceiros) parApi.listar().then((l) => vigente && setPars(l ?? []), () => {});
+    if (!categorias) catApi.listar().then((l) => vigente && setCatsCarregadas(l ?? []), () => {});
+    if (!parceiros) parApi.listar().then((l) => vigente && setParsCarregados(l ?? []), () => {});
     if (podeVerAssinaturas) assinaturasApi.listarAtivas().then((l) => vigente && setAssinaturasAtivas(l ?? []), () => {});
     return () => { vigente = false; };
   }, [categorias, parceiros, podeVerAssinaturas]);
@@ -396,10 +409,10 @@ export default function ContaForm({
           onFechar={() => setCriacaoRapida(null)}
           onCriado={(novo) => {
             if (criacaoRapida === 'categoria') {
-              setCats((l) => [...l, novo]);
+              setCatsNovas((l) => [...l, novo]);
               set('categoriaId')(String(novo.id));
             } else {
-              setPars((l) => [...l, novo]);
+              setParsNovos((l) => [...l, novo]);
               set('parceiroId')(String(novo.id));
             }
             setCriacaoRapida(null);

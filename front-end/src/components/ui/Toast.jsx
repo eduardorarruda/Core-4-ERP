@@ -12,42 +12,48 @@ const TIPOS = {
 };
 
 
-/**
- * Aviso flutuante. Erros NÃO somem sozinhos (WCAG 2.2.1/2.2.3): ficam até a pessoa fechar.
- * O anúncio para leitores de tela é feito pelas regiões vivas do
- * ToastContainer (fixas no DOM), então o item não tem role/aria-live — evita anúncios duplos.
- * O tempo pausa com o mouse em cima ou com o foco dentro (WCAG 2.2.1).
- */
-function ToastItem({ id, message, type = 'success', duration = 4000 }) {
-  const { dismiss } = useToast();
+/** Relógio que pausa com o mouse em cima ou com o foco dentro (WCAG 2.2.1). `duration` null = sem tempo. */
+function useTempoPausavel(duration, aoTerminar) {
   const [pausado, setPausado] = useState(false);
   const restante = useRef(duration);
   const inicio = useRef(0);
 
-  // A saída animada é do AnimatePresence do contêiner: aqui só tiramos o item da lista.
-  const close = useCallback(() => dismiss(id), [dismiss, id]);
-
-  const semTempo = type === 'error';
-
   useEffect(() => {
-    if (pausado || semTempo) return undefined;
+    if (pausado || !duration) return undefined;
     inicio.current = Date.now();
-    const t = setTimeout(close, restante.current);
+    const t = setTimeout(aoTerminar, restante.current);
     return () => {
       clearTimeout(t);
       restante.current = Math.max(0, restante.current - (Date.now() - inicio.current));
     };
-  }, [pausado, close, semTempo]);
+  }, [pausado, aoTerminar, duration]);
 
+  const pausar = {
+    onMouseEnter: () => setPausado(true),
+    onMouseLeave: () => setPausado(false),
+    onFocus: () => setPausado(true),
+    onBlur: () => setPausado(false),
+  };
+  return { pausado, pausar };
+}
+
+/**
+ * Cartão de aviso flutuante (visual + relógio). Usado pelos toasts e por avisos com "Desfazer"
+ * que precisam de estado próprio (ex.: conciliação, que adia o envio até o aviso fechar).
+ * O anúncio para leitor de tela fica a cargo de quem renderiza (regiões vivas fixas).
+ *
+ * Props: type ('success'|'error'|'info'), titulo (padrão do tipo), message, icone (lucide, opcional),
+ * duration (ms; null = sem tempo), onFechar(), action ({ label, onClick, icon }).
+ */
+export function CartaoAviso({ type = 'success', titulo, message, icone, duration, onFechar, action }) {
+  const { pausado, pausar } = useTempoPausavel(duration, onFechar);
   const tipo = TIPOS[type] ?? TIPOS.info;
-  const { Icone } = tipo;
+  const Icone = icone ?? tipo.Icone;
+  const IconeAcao = action?.icon;
 
   return (
     <div
-      onMouseEnter={() => setPausado(true)}
-      onMouseLeave={() => setPausado(false)}
-      onFocus={() => setPausado(true)}
-      onBlur={() => setPausado(false)}
+      {...pausar}
       className={cn(
         'relative flex items-start gap-3 pl-3 pr-1 py-2 w-full sm:w-[22rem] overflow-hidden',
         'rounded-2xl border border-border-strong bg-surface-low/90 backdrop-blur-xl',
@@ -58,24 +64,56 @@ function ToastItem({ id, message, type = 'success', duration = 4000 }) {
         <Icone className="w-5 h-5" />
       </span>
       <div className="flex-1 min-w-0 py-1">
-        <p className="text-sm font-semibold leading-tight">{tipo.titulo}</p>
+        <p className="text-sm font-semibold leading-tight">{titulo ?? tipo.titulo}</p>
         <p className="mt-0.5 text-sm text-text-primary/75 leading-snug break-words">{message}</p>
+        {action && (
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="mt-1.5 -ml-2 inline-flex items-center gap-1.5 min-h-11 px-2 rounded-lg text-sm font-semibold text-primary hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {IconeAcao && <IconeAcao className="w-4 h-4" aria-hidden="true" />}
+            {action.label}
+          </button>
+        )}
       </div>
       <button
         type="button"
-        onClick={close}
+        onClick={onFechar}
         aria-label="Fechar aviso"
         className="min-w-11 min-h-11 grid place-items-center rounded-xl text-text-primary/55 hover:text-text-primary hover:bg-text-primary/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <X className="w-4 h-4" aria-hidden="true" />
       </button>
-      {/* Tempo restante: barra que encolhe e pausa junto com o relógio (erros não têm tempo) */}
-      {!semTempo && <div
-        aria-hidden="true"
-        className={cn('absolute bottom-0 inset-x-0 h-0.5 opacity-70 origin-left', tipo.fio)}
-        style={{ animation: `progressBar ${duration}ms linear forwards`, animationPlayState: pausado ? 'paused' : 'running' }}
-      />}
+      {/* Tempo restante: barra que encolhe e pausa junto com o relógio */}
+      {duration ? (
+        <div
+          aria-hidden="true"
+          className={cn('absolute bottom-0 inset-x-0 h-0.5 opacity-70 origin-left', tipo.fio)}
+          style={{ animation: `progressBar ${duration}ms linear forwards`, animationPlayState: pausado ? 'paused' : 'running' }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Item da pilha de toasts. Erros NÃO somem sozinhos (WCAG 2.2.1/2.2.3): ficam até a pessoa fechar.
+ * Com `action`, o clique executa a ação e fecha o aviso; `onClose` roda quando o aviso some sem a ação.
+ */
+function ToastItem({ id, message, type = 'success', duration = 4000, action, onClose }) {
+  const { dismiss } = useToast();
+  const fechar = useCallback(() => { dismiss(id); onClose?.(); }, [dismiss, id, onClose]);
+  const agir = useCallback(() => { dismiss(id); action?.onClick(); }, [dismiss, id, action]);
+
+  return (
+    <CartaoAviso
+      type={type}
+      message={message}
+      duration={type === 'error' ? null : duration}
+      onFechar={fechar}
+      action={action ? { ...action, onClick: agir } : undefined}
+    />
   );
 }
 

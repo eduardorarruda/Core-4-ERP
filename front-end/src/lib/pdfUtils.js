@@ -1,11 +1,23 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const PRIMARY = [110, 255, 192];   // #6EFFC0
-const ON_PRIMARY = [0, 56, 36];    // #003824
-const SURFACE = [42, 42, 42];      // #2A2A2A
-const TEXT = [200, 200, 200];
+// O PDF é impresso (fundo branco): cores fixas em RGB, da marca Core 4 (esmeralda) com contraste
+// AA para texto escuro sobre a faixa. Não dependem do tema da tela.
+const PRIMARY = [20, 226, 156];   // esmeralda da marca
+const ON_PRIMARY = [3, 26, 20];   // petróleo quase preto
 
+/** 'yyyy-MM-dd' → 'dd/MM/yyyy' (texto já em outro formato passa direto). */
+function dataBr(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : String(iso ?? '');
+}
+
+/**
+ * PDF de um relatório em tabela.
+ * @param {string} titulo
+ * @param {{inicio: string, fim: string} | null} periodo  null = relatório sem período (situação de hoje)
+ * @param {{cabecalho: string[], linhas: any[][], totais?: any[]}} dados
+ */
 export function gerarPDF(titulo, periodo, dados) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
@@ -20,7 +32,8 @@ export function gerarPDF(titulo, periodo, dados) {
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Período: ${periodo.inicio} a ${periodo.fim}`, 200, 13);
+  const hoje = new Date().toLocaleDateString('pt-BR');
+  doc.text(periodo ? `Período: ${dataBr(periodo.inicio)} a ${dataBr(periodo.fim)}` : `Situação em ${hoje}`, 200, 13);
 
   // ── Tabela ─────────────────────────────────────────────────────────────────
   const bodyRows = dados.linhas.map(row =>
@@ -80,7 +93,8 @@ export function gerarPDF(titulo, periodo, dados) {
     doc.text(`Página ${i} de ${pageCount}`, 260, 205);
   }
 
-  const nomeArquivo = `${titulo.replace(/ /g, '_')}_${periodo.inicio}_${periodo.fim}.pdf`;
+  const sufixo = periodo ? `${periodo.inicio}_${periodo.fim}` : new Date().toISOString().slice(0, 10);
+  const nomeArquivo = `${titulo.replace(/ /g, '_')}_${sufixo}.pdf`;
   doc.save(nomeArquivo);
 }
 

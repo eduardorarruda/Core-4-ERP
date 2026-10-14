@@ -39,8 +39,11 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,woff2}'], // precache do app shell
           // Fora do precache: PDF (só baixa ao exportar), dependências opcionais do jsPDF e
-          // subconjuntos de fonte de alfabetos que o app não usa (cirílico, grego, vietnamita)
+          // subconjuntos de fonte de alfabetos que o app não usa (cirílico, grego, vietnamita) e as
+          // fontes do modo de acessibilidade (Lexend, Atkinson), carregadas só quando a pessoa as escolhe
           globIgnores: [
+            '**/lexend-*',
+            '**/atkinson-*',
             '**/pdf-*.js',
             '**/pdf-html2canvas-*.js',
             '**/pdf-canvg-*.js',
@@ -72,25 +75,30 @@ export default defineConfig(({ mode }) => {
       }),
     ],
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         output: {
-          // Separa bibliotecas grandes em chunks próprios: o cache do navegador sobrevive a
-          // deploys que só mudam o código do app, e o que é pesado só baixa quando é usado.
-          manualChunks(id) {
-            // Helpers compartilhados (CommonJS interop, clsx…) vão para o chunk base; senão o
-            // Rollup os coloca no 1º chunk manual que os usa e o index passa a puxar pdf/charts.
-            if (id.includes('commonjsHelpers') || id.includes('vite/preload-helper') || /[\\/]node_modules[\\/](clsx|tailwind-merge|react-is|tiny-invariant|@babel[\\/]runtime|use-sync-external-store)[\\/]/.test(id)) {
-              return 'react-vendor';
-            }
-            if (!id.includes('node_modules')) return undefined;
-            if (/[\\/]node_modules[\\/](html2canvas)[\\/]/.test(id)) return 'pdf-html2canvas';
-            if (/[\\/]node_modules[\\/](canvg|stackblur-canvas|rgbcolor|svg-pathdata|core-js|raf)[\\/]/.test(id)) return 'pdf-canvg';
-            if (/[\\/]node_modules[\\/]dompurify[\\/]/.test(id)) return 'pdf-purify';
-            if (/[\\/]node_modules[\\/](jspdf|jspdf-autotable|fflate|fast-png|iobuffer|pako)[\\/]/.test(id)) return 'pdf';
-            if (/[\\/]node_modules[\\/](recharts|recharts-scale|d3-[^\\/]+|victory-vendor|decimal\.js-light|internmap|@reduxjs|redux|reselect|immer|es-toolkit|eventemitter3|use-sync-external-store|react-redux)[\\/]/.test(id)) return 'charts';
-            if (/[\\/]node_modules[\\/](@assistant-ui|assistant-stream|assistant-cloud|react-markdown|remark-[^\\/]+|rehype-[^\\/]+|micromark[^\\/]*|mdast-[^\\/]+|hast-[^\\/]+|unist-[^\\/]+|unified|vfile[^\\/]*|zustand|nanoid|@radix-ui|property-information|space-separated-tokens|comma-separated-tokens|html-url-attributes|decode-named-character-reference|character-entities|trim-lines|ccount|devlop|bail|trough|is-plain-obj|zwitch|longest-streak|markdown-table|estree-util-is-identifier-name|style-to-js|style-to-object|inline-style-parser)[\\/]/.test(id)) return 'chat';
-            if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|cookie|set-cookie-parser)[\\/]/.test(id)) return 'react-vendor';
-            return undefined;
+          // Separa bibliotecas grandes em chunks próprios: o cache do navegador sobrevive a deploys
+          // que só mudam o código do app, e o que é pesado (PDF, gráficos) só baixa quando é usado.
+          // Rolldown (Vite 8) leva junto as dependências de cada grupo; a prioridade decide quem fica
+          // com o módulo compartilhado — React e os helpers do Vite precisam cair no react-vendor,
+          // senão o chunk de gráficos/PDF vira dependência estática da página inicial.
+          codeSplitting: {
+            groups: [
+              {
+                name: 'react-vendor',
+                priority: 40,
+                test: /vite[\\/]preload-helper|commonjsHelpers|[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|cookie|set-cookie-parser|clsx|tailwind-merge|react-is|use-sync-external-store|@babel[\\/]runtime)[\\/]/,
+              },
+              { name: 'pdf-html2canvas', priority: 30, test: /[\\/]node_modules[\\/]html2canvas[\\/]/ },
+              { name: 'pdf-canvg', priority: 30, test: /[\\/]node_modules[\\/](canvg|stackblur-canvas|rgbcolor|svg-pathdata|core-js|raf)[\\/]/ },
+              { name: 'pdf-purify', priority: 30, test: /[\\/]node_modules[\\/]dompurify[\\/]/ },
+              { name: 'pdf', priority: 20, test: /[\\/]node_modules[\\/](jspdf|jspdf-autotable|fflate|fast-png|iobuffer|pako)[\\/]/ },
+              {
+                name: 'charts',
+                priority: 20,
+                test: /[\\/]node_modules[\\/](recharts|recharts-scale|d3-[^\\/]+|victory-vendor|decimal\.js-light|internmap|@reduxjs|redux|reselect|immer|es-toolkit|eventemitter3|react-redux)[\\/]/,
+              },
+            ],
           },
         },
       },

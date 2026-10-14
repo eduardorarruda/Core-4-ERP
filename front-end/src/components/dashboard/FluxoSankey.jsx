@@ -107,7 +107,7 @@ function ListaMobile({ itens, total }) {
         const pct = total > 0 ? d.valor / total : 0;
         return (
           <li key={d.nome}>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
               <span className="truncate text-text-primary/85">{d.nome}</span>
               <span className="tabular-nums font-medium valor-privado shrink-0">{formatarMoeda(d.valor)}</span>
             </div>

@@ -170,10 +170,9 @@ function CursorDigitacao() {
 
 /**
  * Props: texto (markdown), className, cursor (true = mostra o cursor de digitação no fim).
- * Também aceita `text` para servir direto como componente Text do @assistant-ui.
  */
-export default function MarkdownAurea({ texto, text, className, cursor = false }) {
-  const conteudo = texto ?? text ?? '';
+export default function MarkdownAurea({ texto, className, cursor = false }) {
+  const conteudo = texto ?? '';
   return (
     <div className={cn('space-y-2.5 text-[0.9375rem] leading-relaxed text-text-primary/90 break-words', className)}>
       {blocos(conteudo).map((b, i) => <Bloco key={i} b={b} k={String(i)} />)}

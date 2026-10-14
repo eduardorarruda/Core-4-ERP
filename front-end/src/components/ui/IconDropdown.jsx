@@ -163,7 +163,7 @@ export default function IconDropdown({ value, onChange }) {
       {open && (
         <div
           className="absolute z-50 top-full mt-1 w-72 rounded-2xl border border-text-primary/10 shadow-2xl overflow-hidden"
-          style={{ background: 'rgba(18,18,28,.98)', backdropFilter: 'blur(12px)' }}
+          style={{ background: 'color-mix(in srgb, var(--color-surface-low) 98%, transparent)', backdropFilter: 'blur(12px)' }}
         >
           <div className="p-3 border-b border-text-primary/8">
             <div className="relative">

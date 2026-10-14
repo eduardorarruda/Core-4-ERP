@@ -50,19 +50,22 @@ export function FadeIn({ children, className, delay = 0, y = 8, as = 'div', ...r
 /**
  * Lista/grade com entrada escalonada (40ms entre filhos). Os filhos diretos que devem
  * animar são <StaggerItem>. `aoRolar` anima só quando entra na tela.
+ *
+ * O estado vai sempre por `animate` (e não por `whileInView`): assim um item que entra na lista
+ * depois da 1ª animação herda "visivel" e aparece — com `whileInView` ele ficava invisível.
  */
 export function Stagger({ children, className, delay = 0, aoRolar = false, as = 'div', ...rest }) {
   const reduzir = useMovimentoReduzido();
+  const ref = useRef(null);
+  const naTela = useInView(ref, { once: true, amount: 0.15 });
   const Comp = motion[as] ?? motion.div;
-  const gatilho = aoRolar
-    ? { whileInView: 'visivel', viewport: { once: true, amount: 0.15 } }
-    : { animate: 'visivel' };
   return (
     <Comp
+      ref={ref}
       className={className}
       variants={variantesStagger(delay)}
       initial={reduzir ? false : 'inicial'}
-      {...gatilho}
+      animate={!aoRolar || naTela ? 'visivel' : 'inicial'}
       {...rest}
     >
       {children}

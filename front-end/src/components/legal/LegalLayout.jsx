@@ -49,7 +49,7 @@ export function LegalSection({ id, titulo, children }) {
 function Sumario({ secoes }) {
   if (!secoes?.length) return null;
   return (
-    <nav aria-label="Nesta página" className="c4-card p-4 sm:p-5 lg:sticky lg:top-24">
+    <nav aria-label="Nesta página" className="c4-card p-4 sm:p-5 min-w-0 break-words lg:sticky lg:top-24">
       <p className="c4-eyebrow mb-3">Nesta página</p>
       <ol className="grid gap-0.5 text-sm">
         {secoes.map((s, i) => (
@@ -78,10 +78,11 @@ function BotaoVoltar() {
     <Link
       to="/login"
       onClick={voltar}
-      className={`inline-flex items-center gap-1.5 min-h-11 px-3 text-sm font-medium text-text-primary/80 hover:text-primary transition-colors ${FOCO}`}
+      className={`inline-flex items-center justify-center gap-1.5 min-h-11 min-w-[44px] px-2 sm:px-3 text-sm font-medium text-text-primary/80 hover:text-primary transition-colors ${FOCO}`}
     >
       <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-      Voltar
+      {/* Em tela estreita fica só a seta (o nome acessível continua "Voltar") */}
+      <span className="sr-only min-[400px]:not-sr-only">Voltar</span>
     </Link>
   );
 }
@@ -95,7 +96,7 @@ export default function LegalLayout({ titulo, resumo, secoes, children, eyebrow 
     <div className="relative min-h-dvh bg-surface text-text-primary overflow-x-hidden">
       <FundoVivo />
       <header className="sticky top-0 z-20 c4-glass border-b pt-safe">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
           <Link to="/login" className={FOCO}>
             <BrandLogo size="sm" as="span" />
             <span className="sr-only">, ir para o login</span>
@@ -108,9 +109,9 @@ export default function LegalLayout({ titulo, resumo, secoes, children, eyebrow 
       </header>
 
       <main id="main-content" tabIndex={-1} className="outline-none relative z-[1] mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-14">
-        <FadeIn className="max-w-3xl">
+        <FadeIn className="@container max-w-3xl">
           <p className="c4-eyebrow mb-3">{eyebrow}</p>
-          <h1 className="font-display text-[2rem] sm:text-[2.5rem] font-semibold tracking-[-0.03em] leading-tight">{titulo}</h1>
+          <h1 className="font-display break-words text-[min(2rem,10cqi)] sm:text-[min(2.5rem,8cqi)] font-semibold tracking-[-0.03em] leading-tight">{titulo}</h1>
           <p className="mt-3 inline-flex flex-wrap items-center gap-2 text-xs sm:text-sm text-text-primary/70">
             {meta ?? (
               <>
@@ -124,7 +125,7 @@ export default function LegalLayout({ titulo, resumo, secoes, children, eyebrow 
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[16rem_1fr] lg:gap-12 items-start">
           <Sumario secoes={secoes} />
-          <article className="c4-card p-5 sm:p-8 min-w-0 max-w-3xl">{children}</article>
+          <article className="c4-card p-5 sm:p-8 min-w-0 max-w-3xl break-words">{children}</article>
         </div>
       </main>
 

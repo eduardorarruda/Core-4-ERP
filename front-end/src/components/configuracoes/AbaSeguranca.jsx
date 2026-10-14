@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Check, KeyRound, LogOut, MonitorSmartphone } from 'lucide-react';
-import { auth, clearAuth, getEmpresaAtivaId, getLoginState, setLoginState } from '../../lib/api';
+import { auth, clearAuth, getLoginState, setLoginState } from '../../lib/api';
 import { useConfirm } from '../../hooks/useConfirm';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
@@ -9,23 +9,16 @@ import FormField, { PasswordInput } from '../ui/FormField';
 import PasswordRules from '../ui/PasswordRules';
 import { senhaValida } from '../../lib/senha';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '';
-
 /*
  * "Sair de todos os dispositivos": POST /api/auth/logout-todos revoga todos os tokens já
- * emitidos (incrementa a versão do token) e apaga o cookie desta sessão.
- * lib/api.js ainda não expõe esse endpoint; a chamada fica aqui, com os mesmos cabeçalhos.
+ * emitidos (incrementa a versão do token) e apaga o cookie desta sessão. Um 401 aqui quer dizer
+ * que a sessão já tinha caído — o resultado é o mesmo.
  */
 async function sairDeTodosOsDispositivos() {
-  const empresaId = getEmpresaAtivaId();
-  const resp = await fetch(`${BASE_URL}/api/auth/logout-todos`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: empresaId ? { 'X-Empresa-Id': String(empresaId) } : {},
-  });
-  if (!resp.ok && resp.status !== 401) {
-    const corpo = await resp.json().catch(() => ({}));
-    throw new Error(corpo.mensagem || 'Não foi possível encerrar as sessões. Tente novamente.');
+  try {
+    await auth.logoutTodos();
+  } catch (err) {
+    if (err?.status !== 401) throw err;
   }
 }
 

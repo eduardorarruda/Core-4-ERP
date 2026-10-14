@@ -88,7 +88,7 @@ export default function Register() {
     >
       <Stagger>
         <StaggerItem>
-          <h1 className="font-display text-[2rem] sm:text-[2.25rem] font-semibold tracking-[-0.03em] leading-tight">
+          <h1 className="font-display break-words hyphens-auto text-[2rem] sm:text-[2.25rem] font-semibold tracking-[-0.03em] leading-tight">
             Criar sua <span className="c4-text-emerald">conta</span>
           </h1>
         </StaggerItem>

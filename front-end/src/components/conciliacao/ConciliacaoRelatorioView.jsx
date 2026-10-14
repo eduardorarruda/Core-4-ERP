@@ -115,6 +115,12 @@ export default function ConciliacaoRelatorioView({ modo, id }) {
   const periodo = rel.dataInicioOfx && rel.dataFimOfx ? `${formatDate(rel.dataInicioOfx)} a ${formatDate(rel.dataFimOfx)}` : null;
   const detalhe = cfg.detalheSessao(rel);
   const rotuloBaixa = cfg.id === 'cartao' ? 'Confirmados' : 'Baixados';
+  // Situação FINAL de cada movimento (os totais "não identificados" do backend são os da importação,
+  // antes da revisão — somá-los aos ignorados contava em dobro o que foi resolvido depois).
+  const itensRel = rel.itens ?? [];
+  const contar = (status) => itensRel.filter((i) => i.statusItem === status).length;
+  const ignorados = itensRel.length ? contar('IGNORADO') : (rel.totalIgnorados ?? 0);
+  const semCorrespondencia = itensRel.length ? contar('NAO_IDENTIFICADO') : (rel.totalNaoIdentificados ?? 0);
 
   return (
     <div className="space-y-6">
@@ -147,8 +153,8 @@ export default function ConciliacaoRelatorioView({ modo, id }) {
           ajuda={cfg.id === 'cartao' ? 'Lançamentos do cartão confirmados pelo extrato.' : 'Contas baixadas na conta bancária ao finalizar.'} />
         <KpiCard label="Vinculados à mão" valor={rel.totalManuais ?? 0} formato="numero" tom="primary" icon={Link2}
           ajuda="Itens que você vinculou ou criou durante a revisão." />
-        <KpiCard label="Ignorados ou sem correspondência" valor={(rel.totalIgnorados ?? 0) + (rel.totalNaoIdentificados ?? 0)} formato="numero" icon={EyeOff}
-          ajuda={`${rel.totalIgnorados ?? 0} ignorados e ${rel.totalNaoIdentificados ?? 0} sem correspondência.`} />
+        <KpiCard label="Ignorados ou sem correspondência" valor={ignorados + semCorrespondencia} formato="numero" icon={EyeOff}
+          ajuda={`${ignorados} ${ignorados === 1 ? 'ignorado' : 'ignorados'} e ${semCorrespondencia} sem correspondência.`} />
       </KpiGrid>
 
       <DataTable

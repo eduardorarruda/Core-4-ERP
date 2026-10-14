@@ -121,12 +121,14 @@ export default function KpiCard({
       <span
         aria-hidden="true"
         className={cn('pointer-events-none absolute -right-10 -bottom-16 w-60 h-60 rounded-full', destaque ? 'opacity-25' : 'opacity-[0.14]')}
-        style={{ background: t.cor, maskImage: 'radial-gradient(closest-side, #000, transparent)', WebkitMaskImage: 'radial-gradient(closest-side, #000, transparent)' }}
+        style={{ background: t.cor, maskImage: 'radial-gradient(closest-side, black, transparent)', WebkitMaskImage: 'radial-gradient(closest-side, black, transparent)' }}
       />
-      <header className="relative flex items-center gap-2.5 min-w-0">
+      {/* Rótulo nunca quebra no meio da palavra: com pouco espaço (2 colunas no celular, texto 175%)
+          ele desce para baixo do ícone em vez de virar "Entra/das". */}
+      <header className="relative flex flex-wrap items-center gap-x-2.5 gap-y-1.5 min-w-0">
         <IconeKpi icon={icon} classe={t.icone} />
         {/* <p> e não <h3>: rótulo de número não é seção — h3 solto depois do h1 quebrava a ordem dos títulos */}
-        <p className="min-w-0 text-sm font-medium text-text-primary/75 font-body tracking-normal leading-snug hyphens-auto">{rotulo}</p>
+        <p className="flex-1 basis-[7rem] min-w-0 text-sm font-medium text-text-primary/75 font-body tracking-normal leading-snug text-balance hyphens-manual [overflow-wrap:normal]">{rotulo}</p>
         {ajuda && (
           <Tooltip conteudo={ajuda}>
             <button type="button" aria-label={`Como é calculado: ${rotulo}`} className="ml-auto -mr-1 w-7 h-7 grid place-items-center rounded-full text-text-primary/45 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">

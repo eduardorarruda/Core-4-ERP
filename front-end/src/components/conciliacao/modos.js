@@ -15,14 +15,14 @@ import {
  * devolve sempre { id, descricao, valor } para a tela não precisar saber o modo.
  */
 
+/** "9999000011112222" → "final 2222" (número de cartão não aparece inteiro na tela). */
+const finalDoNumero = (num) => {
+  const digitos = String(num ?? '').replace(/\D/g, '');
+  return digitos.length > 4 ? `final ${digitos.slice(-4)}` : String(num ?? '');
+};
+
 /** Limite de contas em aberto carregadas no "Vincular" (o backend pagina). */
 const LIMITE_CONTAS = 200;
-
-const comum = {
-  // O backend permite reabrir item ignorado (PATCH desfazer-ignorar). Se o cliente da API
-  // ainda não expõe o método, "desvincular" tem o mesmo efeito (volta a Não identificado).
-  desfazerIgnorar: (api) => (id, itemId) => (api.desfazerIgnorar ?? api.desvincularItem)(id, itemId),
-};
 
 export const MODOS = {
   banco: {
@@ -65,7 +65,7 @@ export const MODOS = {
       criar: (sessaoId, itemId, dto) => apiBanco.criarContaItem(sessaoId, itemId, dto),
       ignorar: (sessaoId, itemId) => apiBanco.ignorarItem(sessaoId, itemId),
       desvincular: (sessaoId, itemId) => apiBanco.desvincularItem(sessaoId, itemId),
-      desfazerIgnorar: comum.desfazerIgnorar(apiBanco),
+      desfazerIgnorar: (sessaoId, itemId) => apiBanco.desfazerIgnorar(sessaoId, itemId),
     },
     /** Candidatos ao vínculo: contas em aberto (pendentes ou atrasadas). */
     buscarCandidatos: async () => {
@@ -103,7 +103,7 @@ export const MODOS = {
     destino: {
       rotulo: 'Cartão',
       erroPrefixo: 'CARTAO_NAO_ENCONTRADO:',
-      aviso: (num) => `Não achamos o cartão ${num} do arquivo entre os seus cartões. Escolha qual cartão é esse para continuar.`,
+      aviso: (num) => `Não achamos o cartão ${finalDoNumero(num)} do arquivo entre os seus cartões. Escolha qual cartão é esse para continuar.`,
       listar: () => cartoesApi.listar(),
       opcao: (c) => ({ value: c.id, label: c.nome }),
     },
@@ -128,7 +128,7 @@ export const MODOS = {
       criar: (sessaoId, itemId, dto) => apiCartao.criarLancamento(sessaoId, itemId, dto),
       ignorar: (sessaoId, itemId) => apiCartao.ignorarItem(sessaoId, itemId),
       desvincular: (sessaoId, itemId) => apiCartao.desvincularItem(sessaoId, itemId),
-      desfazerIgnorar: comum.desfazerIgnorar(apiCartao),
+      desfazerIgnorar: (sessaoId, itemId) => apiCartao.desfazerIgnorar(sessaoId, itemId),
     },
     /** Candidatos ao vínculo: lançamentos do cartão da sessão. */
     buscarCandidatos: async (sessao) => {

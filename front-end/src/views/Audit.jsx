@@ -54,7 +54,7 @@ function LinhaEvento({ evento, meuId, onAbrir }) {
         <Icone className="w-4 h-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm text-text-primary leading-relaxed">
+        <span className="block min-w-0 break-words text-sm text-text-primary leading-relaxed">
           <strong className="font-semibold">{f.autor}</strong> {f.verbo} {f.alvo}
           {f.nome && <> <span className="font-medium">“{f.nome}”</span></>}
         </span>

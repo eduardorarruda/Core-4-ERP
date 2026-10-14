@@ -86,7 +86,8 @@ export default function Acessibilidade() {
           &quot;Pular para o conteúdo&quot;, &quot;Pular para a navegação&quot; e &quot;Abrir opções de acessibilidade&quot;.
           Ao trocar de tela, o foco vai para o título da página nova e o leitor de tela avisa qual página carregou.
         </p>
-        <div className="mt-4 overflow-x-auto">
+        {/* Rola na horizontal em tela estreita: focável para quem usa só o teclado (WCAG 2.1.1) */}
+        <div className="mt-4 overflow-x-auto rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" tabIndex={0} role="region" aria-label="Tabela de atalhos de teclado">
           <table className="w-full text-sm border-collapse">
             <caption className="sr-only">Atalhos de teclado do Core 4</caption>
             <thead>

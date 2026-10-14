@@ -23,12 +23,12 @@ import { cn } from '../../lib/utils';
 const VARIANTS = {
   primary: cn(
     'bg-gradient-primary text-on-primary font-semibold',
-    'shadow-[inset_0_1px_0_rgba(255,255,255,0.28),var(--shadow-primary)]',
-    'hover:brightness-110 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_30px_-8px_color-mix(in_srgb,var(--color-primary)_55%,transparent)]',
+    'shadow-[var(--c4-brilho-botao),var(--shadow-primary)]',
+    'hover:brightness-110 hover:shadow-[var(--c4-brilho-botao-forte),0_10px_30px_-8px_color-mix(in_srgb,var(--color-primary)_55%,transparent)]',
   ),
   secondary: cn(
     'bg-surface-medium/70 text-text-primary border border-border-strong',
-    'shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'shadow-[var(--c4-brilho-sutil)]',
     'hover:bg-surface-high hover:border-text-primary/[0.22]',
   ),
   ghost: 'bg-transparent text-text-primary/80 hover:text-text-primary hover:bg-text-primary/[0.06]',
@@ -42,9 +42,11 @@ const SIZES = {
   sm: 'h-9 px-3 text-sm gap-1.5 rounded-lg',
   md: 'h-11 px-4 text-sm gap-2 rounded-xl',
   lg: 'h-12 px-5 text-base gap-2 rounded-xl',
-  icon: 'w-11 h-11 shrink-0 rounded-xl',
+  // Botões só de ícone em px: o alvo continua ≥ 44px, mas não cresce com o texto ampliado (175%)
+  // e as linhas com várias ações cabem em 320px (WCAG 1.4.10)
+  icon: 'w-[44px] h-[44px] shrink-0 rounded-xl',
   // Visual de 36px com área de toque de 44px (pseudo-elemento) — para barras densas
-  'icon-sm': "w-9 h-9 shrink-0 rounded-lg after:absolute after:-inset-1 after:content-['']",
+  'icon-sm': "w-[36px] h-[36px] shrink-0 rounded-lg after:absolute after:-inset-1 after:content-['']",
 };
 
 const Button = forwardRef(function Button(

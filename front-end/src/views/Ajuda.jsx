@@ -127,8 +127,8 @@ function Artigo({ secao, temAcesso, termo, recolhivel, aberto, onAlternar }) {
         <Icone nome={secao.icone} className="w-5 h-5" />
       </span>
       <span className="min-w-0 flex-1 text-left">
-        <span className="block text-base font-semibold text-text-primary font-display"><Destaque texto={secao.titulo} termo={termo} /></span>
-        <span className="block text-sm text-text-primary/70 leading-relaxed mt-0.5"><Destaque texto={secao.resumo} termo={termo} /></span>
+        <span className="block break-words hyphens-auto text-base font-semibold text-text-primary font-display"><Destaque texto={secao.titulo} termo={termo} /></span>
+        <span className="block break-words hyphens-auto text-sm text-text-primary/70 leading-relaxed mt-0.5"><Destaque texto={secao.resumo} termo={termo} /></span>
       </span>
     </>
   );
@@ -140,7 +140,8 @@ function Artigo({ secao, temAcesso, termo, recolhivel, aberto, onAlternar }) {
             type="button"
             onClick={onAlternar}
             aria-expanded={aberto}
-            aria-controls={corpoId}
+            // O corpo só existe no DOM aberto (Revelar): aria-controls apontaria para um id inexistente
+            aria-controls={aberto ? corpoId : undefined}
             className="w-full flex items-start gap-3 rounded-xl -m-1 p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             {cabecalho}
@@ -165,11 +166,11 @@ function SecaoAtalhos() {
   const { abrirPainel } = useAcessibilidade();
   return (
     <section id="atalhos" aria-labelledby="titulo-atalhos" className="scroll-mt-24 c4-card p-4 sm:p-5">
-      <h2 id="titulo-atalhos" className="flex items-center gap-3 text-lg font-semibold text-text-primary font-display">
-        <span className="grid place-items-center w-10 h-10 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20" aria-hidden="true">
+      <h2 id="titulo-atalhos" className="flex items-center gap-3 min-w-0 break-words hyphens-auto text-lg font-semibold text-text-primary font-display">
+        <span className="grid place-items-center w-10 h-10 shrink-0 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20" aria-hidden="true">
           <Keyboard className="w-5 h-5" />
         </span>
-        Atalhos de teclado e acessibilidade
+        <span className="min-w-0">Atalhos de teclado e acessibilidade</span>
       </h2>
       <p className="mt-2 text-sm text-text-primary/70 leading-relaxed">
         Todos os atalhos usam uma tecla junto (Alt ou Ctrl), para não dispararem sem querer. Dá para desligar os atalhos com Alt no painel de acessibilidade.
@@ -303,7 +304,7 @@ export default function Ajuda() {
       {!termo && (
         <nav aria-label="Assuntos da ajuda">
           <h2 className="c4-eyebrow mb-3">Navegue por assunto</h2>
-          <Stagger as="ul" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Stagger as="ul" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-3">
             {AJUDA_GRUPOS.filter((g) => grupos.some((x) => x.id === g.id)).map((g) => (
               <StaggerItem as="li" key={g.id}>
                 <a href={`#grupo-${g.id}`} className="c4-card c4-card--interativo h-full flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">

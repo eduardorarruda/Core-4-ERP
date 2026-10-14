@@ -168,7 +168,11 @@ export default function CartaoDashboard() {
             <span className="tabular-nums">{formatarNumero(fracaoUso * 100, 'percent', { casas: 0 })} de {formatarMoeda(limite, { casas: 0 })}</span>
           </span>
         </KpiCard>
-        <KpiCard label="Limite disponível" valor={limite - usado} icon={Wallet} tom="income" ajuda="Quanto ainda dá para gastar somando todos os cartões." />
+        {limite - usado < 0 ? (
+          <KpiCard label="Acima do limite em" valor={usado - limite} icon={Wallet} tom="expense" ajuda="Os gastos não pagos passaram do limite somado dos cartões. Novas compras podem ser recusadas." />
+        ) : (
+          <KpiCard label="Limite disponível" valor={limite - usado} icon={Wallet} tom="income" ajuda="Quanto ainda dá para gastar somando todos os cartões." />
+        )}
       </KpiGrid>
 
       {/* Secundário: evolução + próximas faturas */}
@@ -224,6 +228,7 @@ export default function CartaoDashboard() {
                 titulo="Assinaturas e compras avulsas no período"
                 rotuloCentro="Total no período"
                 tamanho={170}
+                mostrarZeradas
                 className="lg:flex-col lg:items-stretch [&>div:first-child]:self-center"
                 fatias={[
                   { id: 'assinaturas', nome: 'Assinaturas', valor: assinaturas, cor: 'var(--color-chart-2)' },

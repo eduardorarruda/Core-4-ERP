@@ -11,14 +11,17 @@ let idCounter = 0;
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const show = useCallback(({ message, type = 'success', duration }) => {
+  // action: { label, onClick, icon? } — botão no aviso (ex.: "Desfazer"); onClose: roda se o aviso
+  // fechar sem a ação (tempo esgotado ou botão fechar).
+  const show = useCallback(({ message, type = 'success', duration, action, onClose }) => {
     // Bloqueio por senha provisória já é comunicado pelo modal de troca de senha;
     // repetir em toast a cada requisição bloqueada só gera ruído.
     if (message === MSG_SENHA_PROVISORIA) return null;
     const id = ++idCounter;
     // Erros ficam mais tempo na tela: dão tempo de ler e agir
-    const tempo = duration ?? (type === 'error' ? 6000 : 4000);
-    setToasts((prev) => [...prev, { id, message, type, duration: tempo }]);
+    // Com ação, mais tempo para a pessoa decidir.
+    const tempo = duration ?? (type === 'error' ? 6000 : action ? 10000 : 4000);
+    setToasts((prev) => [...prev, { id, message, type, duration: tempo, action, onClose }]);
     return id;
   }, []);
 

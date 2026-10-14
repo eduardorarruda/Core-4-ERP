@@ -18,7 +18,8 @@ import BotaoAcessibilidade from '../acessibilidade/BotaoAcessibilidade';
  * privacidade, tema, ajuda, notificações e menu do avatar. Mobile: menu, símbolo e ações.
  * Configurações, Ajuda e Sair ficam AQUI (menu do avatar) — o menu lateral não repete.
  */
-const BOTAO_ICONE = 'relative w-11 h-11 grid place-items-center rounded-xl transition-colors text-text-primary/65 hover:text-text-primary hover:bg-text-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+// Ícones da barra em px (44 = alvo mínimo): com texto ampliado eles não crescem e a barra cabe em 320px
+const BOTAO_ICONE = 'relative w-[44px] h-[44px] grid place-items-center rounded-xl transition-colors text-text-primary/65 hover:text-text-primary hover:bg-text-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 const ITEM_MENU = 'flex items-center gap-3 w-full px-3 min-h-11 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:bg-text-primary/[0.06]';
 
 export default function TopNav({ onCommandPaletteOpen }) {
@@ -113,7 +114,7 @@ export default function TopNav({ onCommandPaletteOpen }) {
               type="button"
               onClick={toggleTheme}
               aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
-              className={BOTAO_ICONE}
+              className={cn(BOTAO_ICONE, 'hidden sm:grid')}
             >
               {theme === 'dark' ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
             </button>
@@ -139,10 +140,10 @@ export default function TopNav({ onCommandPaletteOpen }) {
               aria-haspopup="menu"
               aria-expanded={open}
               aria-controls={open ? menuId : undefined}
-              className="w-11 h-11 grid place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="w-[44px] h-[44px] grid place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <span aria-hidden="true">
-                <Avatar nome={usuario?.nome} src={usuario?.fotoPerfil} size="md" className={cn('transition-shadow', open && 'ring-2 ring-primary/60')} />
+                <Avatar nome={usuario?.nome} src={usuario?.fotoPerfil} size="md" className={cn('w-[36px] h-[36px] transition-shadow', open && 'ring-2 ring-primary/60')} />
               </span>
               <span className="sr-only">Menu da conta</span>
             </button>
@@ -181,6 +182,16 @@ export default function TopNav({ onCommandPaletteOpen }) {
               >
                 {privado ? <Eye className="w-4 h-4 text-text-primary/60" aria-hidden="true" /> : <EyeOff className="w-4 h-4 text-text-primary/60" aria-hidden="true" />}
                 {privado ? 'Mostrar valores' : 'Esconder valores'}
+              </button>
+              {/* No celular o tema sai da barra (falta espaço com texto ampliado) e fica aqui */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={toggleTheme}
+                className={cn(ITEM_MENU, 'sm:hidden text-text-primary/85 hover:bg-text-primary/[0.06]')}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-text-primary/60" aria-hidden="true" /> : <Moon className="w-4 h-4 text-text-primary/60" aria-hidden="true" />}
+                {theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
               </button>
               <div className="my-1 h-px bg-border" role="none" />
               <button type="button" role="menuitem" onClick={logout} className={cn(ITEM_MENU, 'text-error hover:bg-error/10')}>

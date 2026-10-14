@@ -26,16 +26,16 @@ const porNome = (a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR');
 function Linha({ c, sub, inativa, paiInativo, onEditar, onExcluir, onReativar, onNovaSub }) {
   const pode = usePermissao();
   return (
-    <div className={cn('flex items-center gap-3 px-2 py-1.5 min-h-12 rounded-xl', !inativa && 'hover:bg-text-primary/[0.03]')}>
+    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-2 py-1.5 min-h-12 rounded-xl', !inativa && 'hover:bg-text-primary/[0.03]')}>
       {sub && <CornerDownRight className="w-4 h-4 shrink-0 text-text-primary/35" aria-hidden="true" />}
       <ChipCategoria icone={c.icone} tamanho={sub ? 'sm' : 'md'} tom={inativa ? 'neutro' : 'primary'} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[7rem]">
         <p className={cn('truncate', sub ? 'text-sm' : 'font-medium font-display')}>{c.descricao}</p>
         {inativa && sub && c.categoriaPaiDescricao && (
           <p className="text-xs text-text-primary/60 truncate">em {c.categoriaPaiDescricao}</p>
         )}
       </div>
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0 ml-auto">
         {inativa ? (
           pode('CATEGORIA_EDITAR') && (
             <Button variant="secondary" size="sm" className="min-h-11 sm:min-h-9" onClick={() => onReativar(c)} disabled={paiInativo}
@@ -72,8 +72,8 @@ function Ramo({ raiz, filhas, aberto, onAlternar, acoes }) {
   const idFilhas = `filhas-${raiz.id}`;
   return (
     <article className="c4-card p-2">
-      <div className="flex items-center">
-        <div className="flex-1 min-w-0"><Linha c={raiz} {...acoes} /></div>
+      <div className="flex flex-wrap items-center">
+        <div className="flex-1 min-w-0 basis-[12rem]"><Linha c={raiz} {...acoes} /></div>
         {filhas.length > 0 && (
           <button
             type="button"

@@ -120,6 +120,7 @@ export function tamanhoLegivel(bytes) {
  * frases para mostrar o estado de erro com "Tentar novamente" em vez de um balão comum.
  */
 const RESPOSTAS_DE_ERRO = [
+  /^n[aã]o consegui responder agora/i, // RespostaFalhaChat.TEXTO_PADRAO (backend atual)
   /^o assistente est[aá] temporariamente indispon[ií]vel/i,
   /^o assistente recebeu muitas solicita[cç][oõ]es/i,
   /^erro ao processar mensagem/i,

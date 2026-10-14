@@ -6,7 +6,7 @@ import { categorias as categoriasApi } from '../../lib/api';
 import { useCarga } from '../../hooks/useCarga';
 import { useToast } from '../../hooks/useToast';
 import { formatarMoeda } from '../../lib/formatters';
-import { orcamentosApi } from './apiVisaoGeral';
+import { orcamentos as orcamentosApi } from '../../lib/api';
 
 /**
  * Criar/editar orçamento numa gaveta lateral (mesmo formulário nos dois modos).

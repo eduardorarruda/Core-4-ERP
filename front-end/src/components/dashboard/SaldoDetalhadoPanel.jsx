@@ -22,14 +22,14 @@ function Linha({ icon: Icone, rotulo, valor, tom, sinal }) {
   const cor = { income: 'text-income', expense: 'text-expense' }[tom] ?? 'text-text-primary';
   const prefixo = sinal === '+' ? '+' : sinal === '−' ? '−' : '';
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
       {Icone && (
         <span aria-hidden="true" className={cn('grid place-items-center w-7 h-7 rounded-lg bg-text-primary/[0.05] shrink-0', cor)}>
           <Icone className="w-3.5 h-3.5" />
         </span>
       )}
-      <span className="flex-1 text-sm text-text-primary/75">{rotulo}</span>
-      <span className={cn('text-sm font-semibold tabular-nums valor-privado', cor)}>
+      <span className="flex-1 min-w-0 text-sm text-text-primary/75">{rotulo}</span>
+      <span className={cn('ml-auto text-sm font-semibold tabular-nums valor-privado whitespace-nowrap', cor)}>
         {prefixo}{formatarMoeda(valor, { sinal: prefixo ? 'nunca' : 'auto' })}
       </span>
     </div>
@@ -88,14 +88,17 @@ export default function SaldoDetalhadoPanel({ dados, carregando, erro, onTentarN
               <Linha icon={CreditCard} rotulo="Faturas fechadas a pagar" valor={dados?.totalFaturasCartaoPendentes} tom="expense" sinal="−" />
             )}
             {limiteLivre != null && (
-              <div className="flex items-center gap-3 py-2">
-                <span className="flex-1 text-sm text-text-primary/75">Limite livre</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                {/* Cartões estourados: "Acima do limite em R$ X" em vez de um limite livre negativo */}
+                <span className={cn('flex-1 text-sm', limiteLivre < 0 ? 'text-expense font-medium' : 'text-text-primary/75')}>
+                  {limiteLivre < 0 ? 'Acima do limite em' : 'Limite livre'}
+                </span>
                 {temPermissao('CARTAO_VISUALIZAR') ? (
-                  <Link to="/cartoes/dashboard" className="text-sm font-semibold tabular-nums valor-privado text-text-primary underline decoration-dotted underline-offset-4 hover:text-primary">
-                    {formatarMoeda(limiteLivre)}
+                  <Link to="/cartoes/dashboard" className={cn('text-sm font-semibold tabular-nums valor-privado underline decoration-dotted underline-offset-4 hover:text-primary', limiteLivre < 0 ? 'text-expense' : 'text-text-primary')}>
+                    {formatarMoeda(Math.abs(limiteLivre))}
                   </Link>
                 ) : (
-                  <span className="text-sm font-semibold tabular-nums valor-privado">{formatarMoeda(limiteLivre)}</span>
+                  <span className={cn('text-sm font-semibold tabular-nums valor-privado', limiteLivre < 0 && 'text-expense')}>{formatarMoeda(Math.abs(limiteLivre))}</span>
                 )}
               </div>
             )}
@@ -107,7 +110,7 @@ export default function SaldoDetalhadoPanel({ dados, carregando, erro, onTentarN
             <p className="text-xs text-text-primary/65">Saldo previsto (contas em dia)</p>
             <AnimatedNumber value={previsto} colorir className="font-display text-2xl font-semibold" />
           </div>
-          <div className="flex items-baseline justify-between gap-3 pt-3 border-t border-primary/15">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pt-3 border-t border-primary/15">
             <span className="text-xs text-text-primary/65">Depois de pagar os cartões</span>
             <span className={cn('font-semibold tabular-nums valor-privado', comCartao < 0 ? 'text-expense' : 'text-text-primary')}>{formatarMoeda(comCartao)}</span>
           </div>

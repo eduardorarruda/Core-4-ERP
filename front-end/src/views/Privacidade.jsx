@@ -35,7 +35,7 @@ export default function Privacidade() {
     >
       <LegalSection id="controlador" titulo="1. Quem é o controlador">
         <p>
-          O Core 4 é um {CONTROLADOR.natureza}, disponível em <span className="font-mono">{URL_APP}</span>.
+          O Core 4 é um {CONTROLADOR.natureza}, disponível em <span className="font-mono break-all">{URL_APP}</span>.
           O controlador dos dados é <strong>{CONTROLADOR.responsavel}</strong>, {CONTROLADOR.papel}, em conjunto
           com os demais autores: {CONTROLADOR.coautores.join(', ')}.
         </p>

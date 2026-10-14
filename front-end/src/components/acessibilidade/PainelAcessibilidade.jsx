@@ -20,12 +20,13 @@ import { estiloAmostraPadrao, TIPOS_PADRAO } from './padroesGrafico';
 const ICONE_PRESET = { 'baixa-visao': Glasses, dislexia: Brain, movimento: Wind, daltonismo: Droplets, teclado: Keyboard };
 
 // Amostras fixas para a prévia (o modo em si troca as variáveis CSS do app inteiro).
+const amostras = (paleta) => [1, 2, 3, 4, 5, 6].map((n) => `var(--amostra-${paleta}-${n})`);
 const AMOSTRAS_COR = {
-  padrao: ['#14E29C', '#7CC7FF', '#F5B83D', '#FF7A85', '#B9A2FF', '#C9D6DD'],
-  protanopia: ['#56B4E9', '#E69F00', '#009E73', '#F0E442', '#CC79A7', '#4A9BD9'],
-  deuteranopia: ['#56B4E9', '#E69F00', '#009E73', '#F0E442', '#CC79A7', '#4A9BD9'],
-  tritanopia: ['#3FCFC0', '#FF6B7D', '#F2F2F2', '#FF9FC3', '#8C8C8C', '#D77BE0'],
-  monocromia: ['#FFFFFF', '#B3B3B3', '#7A7A7A', '#DDDDDD', '#5E5E5E', '#9A9A9A'],
+  padrao: amostras('padrao'),
+  protanopia: amostras('protanopia'),
+  deuteranopia: amostras('protanopia'),
+  tritanopia: amostras('tritanopia'),
+  monocromia: amostras('monocromia'),
 };
 
 function Amostras({ cores, padroes }) {

@@ -111,23 +111,23 @@ export default function BentoCard({
         />
       )}
       {(title || acoes || accentChip || eyebrow) && (
-        <div className={cn('flex justify-between items-start gap-4', padding === 'none' ? 'p-5 pb-0 mb-4' : 'mb-5')}>
-          <div className="flex items-start gap-3 min-w-0">
+        <div className={cn('flex flex-wrap justify-between items-start gap-x-4 gap-y-3', padding === 'none' ? 'p-5 pb-0 mb-4' : 'mb-5')}>
+          <div className="flex items-start gap-3 min-w-0 flex-1 basis-[12rem]">
             <IconeTitulo icon={icon} />
             <div className="min-w-0">
               {eyebrow && <p className="c4-eyebrow mb-1">{eyebrow}</p>}
               {title && (
-                <Titulo id={tituloId} className="block text-base sm:text-[1.0625rem] font-semibold tracking-tight text-text-primary font-display leading-snug">
+                <Titulo id={tituloId} className="block break-words text-base sm:text-[1.0625rem] font-semibold tracking-tight text-text-primary font-display leading-snug">
                   {title}
                 </Titulo>
               )}
               {apoio && (
-                <p className="mt-0.5 text-sm text-text-primary/60 leading-snug text-pretty">{apoio}</p>
+                <p className="mt-0.5 break-words text-sm text-text-primary/60 leading-snug text-pretty">{apoio}</p>
               )}
             </div>
           </div>
           {(accentChip || acoes) && (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
               {accentChip && (
                 <span className={cn(
                   'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',

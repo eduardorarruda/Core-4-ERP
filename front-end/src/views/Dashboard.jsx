@@ -19,6 +19,12 @@ import { formatarMoeda, formatarNumero } from '../lib/formatters';
 import { MESES_ABREV, MESES_COMPLETOS } from '../lib/constants';
 import { cn } from '../lib/utils';
 
+/*
+ * Faturas fechando: calculado aqui a partir de GET /api/cartoes (já carregado pelo Início) em vez de
+ * chamar o BI de cartões (7 painéis, bem mais caro) só para isso. Mesma regra do `alertasFechamento`
+ * do BI (CartaoCreditoService): até 7 dias, 0 = "fecha hoje", próximo dia de fechamento a partir de hoje.
+ * Única diferença: aqui o dia 29–31 é ajustado ao último dia de meses curtos (o BI não ajusta).
+ */
 const DIAS_ALERTA_FATURA = 7;
 const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
 
@@ -175,22 +181,22 @@ export default function Dashboard() {
             </KpiGrid>
           </section>
 
-          <div className="grid grid-cols-12 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
             {pode.contas && (
               <ProximosVencimentos
                 id="proximos-vencimentos"
-                className="col-span-12 xl:col-span-6"
+                className="lg:col-span-12 xl:col-span-6"
                 contas={contas.dados ?? []}
                 carregando={contas.carregandoInicial}
                 onBaixar={setContaBaixa}
               />
             )}
-            <FluxoCaixaChart dados={fluxo} carregando={inicial} className={cn('col-span-12', pode.contas && 'xl:col-span-6')} />
+            <FluxoCaixaChart dados={fluxo} carregando={inicial} className={cn('lg:col-span-12', pode.contas && 'xl:col-span-6')} />
 
-            <FluxoSankey entradas={entradas} categorias={categorias} carregando={inicial} className={cn('col-span-12', pode.saldo && 'xl:col-span-8')} />
+            <FluxoSankey entradas={entradas} categorias={categorias} carregando={inicial} className={cn('lg:col-span-12', pode.saldo && 'xl:col-span-8')} />
             {pode.saldo && (
               <SaldoDetalhadoPanel
-                className="col-span-12 xl:col-span-4"
+                className="lg:col-span-12 xl:col-span-4"
                 dados={saldo.dados}
                 carregando={saldo.carregando}
                 erro={saldo.erro}

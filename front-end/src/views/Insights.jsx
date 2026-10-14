@@ -9,7 +9,7 @@ import KpiCard, { KpiGrid } from '../components/ui/KpiCard';
 import { MonthSelector } from '../components/ui/PeriodoSelector';
 import { RitmoDoMes, GastoPorDiaDaSemana } from '../components/dashboard/InsightsGraficos';
 import { FrasesInsight, ProjecaoMes, ForaDoNormal, MaioresGastos } from '../components/dashboard/InsightsListas';
-import { insightsApi } from '../components/dashboard/apiVisaoGeral';
+import { insights as insightsApi } from '../lib/api';
 import { useMesUrl } from '../hooks/usePeriodoUrl';
 import { useCarga } from '../hooks/useCarga';
 import { mesAtual } from '../lib/periodo';
@@ -68,18 +68,18 @@ export default function Insights() {
                   tom="expense"
                   destaque
                 />
-                <KpiCard label="Lançamentos" valor={d?.resumo?.quantidade} formato="numero" icon={ShoppingBag} ajuda="Contas a pagar e compras no cartão até a data de referência." />
+                <KpiCard label="Gastos registrados" valor={d?.resumo?.quantidade} formato="numero" icon={ShoppingBag} ajuda="Contas a pagar e compras no cartão até a data de referência." />
                 <KpiCard label="Valor médio" valor={d?.resumo?.ticketMedio} icon={ReceiptText} ajuda="Gasto dividido pelo número de lançamentos." />
                 <KpiCard label="Média por dia" valor={d?.resumo?.mediaDiaria} icon={CalendarDays} ajuda="Gasto dividido pelos dias já passados do mês." />
               </KpiGrid>
             </section>
 
-            <div className="grid grid-cols-12 gap-4 lg:gap-6">
-              <RitmoDoMes className="col-span-12 xl:col-span-8" ritmo={d?.ritmo} diaReferencia={d?.diaReferencia} />
-              <ProjecaoMes className="col-span-12 xl:col-span-4" projecao={d?.projecao} diasNoMes={d?.diasNoMes} diaReferencia={d?.diaReferencia} />
-              <GastoPorDiaDaSemana className="col-span-12 lg:col-span-6 xl:col-span-4" dias={d?.gastoPorDiaDaSemana ?? []} />
-              <ForaDoNormal className="col-span-12 lg:col-span-6 xl:col-span-4" categorias={d?.categoriasForaDoNormal ?? []} />
-              <MaioresGastos className="col-span-12 xl:col-span-4" gastos={d?.maioresGastos ?? []} />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+              <RitmoDoMes className="lg:col-span-12 xl:col-span-8" ritmo={d?.ritmo} diaReferencia={d?.diaReferencia} />
+              <ProjecaoMes className="lg:col-span-12 xl:col-span-4" projecao={d?.projecao} diasNoMes={d?.diasNoMes} diaReferencia={d?.diaReferencia} />
+              <GastoPorDiaDaSemana className="lg:col-span-6 xl:col-span-4" dias={d?.gastoPorDiaDaSemana ?? []} />
+              <ForaDoNormal className="lg:col-span-6 xl:col-span-4" categorias={d?.categoriasForaDoNormal ?? []} />
+              <MaioresGastos className="lg:col-span-12 xl:col-span-4" gastos={d?.maioresGastos ?? []} />
             </div>
 
             <p className="text-xs text-text-primary/55 max-w-3xl">

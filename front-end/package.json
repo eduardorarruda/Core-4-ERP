@@ -10,10 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@assistant-ui/react": "^0.12.28",
-    "@assistant-ui/react-markdown": "^0.12.11",
-    "@assistant-ui/store": "0.2.20",
-    "@assistant-ui/tap": "^0.5.16",
     "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource-variable/lexend": "^5.3.0",

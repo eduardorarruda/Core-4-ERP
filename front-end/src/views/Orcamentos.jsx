@@ -14,7 +14,7 @@ import { AnimatedNumber, Stagger, StaggerItem } from '../components/motion/Movim
 import IconeCategoria from '../components/dashboard/IconeCategoria';
 import BarraOrcamento, { StatusOrcamento } from '../components/dashboard/BarraOrcamento';
 import OrcamentoDrawer from '../components/dashboard/OrcamentoDrawer';
-import { orcamentosApi } from '../components/dashboard/apiVisaoGeral';
+import { orcamentos as orcamentosApi } from '../lib/api';
 import { useMesUrl } from '../hooks/usePeriodoUrl';
 import { useCarga } from '../hooks/useCarga';
 import { useConfirm } from '../hooks/useConfirm';
@@ -74,7 +74,7 @@ function LinhaOrcamento({ item, onEditar, onExcluir }) {
       <div className="flex items-center gap-3">
         <IconeCategoria nome={item.categoria?.icone} cor={item.status === 'ESTOURADO' ? 'var(--color-expense)' : item.status === 'ATENCAO' ? 'var(--color-warning)' : 'var(--color-primary)'} />
         <div className="min-w-0 flex-1">
-          <h3 id={`orc-${item.id}`} className="font-semibold truncate">{item.categoria?.descricao}</h3>
+          <h2 id={`orc-${item.id}`} className="font-semibold truncate">{item.categoria?.descricao}</h2>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
             <StatusOrcamento status={item.status} />
             <span className="text-xs text-text-primary/60 tabular-nums">limite de <span className="valor-privado">{formatarMoeda(item.limite)}</span>/mês</span>
@@ -104,14 +104,14 @@ function Sugestoes({ sugestoes, onUsar, onAjustar, criando }) {
         {sugestoes.map((s, i) => (
           <li key={s.categoria.id} className="flex flex-wrap items-center gap-3 py-3">
             <IconeCategoria nome={s.categoria.icone} tamanho="sm" cor={`var(--color-chart-${(i % 5) + 2})`} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-[10rem]">
               <p className="text-sm font-medium truncate">{s.categoria.descricao}</p>
               <p className="text-xs text-text-primary/60 tabular-nums">
                 Este mês <span className="valor-privado">{formatarMoeda(s.gastoMes)}</span> · média <span className="valor-privado">{formatarMoeda(s.mediaUltimos3Meses)}</span>
               </p>
             </div>
             <PermissaoGuard permissao="ORCAMENTO_EDITAR">
-              <div className="flex gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2 min-w-0 ml-auto">
                 <Button size="sm" variant="ghost" onClick={() => onAjustar(s)}>Ajustar</Button>
                 <Button size="sm" variant="secondary" loading={criando === s.categoria.id} onClick={() => onUsar(s)} leftIcon={<Wand2 className="w-4 h-4" aria-hidden="true" />}>
                   Usar {formatarMoeda(s.sugestaoLimite, { casas: 0 })}
@@ -179,7 +179,7 @@ export default function Orcamentos() {
         title="Orçamentos"
         subtitle="Quanto você quer gastar por categoria e como está o ritmo do mês."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
             <MonthSelector value={anoMes} onChange={setAnoMes} label="Mês do orçamento" />
             <PermissaoGuard permissao="ORCAMENTO_EDITAR">
               <Button onClick={() => abrir()} leftIcon={<Plus className="w-4 h-4" aria-hidden="true" />}>Novo orçamento</Button>
@@ -207,7 +207,7 @@ export default function Orcamentos() {
           ) : (
             <>
               <Resumo dados={orc.dados} />
-              <Stagger as="ul" className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <Stagger as="ul" aoRolar className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {itens.map((item) => (
                   <StaggerItem as="li" key={item.id} className="min-w-0">
                     <LinhaOrcamento item={item} onEditar={(i) => abrir(i)} onExcluir={excluir} />

@@ -41,15 +41,15 @@ function LinhaConta({ conta, onBaixar }) {
   const atrasada = dias < 0 || conta.status === 'ATRASADO';
   const Seta = receber ? ArrowDownLeft : ArrowUpRight;
   return (
-    <div className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-text-primary/[0.03] transition-colors">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-2 hover:bg-text-primary/[0.03] transition-colors">
       <IconeCategoria nome={conta.categoriaIcone} tamanho="sm" cor={receber ? 'var(--color-income)' : 'var(--color-chart-2)'} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[9rem]">
         <p className="text-sm font-medium text-text-primary truncate">{conta.descricao}</p>
         <p className={cn('text-xs truncate', atrasada ? 'text-error' : 'text-text-primary/60')}>
           {receber ? 'A receber' : 'A pagar'} · {rotuloVencimento(conta.dataVencimento)}
         </p>
       </div>
-      <span className={cn('inline-flex items-center gap-1 text-sm font-semibold tabular-nums shrink-0 valor-privado', receber ? 'text-income' : 'text-expense')}>
+      <span className={cn('ml-auto inline-flex items-center gap-1 text-sm font-semibold tabular-nums shrink-0 valor-privado', receber ? 'text-income' : 'text-expense')}>
         <Seta className="w-3.5 h-3.5" aria-hidden="true" />
         {receber ? '+' : '−'}{formatarMoeda(valorDe(conta), { sinal: 'nunca' })}
       </span>
@@ -115,7 +115,7 @@ export default function ProximosVencimentos({ contas = [], carregando = false, o
           <EmptyState compact tom="income" icon={Check} title="Nada vencendo nos próximos 30 dias" description="Quando uma conta estiver perto do vencimento, ela aparece aqui com o botão para dar baixa." />
         ) : (
           <>
-            <GroupedList key={todos ? "todas" : "parcial"} grupos={grupos} formatoTotal={formatarTotal} renderItem={(c) => <LinhaConta conta={c} onBaixar={onBaixar} />} />
+            <GroupedList grupos={grupos} formatoTotal={formatarTotal} renderItem={(c) => <LinhaConta conta={c} onBaixar={onBaixar} />} />
             {(ocultas > 0 || todos) && (
               <Button variant="ghost" size="sm" className="mt-3 w-full" onClick={() => setTodos((v) => !v)} aria-expanded={todos}>
                 {todos ? 'Mostrar menos' : `Mostrar mais ${ocultas} ${ocultas === 1 ? 'conta' : 'contas'}`}

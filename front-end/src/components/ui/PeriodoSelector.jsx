@@ -10,13 +10,18 @@ import {
   rotuloMes, rotuloPeriodo, somarMeses, validarPeriodo,
 } from '../../lib/periodo';
 import { PopPresence } from '../motion/Movimento';
+import Button from './Button';
 
 /** "2026-10" → "Out 2026" (rótulo curto para espaço estreito). */
 const rotuloMesCurto = (anoMes) => {
   const [ano, mes] = String(anoMes ?? '').split('-').map(Number);
-  return ano && mes ? `${MESES_ABREV[mes - 1]} ${ano}` : '';
+  return ano && mes ? primeiraMaiuscula(`${MESES_ABREV[mes - 1]} ${ano}`) : '';
 };
-import Button from './Button';
+
+/** Só a 1ª letra em maiúscula ("Outubro de 2026" — `capitalize` do CSS gerava "Outubro De 2026"). */
+function primeiraMaiuscula(texto) {
+  return texto ? texto.charAt(0).toLocaleUpperCase('pt-BR') + texto.slice(1) : '';
+}
 
 /**
  * O ÚNICO filtro de período do Core 4 (um por tela). Botão-gatilho que abre um painel com
@@ -271,7 +276,7 @@ export function MonthSelector({ value, onChange, min, max, label = 'Mês', class
   };
 
   return (
-    <div className={cn('inline-flex flex-wrap items-center gap-2 max-w-full', className)} role="group" aria-label={label}>
+    <div className={cn('inline-flex flex-wrap items-center gap-2 min-w-0 max-w-full', className)} role="group" aria-label={label}>
       <div className="inline-flex items-center max-w-full min-w-0 rounded-xl bg-surface-medium/70 border border-border-strong">
         <button
           type="button"
@@ -287,15 +292,15 @@ export function MonthSelector({ value, onChange, min, max, label = 'Mês', class
           <AnimatePresence mode="popLayout" initial={false} custom={direcao}>
             <motion.span
               key={atual}
-              className="absolute text-sm font-semibold capitalize whitespace-nowrap max-w-full"
+              className="absolute text-sm font-semibold whitespace-nowrap max-w-full"
               initial={reduzir ? { opacity: 0 } : { opacity: 0, y: direcao >= 0 ? 14 : -14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={reduzir ? { opacity: 0 } : { opacity: 0, y: direcao >= 0 ? -14 : 14 }}
               transition={{ type: 'spring', stiffness: 500, damping: 36 }}
             >
-              <span className="hidden @[9rem]:inline">{rotuloMes(atual)}</span>
+              <span className="hidden @[9rem]:inline">{primeiraMaiuscula(rotuloMes(atual))}</span>
               <span className="@[9rem]:hidden" aria-hidden="true">{rotuloMesCurto(atual)}</span>
-              <span className="sr-only @[9rem]:hidden">{rotuloMes(atual)}</span>
+              <span className="sr-only @[9rem]:hidden">{primeiraMaiuscula(rotuloMes(atual))}</span>
             </motion.span>
           </AnimatePresence>
         </span>

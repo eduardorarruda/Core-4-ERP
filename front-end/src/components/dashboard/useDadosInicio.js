@@ -1,11 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   assinaturas as assinaturasApi, cartoes as cartoesApi, contas as contasApi,
-  dashboard as dashboardApi, investimentos as investimentosApi,
+  dashboard as dashboardApi, investimentos as investimentosApi, orcamentos as orcamentosApi,
 } from '../../lib/api';
 import { useCarga } from '../../hooks/useCarga';
 import { useAuth } from '../../hooks/useAuth';
-import { orcamentosApi } from './apiVisaoGeral';
 import { hojeLocal, paraIsoLocal } from './datasVisaoGeral';
 
 const JANELA_VENCIMENTOS_DIAS = 30;

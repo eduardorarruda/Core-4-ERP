@@ -88,7 +88,7 @@ export default function AceitarConvite() {
           <span aria-hidden="true" className="mx-auto mb-5 grid place-items-center w-16 h-16 rounded-2xl bg-error/10 border border-error/25 text-error">
             <MailX className="w-7 h-7" />
           </span>
-          <h1 className="font-display text-[1.75rem] font-semibold tracking-tight mb-2">Convite indisponível</h1>
+          <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-tight mb-2">Convite indisponível</h1>
           <p className="text-sm text-text-primary/65 mb-7 leading-relaxed" role="alert">{erroConvite}</p>
           <p className="text-sm text-text-primary/65 mb-6">Peça a quem convidou você para enviar um novo convite.</p>
           <Link to="/login" className="text-sm font-semibold text-primary hover:underline underline-offset-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -112,7 +112,7 @@ export default function AceitarConvite() {
           >
             <Check className="w-10 h-10" strokeWidth={2.75} />
           </motion.span>
-          <h1 className="font-display text-[1.75rem] font-semibold tracking-tight mb-2">Conta criada</h1>
+          <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-tight mb-2">Conta criada</h1>
           <p className="text-sm text-text-primary/65" role="status">Levando você para o login…</p>
         </FadeIn>
       </AuthLayout>
@@ -128,7 +128,7 @@ export default function AceitarConvite() {
           </span>
         </StaggerItem>
         <StaggerItem>
-          <h1 className="font-display text-[2rem] font-semibold tracking-[-0.03em] leading-tight">Você foi convidado</h1>
+          <h1 className="font-display break-words hyphens-auto text-[2rem] font-semibold tracking-[-0.03em] leading-tight">Você foi convidado</h1>
           <p className="mt-2 text-sm text-text-primary/65">Crie sua senha para aceitar o convite.</p>
         </StaggerItem>
 

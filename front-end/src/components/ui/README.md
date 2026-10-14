@@ -93,7 +93,7 @@ const [mes, setMes] = useMesUrl();                  // ?mes=2026-10  (telas mens
 ```
 `lib/periodo.js`: `periodoDoAtalho(id)`, `atalhoDoPeriodo(p)`, `paraMesAno(p)`, `deMesAno(m)`, `rotuloPeriodo(p)`,
 `validarPeriodo(p)`, `periodoDoMes('2026-10')`, `somarMeses`, `rotuloMes`, `paraIso`, `deIso`.
-Compatível com o formato antigo `{mesInicio,…}` (devolve no mesmo formato). `DateRangeModal` está **obsoleto**.
+Compatível com o formato antigo `{mesInicio,…}` (devolve no mesmo formato).
 
 ### FilterBar
 ```jsx
@@ -188,6 +188,8 @@ import ChartTooltip, { GradienteArea, BrilhoLinha, PontoFinal } from '../compone
 <Drawer open onClose title side="right|left|bottom" size="sm|md|lg" footer={<Button>Salvar</Button>}>…</Drawer>
 const confirmar = useConfirm(); if (await confirmar({ title: 'Excluir conta?', message: '…', confirmLabel: 'Excluir' })) …
 const toast = useToast(); toast.success('Conta salva.'); toast.error(msg);
+toast.info('Item arquivado.', { action: { label: 'Desfazer', onClick: desfazer, icon: Undo2 }, onClose: confirmar }); // 10 s, pausa no hover/foco
+// Aviso com estado próprio (ex.: conciliação soma itens ignorados): <CartaoAviso … /> de ui/Toast.jsx
 <Tooltip conteudo="Exportar em Excel"><Button size="icon" aria-label="Exportar">…</Button></Tooltip>
 ```
 

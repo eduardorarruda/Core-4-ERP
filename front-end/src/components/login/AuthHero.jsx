@@ -94,8 +94,8 @@ export default function AuthHero({ titulo, subtitulo }) {
     <div className="c4-tema-escuro relative h-full w-full overflow-hidden bg-surface flex flex-col justify-between p-10 xl:p-14">
       {/* Atmosfera: brilho petróleo + fios esmeralda dos cantos (como na arte da logo) */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 -left-40 w-[42rem] h-[42rem] rounded-full opacity-60" style={{ background: 'radial-gradient(closest-side, rgba(20,226,156,0.18), transparent)' }} />
-        <div className="absolute -bottom-56 -right-40 w-[46rem] h-[46rem] rounded-full opacity-60" style={{ background: 'radial-gradient(closest-side, rgba(27,74,80,0.55), transparent)' }} />
+        <div className="absolute -top-40 -left-40 w-[42rem] h-[42rem] rounded-full opacity-60" style={{ background: 'radial-gradient(closest-side, var(--c4-aura-esmeralda), transparent)' }} />
+        <div className="absolute -bottom-56 -right-40 w-[46rem] h-[46rem] rounded-full opacity-60" style={{ background: 'radial-gradient(closest-side, var(--c4-aura-petroleo), transparent)' }} />
         <div className="c4-backdrop__grao" />
         <svg className="absolute left-0 top-0 w-64 h-64 text-primary opacity-40" viewBox="0 0 200 200" fill="none">
           <path d="M200 0 L70 130 Q55 145 35 145 L0 145" stroke="currentColor" strokeWidth="1" vectorEffect="non-scaling-stroke" />

@@ -27,7 +27,7 @@ function renderIcone(icon) {
 
 function Trilha({ itens }) {
   return (
-    <nav aria-label="Você está em" className="mb-2">
+    <nav aria-label="Caminho até esta tela" className="mb-2">
       <ol className="flex flex-wrap items-center gap-1 text-xs text-text-primary/60">
         {itens.map((item, i) => {
           const ultimo = i === itens.length - 1;
@@ -56,34 +56,35 @@ export default function PageHeader({ title, subtitle, description, eyebrow, acti
   return (
     <FadeIn as="header" className={cn('space-y-4', className)}>
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-      <div className="min-w-0">
+      {/* @container: o título encolhe com a largura da coluna (texto 175% em 320px não estoura — WCAG 1.4.10) */}
+      <div className="@container min-w-0 flex-1">
         {breadcrumb?.length > 0 && <Trilha itens={breadcrumb} />}
         {eyebrow && !breadcrumb?.length && <p className="c4-eyebrow mb-2">{eyebrow}</p>}
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-[14px]">
           {icon && (
             <span
               aria-hidden="true"
               className={cn(
-                'relative grid place-items-center w-11 h-11 shrink-0 rounded-[0.9rem] text-on-primary',
+                'relative grid place-items-center w-[44px] h-[44px] shrink-0 rounded-[14px] text-on-primary',
                 'bg-gradient-primary shadow-[var(--shadow-primary)] ring-1 ring-inset ring-text-primary/10',
-                '[&>svg]:w-5 [&>svg]:h-5',
+                '[&>svg]:w-[20px] [&>svg]:h-[20px]',
               )}
             >
               {renderIcone(icon)}
             </span>
           )}
-          <h1 className="min-w-0 text-[1.625rem] sm:text-[2rem] font-semibold tracking-[-0.025em] text-text-primary font-display leading-tight">
+          <h1 className="min-w-0 break-words text-[min(1.625rem,9.5cqi)] sm:text-[min(2rem,7cqi)] font-semibold tracking-[-0.025em] text-text-primary font-display leading-tight">
             {title}
           </h1>
         </div>
         {apoio && (
-          <p className={cn('mt-1.5 text-sm sm:text-[0.95rem] text-text-primary/65 leading-relaxed max-w-2xl text-pretty', icon && 'sm:pl-[3.6rem]')}>
+          <p className={cn('mt-1.5 text-sm sm:text-[0.95rem] text-text-primary/65 leading-relaxed max-w-2xl text-pretty', icon && 'sm:pl-[58px]')}>
             {apoio}
           </p>
         )}
       </div>
       {actions && (
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0 max-w-full">
           {actions}
         </div>
       )}

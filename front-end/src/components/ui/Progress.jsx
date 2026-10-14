@@ -60,7 +60,7 @@ export function ProgressBar({ valor = 0, tom = 'primary', cor, marca, altura = 8
           <motion.div
             aria-hidden="true"
             className="absolute inset-0 motion-safe:animate-[c4Listras_1s_linear_infinite]"
-            style={{ backgroundImage: 'repeating-linear-gradient(-45deg, transparent 0 6px, rgba(255,255,255,.22) 6px 12px)', backgroundSize: '17px 17px' }}
+            style={{ backgroundImage: 'repeating-linear-gradient(-45deg, transparent 0 6px, var(--c4-listra-clara) 6px 12px)', backgroundSize: '17px 17px' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: reduzir ? 0 : 0.7 }}

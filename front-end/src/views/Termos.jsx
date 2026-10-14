@@ -34,7 +34,7 @@ export default function Termos() {
     >
       <LegalSection id="objeto" titulo="1. O que é o serviço">
         <p>
-          O Core 4, disponível em <span className="font-mono">{URL_APP}</span>, é um software de gestão financeira
+          O Core 4, disponível em <span className="font-mono break-all">{URL_APP}</span>, é um software de gestão financeira
           para pessoas e empresas: contas a pagar e a receber, contas correntes, cartões, conciliação de extratos OFX,
           investimentos, assinaturas, relatórios e um assistente de inteligência artificial.
         </p>
@@ -172,7 +172,7 @@ export default function Termos() {
         <p>
           O código-fonte do Core 4 é distribuído sob a licença MIT, que permite usá-lo, copiá-lo e modificá-lo nos
           termos dessa licença. Essa licença cobre o código, não a instância em produção: o uso do serviço hospedado em{' '}
-          <span className="font-mono">{URL_APP}</span> segue estes termos.
+          <span className="font-mono break-all">{URL_APP}</span> segue estes termos.
         </p>
         <p>
           O nome e a marca Core 4 identificam o projeto e não podem ser usados de forma a sugerir que uma versão

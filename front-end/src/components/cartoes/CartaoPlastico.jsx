@@ -87,6 +87,8 @@ export default function CartaoPlastico({ cartao, onSelecionar, selecionado = fal
   const acabamento = ACABAMENTOS[acabamentoDoCartao(cartao)];
   const bandeira = bandeiraDoNome(cartao.nome);
   const fracao = fracaoLimite(cartao);
+  const livre = Number(cartao.limiteLivre) || 0;
+  const estourado = livre < 0;
   const apelido = apelidoDoCartao(cartao.nome);
 
   return (
@@ -98,7 +100,7 @@ export default function CartaoPlastico({ cartao, onSelecionar, selecionado = fal
         whileTap={onSelecionar && !reduzir ? { scale: 0.98 } : undefined}
         className={cn(
           '@container c4-tema-escuro group relative isolate overflow-hidden aspect-[1.586/1] w-full rounded-3xl border',
-          'shadow-[0_24px_48px_-24px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.08)]',
+          'shadow-[var(--c4-sombra-plastico)]',
           selecionado ? 'border-primary/70 ring-2 ring-primary/50' : 'border-border-strong',
           'focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-surface',
         )}
@@ -144,9 +146,12 @@ export default function CartaoPlastico({ cartao, onSelecionar, selecionado = fal
           <div className="space-y-2">
             <div className="flex items-end justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[0.6875rem] uppercase tracking-[0.14em] text-text-primary/60">Disponível</p>
-                <p className={cn('font-display font-semibold tabular-nums text-text-primary valor-privado truncate', compacto ? 'text-lg' : 'text-xl sm:text-2xl')}>
-                  {formatarMoeda(cartao.limiteLivre)}
+                {/* Cartão estourado: "Acima do limite em R$ X" em vez de um disponível negativo */}
+                <p className={cn('text-[0.6875rem] uppercase tracking-[0.14em]', estourado ? 'text-expense font-semibold' : 'text-text-primary/60')}>
+                  {estourado ? 'Acima do limite em' : 'Disponível'}
+                </p>
+                <p className={cn('font-display font-semibold tabular-nums valor-privado truncate', estourado ? 'text-expense' : 'text-text-primary', compacto ? 'text-lg' : 'text-xl sm:text-2xl')}>
+                  {formatarMoeda(Math.abs(livre))}
                 </p>
               </div>
               <MarcaBandeira bandeira={bandeira} />

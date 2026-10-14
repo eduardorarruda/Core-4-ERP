@@ -7,7 +7,7 @@ import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import { MOLA, pressionar, variantesDrawer, variantesOverlay } from '../motion/presets';
 import { cn } from '../../lib/utils';
 
-// O painel (assistant-ui) é pesado: só baixa quando o usuário abre a Áurea.
+// O painel (markdown, conversa) só baixa quando o usuário abre a Áurea.
 const ChatSidebar = lazy(() => import('./ChatSidebar'));
 
 const FOCAVEIS = 'textarea:not([disabled]), input:not([disabled]), button:not([disabled]), a[href]';

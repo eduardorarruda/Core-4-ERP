@@ -167,8 +167,8 @@ const REPORT_CARDS = [
     onDownloadXlsx: (_i, _f, params) => relatorios.assinaturas(params?.ativas),
     filterConfig: [
       {
-        // O backend não aceita "todas" (ativas=true por padrão): só Ativas ou Inativas
-        key: 'ativas', label: 'Situação', type: 'select', semTodos: true, padrao: 'true', options: [
+        // Todas = parâmetro omitido; true = só ativas; false = só inativas
+        key: 'ativas', label: 'Situação', type: 'select', rotuloTodos: 'Todas', options: [
           { value: 'true', label: 'Ativas' },
           { value: 'false', label: 'Inativas' },
         ],

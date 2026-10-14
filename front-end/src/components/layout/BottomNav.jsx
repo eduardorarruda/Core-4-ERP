@@ -55,7 +55,7 @@ export default function BottomNav({ onAbrirMenu }) {
             <span
               className={cn(
                 'relative grid place-items-center w-14 h-14 rounded-2xl bg-gradient-primary text-on-primary',
-                'shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_10px_28px_-8px_var(--color-primary)]',
+                'shadow-[var(--c4-brilho-botao-forte),0_10px_28px_-8px_var(--color-primary)]',
                 'transition-transform active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-surface',
                 aureaAtiva && 'ring-4 ring-primary/25'
               )}

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowUp, FileSpreadsheet, FileText, Paperclip, ShieldCheck, Square, X } from 'lucide-react';
 import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
@@ -16,9 +16,12 @@ function IconeArquivo({ nome, className }) {
 
 /**
  * Campo de mensagem da Áurea: texto que cresce, anexo (clique ou arrastar), enviar/parar.
- * Props: onEnviar(texto, arquivo|null), onParar, ocupado, podeParar, onErroAnexo(msg), autoFocus.
+ * Props: onEnviar(texto, arquivo|null), onParar, ocupado, podeParar, onErroAnexo(msg), autoFocus,
+ * permitirAnexo (true; o painel flutuante não aceita arquivo — anexos ficam na tela cheia),
+ * compacto (painel estreito: o rodapé fica em uma coluna, sem a dica de teclado).
  */
-export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, onErroAnexo, autoFocus = false }) {
+export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, onErroAnexo, autoFocus = false, permitirAnexo = true, compacto = false }) {
+  const idDica = `aurea-dica-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const [texto, setTexto] = useState('');
   const [arquivo, setArquivo] = useState(null);
   const [arrastando, setArrastando] = useState(false);
@@ -35,7 +38,7 @@ export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, o
   }, [texto]);
 
   function escolher(f) {
-    if (!f) return;
+    if (!f || !permitirAnexo) return;
     const erro = validarAnexo(f);
     if (erro) { onErroAnexo?.(erro); return; }
     setArquivo(f);
@@ -55,7 +58,7 @@ export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, o
 
   return (
     <div
-      onDragOver={(e) => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setArrastando(true); } }}
+      onDragOver={(e) => { if (permitirAnexo && e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); setArrastando(true); } }}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setArrastando(false); }}
       onDrop={(e) => { e.preventDefault(); setArrastando(false); escolher(e.dataTransfer.files?.[0]); }}
     >
@@ -96,6 +99,7 @@ export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, o
           arrastando ? 'border-primary border-dashed bg-primary/5' : 'border-border-strong',
         )}
       >
+        {permitirAnexo && (<>
         <input
           ref={fileRef}
           type="file"
@@ -114,7 +118,8 @@ export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, o
         >
           <Paperclip className="w-5 h-5" aria-hidden="true" />
         </button>
-        <label className="flex-1 min-w-0">
+        </>)}
+        <label className={cn('flex-1 min-w-0', !permitirAnexo && 'pl-2')}>
           <span className="sr-only">Mensagem para a Áurea</span>
           <textarea
             ref={textareaRef}
@@ -124,7 +129,7 @@ export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, o
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); enviar(); } }}
             placeholder={arrastando ? 'Solte o arquivo aqui' : arquivo ? 'O que a Áurea deve fazer com o arquivo?' : 'Escreva para a Áurea…'}
             rows={1}
-            aria-describedby="aurea-dica-teclado"
+            aria-describedby={idDica}
             className="block w-full bg-transparent px-1 py-2.5 text-[0.9375rem] leading-relaxed text-text-primary outline-none placeholder:text-text-primary/50 resize-none"
             style={{ maxHeight: ALTURA_MAX }}
           />
@@ -153,13 +158,13 @@ export default function ComposerAurea({ onEnviar, onParar, ocupado, podeParar, o
         )}
       </div>
 
-      <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs text-text-primary/60">
+      <div className={cn('mt-2 flex flex-col gap-1 text-xs text-text-primary/60', !compacto && 'sm:flex-row sm:items-center sm:justify-between')}>
         <p className="flex items-start gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 mt-px shrink-0 text-primary" aria-hidden="true" />
           {TEXTO_CONFIANCA}
         </p>
-        <p id="aurea-dica-teclado" className="hidden sm:block shrink-0">
-          <kbd className="c4-kbd">Enter</kbd> envia · <kbd className="c4-kbd">Shift</kbd>+<kbd className="c4-kbd">Enter</kbd> quebra a linha · até {MAX_ANEXO_MB} MB
+        <p id={idDica} className={cn('hidden shrink-0', !compacto && 'sm:block')}>
+          <kbd className="c4-kbd">Enter</kbd> envia · <kbd className="c4-kbd">Shift</kbd>+<kbd className="c4-kbd">Enter</kbd> quebra a linha{permitirAnexo ? ` · até ${MAX_ANEXO_MB} MB` : ''}
         </p>
       </div>
     </div>

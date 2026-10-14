@@ -46,7 +46,7 @@ export function AcoesConta({ conta, onBaixar, onEditar, onEstornar, onExcluir })
   const travada = Boolean(conta.conciliada);
 
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    <div className="flex flex-wrap items-center justify-end gap-1 min-w-0 ml-auto">
       {aberta && pode('CONTA_BAIXAR') && (
         <Button
           size="sm"
@@ -114,8 +114,8 @@ export default function LinhaConta({ conta, onBaixar, onEditar, onEstornar, onEx
           <p className="text-xs text-text-primary/60 truncate">{detalhes || (conta.numeroDocumento ?? '')}</p>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 sm:justify-end">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
           {mostrarStatus && <StatusConta status={conta.status} />}
           <ValorConta conta={conta} />
         </div>

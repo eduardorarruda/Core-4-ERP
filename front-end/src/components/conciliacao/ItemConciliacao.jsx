@@ -162,7 +162,7 @@ export default function ItemConciliacao({
         <div className="min-w-0 flex-1 grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.2fr)_auto] md:items-start">
           {/* Movimento do extrato */}
           <div className="min-w-0 space-y-1">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
               <p id={descricaoId} className="text-sm font-medium text-text-primary break-words">{descricao}</p>
               <ValorOfx valor={item.ofxValor} className="text-sm md:hidden" />
             </div>

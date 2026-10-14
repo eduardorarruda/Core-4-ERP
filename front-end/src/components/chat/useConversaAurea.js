@@ -1,42 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { chat, clearAuth } from '../../lib/api';
-import { ERRO_CONEXAO, ehRespostaDeErro, mensagemDaRespostaDeErro, mensagemErroChat } from './aureaUtils';
+import { chat } from '../../lib/api';
+import { mensagemErroChat } from './aureaUtils';
+import { mensagensDoHistorico, novoIdMensagem as novoId, perguntarAurea } from './streamAurea';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const CANAL = 'ASSISTENTE';
-
-let sequencia = 0;
-const novoId = () => `m${Date.now().toString(36)}${(sequencia += 1)}`;
-
-function irParaLogin() {
-  clearAuth();
-  window.location.assign('/login');
-}
-
-/** Lê o stream SSE (`data: {"t":"..."}`) e chama `aoReceber(textoAcumulado)` a cada trecho. */
-async function lerStream(resp, aoReceber) {
-  const reader = resp.body.getReader();
-  const dec = new TextDecoder();
-  let buf = '';
-  let acc = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    const linhas = buf.split('\n');
-    buf = linhas.pop();
-    for (const linha of linhas) {
-      if (!linha.startsWith('data:')) continue;
-      const p = linha.slice(5).trim();
-      if (!p) continue;
-      let delta;
-      try { delta = JSON.parse(p).t ?? ''; } catch { delta = p; }
-      acc += delta;
-      aoReceber(acc);
-    }
-  }
-  return acc;
-}
 
 /**
  * Estado e ações da conversa da tela /assistente (canal ASSISTENTE): lista de conversas,
@@ -71,11 +38,7 @@ export function useConversaAurea({ onErro }) {
     setCarregandoMsgs(true);
     try {
       const msgs = await chat.mensagensConversa(id);
-      setMensagens((msgs || []).map((m) => (
-        m.role === 'assistant' && ehRespostaDeErro(m.texto)
-          ? { id: novoId(), role: m.role, text: '', erro: mensagemDaRespostaDeErro(m.texto) }
-          : { id: novoId(), role: m.role, text: m.texto }
-      )));
+      setMensagens(mensagensDoHistorico(msgs));
     } catch {
       setMensagens([]);
       onErroRef.current?.('Não foi possível abrir esta conversa. Tente novamente.');
@@ -124,30 +87,13 @@ export function useConversaAurea({ onErro }) {
     abortRef.current = controller;
     setOcupado(true);
     setEscrevendoId(respostaId);
-    let acc = '';
     try {
-      const resp = await fetch(`${BASE_URL}/api/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ mensagem: pergunta, canal: CANAL, conversaId: cid }),
-        signal: controller.signal,
+      const r = await perguntarAurea({
+        pergunta, canal: CANAL, conversaId: cid, signal: controller.signal,
+        aoReceber: (t) => atualizarMsg(respostaId, { text: t }),
       });
-      if (resp.status === 401) { irParaLogin(); return; }
-      if (!resp.ok) {
-        const corpo = await resp.json().catch(() => ({}));
-        atualizarMsg(respostaId, { text: '', erro: mensagemErroChat(resp.status, corpo.mensagem), pergunta });
-        return;
-      }
-      acc = await lerStream(resp, (t) => atualizarMsg(respostaId, { text: t }));
-      if (!acc.trim()) atualizarMsg(respostaId, { erro: mensagemErroChat(503), pergunta });
-      else if (ehRespostaDeErro(acc)) atualizarMsg(respostaId, { text: '', erro: mensagemDaRespostaDeErro(acc), pergunta });
-    } catch (e) {
-      if (e?.name === 'AbortError') {
-        atualizarMsg(respostaId, { text: acc || '_Resposta interrompida._' });
-      } else {
-        atualizarMsg(respostaId, { text: '', erro: ERRO_CONEXAO, pergunta });
-      }
+      if (r.interrompido) atualizarMsg(respostaId, { text: r.texto || '_Resposta interrompida._' });
+      else if (r.erro) atualizarMsg(respostaId, { text: '', erro: r.erro, pergunta });
     } finally {
       abortRef.current = null;
       setOcupado(false);

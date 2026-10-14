@@ -44,7 +44,7 @@ export default function Configuracoes() {
         subtitle="Sua conta, segurança e o jeito como o Core 4 aparece para você."
         icon={Settings}
       >
-        <Tabs value={aba} onChange={trocarAba} label="Seções das configurações" idBase={ID_BASE} items={ABAS} className="[&>[role=tab]]:shrink-0" />
+        <Tabs value={aba} onChange={trocarAba} label="Seções das configurações" idBase={ID_BASE} items={ABAS} />
       </PageHeader>
 
       <div role="tabpanel" id={Tabs.painelId(ID_BASE, aba)} aria-labelledby={Tabs.abaId(ID_BASE, aba)} tabIndex={-1} className="outline-none">

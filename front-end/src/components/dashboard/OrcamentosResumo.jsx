@@ -37,9 +37,9 @@ export default function OrcamentosResumo({ orcamento, carregando = false, classN
         <ul className="space-y-4">
           {top.map((o, i) => (
             <li key={o.id} className="space-y-2">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <IconeCategoria nome={o.categoria?.icone} tamanho="sm" cor={`var(--color-chart-${(i % 5) + 2})`} />
-                <span className="flex-1 min-w-0 text-sm font-medium truncate">{o.categoria?.descricao}</span>
+                <span className="flex-1 basis-[7rem] min-w-0 text-sm font-medium truncate">{o.categoria?.descricao}</span>
                 <StatusOrcamento status={o.status} />
               </div>
               <BarraOrcamento item={o} />

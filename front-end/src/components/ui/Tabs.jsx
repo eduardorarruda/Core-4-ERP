@@ -69,8 +69,9 @@ export default function Tabs({ items, value, onChange, label, idBase, className,
         role="tablist"
         aria-label={label}
         onKeyDown={(e) => moverFoco(e, valores, value, onChange)}
+        // Muitas abas no celular: rolam na horizontal (com encaixe) em vez de se espremer
         className={cn(
-          'relative flex items-center gap-1 border-b border-border overflow-x-auto no-scrollbar',
+          'relative flex items-center gap-1 border-b border-border overflow-x-auto overscroll-x-contain no-scrollbar snap-x scroll-px-2',
           className
         )}
       >
@@ -92,7 +93,7 @@ export default function Tabs({ items, value, onChange, label, idBase, className,
                 'relative isolate inline-flex items-center gap-2 min-h-11 px-3.5 text-sm font-medium whitespace-nowrap rounded-t-lg transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
                 'disabled:opacity-40 disabled:cursor-not-allowed',
-                fullWidth && 'flex-1 justify-center',
+                fullWidth ? 'flex-1 justify-center' : 'shrink-0 snap-start',
                 ativo ? 'text-text-primary' : 'text-text-primary/60 hover:text-text-primary'
               )}
             >
@@ -123,7 +124,7 @@ function TabsLinks({ items, label, className }) {
 
   return (
     <IndicatorGroup>
-      <nav aria-label={label} className={cn('relative flex items-center gap-1 border-b border-border overflow-x-auto no-scrollbar', className)}>
+      <nav aria-label={label} className={cn('relative flex items-center gap-1 border-b border-border overflow-x-auto overscroll-x-contain no-scrollbar snap-x scroll-px-2', className)}>
         {items.map((item) => {
           const eAtivo = item.to === ativo;
           return (
@@ -133,7 +134,7 @@ function TabsLinks({ items, label, className }) {
               end={item.end}
               aria-current={eAtivo ? 'page' : undefined}
               className={cn(
-                'relative isolate inline-flex items-center gap-2 min-h-11 px-3.5 text-sm font-medium whitespace-nowrap rounded-t-lg transition-colors',
+                'relative isolate inline-flex shrink-0 snap-start items-center gap-2 min-h-11 px-3.5 text-sm font-medium whitespace-nowrap rounded-t-lg transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset',
                 eAtivo ? 'text-text-primary' : 'text-text-primary/60 hover:text-text-primary'
               )}
@@ -175,7 +176,8 @@ export function SegmentedControl({ items, value, onChange, label, size = 'md', c
         aria-label={label}
         onKeyDown={(e) => moverFoco(e, valores, value, onChange)}
         className={cn(
-          'relative inline-flex items-center gap-0.5 p-1 rounded-xl bg-surface-medium/70 border border-border',
+          // flex-wrap: com texto ampliado em tela estreita as opções descem de linha em vez de vazar
+          'relative inline-flex flex-wrap items-center gap-0.5 p-1 max-w-full rounded-xl bg-surface-medium/70 border border-border',
           fullWidth && 'flex w-full',
           className
         )}
@@ -203,7 +205,7 @@ export function SegmentedControl({ items, value, onChange, label, size = 'md', c
               {ativo && (
                 <LayoutIndicator
                   layoutId="segmento"
-                  className="rounded-lg bg-surface-low border border-border-strong shadow-[0_2px_10px_-4px_rgba(0,0,0,0.5)]"
+                  className="rounded-lg bg-surface-low border border-border-strong shadow-[var(--c4-sombra-chip)]"
                 />
               )}
               <Icone icon={item.icon} />

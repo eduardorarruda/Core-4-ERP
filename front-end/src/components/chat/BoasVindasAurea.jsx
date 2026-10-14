@@ -16,10 +16,9 @@ const COMO_FUNCIONA = [
 /**
  * Tela de boas-vindas da Áurea (conversa vazia): saudação, sugestões com ícone e um
  * "Como funciona" curto. `compacto` = versão do painel flutuante (sem o bloco explicativo).
- * Props: nome (usuário), onSugestao(texto), desabilitado, compacto, renderSugestao (opcional,
- * para o painel usar o primitivo de sugestão do assistant-ui).
+ * Props: nome (usuário), onSugestao(texto), desabilitado, compacto.
  */
-export default function BoasVindasAurea({ nome, onSugestao, desabilitado = false, compacto = false, renderSugestao }) {
+export default function BoasVindasAurea({ nome, onSugestao, desabilitado = false, compacto = false }) {
   const ola = `${saudacao()}${nome ? `, ${primeiroNome(nome)}` : ''}!`;
   return (
     <div className={cn('flex flex-col items-center text-center', compacto ? 'gap-4 py-6' : 'gap-6 py-10 sm:py-14')}>
@@ -45,11 +44,9 @@ export default function BoasVindasAurea({ nome, onSugestao, desabilitado = false
           const classe = 'w-full flex items-center gap-3 text-left min-h-14 px-3 py-2.5 rounded-2xl border border-border bg-surface-low hover:border-primary/40 hover:bg-surface-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50';
           return (
             <StaggerItem as="li" key={s.texto}>
-              {renderSugestao ? renderSugestao(s, classe, conteudo) : (
-                <motion.button type="button" whileTap={pressionar} disabled={desabilitado} onClick={() => onSugestao(s.texto)} className={classe}>
-                  {conteudo}
-                </motion.button>
-              )}
+              <motion.button type="button" whileTap={pressionar} disabled={desabilitado} onClick={() => onSugestao(s.texto)} className={classe}>
+                {conteudo}
+              </motion.button>
             </StaggerItem>
           );
         })}

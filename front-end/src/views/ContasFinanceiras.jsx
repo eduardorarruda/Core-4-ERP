@@ -9,6 +9,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { useToast } from '../hooks/useToast';
 import { usePermissao } from '../hooks/usePermissao';
 import { usePeriodoUrl } from '../hooks/usePeriodoUrl';
+import { useValorAtrasado } from '../hooks/useValorAtrasado';
 import PageHeader from '../components/ui/PageHeader';
 import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
@@ -55,12 +56,6 @@ const STATUS = [
 /** Monta os parâmetros da API sem campos vazios. */
 function params(base) {
   return Object.fromEntries(Object.entries(base).filter(([, v]) => v !== '' && v != null));
-}
-
-function combinaBusca(conta, termo) {
-  if (!termo) return true;
-  return [conta.descricao, conta.numeroDocumento, conta.parceiroNome, conta.categoriaDescricao]
-    .some((t) => t && String(t).toLowerCase().includes(termo));
 }
 
 /** KPIs a partir das contas em aberto: a pagar e a receber até o fim do mês + atrasadas. */
@@ -119,7 +114,9 @@ export default function ContasFinanceiras() {
   );
   const [cats, pars] = auxiliares.dados ?? [[], []];
 
-  const filtrosServidor = { tipo, categoriaId, parceiroId };
+  // Busca no servidor (descrição, parceiro e nº do documento), 300 ms depois de parar de digitar
+  const termo = useValorAtrasado(busca.trim(), 300);
+  const filtrosServidor = { tipo, categoriaId, parceiroId, busca: termo };
 
   // Em aberto: atrasadas + pendentes, sem limite de data (base dos KPIs e da lista por urgência)
   const abertas = useCarga(async () => {
@@ -132,7 +129,7 @@ export default function ContasFinanceiras() {
       itens: [...(atr.content ?? []), ...(pen.content ?? [])],
       excedeu: (atr.totalElements ?? 0) > LIMITE || (pen.totalElements ?? 0) > LIMITE,
     };
-  }, [tipo, categoriaId, parceiroId]);
+  }, [tipo, categoriaId, parceiroId, termo]);
 
   // Todas: filtros completos com período de vencimento
   const todas = useCarga(
@@ -141,23 +138,19 @@ export default function ContasFinanceiras() {
       size: LIMITE,
       sort: 'dataVencimento,asc',
     }),
-    [tipo, categoriaId, parceiroId, status, periodo.inicio, periodo.fim],
+    [tipo, categoriaId, parceiroId, termo, status, periodo.inicio, periodo.fim],
     { ativo: aba === 'todas' },
   );
 
   const recarregar = () => { abertas.recarregar(); if (aba === 'todas') todas.recarregar(); };
 
-  const termo = busca.trim().toLowerCase();
   const listaAbertas = useMemo(() => (abertas.dados?.itens ?? []), [abertas.dados]);
   const kpis = useMemo(() => calcularKpis(listaAbertas), [listaAbertas]);
   const grupos = useMemo(
-    () => agruparPorUrgencia(listaAbertas.filter((c) => combinaBusca(c, termo))),
-    [listaAbertas, termo],
+    () => agruparPorUrgencia(listaAbertas),
+    [listaAbertas],
   );
-  const listaTodas = useMemo(
-    () => (todas.dados?.content ?? []).filter((c) => combinaBusca(c, termo)),
-    [todas.dados, termo],
-  );
+  const listaTodas = useMemo(() => todas.dados?.content ?? [], [todas.dados]);
 
   const filtrosAtivos = [busca, tipo, categoriaId, parceiroId, aba === 'todas' ? status : ''].filter(Boolean).length;
   const limpar = () => { setBusca(''); setTipo(''); setStatus(''); setCategoriaId(''); setParceiroId(''); };

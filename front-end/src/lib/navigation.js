@@ -140,12 +140,13 @@ export const NAV_CONTA = [
  * (senão a ação vira um link morto). Quem implementar a leitura na tela liga a flag aqui.
  */
 export const NAV_ACOES = [
-  { id: 'nova-conta-pagar', label: 'Nova conta a pagar', path: '/contas?novo=PAGAR', permissao: 'CONTA_CRIAR', desc: 'Registrar uma despesa', ativa: false },
-  { id: 'nova-conta-receber', label: 'Nova conta a receber', path: '/contas?novo=RECEBER', permissao: 'CONTA_CRIAR', desc: 'Registrar uma receita', ativa: false },
-  { id: 'novo-lancamento-cartao', label: 'Novo lançamento do cartão', path: '/cartoes?novo=lancamento', permissao: 'CARTAO_LANCAR', desc: 'Registrar uma compra no cartão', ativa: false },
-  { id: 'novo-parceiro', label: 'Novo parceiro', path: '/parceiros?novo=1', permissao: 'PARCEIRO_CRIAR', desc: 'Cadastrar cliente ou fornecedor', ativa: false },
-  { id: 'nova-assinatura', label: 'Nova assinatura', path: '/assinaturas?novo=1', permissao: 'ASSINATURA_CRIAR', desc: 'Adicionar cobrança recorrente', ativa: false },
-  { id: 'novo-investimento', label: 'Novo investimento', path: '/investimentos?novo=1', permissao: 'INVESTIMENTO_CRIAR', desc: 'Registrar um investimento', ativa: false },
+  { id: 'nova-conta-pagar', label: 'Nova conta a pagar', path: '/contas?novo=PAGAR', permissao: 'CONTA_CRIAR', desc: 'Registrar uma despesa', ativa: true },
+  { id: 'nova-conta-receber', label: 'Nova conta a receber', path: '/contas?novo=RECEBER', permissao: 'CONTA_CRIAR', desc: 'Registrar uma receita', ativa: true },
+  { id: 'novo-lancamento-cartao', label: 'Novo lançamento do cartão', path: '/cartoes?novo=lancamento', permissao: 'CARTAO_LANCAR', desc: 'Registrar uma compra no cartão', ativa: true },
+  { id: 'novo-parceiro', label: 'Novo parceiro', path: '/parceiros?novo=1', permissao: 'PARCEIRO_CRIAR', desc: 'Cadastrar cliente ou fornecedor', ativa: true },
+  { id: 'nova-categoria', label: 'Nova categoria', path: '/categorias?novo=1', permissao: 'CATEGORIA_CRIAR', desc: 'Organizar receitas e despesas', ativa: true },
+  { id: 'nova-assinatura', label: 'Nova assinatura', path: '/assinaturas?novo=1', permissao: 'ASSINATURA_CRIAR', desc: 'Adicionar cobrança recorrente', ativa: true },
+  { id: 'novo-investimento', label: 'Novo investimento', path: '/investimentos?novo=1', permissao: 'INVESTIMENTO_CRIAR', desc: 'Registrar um investimento', ativa: true },
 ];
 
 /** Usuário pode ver o item? `ctx` = { temPermissao, tipoConta } (do useAuth). */

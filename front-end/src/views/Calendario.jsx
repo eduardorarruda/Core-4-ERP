@@ -31,7 +31,7 @@ function ResumoMes({ totais, carregando }) {
     { id: 'recebido', rotulo: 'Já recebido', valor: totais.recebido, sinal: '+', cor: 'text-text-primary', Icone: CheckCircle2 },
   ];
   return (
-    <Stagger as="dl" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <Stagger as="dl" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9.5rem),1fr))] gap-3">
       {itens.map((i) => (
         <StaggerItem key={i.id} className="c4-card px-4 py-3">
           <dt className="flex items-center gap-1.5 text-xs text-text-primary/65">
@@ -219,7 +219,8 @@ export default function Calendario() {
         </Card>
 
         {/* Agenda (celular e tablet) */}
-        <section className="lg:hidden space-y-5" aria-label="Agenda do mês">
+        <section className="lg:hidden space-y-5" aria-labelledby="agenda-mes-titulo">
+          <h2 id="agenda-mes-titulo" className="sr-only">Agenda do mês</h2>
           {carregando ? (
             <div className="space-y-3" aria-hidden="true">{[0, 1, 2].map((i) => <div key={i} className="h-24 rounded-2xl shimmer-bg" />)}</div>
           ) : diasComEventos.length === 0 ? (
@@ -232,11 +233,11 @@ export default function Calendario() {
               const t = totaisDasContas(doDia);
               return (
                 <div key={dia} className="space-y-2">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold sticky top-0 z-[1] bg-surface/90 backdrop-blur py-1.5">
-                    <span className={cn('grid place-items-center w-8 h-8 rounded-full tabular-nums text-xs', hoje ? 'bg-gradient-primary text-on-primary' : 'bg-surface-medium')}>{pad(dia)}</span>
+                  <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-sm font-semibold sticky top-0 z-[1] bg-surface/90 backdrop-blur py-1.5">
+                    <span className={cn('grid place-items-center w-8 h-8 shrink-0 rounded-full tabular-nums text-xs', hoje ? 'bg-gradient-primary text-on-primary' : 'bg-surface-medium')}>{pad(dia)}</span>
                     <span>{DIAS_SEMANA_LONGOS[data.getDay()].replace(/^./, (l) => l.toUpperCase())}</span>
                     {hoje && <Badge variant="primary" size="sm">Hoje</Badge>}
-                    <span className="ml-auto flex gap-2 text-xs tabular-nums font-medium">
+                    <span className="ml-auto flex flex-wrap justify-end gap-x-2 min-w-0 text-xs tabular-nums font-medium">
                       {t.pagar > 0 && <span className="text-expense valor-privado">−{valorCurto(t.pagar)}</span>}
                       {t.receber > 0 && <span className="text-income valor-privado">+{valorCurto(t.receber)}</span>}
                     </span>

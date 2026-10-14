@@ -48,7 +48,7 @@ function CartaoAssinatura({ a, onEditar, onAlternar, onExcluir }) {
         </div>
         <StatusAssinatura ativa={a.ativa} />
       </header>
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p>
           <span className="font-display text-2xl font-semibold tabular-nums valor-privado">{formatarMoeda(a.valor)}</span>
           <span className="text-sm text-text-primary/60"> /mês</span>
@@ -113,18 +113,18 @@ function Proximos30({ cobrancas }) {
               <span className="block text-[0.6875rem] uppercase text-text-primary/60">{format(data, 'MMM', { locale: ptBR })}</span>
             </span>
             <div className="min-w-0 flex-1 pt-0.5">
-              <p className="flex items-center justify-between gap-2 text-xs text-text-primary/60">
+              <p className="flex flex-wrap items-center justify-between gap-x-2 text-xs text-text-primary/60">
                 <span className="first-letter:uppercase">{format(data, 'EEEE', { locale: ptBR })}</span>
                 <span className="tabular-nums valor-privado">{formatarMoeda(total)}</span>
               </p>
               <ul className="mt-1 space-y-1">
                 {itens.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                  <li key={a.id} className="flex flex-wrap items-center justify-between gap-x-2 text-sm">
                     <span className="truncate">
                       {a.descricao}
                       {a.cartaoCreditoNome && <span className="text-text-primary/55"> · no cartão</span>}
                     </span>
-                    <span className="shrink-0 tabular-nums text-expense valor-privado">−{formatarMoeda(a.valor)}</span>
+                    <span className="ml-auto shrink-0 tabular-nums text-expense valor-privado">−{formatarMoeda(a.valor)}</span>
                   </li>
                 ))}
               </ul>
