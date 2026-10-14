@@ -32,6 +32,7 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
+import java.util.IllegalFormatException;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -180,6 +181,19 @@ public class GlobalExceptionHandler {
         log.warn("Regra de negócio violada: {} — {}", e.getCode(), e.getMessage());
         return ResponseEntity.status(status).body(new ErrorResponseDto(
                 e.getCode(), e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
+    /**
+     * {@link IllegalFormatException} (ex.: "Format specifier '% e'") estende IllegalArgumentException,
+     * mas NÃO é erro do cliente: é bug do servidor (texto com "%" usado como string de formato). Sem
+     * este handler (mais específico, tem precedência) virava 400 com a mensagem técnica na tela.
+     */
+    @ExceptionHandler(IllegalFormatException.class)
+    public ResponseEntity<ErrorResponseDto> handleIllegalFormat(IllegalFormatException e) {
+        log.error("[ERRO_INTERNO] Formatação de texto inválida — {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+        return ResponseEntity.status(500).body(new ErrorResponseDto(
+                "ERRO_INTERNO", "Não foi possível concluir sua solicitação agora. Tente novamente.", LocalDateTime.now()
         ));
     }
 

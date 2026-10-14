@@ -45,8 +45,13 @@ public class ChatMemoryService {
                 conversaId, PageRequest.of(0, MAX_MENSAGENS_CONTEXTO));
 
         // Ordem cronológica.
+        // O marcador de falha (RespostaFalhaChat) não é resposta real — não vai como contexto ao modelo.
         List<ChatMensagem> ordenado = new ArrayList<>(recentes.size());
-        for (int i = recentes.size() - 1; i >= 0; i--) ordenado.add(recentes.get(i));
+        for (int i = recentes.size() - 1; i >= 0; i--) {
+            ChatMensagem m = recentes.get(i);
+            if (m.getRole() == ChatMensagem.Role.ASSISTANT && RespostaFalhaChat.ehMarcador(m.getConteudo())) continue;
+            ordenado.add(m);
+        }
 
         // Mantém só as mensagens mais recentes até MAX_CONTEXTO_CHARS.
         int total = 0, inicio = 0;

@@ -154,8 +154,7 @@ public class RagService {
                       suas ferramentas.
                     - Não invente nada além do que vier das ferramentas.
 
-                    %s
-                    """.formatted(ctx);
+                    """ + ctx + "\n"; // concatenação: trecho do RAG pode conter "%" (nunca usar formatted)
     }
 
     /** Consulta o número de pontos da coleção no Qdrant (REST). Best-effort: na dúvida, assume não-vazia. */

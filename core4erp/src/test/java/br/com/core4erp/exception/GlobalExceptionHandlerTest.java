@@ -34,4 +34,15 @@ class GlobalExceptionHandlerTest {
         String html = "<html>" + "x".repeat(500) + "</html>";
         assertEquals(GlobalExceptionHandler.MAX_DETALHE_UPSTREAM + 1, GlobalExceptionHandler.resumirErroUpstream(html).length());
     }
+
+    @Test
+    void illegalFormatException_viraErroInternoAmigavel_nunca400ComMensagemTecnica() {
+        var resposta = new GlobalExceptionHandler()
+                .handleIllegalFormat(new java.util.MissingFormatArgumentException("% e"));
+
+        assertEquals(500, resposta.getStatusCode().value());
+        assertEquals("ERRO_INTERNO", resposta.getBody().codigo());
+        assertFalse(resposta.getBody().mensagem().contains("Format"));
+        assertFalse(resposta.getBody().mensagem().contains("%"));
+    }
 }

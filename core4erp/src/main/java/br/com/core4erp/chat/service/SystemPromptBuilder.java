@@ -20,6 +20,8 @@ public class SystemPromptBuilder {
      *   arquivos INTEGRALMENTE (sem resumir/pular itens) — casa com o anexo sem truncamento.
      */
     public String build(Usuario usuario, boolean pensamentoEstendido) {
+        // Montado por CONCATENAÇÃO, nunca String.format/formatted: o texto fixo pode conter "%"
+        // (ex.: "50% a mais") e dado dinâmico (nome do usuário) nunca pode virar string de formato.
         String extendido = pensamentoEstendido ? """
 
                 ## PENSAMENTO ESTENDIDO (ADMINISTRADOR)
@@ -33,8 +35,10 @@ public class SystemPromptBuilder {
                 se chama Áurea.
 
                 ## CONTEXTO
-                - Usuário: %s (email: %s)
-                - Data de hoje: %s
+                """
+                + "- Usuário: " + nomeOuVazio(usuario.getNome()) + " (email: " + nomeOuVazio(usuario.getEmail()) + ")\n"
+                + "- Data de hoje: " + LocalDate.now().format(BR_DATE) + "\n"
+                + """
                 - Moeda: BRL (Real Brasileiro)
                 - Fuso horário: America/Sao_Paulo
 
@@ -208,10 +212,10 @@ public class SystemPromptBuilder {
                 Usuário: sim
                 Assistente: (chama transferirEntreContas com os mesmos argumentos) Transferência de
                 **R$ 100,00** de **Nubank** para **Itaú** realizada.
-                """.formatted(
-                        usuario.getNome(),
-                        usuario.getEmail(),
-                        LocalDate.now().format(BR_DATE)
-                ) + extendido;
+                """ + extendido;
+    }
+
+    private static String nomeOuVazio(String valor) {
+        return valor != null ? valor : "";
     }
 }

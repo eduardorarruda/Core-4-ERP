@@ -1330,6 +1330,18 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 ### Fallback
 - Se o modelo retornar JSON malformado em tool calls: logar erro com `requestId`, retornar HTTP 502 com mensagem genérica ao usuário.
 - Se a OpenAI estiver indisponível: retornar HTTP 503 com `Retry-After` — não tentar fallback para outro modelo sem decisão explícita de arquitetura.
+- **Falha da resposta nunca deixa a pergunta órfã** (`RespostaFalhaChat`): erro da OpenAI/timeout/stream/montagem do
+  prompt grava uma mensagem ASSISTANT com texto fixo amigável ("Não consegui responder agora. Tente novamente." ou o
+  de 429), nos dois caminhos (`processar` antes de propagar → 503; `processarStream` envia o mesmo texto no SSE e
+  completa — nunca 4xx). Stream que cai no meio grava o parcial + "_(A resposta foi interrompida…)_". Sem migration:
+  o marcador é reconhecido pelo texto exato — `carregarContexto` o descarta (não vai ao modelo) e
+  `GET /api/chat/conversas/{id}/mensagens` devolve `falha=true` nele (`ChatHistoricoItemDto.falha`).
+- **Nunca usar texto dinâmico como string de formato** (`String.format`/`.formatted`/`MessageFormat`): mensagem,
+  nome, RAG, anexo, categoria e frases de insight têm "%" ("50% a mais", "% e"). Prompts (`SystemPromptBuilder`,
+  `RagService.montarBlocoReferencia`, `ChatAnexoService.montarPromptAnexo`) e formatters de tools são por
+  concatenação/StringBuilder (testes `TextoComPercentualPromptTest`, `AnaliseFinanceiraFormatterPercentualTest`).
+  `IllegalFormatException` (subclasse de IllegalArgumentException) tem handler próprio no `GlobalExceptionHandler`
+  → 500 `ERRO_INTERNO` amigável, nunca 400 com "Format specifier".
 
 ---
 
