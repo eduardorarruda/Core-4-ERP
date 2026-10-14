@@ -257,7 +257,9 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
         AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
         AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
     """)
-    Object[] assinaturasVsAvulsos(@Param("eid") Long eid,
+    // Linha única, mas tipada como lista: com Object[] o Spring Data embrulha a tupla
+    // (Object[]{Object[]{...}}) e o parse do BigDecimal estourava no BI (400 sempre).
+    List<Object[]> assinaturasVsAvulsos(@Param("eid") Long eid,
                                    @Param("mesInicio") Integer mesInicio,
                                    @Param("anoInicio") Integer anoInicio,
                                    @Param("mesFim") Integer mesFim,

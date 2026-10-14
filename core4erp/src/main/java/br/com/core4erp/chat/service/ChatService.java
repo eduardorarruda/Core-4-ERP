@@ -6,6 +6,7 @@ import br.com.core4erp.chat.dto.ChatResponseDto;
 import br.com.core4erp.chat.entity.ChatMensagem;
 import br.com.core4erp.chat.metrics.ChatMetrics;
 import br.com.core4erp.chat.tools.cadastro.CadastroTools;
+import br.com.core4erp.chat.tools.consulta.AnaliseFinanceiraTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
@@ -56,6 +57,7 @@ public class ChatService {
     private final SecurityContextUtils securityCtx;
     private final ChatInputSanitizer sanitizer;
     private final ConsultaTools consultaTools;
+    private final AnaliseFinanceiraTools analiseFinanceiraTools;
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
     private final CadastroTools cadastroTools;
@@ -103,6 +105,7 @@ public class ChatService {
                        SecurityContextUtils securityCtx,
                        ChatInputSanitizer sanitizer,
                        ConsultaTools consultaTools,
+                       AnaliseFinanceiraTools analiseFinanceiraTools,
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
                        CadastroTools cadastroTools,
@@ -124,6 +127,7 @@ public class ChatService {
         this.securityCtx = securityCtx;
         this.sanitizer = sanitizer;
         this.consultaTools = consultaTools;
+        this.analiseFinanceiraTools = analiseFinanceiraTools;
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
         this.cadastroTools = cadastroTools;
@@ -282,7 +286,8 @@ public class ChatService {
             TurnoChatHolder.definir(abrirTurno(conversaId, usuarioId, mensagemUsuario, limitePromptMontado > 0));
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
-                    .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
+                    .tools(consultaTools, analiseFinanceiraTools, lancamentoTools, relatorioTools, cadastroTools,
+                            gestaoFinanceiraTools)
                     .call()
                     .chatResponse();
 
@@ -396,7 +401,8 @@ public class ChatService {
                 TurnoChatHolder.definir(abrirTurno(conversaId, usuarioId, mensagemUsuario, false));
                 chatClient.prompt()
                         .messages(allMessages)
-                        .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
+                        .tools(consultaTools, analiseFinanceiraTools, lancamentoTools, relatorioTools, cadastroTools,
+                                gestaoFinanceiraTools)
                         .stream()
                         .chatResponse()
                         .toStream()

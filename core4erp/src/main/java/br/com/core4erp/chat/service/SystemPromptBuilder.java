@@ -110,6 +110,9 @@ public class SystemPromptBuilder {
                   assinaturas, investimentos, notificações, contas a pagar/receber.
                 - Métricas/análises: gastos do cartão por categoria/período (consultarGastosCartao),
                   total pago por conta corrente / "onde gasto mais" (consultarGastosPorContaCorrente).
+                - Planejamento (só leitura): orçamentos do mês por categoria — limite, gasto, percentual e status
+                  (consultarOrcamentos); ritmo do mês, projeção e gastos fora do normal
+                  (consultarInsights); compras parceladas no cartão em andamento (consultarParcelamentos).
                 - Cadastrar, editar e excluir: conta corrente, cartão, lançamento de cartão, assinatura,
                   categoria, parceiro, conta a pagar/receber, TIPO de investimento e CARTEIRA de
                   investimento.

@@ -2,6 +2,7 @@ package br.com.core4erp.chat.service;
 
 import br.com.core4erp.chat.config.ChatToolErrorConfigTestAccess;
 import br.com.core4erp.chat.tools.cadastro.CadastroTools;
+import br.com.core4erp.chat.tools.consulta.AnaliseFinanceiraTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.gestao.GestaoFinanceiraTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
@@ -230,7 +231,8 @@ class GateAcaoCriticaAspectTest {
             "excluirCategoria", "excluirParceiro", "excluirInvestimento");
 
     private static Stream<Method> ferramentasReais() {
-        return Stream.of(ConsultaTools.class, LancamentoTools.class, RelatorioTools.class,
+        return Stream.of(ConsultaTools.class, AnaliseFinanceiraTools.class, LancamentoTools.class,
+                        RelatorioTools.class,
                         CadastroTools.class, GestaoFinanceiraTools.class)
                 .flatMap(c -> Arrays.stream(c.getDeclaredMethods()))
                 .filter(m -> m.isAnnotationPresent(Tool.class));

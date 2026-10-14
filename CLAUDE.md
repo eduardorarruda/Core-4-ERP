@@ -1243,6 +1243,15 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 ### Tools (Function Calling)
 - Cada tool é um `@Component` Spring com métodos `@Tool` — Spring AI injeta automaticamente no `ChatClient`.
 - Tools de **leitura** (`consulta/`): obtêm `empresaId` do `TenantContext`, filtram dados financeiros por ele.
+  - `ConsultaTools`: `consultarDashboard`, `consultarContasCorrentes`, `consultarCategorias`, `consultarCartoes`,
+    `consultarInvestimentos`, `consultarNotificacoes`, `consultarAssinaturas`, `consultarParceiros`.
+  - `AnaliseFinanceiraTools` (texto compacto pt-BR via `AnaliseFinanceiraFormatter`/`MoedaFormatter`):
+    `consultarOrcamentos(mes?)` (`OrcamentoService`, ORCAMENTO_VISUALIZAR), `consultarInsights(mes?)`
+    (`InsightsService`, DASHBOARD_VISUALIZAR), `consultarParcelamentos()` (`ParcelamentoCartaoService`,
+    CARTAO_VISUALIZAR). `mes` = "AAAA-MM" opcional. `AcessoNegadoException` vira mensagem amigável (sem código de
+    permissão) em vez de erro de tool. No n8n: nós `consultarOrcamentos`/`consultarInsights` no ANALISTA.
+  - Registro de tools: `ChatService` (`.tools(...)`, 2 pontos — síncrono e streaming) e `McpServerConfig`; classe
+    nova de tools também entra em `GateAcaoCriticaAspectTest.ferramentasReais()`.
 - Tools de **escrita** (`lancamento/`): validam `usuarioId` do `SecurityContext` **dentro da tool**, nunca confiam no parâmetro recebido do modelo.
 - Schema de tools é gerado automaticamente pelo Spring AI a partir da assinatura do método — manter parâmetros tipados e documentados com Javadoc (Spring AI usa como descrição).
 - Resultado de tools deve ser validado antes de repassar ao agente — se retornar null ou lista vazia, retornar mensagem descritiva, não null cru.

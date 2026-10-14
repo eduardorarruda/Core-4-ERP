@@ -560,10 +560,11 @@ public class CartaoCreditoService {
         )).toList();
 
         // Painel 7 — Assinaturas vs. avulsos
-        Object[] avRow = lancamentoRepo.assinaturasVsAvulsos(
+        List<Object[]> avRows = lancamentoRepo.assinaturasVsAvulsos(
                 eid, inicio.getMonthValue(), inicio.getYear(), fim.getMonthValue(), fim.getYear());
+        Object[] avRow = avRows.isEmpty() ? null : avRows.get(0);
         AssinaturaVsAvulsoDto assVsAv;
-        if (avRow != null) {
+        if (avRow != null && avRow.length >= 2) {
             BigDecimal totalAss = avRow[0] instanceof BigDecimal bd ? bd : new BigDecimal(avRow[0].toString());
             BigDecimal totalAv  = avRow[1] instanceof BigDecimal bd ? bd : new BigDecimal(avRow[1].toString());
             assVsAv = new AssinaturaVsAvulsoDto(totalAss, totalAv);

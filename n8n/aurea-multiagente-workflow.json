@@ -905,6 +905,90 @@
     },
     {
       "parameters": {
+        "toolDescription": "Orçamentos do mês por categoria: limite, gasto, percentual usado, restante e status (OK, ATENCAO = acima do ritmo do mês, ESTOURADO = passou do limite), mais totais e gasto em categorias sem orçamento. Query opcional: mes no formato AAAA-MM (padrão: mês atual).",
+        "url": "http://backend:8080/api/orcamentos",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "mes",
+              "value": "{mes}",
+              "valueProvider": "modelOptional"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
+          ]
+        }
+      },
+      "id": "t00000029-0000-4000-8000-000000000029",
+      "name": "consultarOrcamentos",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        1120
+      ]
+    },
+    {
+      "parameters": {
+        "toolDescription": "Insights do mês: ritmo de gasto vs mesmo período do mês anterior e média de 3 meses, projeção de fechamento, categorias fora do normal, maiores gastos e frases prontas. Query opcional: mes no formato AAAA-MM (padrão: mês atual).",
+        "url": "http://backend:8080/api/insights",
+        "options": {},
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "mes",
+              "value": "{mes}",
+              "valueProvider": "modelOptional"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "parametersHeaders": {
+          "values": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
+          ]
+        }
+      },
+      "id": "t00000030-0000-4000-8000-000000000030",
+      "name": "consultarInsights",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        1180,
+        1240
+      ]
+    },
+    {
+      "parameters": {
         "toolDescription": "Registra uma nova conta a pagar ou a receber. Campos: descricao, valor (número), tipo (PAGAR ou RECEBER), dataVencimento e dataCompetencia (AAAA-MM-DD), parceiroId e categoriaId (números). Confirme os dados antes de chamar.",
         "url": "http://backend:8080/api/contas",
         "options": {},
@@ -1811,6 +1895,28 @@
         [
           {
             "node": "Consultor",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarOrcamentos": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analista",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultarInsights": {
+      "ai_tool": [
+        [
+          {
+            "node": "Analista",
             "type": "ai_tool",
             "index": 0
           }
