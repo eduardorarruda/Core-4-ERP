@@ -26,7 +26,7 @@
 | **Owner account do n8n** logado | editor via túnel SSH: `ssh -L 5678:127.0.0.1:5678 servidor` → http://localhost:5678 (o editor não é público — ver DEPLOY.md) | não dá para cadastrar credencial nem salvar workflow |
 | **Credencial OpenAI** (`OpenAI Core4`) | Credentials → OpenAI | nenhum AI Agent / Embeddings roda |
 | **Credencial Qdrant** (`Qdrant Core4`, `http://qdrant:6333`, API key = `QDRANT_API_KEY` do `.env`) | Credentials → Qdrant | WF-ANALISTA não recupera (o WF-DOC não grava no Qdrant — quem indexa é o backend) |
-| **Credencial Postgres** (`Postgres n8n`: host `db`, banco `n8n`, usuário `N8N_DB_USER` — o role do n8n não acessa o banco do ERP) | Credentials → Postgres | sem memória de conversa |
+| **Credencial Postgres** (`Postgres n8n`: host `db`, banco `n8n`, usuário `N8N_DB_USER` — o role do n8n não acessa o banco da aplicação) | Credentials → Postgres | sem memória de conversa |
 | **Credencial Header Auth** (`N8N Webhook Secret`, header `X-Webhook-Secret` = `N8N_WEBHOOK_SECRET`) | Credentials → Header Auth | o webhook não ativa (Header Auth é obrigatório em todos — 403 sem o header) |
 | **Credencial SMTP** (`SMTP Core4`) | Credentials → SMTP | WF-EVENTOS não envia e-mail |
 | **Backend aceita `Authorization: Bearer`** | validar A4 (passo 1.1 do plano) | nenhuma tool autentica |
@@ -42,7 +42,7 @@
 ### 1.1 Prefixo obrigatório do system prompt (colar no topo de cada agente)
 
 ```
-Você faz parte da Áurea, assistente financeira do Core 4 ERP. Responda sempre em
+Você faz parte da Áurea, assistente financeira do Core 4. Responda sempre em
 português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas
 em dd/MM/yyyy. NUNCA invente números: todo valor financeiro citado deve vir de uma
 ferramenta chamada NESTA resposta. NUNCA exponha termos técnicos (IDs internos,

@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import BrandMark from '../ui/BrandMark';
+import BrandLogo from '../ui/BrandLogo';
+import FundoVivo from '../layout/FundoVivo';
+import { FadeIn } from '../motion/Movimento';
 import { VERSAO_TERMOS, VIGENCIA } from '../../content/legal';
+import BotaoAcessibilidade from '../acessibilidade/BotaoAcessibilidade';
 
 const FOCO = 'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
 const LINK_TEXTO = `text-primary font-medium underline underline-offset-2 hover:opacity-80 transition-opacity ${FOCO}`;
@@ -34,8 +37,8 @@ export function LegalEmail({ email }) {
 export function LegalSection({ id, titulo, children }) {
   const tituloId = `${id}-titulo`;
   return (
-    <section id={id} aria-labelledby={tituloId} className="scroll-mt-24 pt-8 first:pt-0">
-      <h2 id={tituloId} className="font-display text-lg sm:text-xl font-bold tracking-tight text-text-primary mb-3">
+    <section id={id} aria-labelledby={tituloId} className="scroll-mt-24 pt-8 mt-8 border-t border-border first:pt-0 first:mt-0 first:border-0">
+      <h2 id={tituloId} className="font-display text-lg sm:text-xl font-semibold tracking-tight text-text-primary mb-3">
         {titulo}
       </h2>
       <div className={PROSA}>{children}</div>
@@ -46,14 +49,14 @@ export function LegalSection({ id, titulo, children }) {
 function Sumario({ secoes }) {
   if (!secoes?.length) return null;
   return (
-    <nav aria-label="Nesta página" className="mt-8 rounded-2xl bg-surface-low border border-text-primary/10 p-4 sm:p-5">
-      <p className="text-xs font-bold uppercase tracking-wider text-text-primary/70 mb-3">Nesta página</p>
-      <ol className="grid gap-1 sm:grid-cols-2 sm:gap-x-6 text-sm">
+    <nav aria-label="Nesta página" className="c4-card p-4 sm:p-5 min-w-0 break-words lg:sticky lg:top-24">
+      <p className="c4-eyebrow mb-3">Nesta página</p>
+      <ol className="grid gap-0.5 text-sm">
         {secoes.map((s, i) => (
-          <li key={s.id} className="flex gap-2">
-            <span className="font-mono text-xs text-text-primary/60 pt-0.5 w-5 shrink-0 text-right">{i + 1}.</span>
-            <a href={`#${s.id}`} className={`text-text-primary/80 hover:text-primary transition-colors ${FOCO}`}>
-              {s.titulo}
+          <li key={s.id}>
+            <a href={`#${s.id}`} className={`flex gap-2.5 py-1.5 px-2 -mx-2 rounded-lg text-text-primary/75 hover:text-primary hover:bg-primary/[0.06] transition-colors ${FOCO}`}>
+              <span className="tabular-nums text-xs text-text-primary/45 pt-0.5 w-4 shrink-0 text-right">{i + 1}</span>
+              <span>{s.titulo}</span>
             </a>
           </li>
         ))}
@@ -75,10 +78,11 @@ function BotaoVoltar() {
     <Link
       to="/login"
       onClick={voltar}
-      className={`inline-flex items-center gap-1.5 min-h-11 px-3 text-sm font-medium text-text-primary/80 hover:text-primary transition-colors ${FOCO}`}
+      className={`inline-flex items-center justify-center gap-1.5 min-h-11 min-w-[44px] px-2 sm:px-3 text-sm font-medium text-text-primary/80 hover:text-primary transition-colors ${FOCO}`}
     >
       <ArrowLeft className="w-4 h-4" aria-hidden="true" />
-      Voltar
+      {/* Em tela estreita fica só a seta (o nome acessível continua "Voltar") */}
+      <span className="sr-only min-[400px]:not-sr-only">Voltar</span>
     </Link>
   );
 }
@@ -87,40 +91,54 @@ function BotaoVoltar() {
  * Casca pública (sem autenticação) das páginas legais.
  * Recebe o único <h1> da página em `titulo`; as seções usam <LegalSection> (h2/h3).
  */
-export default function LegalLayout({ titulo, resumo, secoes, children }) {
+export default function LegalLayout({ titulo, resumo, secoes, children, eyebrow = 'Documento legal', meta }) {
   return (
-    <div className="min-h-dvh bg-surface text-text-primary overflow-x-hidden">
-      <header className="sticky top-0 z-10 bg-surface/90 backdrop-blur-sm border-b border-text-primary/10">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <Link to="/login" aria-label="Core 4 ERP — ir para o login" className={FOCO}>
-            <BrandMark />
+    <div className="relative min-h-dvh bg-surface text-text-primary overflow-x-hidden">
+      <FundoVivo />
+      <header className="sticky top-0 z-20 c4-glass border-b pt-safe">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
+          <Link to="/login" className={FOCO}>
+            <BrandLogo size="sm" as="span" />
+            <span className="sr-only">, ir para o login</span>
           </Link>
-          <BotaoVoltar />
+          <div className="flex items-center gap-1">
+            <BotaoAcessibilidade />
+            <BotaoVoltar />
+          </div>
         </div>
       </header>
 
-      <main id="conteudo" className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-12">
-        <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-text-primary">{titulo}</h1>
-        <p className="mt-2 text-xs sm:text-sm text-text-primary/70">
-          Versão <span className="font-mono">{VERSAO_TERMOS}</span> · Vigente desde {VIGENCIA}
-        </p>
-        {resumo && <p className="mt-4 text-sm sm:text-base leading-relaxed text-text-primary/80">{resumo}</p>}
+      <main id="main-content" tabIndex={-1} className="outline-none relative z-[1] mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-14">
+        <FadeIn className="@container max-w-3xl">
+          <p className="c4-eyebrow mb-3">{eyebrow}</p>
+          <h1 className="font-display break-words text-[min(2rem,10cqi)] sm:text-[min(2.5rem,8cqi)] font-semibold tracking-[-0.03em] leading-tight">{titulo}</h1>
+          <p className="mt-3 inline-flex flex-wrap items-center gap-2 text-xs sm:text-sm text-text-primary/70">
+            {meta ?? (
+              <>
+                <span className="rounded-full border border-border-strong px-2.5 py-0.5">Versão <span className="font-mono">{VERSAO_TERMOS}</span></span>
+                <span>Vigente desde {VIGENCIA}</span>
+              </>
+            )}
+          </p>
+          {resumo && <p className="mt-5 text-base leading-relaxed text-text-primary/80 text-pretty">{resumo}</p>}
+        </FadeIn>
 
-        <Sumario secoes={secoes} />
-
-        <div className="mt-10">{children}</div>
+        <div className="mt-10 grid gap-8 lg:grid-cols-[16rem_1fr] lg:gap-12 items-start">
+          <Sumario secoes={secoes} />
+          <article className="c4-card p-5 sm:p-8 min-w-0 max-w-3xl break-words">{children}</article>
+        </div>
       </main>
 
-      <footer className="border-t border-text-primary/10">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-text-primary/70">
+      <footer className="relative z-[1] border-t border-border">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs sm:text-sm text-text-primary/65">
           <nav aria-label="Documentos legais" className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <Link to="/privacidade" className={`hover:text-primary transition-colors ${FOCO}`}>Política de Privacidade</Link>
             <span aria-hidden="true">·</span>
             <Link to="/termos" className={`hover:text-primary transition-colors ${FOCO}`}>Termos de Uso</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/acessibilidade" className={`hover:text-primary transition-colors ${FOCO}`}>Acessibilidade</Link>
           </nav>
-          <p>
-            Versão <span className="font-mono">{VERSAO_TERMOS}</span> · Vigência: {VIGENCIA}
-          </p>
+          <p>© 2026 Core 4 · Versão <span className="font-mono">{VERSAO_TERMOS}</span></p>
         </div>
       </footer>
     </div>

@@ -24,18 +24,18 @@ export default function Privacidade() {
     title: 'Política de Privacidade',
     canonical: '/privacidade',
     description:
-      'Como o Core 4 ERP trata seus dados pessoais e financeiros: o que coletamos, para quê, com quem compartilhamos, por quanto tempo guardamos e como exercer seus direitos pela LGPD.',
+      'Como o Core 4 trata seus dados pessoais e financeiros: o que coletamos, para quê, com quem compartilhamos, por quanto tempo guardamos e como exercer seus direitos pela LGPD.',
   });
 
   return (
     <LegalLayout
       titulo="Política de Privacidade"
-      resumo="Este documento explica quais dados pessoais o Core 4 ERP trata, por que trata, com quem compartilha e como você pode exercer seus direitos. Ele segue a Lei Geral de Proteção de Dados (Lei 13.709/2018, a LGPD) e, no que couber, o Regulamento Geral de Proteção de Dados europeu (GDPR)."
+      resumo="Este documento explica quais dados pessoais o Core 4 trata, por que trata, com quem compartilha e como você pode exercer seus direitos. Ele segue a Lei Geral de Proteção de Dados (Lei 13.709/2018, a LGPD) e, no que couber, o Regulamento Geral de Proteção de Dados europeu (GDPR)."
       secoes={SECOES}
     >
       <LegalSection id="controlador" titulo="1. Quem é o controlador">
         <p>
-          O Core 4 ERP é um {CONTROLADOR.natureza}, disponível em <span className="font-mono">{URL_APP}</span>.
+          O Core 4 é um {CONTROLADOR.natureza}, disponível em <span className="font-mono break-all">{URL_APP}</span>.
           O controlador dos dados é <strong>{CONTROLADOR.responsavel}</strong>, {CONTROLADOR.papel}, em conjunto
           com os demais autores: {CONTROLADOR.coautores.join(', ')}.
         </p>
@@ -209,7 +209,7 @@ export default function Privacidade() {
         </ul>
         <p>
           Você também pode pedir a revisão de decisões tomadas unicamente com base em tratamento automatizado (art. 20).
-          No Core 4 ERP, o que a IA sugere ou registra, como a categoria de um lançamento, pode ser revisado e
+          No Core 4, o que a IA sugere ou registra, como a categoria de um lançamento, pode ser revisado e
           corrigido por você a qualquer momento, e as ações do assistente ficam identificadas na trilha de auditoria.
         </p>
       </LegalSection>
@@ -270,7 +270,7 @@ export default function Privacidade() {
 
       <LegalSection id="menores" titulo="11. Menores de idade">
         <p>
-          O Core 4 ERP não é destinado a menores de 18 anos. Se soubermos que uma conta pertence a um menor, ela será
+          O Core 4 não é destinado a menores de 18 anos. Se soubermos que uma conta pertence a um menor, ela será
           desativada e os dados, eliminados. Se você é responsável por um menor que criou uma conta, escreva para{' '}
           <LegalEmail email={CONTATO_EMAIL} />.
         </p>

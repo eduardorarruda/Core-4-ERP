@@ -1,21 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
-/** true enquanto a media query casar. Atualiza ao redimensionar/trocar preferência. */
+const temMatchMedia = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+
+/**
+ * true enquanto a media query casar. Atualiza ao redimensionar/trocar preferência.
+ * `useSyncExternalStore`: lê o valor no render (sem efeito + setState, sem render extra).
+ */
 export function useMediaQuery(query) {
-  const [casa, setCasa] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(query).matches : false
-  ));
-
-  useEffect(() => {
-    if (!window.matchMedia) return undefined;
+  const inscrever = useCallback((avisar) => {
+    if (!temMatchMedia()) return () => {};
     const mq = window.matchMedia(query);
-    const onChange = (e) => setCasa(e.matches);
-    setCasa(mq.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
+    mq.addEventListener('change', avisar);
+    return () => mq.removeEventListener('change', avisar);
   }, [query]);
 
-  return casa;
+  const ler = () => (temMatchMedia() ? window.matchMedia(query).matches : false);
+
+  return useSyncExternalStore(inscrever, ler, () => false);
 }
 
 /** Atalho para prefers-reduced-motion: reduce. */

@@ -1,4 +1,4 @@
-# Deploy — Core 4 ERP (produção)
+# Deploy — Core 4 (produção)
 
 > Servidor: `root@SEU_SERVIDOR` · Projeto: `/opt/core4erp` · Stack: Docker Compose v2 (`docker compose`)
 > Branch de produção: `main`. O servidor **segue a `main`** do GitHub.
@@ -204,7 +204,7 @@ Esta versão endurece a stack e muda alguns pontos que exigem ação manual. Ord
 
 ### n8n — role dedicado no Postgres
 
-O n8n deixa de usar o usuário do ERP. Em **volume novo** o `scripts/postgres/init-n8n.sh` cria tudo
+O n8n deixa de usar o usuário da aplicação. Em **volume novo** o `scripts/postgres/init-n8n.sh` cria tudo
 sozinho. Em **volume existente**, rode uma vez (troque `n8n_app`/senha pelos valores do `.env`, e
 `core4erp` pelo `POSTGRES_DB` se for diferente):
 
@@ -218,8 +218,8 @@ CREATE ROLE n8n_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD
 -- 2a) banco 'n8n' ainda NÃO existe:
 CREATE DATABASE n8n OWNER n8n_app;
 
--- 2b) banco 'n8n' JÁ existe (criado com o usuário do ERP): transfira a posse do banco e das tabelas.
---     (Não use REASSIGN OWNED: o usuário do ERP é o superusuário de bootstrap da imagem e o
+-- 2b) banco 'n8n' JÁ existe (criado com o usuário da aplicação): transfira a posse do banco e das tabelas.
+--     (Não use REASSIGN OWNED: o usuário da aplicação é o superusuário de bootstrap da imagem e o
 --     Postgres recusa reatribuir objetos do sistema dele.)
 ALTER DATABASE n8n OWNER TO n8n_app;
 \c n8n
@@ -227,7 +227,7 @@ SELECT format('ALTER TABLE public.%I OWNER TO n8n_app', tablename) FROM pg_table
 SELECT format('ALTER VIEW public.%I OWNER TO n8n_app', viewname) FROM pg_views WHERE schemaname = 'public' \gexec
 \c postgres
 
--- 3) isolamento: só o n8n conecta no banco dele; ninguém além do dono conecta no ERP
+-- 3) isolamento: só o n8n conecta no banco dele; ninguém além do dono conecta no banco da aplicação
 REVOKE ALL ON DATABASE n8n FROM PUBLIC;
 GRANT CONNECT, TEMPORARY ON DATABASE n8n TO n8n_app;
 REVOKE CONNECT, TEMPORARY ON DATABASE core4erp FROM PUBLIC;
@@ -264,7 +264,7 @@ Nada administrativo é publicado. Use túnel SSH:
 ```bash
 ssh -L 3001:127.0.0.1:3001 -L 5678:127.0.0.1:5678 -L 6333:127.0.0.1:6333 root@SEU_SERVIDOR
 # Grafana: http://localhost:3001  (admin / GRAFANA_PASSWORD)
-#   painel "Chat IA — Uso, Custo e Latência" na pasta "Core 4 ERP"; logs no Explore → Loki
+#   painel "Chat IA — Uso, Custo e Latência" na pasta "Core 4"; logs no Explore → Loki
 #   ({service="backend", level="error"}). traceId/usuarioId/empresaId são metadados (não labels).
 # n8n:     http://localhost:5678
 # Qdrant:  http://localhost:6333/dashboard (pede a API key)
@@ -301,7 +301,7 @@ Ao adicionar uma env nova no `docker-compose.yml`, **atualize também o `.env` d
 
 | Variável | Obrigatória | Para quê / como gerar |
 |---|---|---|
-| `DB_USERNAME`, `DB_PASSWORD` | sim | Postgres do ERP. Senha: `openssl rand -base64 32` |
+| `DB_USERNAME`, `DB_PASSWORD` | sim | Postgres da aplicação. Senha: `openssl rand -base64 32` |
 | `SECRET_KEY` | sim | JWT HS256. `openssl rand -base64 64` |
 | `DATA_ENCRYPTION_KEY` | sim | AES-256 do CPF/CNPJ em repouso. `openssl rand -base64 32`. **Perdeu = dados ilegíveis** |
 | `DATA_HMAC_KEY` | sim | Índice cego (busca/unicidade de CPF/CNPJ). `openssl rand -base64 32` (≠ da anterior) |
@@ -356,7 +356,7 @@ Novas APIs externas chamadas pelo navegador também precisam entrar no `connect-
 ## Backup e restauração
 
 `scripts/backup.sh` gera `backups/core4erp-AAAAMMDD-HHMMSS/` com:
-`core4erp.sql.gz` (ERP), `n8n.sql.gz` (n8n), `qdrant-<coleção>.snapshot`, `n8n_data.tar.gz` e
+`core4erp.sql.gz` (aplicação), `n8n.sql.gz` (n8n), `qdrant-<coleção>.snapshot`, `n8n_data.tar.gz` e
 `SHA256SUMS`. Arquivos com permissão `600` (contêm dados pessoais). Falha no meio → diretório
 renomeado para `*.INCOMPLETO`. Rotação local por `BACKUP_RETENTION_DAYS` (default 14).
 Off-site: defina `RCLONE_REMOTE` (ex.: `b2:core4erp-backups`) com o `rclone` configurado no host.
@@ -370,7 +370,7 @@ Off-site: defina `RCLONE_REMOTE` (ex.: `b2:core4erp-backups`) com o `rclone` con
 **Restaurar** (pede confirmação digitando `restaurar`; `--sim` pula):
 
 ```bash
-scripts/restore.sh /var/backups/core4erp/core4erp-20261013-031500 erp       # banco do ERP
+scripts/restore.sh /var/backups/core4erp/core4erp-20261013-031500 erp       # banco da aplicação
 scripts/restore.sh <dir> n8n | qdrant | n8n-data | tudo
 ```
 
@@ -404,7 +404,7 @@ atualize o **cofre** e o `.env` juntos, depois `docker compose up -d` dos servi�
 
 - [ ] **`SECRET_KEY`** (JWT): trocar e `up -d backend`. Todos os usuários são deslogados (esperado).
 - [ ] **`JWT_PRIVATE_KEY`/`JWT_PUBLIC_KEY`** (se em uso): gerar novo par e `up -d backend`. Idem.
-- [ ] **`DB_PASSWORD`** (ERP): `ALTER ROLE <DB_USERNAME> PASSWORD '...'` no Postgres → `.env` → `up -d backend`.
+- [ ] **`DB_PASSWORD`** (aplicação): `ALTER ROLE <DB_USERNAME> PASSWORD '...'` no Postgres → `.env` → `up -d backend`.
 - [ ] **`N8N_DB_PASSWORD`**: `ALTER ROLE <N8N_DB_USER> PASSWORD '...'` → `.env` → `up -d n8n`
       (e a credencial *Postgres n8n* no editor, se usar o mesmo role).
 - [ ] **`N8N_WEBHOOK_SECRET`**: `.env` → `up -d backend n8n` → no editor do n8n, atualizar a

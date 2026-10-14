@@ -47,6 +47,22 @@ class ChatMemoryServiceTest {
     }
 
     @Test
+    void carregarContexto_descartaMarcadorDeFalhaDoAssistente() {
+        // Pergunta que falhou + marcador + nova pergunta: o marcador não vai como contexto ao modelo.
+        ChatMensagem marcador = new ChatMensagem(1L, CONVERSA, CANAL, ChatMensagem.Role.ASSISTANT,
+                br.com.core4erp.chat.service.RespostaFalhaChat.TEXTO_PADRAO);
+        ChatMensagem pergunta = new ChatMensagem(1L, CONVERSA, CANAL, ChatMensagem.Role.USER, "quanto gastei 50% a mais?");
+        when(repository.findByConversaIdOrderByCriadoEmDescIdDesc(eq(CONVERSA), any(Pageable.class)))
+                .thenReturn(List.of(marcador, pergunta));
+
+        List<Message> mensagens = service.carregarContexto(CONVERSA);
+
+        assertEquals(1, mensagens.size());
+        assertInstanceOf(UserMessage.class, mensagens.get(0));
+        assertEquals("quanto gastei 50% a mais?", mensagens.get(0).getText());
+    }
+
+    @Test
     void carregarContexto_conversaNula_retornaVazioSemConsultar() {
         assertEquals(List.of(), service.carregarContexto(null));
         verify(repository, never()).findByConversaIdOrderByCriadoEmDescIdDesc(anyLong(), any(Pageable.class));

@@ -1,88 +1,71 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { ArrowLeft, Check, MailCheck, Mail } from 'lucide-react';
 import { auth, setLoginState } from '../lib/api';
 import { getFirstAccessibleRoute } from '../lib/routeUtils';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
 import Button from '../components/ui/Button';
-import HeroPane from '../components/login/HeroPane';
 import BrandMark from '../components/ui/BrandMark';
-import LinksLegais from '../components/legal/LinksLegais';
+import AuthLayout from '../components/login/AuthLayout';
+import AvisoFormulario from '../components/login/AvisoFormulario';
+import { FadeIn, Stagger, StaggerItem } from '../components/motion/Movimento';
 import { usePageMeta } from '../hooks/usePageMeta';
-import { usePrefersReducedMotion } from '../hooks/useMediaQuery';
 
-function greetingFor(h) {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function saudacao(h) {
   if (h < 5) return 'Boa madrugada';
   if (h < 12) return 'Bom dia';
   if (h < 18) return 'Boa tarde';
   return 'Boa noite';
 }
 
+const LINK = 'text-primary font-semibold rounded hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+const VOLTAR = 'inline-flex items-center gap-1.5 -ml-1 mb-6 min-h-11 px-1 rounded-lg text-sm text-text-primary/65 hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+
+/** Troca de "telas" do formulário com deslize suave (login ↔ recuperar senha). */
+function Passo({ id, children }) {
+  const reduzir = useReducedMotion();
+  return (
+    <motion.div
+      key={id}
+      initial={reduzir ? { opacity: 0 } : { opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={reduzir ? { opacity: 0 } : { opacity: 0, x: -16, transition: { duration: 0.14 } }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export default function Login() {
   usePageMeta({
     title: 'Entrar',
     canonical: '/login',
-    description: 'Entre no Core 4 ERP para controlar contas a pagar e receber, cartões, conciliação bancária e relatórios da sua vida financeira ou da sua empresa.',
+    description: 'Entre no Core 4 para controlar contas a pagar e receber, cartões, conciliação bancária e relatórios da sua vida financeira ou da sua empresa.',
   });
   const navigate = useNavigate();
   const { state: estadoNavegacao } = useLocation();
   const contaExcluida = Boolean(estadoNavegacao?.contaExcluida);
-  const reduzirMovimento = usePrefersReducedMotion();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [now, setNow] = useState(new Date());
+  const [sucesso, setSucesso] = useState(false);
+  const [hora] = useState(() => new Date().getHours());
 
   const [view, setView] = useState('login');
   const [resetEmail, setResetEmail] = useState('');
   const [resetErro, setResetErro] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
-  const spotRef = useRef(null);
-  const o1Ref = useRef(null);
-  const o2Ref = useRef(null);
-  const o3Ref = useRef(null);
   const navTimer = useRef(null);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(id);
-  }, []);
 
   // Limpa o timer de redirecionamento se o componente desmontar antes do navigate.
   useEffect(() => () => clearTimeout(navTimer.current), []);
 
-  // Parallax do fundo: desligado com "reduzir movimento" e limitado a 1 atualização por quadro
-  useEffect(() => {
-    if (reduzirMovimento) return undefined;
-    let quadro = 0;
-    let ultimo = null;
-    const aplicar = () => {
-      quadro = 0;
-      if (!ultimo) return;
-      const w = window.innerWidth, h = window.innerHeight;
-      const { x, y } = ultimo;
-      const dx = (x / w - 0.5) * 2, dy = (y / h - 0.5) * 2;
-      if (spotRef.current) {
-        spotRef.current.style.setProperty('--mx', `${x}px`);
-        spotRef.current.style.setProperty('--my', `${y}px`);
-      }
-      if (o1Ref.current) o1Ref.current.style.transform = `translate(${dx * 30}px, ${dy * 30}px)`;
-      if (o2Ref.current) o2Ref.current.style.transform = `translate(${dx * -40}px, ${dy * -40}px)`;
-      if (o3Ref.current) o3Ref.current.style.transform = `translate(${dx * 22}px, ${dy * 22}px)`;
-    };
-    const onMove = (e) => {
-      ultimo = { x: e.clientX, y: e.clientY };
-      if (!quadro) quadro = requestAnimationFrame(aplicar);
-    };
-    window.addEventListener('mousemove', onMove, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      if (quadro) cancelAnimationFrame(quadro);
-    };
-  }, [reduzirMovimento]);
-
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const emailValid = EMAIL_RE.test(email);
 
   function voltarParaLogin() {
     setView('login');
@@ -92,7 +75,7 @@ export default function Login() {
 
   const handleEsqueciSenha = async (e) => {
     e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetEmail)) {
+    if (!EMAIL_RE.test(resetEmail)) {
       setResetErro('Informe um e-mail válido.');
       return;
     }
@@ -112,87 +95,58 @@ export default function Login() {
     e?.preventDefault?.();
     setErro('');
     if (!emailValid) { setErro('Informe um e-mail válido.'); return; }
+    if (!senha) { setErro('Informe sua senha.'); return; }
     setCarregando(true);
     try {
       const result = await auth.login(email, senha);
       setLoginState(result);
-      setSuccess(true);
+      setSucesso(true);
       const permSet = new Set(result.empresas?.[0]?.permissoes ?? []);
       const check = (cod) => result.adminSistema || permSet.has(cod);
-      navTimer.current = setTimeout(() => navigate(getFirstAccessibleRoute(check)), 800);
+      navTimer.current = setTimeout(() => navigate(getFirstAccessibleRoute(check)), 700);
     } catch (err) {
-      setErro(err.message || 'Credenciais inválidas');
+      setErro(err.message || 'E-mail ou senha incorretos.');
     } finally {
       setCarregando(false);
     }
   };
 
-  const errBanner = 'flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-error/10 border border-error/20 text-error text-[13px] mt-3';
-  const backBtn = 'flex items-center gap-1.5 text-xs text-text-primary/70 hover:text-text-primary transition-colors mb-7 min-h-11 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
-  const iconBadge = 'flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 border border-primary/20 mb-5';
-
   return (
-    <div className="relative min-h-dvh flex bg-surface overflow-hidden text-text-primary">
-      {/* Background decorativo */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: 'linear-gradient(to right,color-mix(in srgb,var(--color-text-primary) 5%,transparent) 1px,transparent 1px),linear-gradient(to bottom,color-mix(in srgb,var(--color-text-primary) 5%,transparent) 1px,transparent 1px)',
-            backgroundSize: '56px 56px',
-            WebkitMaskImage: 'radial-gradient(ellipse 80% 70% at 50% 40%,#000 20%,transparent 80%)',
-            maskImage: 'radial-gradient(ellipse 80% 70% at 50% 40%,#000 20%,transparent 80%)',
-          }}
-        />
-        <div ref={o1Ref} className="absolute rounded-full bg-primary blur-[80px] opacity-25 -top-36 -left-36 will-change-transform" style={{ width: 520, height: 520 }} />
-        <div ref={o2Ref} className="absolute rounded-full bg-secondary blur-[80px] opacity-[.15] -bottom-44 -right-36 will-change-transform" style={{ width: 620, height: 620 }} />
-        <div ref={o3Ref} className="absolute rounded-full bg-warning blur-[80px] opacity-10 top-[40%] left-[35%] will-change-transform" style={{ width: 340, height: 340 }} />
-        <div
-          ref={spotRef}
-          className="absolute inset-0 [transition:background_.12s]"
-          style={{ background: 'radial-gradient(420px circle at var(--mx,50%) var(--my,50%), color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 60%)' }}
-        />
-      </div>
+    <AuthLayout>
+      <AnimatePresence mode="wait" initial={false}>
+        {view === 'login' && (
+          <Passo key="login" id="login">
+            {contaExcluida && (
+              <AvisoFormulario tipo="info" className="mb-6">
+                Sua conta foi excluída e seus dados pessoais foram anonimizados.
+              </AvisoFormulario>
+            )}
+            <Stagger>
+              <StaggerItem>
+                <p className="c4-eyebrow mb-3">{saudacao(hora)}</p>
+              </StaggerItem>
+              <StaggerItem>
+                <h1 className="font-display break-words hyphens-auto text-[2rem] sm:text-[2.25rem] font-semibold tracking-[-0.03em] leading-tight">
+                  Entre no <span className="c4-text-emerald">Core 4</span>
+                </h1>
+              </StaggerItem>
+              <StaggerItem>
+                <p className="mt-2 text-sm text-text-primary/65">Use o e-mail e a senha da sua conta.</p>
+              </StaggerItem>
 
-      <section className="relative z-[1] w-full max-w-[520px] min-h-dvh bg-surface/60 backdrop-blur-sm border-r border-text-primary/5 flex flex-col justify-start lg:justify-between px-6 py-8 lg:px-12 gap-8 lg:gap-0">
-        <BrandMark />
-
-        <div className="w-full max-w-[380px] mx-auto">
-          {view === 'login' && (
-            <>
-              {contaExcluida && (
-                <p role="status" className="mb-5 rounded-xl border border-text-primary/15 bg-surface-low px-3.5 py-2.5 text-sm text-text-primary/80">
-                  Sua conta foi excluída e seus dados pessoais foram anonimizados.
-                </p>
-              )}
-              <div className="anim-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-text-primary/5 border border-text-primary/10 text-xs text-text-primary/60 mb-5">
-                <span className="live-dot" />
-                {greetingFor(now.getHours())} — pronto para entrar
-              </div>
-
-              <h1 className="anim-in d1 font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
-                Acesse sua <em className="text-primary italic">conta</em>
-              </h1>
-              <p className="anim-in d2 text-sm text-text-primary/70 mb-7">
-                Entre com o e-mail e a senha cadastrados.
-              </p>
-
-              <form onSubmit={handleLogin}>
-                <div className="anim-in d3 mb-3">
+              <StaggerItem>
+                <form onSubmit={handleLogin} noValidate className="mt-8 space-y-3">
                   <FloatingInput
                     id="email"
                     label="E-mail"
                     type="email"
+                    inputMode="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="email"
                     required
-                    validIcon={emailValid
-                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
-                      : null}
+                    validIcon={emailValid ? <Check className="w-4 h-4" strokeWidth={2.5} /> : null}
                   />
-                </div>
-                <div className="anim-in d4 mb-3">
                   <FloatingPasswordInput
                     id="senha"
                     label="Senha"
@@ -201,117 +155,109 @@ export default function Login() {
                     autoComplete="current-password"
                     required
                   />
-                </div>
 
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="text-xs text-primary font-medium min-h-11 px-1 hover:opacity-80 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    onClick={() => { setResetEmail(email); setResetErro(''); setView('forgot-email'); }}
-                  >
-                    Esqueci a senha
-                  </button>
-                </div>
-
-                {erro && (
-                  <div className={errBanner}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
-                    {erro}
+                  <div className="flex justify-end -mt-1">
+                    <button
+                      type="button"
+                      className="text-sm text-primary font-medium min-h-11 px-1 rounded hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      onClick={() => { setResetEmail(email); setResetErro(''); setView('forgot-email'); }}
+                    >
+                      Esqueci a senha
+                    </button>
                   </div>
-                )}
 
-                <div className="anim-in d5">
-                  <Button type="submit" loading={carregando} className="w-full h-12 mt-4 text-[15px] font-display font-bold">
-                    {carregando ? 'Autenticando…' : 'Entrar no Core 4'}
+                  <AvisoFormulario>{erro}</AvisoFormulario>
+
+                  <Button type="submit" size="lg" loading={carregando} fullWidth className="mt-2">
+                    {carregando ? 'Entrando…' : 'Entrar'}
                   </Button>
-                </div>
-              </form>
+                </form>
+              </StaggerItem>
 
-              <div className="anim-in d6 text-center mt-6 text-[13px] text-text-primary/70">
-                Primeira vez no Core 4?{' '}
-                <Link to="/register" className="text-primary font-semibold hover:opacity-80 transition-opacity">Criar conta</Link>
-              </div>
-            </>
-          )}
+              <StaggerItem>
+                <p className="mt-8 text-center text-sm text-text-primary/65">
+                  Ainda não tem conta? <Link to="/register" className={LINK}>Criar conta grátis</Link>
+                </p>
+              </StaggerItem>
+            </Stagger>
+          </Passo>
+        )}
 
-          {view === 'forgot-email' && (
-            <div className="anim-in">
-              <button type="button" onClick={voltarParaLogin} className={backBtn}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
-                Voltar ao login
-              </button>
-              <div className={iconBadge}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
-              </div>
-              <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">Recuperar acesso</h1>
-              <p className="text-sm text-text-primary/70 mb-7 leading-relaxed">
-                Informe o e-mail cadastrado. Enviaremos um código de verificação.
-              </p>
-              <form onSubmit={handleEsqueciSenha}>
-                <FloatingInput id="reset-email" label="E-mail cadastrado" type="email" value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)} autoComplete="email" required />
-                {resetErro && (
-                  <div className={errBanner}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><circle cx="12" cy="16" r=".5" fill="currentColor" /></svg>
-                    {resetErro}
-                  </div>
-                )}
-                <Button type="submit" loading={resetLoading} className="w-full h-12 mt-4 text-[15px] font-display font-bold">
-                  {resetLoading ? 'Enviando…' : 'Enviar código'}
-                </Button>
-              </form>
-            </div>
-          )}
-
-          {view === 'forgot-sent' && (
-            <div className="anim-in">
-              <button type="button" onClick={voltarParaLogin} className={backBtn}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
-                Voltar ao login
-              </button>
-              <div className={iconBadge}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
-              </div>
-              <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">Verifique seu e-mail</h1>
-              <p className="text-sm text-text-primary/70 leading-relaxed mb-7">
-                Enviamos um link de recuperação para <strong className="text-text-primary">{resetEmail}</strong>.<br />
-                Clique no link do e-mail para criar sua nova senha.<br />
-                <span className="text-xs text-text-primary/70">O link expira em 60 minutos.</span>
-              </p>
-              <Button type="button" variant="secondary" onClick={voltarParaLogin} className="w-full h-11 mt-1">
-                Voltar ao login
+        {view === 'forgot-email' && (
+          <Passo key="forgot-email" id="forgot-email">
+            <button type="button" onClick={voltarParaLogin} className={VOLTAR}>
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Voltar ao login
+            </button>
+            <span aria-hidden="true" className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-5">
+              <Mail className="w-6 h-6" />
+            </span>
+            <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Recuperar acesso</h1>
+            <p className="text-sm text-text-primary/65 mb-7 leading-relaxed">
+              Informe o e-mail da sua conta. Enviamos um link para você criar uma senha nova.
+            </p>
+            <form onSubmit={handleEsqueciSenha} noValidate className="space-y-3">
+              <FloatingInput
+                id="reset-email"
+                label="E-mail da conta"
+                type="email"
+                inputMode="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
+              <AvisoFormulario>{resetErro}</AvisoFormulario>
+              <Button type="submit" size="lg" loading={resetLoading} fullWidth>
+                {resetLoading ? 'Enviando…' : 'Enviar link'}
               </Button>
-            </div>
-          )}
-        </div>
+            </form>
+          </Passo>
+        )}
 
-        <footer className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-primary/70">
-          <span>© 2026 Core 4 ERP</span>
-          <LinksLegais />
-        </footer>
-      </section>
+        {view === 'forgot-sent' && (
+          <Passo key="forgot-sent" id="forgot-sent">
+            <button type="button" onClick={voltarParaLogin} className={VOLTAR}>
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Voltar ao login
+            </button>
+            <span aria-hidden="true" className="grid place-items-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary mb-5">
+              <MailCheck className="w-6 h-6" />
+            </span>
+            <h1 className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-[-0.025em] mb-2">Confira seu e-mail</h1>
+            <p className="text-sm text-text-primary/65 leading-relaxed mb-7" role="status">
+              Se houver uma conta com <strong className="text-text-primary">{resetEmail}</strong>, enviamos um link para
+              criar uma senha nova. O link vale por 60 minutos.
+            </p>
+            <Button type="button" variant="secondary" size="lg" onClick={voltarParaLogin} fullWidth>
+              Voltar ao login
+            </Button>
+          </Passo>
+        )}
+      </AnimatePresence>
 
-      <div className="hidden lg:flex flex-1 min-w-0 relative z-[1]">
-        <HeroPane />
-      </div>
-
-      {success && (
-        <div className="fixed inset-0 z-[100] bg-surface/90 backdrop-blur-xl grid place-items-center" style={{ animation: 'fadeIn 300ms both' }}>
-          <div className="text-center p-10" style={{ animation: 'scaleSpring 500ms cubic-bezier(.34,1.56,.64,1) both' }}>
-            <div className="w-24 h-24 rounded-full bg-primary text-on-primary grid place-items-center mx-auto mb-6" style={{ boxShadow: '0 0 60px color-mix(in srgb, var(--color-primary) 40%, transparent)' }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            </div>
-            <div className="font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
-              Bem-vindo de volta!
-            </div>
-            <div className="text-text-primary/70 text-sm" role="status">
-              Redirecionando…
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {/* Confirmação breve antes de entrar */}
+      <AnimatePresence>
+        {sucesso && (
+          <motion.div
+            className="fixed inset-0 z-[100] grid place-items-center bg-surface/85 backdrop-blur-xl"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <FadeIn className="text-center p-10" y={12}>
+              <motion.div
+                className="mx-auto mb-6 w-24 h-24 grid place-items-center rounded-3xl c4-card c4-card--destaque"
+                initial={{ scale: 0.8, rotate: -8 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              >
+                <BrandMark size={56} />
+              </motion.div>
+              <p className="font-display break-words hyphens-auto text-[1.75rem] font-semibold tracking-tight">Bem-vindo de volta</p>
+              <p className="mt-1 text-sm text-text-primary/65" role="status">Abrindo o Core 4…</p>
+            </FadeIn>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AuthLayout>
   );
 }

@@ -1,130 +1,102 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Sparkles, Calendar, Menu } from 'lucide-react';
+import { Menu, Sparkles } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
-import { getFirstAccessibleRoute } from '../../lib/routeUtils';
+import { NAV, itemDaRota, podeVerItem, destinoDoItem } from '../../lib/navigation';
+import { IndicatorGroup, LayoutIndicator } from '../motion/Movimento';
 
 /**
- * BottomNav — barra de navegação inferior para o app instalado (PWA) no mobile.
+ * Barra de navegação inferior (celular / PWA). Slots vêm de lib/navigation.js (`mobile: true`):
+ * Início · Contas · [Áurea no centro] · Calendário · Menu. Slot sem permissão SOME (a barra
+ * redistribui) — nunca um rótulo apontando para outra tela.
  *
- * Visível somente em telas pequenas (`lg:hidden`); no desktop a navegação continua
- * sendo o rail lateral (Sidebar). Fixa no rodapé, respeita a safe-area do iOS
- * (`pb-safe`) e tem 5 slots, com a Áurea (IA) em destaque no centro.
- *
- * Regra de permissão: slots gateados por permissão que o usuário não possui são
- * substituídos pela primeira rota acessível, evitando levar o usuário a uma tela
- * que ele não pode ver.
- *
- * Props:
- *  - onAbrirMenu (fn) abre o drawer do Sidebar (mesmo estado usado no App).
+ * Props: onAbrirMenu (abre o drawer do menu lateral).
  */
 export default function BottomNav({ onAbrirMenu }) {
-  const { temPermissao } = useAuth();
+  const { temPermissao, tipoConta } = useAuth();
   const { pathname } = useLocation();
+  const ctx = { temPermissao, tipoConta };
+  const ativoId = itemDaRota(pathname)?.id;
+  const slots = NAV.filter((i) => i.mobile && podeVerItem(i, ctx)).sort((a, b) => a.mobile - b.mobile);
+  const meio = Math.ceil(slots.length / 2);
+  const esquerda = slots.slice(0, meio);
+  const direita = slots.slice(meio);
+  const aureaAtiva = ativoId === 'aurea';
 
-  // Destino do slot "Início": Dashboard quando permitido, senão a 1ª rota acessível.
-  const inicioPath = temPermissao('DASHBOARD_VISUALIZAR')
-    ? '/dashboard'
-    : getFirstAccessibleRoute(temPermissao);
-
-  const isAtivo = (path) =>
-    pathname === path || pathname.startsWith(`${path}/`);
+  const renderSlot = (item) => (
+    <SlotLink
+      key={item.id}
+      to={destinoDoItem(item, temPermissao)}
+      icon={item.icon}
+      label={item.labelCurto ?? item.label}
+      ativo={item.id === ativoId}
+    />
+  );
 
   return (
     <nav
       aria-label="Navegação principal"
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface-low/95 backdrop-blur-md border-t border-text-primary/10 pb-safe"
+      data-navegacao-principal=""
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 c4-glass border-t pb-safe"
     >
-      <div className="flex items-end justify-around px-2 pt-1.5 pb-1">
-        {/* Início (Dashboard ou 1ª rota acessível) */}
-        <SlotLink
-          to={inicioPath}
-          icon={LayoutDashboard}
-          label="Início"
-          ativo={isAtivo('/dashboard') || (inicioPath !== '/dashboard' && isAtivo(inicioPath))}
-        />
+      <IndicatorGroup id="bottomnav">
+        <div className="grid grid-cols-5 items-end px-1.5 pt-1.5 pb-1">
+          {esquerda.map(renderSlot)}
+          {Array.from({ length: 2 - esquerda.length }).map((_, i) => <span key={`e${i}`} aria-hidden="true" />)}
 
-        {/* Lançamentos — só se puder visualizar contas; senão vira 1ª rota acessível */}
-        {temPermissao('CONTA_VISUALIZAR') ? (
-          <SlotLink to="/contas" icon={Receipt} label="Lançamentos" ativo={isAtivo('/contas')} />
-        ) : (
-          <SlotLink
-            to={getFirstAccessibleRoute(temPermissao)}
-            icon={Receipt}
-            label="Lançamentos"
-            ativo={false}
-          />
-        )}
-
-        {/* Áurea — slot central destacado (a IA é protagonista) */}
-        <Link
-          to="/assistente"
-          aria-label="Áurea, assistente de IA"
-          aria-current={isAtivo('/assistente') ? 'page' : undefined}
-          className="flex flex-col items-center gap-1 -mt-5 shrink-0"
-        >
-          <span
-            className={cn(
-              'grid place-items-center w-14 h-14 rounded-full bg-primary text-on-primary shadow-lg shadow-primary/30 transition-transform active:scale-95',
-              isAtivo('/assistente') && 'ring-4 ring-primary/25'
-            )}
+          {/* Áurea — slot central em destaque */}
+          <Link
+            to="/assistente"
+            aria-label="Áurea, assistente"
+            aria-current={aureaAtiva ? 'page' : undefined}
+            className="flex flex-col items-center gap-1 -mt-6 focus-visible:outline-none group"
           >
-            <Sparkles className="w-6 h-6" />
-          </span>
-          <span
-            className={cn(
-              'text-xs font-semibold',
-              isAtivo('/assistente') ? 'text-primary' : 'text-text-primary/60'
-            )}
+            <span
+              className={cn(
+                'relative grid place-items-center w-14 h-14 rounded-2xl bg-gradient-primary text-on-primary',
+                'shadow-[var(--c4-brilho-botao-forte),0_10px_28px_-8px_var(--color-primary)]',
+                'transition-transform active:scale-95 group-focus-visible:ring-2 group-focus-visible:ring-primary group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-surface',
+                aureaAtiva && 'ring-4 ring-primary/25'
+              )}
+            >
+              <Sparkles className="w-6 h-6" aria-hidden="true" />
+            </span>
+            <span className={cn('text-[0.6875rem] font-semibold', aureaAtiva ? 'text-primary' : 'text-text-primary/65')}>Áurea</span>
+          </Link>
+
+          {direita.map(renderSlot)}
+          {Array.from({ length: Math.max(0, 1 - direita.length) }).map((_, i) => <span key={`d${i}`} aria-hidden="true" />)}
+
+          <button
+            type="button"
+            onClick={onAbrirMenu}
+            aria-label="Abrir menu de navegação"
+            className="flex flex-col items-center justify-center gap-1 min-h-12 rounded-xl text-text-primary/60 active:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            Áurea
-          </span>
-        </Link>
-
-        {/* Calendário — só se tiver permissão; senão 1ª rota acessível */}
-        {temPermissao('CALENDARIO_VISUALIZAR') ? (
-          <SlotLink to="/calendario" icon={Calendar} label="Calendário" ativo={isAtivo('/calendario')} />
-        ) : (
-          <SlotLink
-            to={getFirstAccessibleRoute(temPermissao)}
-            icon={Calendar}
-            label="Calendário"
-            ativo={false}
-          />
-        )}
-
-        {/* Menu — abre o drawer do Sidebar */}
-        <button
-          type="button"
-          onClick={onAbrirMenu}
-          aria-label="Abrir menu de navegação"
-          className="flex flex-col items-center justify-center gap-1 min-h-11 min-w-11 shrink-0 text-text-primary/60 active:text-text-primary transition-colors"
-        >
-          <Menu className="w-5 h-5" />
-          <span className="text-xs font-medium">Menu</span>
-        </button>
-      </div>
+            <Menu className="w-5 h-5" aria-hidden="true" />
+            <span className="text-[0.6875rem] font-medium">Menu</span>
+          </button>
+        </div>
+      </IndicatorGroup>
     </nav>
   );
 }
 
-/**
- * Slot padrão da barra (ícone + rótulo). Item ativo destacado com a cor primária.
- */
 function SlotLink({ to, icon: Icon, label, ativo }) {
   return (
     <Link
       to={to}
-      aria-label={label}
       aria-current={ativo ? 'page' : undefined}
       className={cn(
-        'flex flex-col items-center justify-center gap-1 min-h-11 min-w-11 shrink-0 transition-colors',
+        'relative isolate flex flex-col items-center justify-center gap-1 min-h-12 rounded-xl transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         ativo ? 'text-primary' : 'text-text-primary/60 active:text-text-primary'
       )}
     >
-      <Icon className="w-5 h-5" />
-      <span className="text-xs font-medium">{label}</span>
+      {ativo && <LayoutIndicator layoutId="slot-ativo" className="inset-x-2 inset-y-0.5 rounded-xl bg-primary/[0.1]" />}
+      <Icon className="w-5 h-5" aria-hidden="true" />
+      <span className="text-[0.6875rem] font-medium truncate max-w-full px-1">{label}</span>
     </Link>
   );
 }

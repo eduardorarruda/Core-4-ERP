@@ -45,10 +45,10 @@ export function usePwa() {
   const [jaInstalado, setJaInstalado] = useState(estaInstalado);
 
   useEffect(() => {
-    // Evento pode ter disparado antes do React montar — o script no index.html guardou em window.
-    if (window.deferredInstallPrompt) setPromptInstalacao(window.deferredInstallPrompt);
-
     const onInstallable = () => setPromptInstalacao(window.deferredInstallPrompt || null);
+    // O useState já leu window.deferredInstallPrompt no 1º render; esta releitura (fora do
+    // corpo do efeito) cobre o evento que chegar entre o render e a inscrição abaixo.
+    queueMicrotask(() => { if (window.deferredInstallPrompt) onInstallable(); });
     const onBeforeInstall = (e) => {
       e.preventDefault();
       window.deferredInstallPrompt = e;

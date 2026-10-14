@@ -1,177 +1,121 @@
-import React, { memo, useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, RefreshCw, AlertTriangle } from 'lucide-react';
-import { dashboard } from '../../lib/api';
-import { brl } from '../../lib/formatters';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowDownLeft, ArrowUpRight, CreditCard, Scale, Telescope } from 'lucide-react';
+import Card from '../ui/Card';
+import AlertaErro from '../ui/AlertaErro';
+import { AnimatedNumber } from '../motion/Movimento';
+import { formatarMoeda } from '../../lib/formatters';
+import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
-import SkeletonCard from '../ui/SkeletonCard';
-import Button from '../ui/Button';
 
-function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
-  const colorMap = {
-    entrada:  'text-secondary border-secondary/20 bg-secondary/5',
-    saida:    'text-error border-error/20 bg-error/5',
-    neutro:   'text-text-primary/80 border-text-primary/5 bg-surface',
-    positivo: 'text-primary border-primary/20 bg-primary/5',
-    negativo: 'text-error border-error/20 bg-error/5',
-  };
-  const prefixo = tipo === 'entrada' ? '+' : tipo === 'saida' ? '−' : '';
+/**
+ * "Em aberto e projeção" (antigo painel Posição financeira, enxuto): o que ainda vai entrar e sair,
+ * o cartão e para onde o saldo caminha. Saldo de hoje, composição acumulada e investimentos
+ * saíram daqui (já estão nos KPIs e no painel de patrimônio).
+ *
+ * Dados: GET /api/dashboard/saldo-detalhado (DASHBOARD_CARTAO_VISUALIZAR — o Dashboard só monta
+ * este painel com a permissão). Recarrega junto com o "Atualizar" do cabeçalho.
+ *
+ * Props: dados, carregando, erro, onTentarNovamente, limiteLivre (número | null), className.
+ */
+function Linha({ icon: Icone, rotulo, valor, tom, sinal }) {
+  const cor = { income: 'text-income', expense: 'text-expense' }[tom] ?? 'text-text-primary';
+  const prefixo = sinal === '+' ? '+' : sinal === '−' ? '−' : '';
   return (
-    <div className={cn('rounded-xl p-3.5 border flex flex-col gap-1', colorMap[tipo] ?? colorMap.neutro)}>
-      <div className="flex items-center gap-1.5">
-        {Icone && <Icone className="w-3.5 h-3.5 opacity-60" />}
-        <span className="text-xs font-bold uppercase tracking-widest opacity-70 font-body">{label}</span>
-      </div>
-      <span className="text-base font-bold font-display">{prefixo} R$ {brl(valor)}</span>
-      {descricao && <span className="text-xs opacity-50">{descricao}</span>}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+      {Icone && (
+        <span aria-hidden="true" className={cn('grid place-items-center w-7 h-7 rounded-lg bg-text-primary/[0.05] shrink-0', cor)}>
+          <Icone className="w-3.5 h-3.5" />
+        </span>
+      )}
+      <span className="flex-1 min-w-0 text-sm text-text-primary/75">{rotulo}</span>
+      <span className={cn('ml-auto text-sm font-semibold tabular-nums valor-privado whitespace-nowrap', cor)}>
+        {prefixo}{formatarMoeda(valor, { sinal: prefixo ? 'nunca' : 'auto' })}
+      </span>
     </div>
   );
 }
 
-function Divider({ label }) {
+function Secao({ titulo, children }) {
   return (
-    <div className="flex items-center gap-3 mt-5 mb-3">
-      <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">{label}</span>
-      <div className="flex-1 h-px bg-text-primary/5" />
+    <div>
+      <p className="c4-eyebrow mb-1">{titulo}</p>
+      <div className="divide-y divide-border">{children}</div>
     </div>
   );
 }
 
-const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
-  const [dados, setDados] = useState(null);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(null);
+export default function SaldoDetalhadoPanel({ dados, carregando, erro, onTentarNovamente, limiteLivre = null, className }) {
+  const { temPermissao } = useAuth();
 
-  async function carregar() {
-    setCarregando(true);
-    setErro(null);
-    try {
-      const res = await dashboard.saldoDetalhado();
-      setDados(res);
-    } catch (e) {
-      setErro(e.message);
-    } finally {
-      setCarregando(false);
-    }
-  }
-
-  useEffect(() => { carregar(); }, []);
-
-  if (carregando) return <SkeletonCard rows={5} className="h-full" />;
-
-  if (erro) {
+  if (erro && !dados) {
     return (
-      <div
-        role="alert"
-        className="bg-error/10 rounded-2xl p-6 border border-error/20 flex flex-col items-center gap-3 text-center h-full justify-center"
-      >
-        <AlertTriangle className="w-7 h-7 text-error" />
-        <div>
-          <p className="text-sm font-bold text-text-primary">Não foi possível carregar a posição financeira</p>
-          <p className="text-xs text-text-primary/60 mt-1">Tente atualizar em instantes.</p>
-        </div>
-        <Button variant="secondary" size="sm" onClick={carregar} leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}>
-          Tentar novamente
-        </Button>
-      </div>
+      <Card className={className} icon={Telescope} title="Em aberto e projeção">
+        <AlertaErro compacto mensagem="Não deu para carregar o que está em aberto." onTentarNovamente={onTentarNovamente} />
+      </Card>
     );
   }
 
-  if (!dados) return null;
-
-  const saldoPrevistoPositivo   = Number(dados.saldoPrevisto) >= 0;
-  const saldoComCartaoPositivo  = Number(dados.saldoPrevistoComCartao) >= 0;
-  const saldoLiquidoPositivo    = Number(dados.saldoLiquidoEmAberto) >= 0;
+  const liquido = Number(dados?.saldoLiquidoEmAberto ?? 0);
+  const previsto = Number(dados?.saldoPrevisto ?? 0);
+  const comCartao = Number(dados?.saldoPrevistoComCartao ?? 0);
+  const temCartao = Number(dados?.totalLancamentosCartaoAberto ?? 0) > 0 || Number(dados?.totalFaturasCartaoPendentes ?? 0) > 0 || limiteLivre != null;
 
   return (
-    <div className="bg-surface-medium rounded-2xl p-5 border border-text-primary/5 space-y-1 h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-base font-bold text-text-primary tracking-tight font-display">Posição Financeira</h2>
-          <p className="text-xs text-text-primary/60 uppercase tracking-widest mt-0.5 font-body">Saldo e projeções</p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={carregar}
-          aria-label="Atualizar saldo"
-          className="text-text-primary/70 hover:text-text-primary"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </Button>
-      </div>
+    <Card
+      className={className}
+      loading={carregando && !dados}
+      icon={Telescope}
+      title="Em aberto e projeção"
+      subtitle="O que ainda vai entrar e sair, e onde o saldo deve chegar"
+      footer={
+        <Link to="/reports" className="inline-flex items-center min-h-11 text-sm font-medium text-primary hover:underline underline-offset-4">
+          Ver posição financeira completa
+        </Link>
+      }
+    >
+      <div className="space-y-5">
+        <Secao titulo="Contas em aberto">
+          <Linha icon={ArrowDownLeft} rotulo="A receber" valor={dados?.totalAReceber} tom="income" sinal="+" />
+          <Linha icon={ArrowUpRight} rotulo="A pagar" valor={dados?.totalAPagar} tom="expense" sinal="−" />
+          <Linha icon={Scale} rotulo="Diferença" valor={liquido} tom={liquido >= 0 ? 'income' : 'expense'} />
+        </Secao>
 
-      {/* Saldo Principal */}
-      <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">Saldo em Conta Hoje</p>
-          <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(dados.saldoContasCorrentes)}</p>
-          <p className="text-xs text-text-primary/60 mt-0.5">Soma das contas correntes</p>
-        </div>
-        <Wallet className="w-9 h-9 text-primary opacity-40" />
-      </div>
+        {temCartao && (
+          <Secao titulo="Cartões">
+            <Linha icon={CreditCard} rotulo="Fatura aberta" valor={dados?.totalLancamentosCartaoAberto} tom="expense" sinal="−" />
+            {Number(dados?.totalFaturasCartaoPendentes ?? 0) > 0 && (
+              <Linha icon={CreditCard} rotulo="Faturas fechadas a pagar" valor={dados?.totalFaturasCartaoPendentes} tom="expense" sinal="−" />
+            )}
+            {limiteLivre != null && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                {/* Cartões estourados: "Acima do limite em R$ X" em vez de um limite livre negativo */}
+                <span className={cn('flex-1 text-sm', limiteLivre < 0 ? 'text-expense font-medium' : 'text-text-primary/75')}>
+                  {limiteLivre < 0 ? 'Acima do limite em' : 'Limite livre'}
+                </span>
+                {temPermissao('CARTAO_VISUALIZAR') ? (
+                  <Link to="/cartoes/dashboard" className={cn('text-sm font-semibold tabular-nums valor-privado underline decoration-dotted underline-offset-4 hover:text-primary', limiteLivre < 0 ? 'text-expense' : 'text-text-primary')}>
+                    {formatarMoeda(Math.abs(limiteLivre))}
+                  </Link>
+                ) : (
+                  <span className={cn('text-sm font-semibold tabular-nums valor-privado', limiteLivre < 0 && 'text-expense')}>{formatarMoeda(Math.abs(limiteLivre))}</span>
+                )}
+              </div>
+            )}
+          </Secao>
+        )}
 
-      {/* Composição */}
-      <Divider label="Composição" />
-      <div className="grid grid-cols-2 gap-2">
-        <ValorCard label="Recebido" valor={dados.totalRecebido} tipo="entrada" icone={ArrowUpRight} />
-        <ValorCard label="Resgates" valor={dados.totalResgatado} tipo="entrada" icone={ArrowUpRight} />
-        <ValorCard label="Pago" valor={dados.totalPago} tipo="saida" icone={ArrowDownRight} />
-        <ValorCard label="Aportes" valor={dados.totalAportado} tipo="saida" icone={ArrowDownRight} />
-      </div>
-
-      {/* Em aberto */}
-      <Divider label="Posição em Aberto" />
-      <div className="grid grid-cols-2 gap-2">
-        <ValorCard label="A Receber" valor={dados.totalAReceber} tipo="entrada" icone={TrendingUp} />
-        <ValorCard label="A Pagar" valor={dados.totalAPagar} tipo="saida" icone={TrendingDown} />
-      </div>
-      <div className={cn(
-        'rounded-xl px-4 py-3 border flex items-center justify-between',
-        saldoLiquidoPositivo ? 'bg-secondary/5 border-secondary/20' : 'bg-error/5 border-error/20'
-      )}>
-        <span className="text-xs font-bold text-text-primary/60 uppercase tracking-widest">Saldo líquido</span>
-        <span className={cn('text-base font-bold font-display', saldoLiquidoPositivo ? 'text-secondary' : 'text-error')}>
-          {saldoLiquidoPositivo ? '+' : ''}R$ {brl(dados.saldoLiquidoEmAberto)}
-        </span>
-      </div>
-
-      {/* Cartão */}
-      <Divider label="Cartão de Crédito" />
-      <div className="grid grid-cols-2 gap-2">
-        <ValorCard label="Fatura aberta" valor={dados.totalLancamentosCartaoAberto} tipo="saida" icone={CreditCard} />
-        <ValorCard label="Faturas pendentes" valor={dados.totalFaturasCartaoPendentes} tipo="saida" icone={CreditCard} />
-      </div>
-
-      {/* Projeções */}
-      <Divider label="Projeções" />
-      <div className="space-y-2">
-        <div className={cn('rounded-xl p-3.5 border', saldoPrevistoPositivo ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20')}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Saldo Previsto</span>
-            <span className={cn('text-lg font-bold font-display', saldoPrevistoPositivo ? 'text-primary' : 'text-error')}>
-              R$ {brl(dados.saldoPrevisto)}
-            </span>
+        <div className="rounded-2xl border border-primary/20 bg-primary/[0.06] p-4 space-y-3">
+          <div>
+            <p className="text-xs text-text-primary/65">Saldo previsto (contas em dia)</p>
+            <AnimatedNumber value={previsto} colorir className="font-display text-2xl font-semibold" />
           </div>
-        </div>
-        <div className={cn('rounded-xl p-3.5 border', saldoComCartaoPositivo ? 'bg-surface border-text-primary/5' : 'bg-error/10 border-error/30')}>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Com Cartão</span>
-            <span className={cn('text-lg font-bold font-display', saldoComCartaoPositivo ? 'text-text-primary' : 'text-error')}>
-              R$ {brl(dados.saldoPrevistoComCartao)}
-            </span>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pt-3 border-t border-primary/15">
+            <span className="text-xs text-text-primary/65">Depois de pagar os cartões</span>
+            <span className={cn('font-semibold tabular-nums valor-privado', comCartao < 0 ? 'text-expense' : 'text-text-primary')}>{formatarMoeda(comCartao)}</span>
           </div>
         </div>
       </div>
-
-      {/* Patrimônio */}
-      <Divider label="Investimentos" />
-      <div className="bg-surface border border-text-primary/5 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">Patrimônio</span>
-        <span className="text-base font-bold text-text-primary font-display">R$ {brl(dados.patrimonioInvestimentos)}</span>
-      </div>
-    </div>
+    </Card>
   );
-});
-
-export default SaldoDetalhadoPanel;
+}

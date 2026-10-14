@@ -128,7 +128,7 @@ public class AuthController {
     @GetMapping("/me/dados")
     public ResponseEntity<DadosPessoaisResponseDto> exportarDados(Authentication authentication) {
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"meus-dados-core4erp.json\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"core4-meus-dados.json\"")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(contaUsuarioService.exportarDados(authentication.getName()));
     }

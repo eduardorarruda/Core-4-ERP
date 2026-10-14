@@ -54,14 +54,14 @@ public class EmailService {
         if (envioDesligado(para, "redefinicao_senha", link)) return;
         String html = montarHtml(new ConteudoEmail(
                 "Redefinição de senha",
-                "Recebemos uma solicitação para redefinir a senha da sua conta Core 4 ERP. "
+                "Recebemos uma solicitação para redefinir a senha da sua conta Core 4. "
                         + "Clique no botão abaixo para criar uma nova senha. O link é válido por "
                         + "<strong style=\"color:#fafafa;\">60 minutos</strong>.",
                 "Redefinir minha senha",
                 link,
                 "Se você não solicitou a redefinição de senha, ignore este e-mail."));
         try {
-            enviar(para, "Core 4 ERP — Redefinição de senha", html);
+            enviar(para, "Core 4 — Redefinição de senha", html);
         } catch (MessagingException e) {
             log.atError().addKeyValue("emailHash", EventoSeguranca.hashEmail(para))
                     .log("Falha ao enviar e-mail de redefinição de senha: {}", e.getMessage());
@@ -78,13 +78,13 @@ public class EmailService {
                 "Você foi convidado",
                 "Você recebeu um convite para ingressar na empresa "
                         + "<strong style=\"color:#fafafa;\">" + HtmlUtils.htmlEscape(nomeEmpresa) + "</strong>"
-                        + " no Core 4 ERP. Clique no botão abaixo para criar sua conta. O convite é válido por "
+                        + " no Core 4. Clique no botão abaixo para criar sua conta. O convite é válido por "
                         + "<strong style=\"color:#fafafa;\">48 horas</strong>.",
                 "Aceitar convite",
                 link,
                 "Se você não esperava este convite, pode ignorar este e-mail com segurança."));
         try {
-            enviar(para, "Core 4 ERP — Convite para " + textoAssunto(nomeEmpresa), html);
+            enviar(para, "Core 4 — Convite para " + textoAssunto(nomeEmpresa), html);
             log.atInfo().addKeyValue("emailHash", EventoSeguranca.hashEmail(para)).log("E-mail de convite enviado");
         } catch (MessagingException e) {
             log.atError().addKeyValue("emailHash", EventoSeguranca.hashEmail(para))
@@ -133,18 +133,18 @@ public class EmailService {
                 <!DOCTYPE html>
                 <html lang="pt-BR">
                 <head><meta charset="UTF-8"></head>
-                <body style="margin:0;padding:0;background:#0c0c0c;font-family:'DM Sans',Arial,sans-serif;">
-                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0c0c0c;padding:40px 20px;">
+                <body style="margin:0;padding:0;background:#030A0B;font-family:'DM Sans',Arial,sans-serif;">
+                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#030A0B;padding:40px 20px;">
                     <tr><td align="center">
                       <table width="520" cellpadding="0" cellspacing="0"
-                             style="background:#131313;border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden;">
+                             style="background:#071315;border:1px solid rgba(255,255,255,.08);border-radius:16px;overflow:hidden;">
                         <tr>
-                          <td style="background:linear-gradient(135deg,#0d1f15,#131313);padding:32px 40px;text-align:center;border-bottom:1px solid rgba(110,255,192,.1);">
-                            <div style="font-size:22px;font-weight:700;color:#fafafa;letter-spacing:-0.02em;">
-                              Core <span style="color:#6EFFC0;">4</span> ERP
+                          <td style="background:linear-gradient(135deg,#0B2420,#071315);padding:32px 40px;text-align:center;border-bottom:1px solid rgba(20,226,156,.1);">
+                            <div style="font-size:24px;font-weight:700;color:#DCE6EB;letter-spacing:-0.02em;">
+                              Core<span style="color:#14E29C;">4</span>
                             </div>
-                            <div style="font-size:10px;color:rgba(250,250,250,.3);letter-spacing:.12em;text-transform:uppercase;margin-top:4px;">
-                              Enterprise Finance
+                            <div style="font-size:11px;color:rgba(201,214,221,.6);letter-spacing:.28em;text-transform:uppercase;margin-top:6px;">
+                              Gestão financeira inteligente
                             </div>
                           </td>
                         </tr>
@@ -158,7 +158,7 @@ public class EmailService {
                             </p>
                             <div style="text-align:center;margin-bottom:28px;">
                               <a href="%s"
-                                 style="display:inline-block;padding:14px 32px;background:#6EFFC0;color:#003824;
+                                 style="display:inline-block;padding:14px 32px;background:#14E29C;color:#01231A;
                                         font-weight:700;font-size:15px;border-radius:12px;text-decoration:none;
                                         letter-spacing:-0.01em;">
                                 %s
@@ -167,9 +167,9 @@ public class EmailService {
                             <p style="font-size:12px;color:rgba(250,250,250,.35);line-height:1.7;margin:0 0 8px;">
                               Se o botão não funcionar, copie e cole este link no seu navegador:
                             </p>
-                            <p style="font-size:11px;color:rgba(110,255,192,.6);word-break:break-all;
-                                      font-family:monospace;background:rgba(110,255,192,.04);
-                                      border:1px solid rgba(110,255,192,.12);border-radius:8px;
+                            <p style="font-size:11px;color:rgba(20,226,156,.6);word-break:break-all;
+                                      font-family:monospace;background:rgba(20,226,156,.04);
+                                      border:1px solid rgba(20,226,156,.12);border-radius:8px;
                                       padding:10px 12px;margin:0 0 28px;">
                               %s
                             </p>
@@ -182,7 +182,7 @@ public class EmailService {
                           <td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,.06);
                                      text-align:center;font-size:10px;color:rgba(250,250,250,.2);
                                      font-family:monospace;letter-spacing:.08em;text-transform:uppercase;">
-                            © 2026 Core 4 ERP · LGPD · Este e-mail foi enviado automaticamente
+                            © 2026 Core 4 · LGPD · Este e-mail foi enviado automaticamente
                           </td>
                         </tr>
                       </table>

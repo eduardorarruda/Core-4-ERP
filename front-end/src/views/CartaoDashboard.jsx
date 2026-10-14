@@ -1,536 +1,243 @@
-import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  CreditCard, TrendingUp, Wallet, AlertCircle, FileText, Loader2,
-  AlertTriangle, BarChart2, SlidersHorizontal,
+  AlertTriangle, CalendarClock, CreditCard, Layers, LineChart, PieChart, Plus, Receipt, Store, Wallet,
 } from 'lucide-react';
-import { cartoes as cartoesApi } from '../lib/api';
+import { cartoes as cartoesApi, contasCorrentes as contasApi } from '../lib/api';
+import { useCarga } from '../hooks/useCarga';
+import { useToast } from '../hooks/useToast';
+import { usePermissao } from '../hooks/usePermissao';
+import { usePeriodoUrl } from '../hooks/usePeriodoUrl';
+import { paraMesAno, rotuloPeriodo } from '../lib/periodo';
+import { formatarMoeda, formatarNumero } from '../lib/formatters';
 import PageHeader from '../components/ui/PageHeader';
 import PeriodoSelector from '../components/ui/PeriodoSelector';
-import DateRangeModal from '../components/ui/DateRangeModal';
-import { ThemeContext } from '../context/ThemeContext';
-import { useToast } from '../hooks/useToast';
-import { brl } from '../lib/formatters';
-import { chartTheme as temaGrafico, readCssVar } from '../components/dashboard/chartTheme';
-import GraficoAcessivel from '../components/ui/GraficoAcessivel';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell,
-} from 'recharts';
+import FilterBar from '../components/ui/FilterBar';
+import Card from '../components/ui/Card';
+import KpiCard, { KpiGrid } from '../components/ui/KpiCard';
+import EmptyState from '../components/ui/EmptyState';
+import AlertaErro from '../components/ui/AlertaErro';
+import DonutChart from '../components/ui/DonutChart';
+import { PageSkeleton } from '../components/ui/Skeleton';
+import { ProgressBar } from '../components/ui/Progress';
+import CartoesTabs from '../components/cartoes/CartoesTabs';
+import CartaoFormModal from '../components/cartoes/CartaoFormModal';
+import ParcelamentosLista from '../components/cartoes/ParcelamentosLista';
+import ProximasFaturas from '../components/cartoes/ProximasFaturas';
+import { Comprometimento, EvolucaoFatura, GastosPorCategoria, Ranking } from '../components/cartoes/GraficosCartao';
+import { tomLimite } from '../components/cartoes/faturas';
 
-const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-// Paleta das séries: 4 primeiras vêm dos tokens --color-chart-* (contraste ≥ 3:1 no tema
-// claro e no escuro); as demais são complementares por tema.
-function paleta(dark) {
-  return [
-    readCssVar('--color-chart-1', dark ? '#6EFFC0' : '#047857'),
-    readCssVar('--color-chart-2', dark ? '#ACC7FF' : '#2563EB'),
-    readCssVar('--color-chart-3', dark ? '#FFD37A' : '#B45309'),
-    readCssVar('--color-chart-4', dark ? '#FFB4AB' : '#DC2626'),
-    dark ? '#C8A4FF' : '#7C3AED',
-    dark ? '#80E5FF' : '#0E7490',
-    dark ? '#FF9F80' : '#C2410C',
-  ];
-}
+/*
+ * Cartões → Visão geral (/cartoes/dashboard, CARTAO_VISUALIZAR).
+ * UM controle de período (PeriodoSelector + URL) para TODOS os painéis, inclusive categorias.
+ * Hierarquia: KPIs → evolução + próximas faturas → categorias + parceiros → parcelamentos
+ * → assinaturas x avulsos. Sem cartões: só o estado vazio (o BI nem é chamado).
+ */
 
-// Cores de tooltip, eixos e grid derivadas dos tokens do tema (mesmo helper do Dashboard)
-function chartTheme(dark) {
-  const t = temaGrafico(dark);
-  return {
-    grid: t.gridColor,
-    tick: t.axisColor,
-    tickStrong: t.tooltipTextColor,
-    tooltip: { ...t.tooltipStyle, borderRadius: 12 },
-  };
-}
+const ATALHOS = ['mes', '3m', '6m', '12m'];
+const qs = (o) => new URLSearchParams(Object.entries(o).filter(([, v]) => v != null)).toString();
 
-// Filtros rápidos de período. A API só aceita mês/ano, então cada botão mapeia para uma
-// janela distinta e o rótulo descreve exatamente o intervalo (sem dois botões iguais).
-const FILTROS_RAPIDOS = [
-  { id: '0m', label: 'Este mês', meses: 0 },
-  { id: '3m', label: 'Últimos 3 meses', meses: 2 },
-  { id: '6m', label: 'Últimos 6 meses', meses: 5 },
-];
-
-// Detecta viewport < sm (640px) para adaptar gráficos no mobile.
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches);
-  useEffect(() => {
-    const mql = window.matchMedia('(max-width: 639px)');
-    const handler = (e) => setIsMobile(e.matches);
-    mql.addEventListener('change', handler);
-    return () => mql.removeEventListener('change', handler);
-  }, []);
-  return isMobile;
-}
-
-function buildChartData(resumo) {
-  const meses = [...new Set(resumo.map((r) => `${r.mes}/${r.ano}`))];
-  const cats = [...new Set(resumo.map((r) => r.categoriaNome))];
-  return {
-    data: meses.map((m) => {
-      const [mes, ano] = m.split('/').map(Number);
-      const entry = { mes: `${MONTH_NAMES[mes - 1]}/${String(ano).slice(2)}` };
-      cats.forEach((cat) => {
-        const row = resumo.find((r) => r.mes === mes && r.ano === ano && r.categoriaNome === cat);
-        entry[cat] = row ? parseFloat(row.totalGasto) : 0;
-      });
-      return entry;
-    }),
-    cats,
-  };
-}
-
-// Superfície dos cartões de conteúdo (tokens do tema: funciona no claro e no escuro)
-const cardSurface = 'bg-surface-low border border-text-primary/10';
-const h2Cls = 'text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono mb-4';
-function periodoMesesAtras(meses) {
-  const now = new Date();
-  const past = new Date(now.getFullYear(), now.getMonth() - meses, 1);
-  return {
-    mesInicio: past.getMonth() + 1,
-    anoInicio: past.getFullYear(),
-    mesFim: now.getMonth() + 1,
-    anoFim: now.getFullYear(),
-  };
-}
 
 export default function CartaoDashboard() {
-  const navigate = useNavigate();
   const toast = useToast();
-  const { theme } = useContext(ThemeContext);
-  const isDark = theme === 'dark';
-  const ct = chartTheme(isDark);
-  const cores = paleta(isDark);
-  const isMobile = useIsMobile();
-  const [cartoes, setCartoes] = useState([]);
-  const [resumo, setResumo] = useState([]);
-  const [bi, setBi] = useState(null);
-  const [erroBi, setErroBi] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadingBi, setLoadingBi] = useState(false);
-  const [periodo, setPeriodo] = useState(() => periodoMesesAtras(2));
-  const [activeFilter, setActiveFilter] = useState('3m');
-  const [showDateModal, setShowDateModal] = useState(false);
+  const pode = usePermissao();
+  const [periodo, setPeriodo] = usePeriodoUrl('3m');
+  const [novoCartao, setNovoCartao] = useState(false);
+  const mesAno = paraMesAno(periodo);
+  const chavePeriodo = [periodo.inicio, periodo.fim];
 
-  const carregarBi = useCallback(async (p) => {
-    setLoadingBi(true);
-    setErroBi(false);
-    try {
-      const params = new URLSearchParams();
-      if (p.mesInicio) params.set('mesInicio', p.mesInicio);
-      if (p.anoInicio) params.set('anoInicio', p.anoInicio);
-      if (p.mesFim) params.set('mesFim', p.mesFim);
-      if (p.anoFim) params.set('anoFim', p.anoFim);
-      const res = await cartoesApi.dashboardBI(params.toString());
-      setBi(res);
-    } catch (e) {
-      // Falha da API é erro, não "sem dados" — sinaliza para oferecer "tentar novamente".
-      setBi(null);
-      setErroBi(true);
-      toast.error(e.message || 'Não foi possível carregar as análises. Tente novamente.');
-    } finally {
-      setLoadingBi(false);
-    }
-  }, [toast]);
+  const cargaCartoes = useCarga(() => cartoesApi.listar(), ['cartoes']);
+  const cartoes = useMemo(() => cargaCartoes.dados ?? [], [cargaCartoes.dados]);
+  const temCartoes = cartoes.length > 0;
 
-  useEffect(() => {
-    Promise.all([
-      cartoesApi.listar(),
-      cartoesApi.dashboard(),
-    ])
-      .then(([lista, res]) => { setCartoes(lista); setResumo(res); })
-      .catch((e) => toast.error(e.message || 'Não foi possível carregar os cartões.'))
-      .finally(() => setLoading(false));
-    carregarBi(periodoMesesAtras(2));
-  }, [carregarBi, toast]);
+  // O BI e o resumo só rodam com cartões (sem eles o BI falhava e gerava toasts duplicados)
+  const cargaBi = useCarga(() => cartoesApi.dashboardBI(qs(mesAno)), chavePeriodo, { ativo: temCartoes });
+  const cargaResumo = useCarga(() => cartoesApi.dashboard(qs(mesAno)), chavePeriodo, { ativo: temCartoes, inicial: [] });
+  const cargaParcelas = useCarga(() => cartoesApi.parcelamentos(), ['parcelamentos'], { ativo: temCartoes, inicial: [] });
+  const cargaContas = useCarga(() => contasApi.listar(), ['contas'], { ativo: novoCartao, inicial: [] });
 
-  function aplicarFiltroRapido(id, novoPeriodo) {
-    setActiveFilter(id);
-    setPeriodo(novoPeriodo);
-    carregarBi(novoPeriodo);
+  const bi = cargaBi.dados;
+  const limite = cartoes.reduce((s, c) => s + (Number(c.limite) || 0), 0);
+  const usado = cartoes.reduce((s, c) => s + (Number(c.limiteUsado) || 0), 0);
+  const fracaoUso = limite > 0 ? usado / limite : 0;
+  const emAberto = (bi?.proximasFaturas ?? []).reduce((s, f) => s + (Number(f.valorAcumulado) || 0), 0);
+  const parceiros = (bi?.gastosPorParceiro ?? []).slice(0, 6).map((p) => ({ nome: p.nomeParceiro, valor: Number(p.total) || 0 }));
+  const assinaturas = Number(bi?.assinaturasVsAvulsos?.totalAssinaturas) || 0;
+  const avulsos = Number(bi?.assinaturasVsAvulsos?.totalAvulsos) || 0;
+  const rotulo = rotuloPeriodo(periodo, { ids: ATALHOS, granularidade: 'mes' });
+
+  const cabecalho = (
+    <PageHeader
+      title="Cartões"
+      subtitle="Quanto está nas faturas, quanto do limite sobra e para onde vai o gasto."
+      icon={CreditCard}
+      actions={temCartoes && pode('CARTAO_LANCAR') ? (
+        <Link to="/cartoes?novo=lancamento" className="inline-flex items-center gap-2 min-h-11 px-4 rounded-xl text-sm font-semibold text-on-primary bg-gradient-primary shadow-[var(--shadow-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface">
+          <Plus className="w-4 h-4" aria-hidden="true" /> Novo lançamento
+        </Link>
+      ) : undefined}
+    >
+      <CartoesTabs />
+    </PageHeader>
+  );
+
+  if (cargaCartoes.carregandoInicial) {
+    return <div className="space-y-6">{cabecalho}<PageSkeleton kpis={3} /></div>;
   }
 
-  const totalLimite = cartoes.reduce((acc, c) => acc + parseFloat(c.limite ?? 0), 0);
-  const totalUsado = cartoes.reduce((acc, c) => acc + parseFloat(c.limiteUsado ?? 0), 0);
-  const totalDisponivel = totalLimite - totalUsado;
-  const { data: chartData, cats } = buildChartData(resumo);
-
-  const metricas = [
-    { label: 'Total de Cartões', value: cartoes.length, icon: CreditCard, color: 'text-text-primary', card: 'bg-surface-low border-text-primary/10' },
-    { label: 'Limite Total', value: `R$ ${brl(totalLimite)}`, icon: Wallet, color: 'text-primary', card: 'bg-primary/[.07] border-primary/20' },
-    { label: 'Limite Usado', value: `R$ ${brl(totalUsado)}`, icon: TrendingUp, color: 'text-error', card: 'bg-error/[.07] border-error/20' },
-    { label: 'Disponível', value: `R$ ${brl(totalDisponivel)}`, icon: AlertCircle, color: 'text-secondary', card: 'bg-secondary/[.07] border-secondary/20' },
-  ];
-
-  if (loading) {
+  if (cargaCartoes.erro && !temCartoes) {
     return (
-      <div className="flex items-center justify-center py-20 gap-3 text-text-primary/60">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        <span className="text-sm">Carregando...</span>
+      <div className="space-y-6">
+        {cabecalho}
+        <AlertaErro mensagem={cargaCartoes.erro.message} onTentarNovamente={cargaCartoes.recarregar} />
       </div>
     );
   }
 
+  if (!temCartoes) {
+    return (
+      <div className="space-y-6">
+        {cabecalho}
+        <EmptyState
+          icon={CreditCard}
+          title="Você ainda não tem cartões"
+          description="Cadastre um cartão para ver aqui o total das faturas, o uso do limite, as compras parceladas e para onde vai o gasto."
+          action={pode('CARTAO_CRIAR') ? { label: 'Cadastrar cartão', onClick: () => setNovoCartao(true), icon: Plus } : undefined}
+          dica={pode('CARTAO_CRIAR') ? undefined : 'Peça a quem administra a empresa para cadastrar os cartões.'}
+        />
+        <CartaoFormModal
+          open={novoCartao}
+          contas={cargaContas.dados ?? []}
+          onFechar={() => setNovoCartao(false)}
+          onSalvo={() => { toast.success('Cartão adicionado.'); setNovoCartao(false); cargaCartoes.recarregar(); }}
+        />
+      </div>
+    );
+  }
+
+  const biCarregando = cargaBi.carregando && !bi;
+  const erroBi = cargaBi.erro ? (
+    <AlertaErro
+      compacto
+      titulo="Não deu para carregar as análises deste período"
+      mensagem="Os demais painéis continuam valendo. Tente de novo em instantes."
+      onTentarNovamente={cargaBi.recarregar}
+    />
+  ) : null;
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Dashboard de Cartões"
-        subtitle="Visão geral e análise dos seus cartões de crédito"
-        icon={<CreditCard className="w-5 h-5" />}
-        actions={
-          <button
-            onClick={() => navigate('/cartoes')}
-            className="flex items-center gap-2 border border-text-primary/10 text-text-primary/60 hover:text-text-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl transition-colors"
-          >
-            <FileText className="w-4 h-4" /> Lançamentos
-          </button>
-        }
+      {cabecalho}
+
+      <FilterBar
+        periodo={<PeriodoSelector value={periodo} onChange={setPeriodo} granularidade="mes" atalhos={ATALHOS} label="Período das análises" />}
+        acoes={<p className="text-xs text-text-primary/60 hidden sm:block" aria-live="polite">Mostrando {rotulo.toLowerCase()}</p>}
       />
 
-      {/* §8 — Alertas de fechamento iminente */}
       {bi?.alertasFechamento?.length > 0 && (
-        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-warning mt-0.5 shrink-0" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-bold text-warning">Faturas fechando em breve</p>
-            <ul className="mt-1 space-y-0.5">
-              {bi.alertasFechamento.map((a) => (
-                <li key={a.cartaoId} className="text-xs text-text-primary/70">
-                  {a.nomeCartao} — fecha em {a.diasRestantes === 0 ? 'hoje' : `${a.diasRestantes} dia(s)`}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div role="status" className="flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3">
+          <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-sm text-text-primary/85">
+            <span className="font-semibold text-warning">Fatura fechando: </span>
+            {bi.alertasFechamento.map((a) => `${a.nomeCartao} ${a.diasRestantes === 0 ? 'fecha hoje' : `fecha em ${a.diasRestantes} dia${a.diasRestantes === 1 ? '' : 's'}`}`).join(' · ')}.
+            {' '}Compras depois disso vão para a fatura seguinte.
+          </p>
         </div>
       )}
 
-      {/* Métricas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {metricas.map((m) => (
-          <div key={m.label} className={`rounded-2xl p-5 border ${m.card}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <m.icon className={`w-4 h-4 shrink-0 ${m.color}`} />
-              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono truncate">{m.label}</span>
-            </div>
-            <p className={`text-xl sm:text-2xl font-bold font-mono truncate ${m.color}`} title={String(m.value)}>{m.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Cards individuais */}
-      {cartoes.length > 0 && (
-        <div>
-          <h2 className={h2Cls}>Cartões</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cartoes.map((c) => {
-              const usado = parseFloat(c.limiteUsado ?? 0);
-              const limite = parseFloat(c.limite ?? 0);
-              const pct = limite > 0 ? Math.min(100, (usado / limite) * 100) : 0;
-              const corBarra = pct >= 80 ? 'bg-error' : pct >= 50 ? 'bg-warning' : 'bg-primary';
-              return (
-                <div key={c.id} className={`rounded-2xl p-5 space-y-4 ${cardSurface}`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-text-primary">{c.nome}</p>
-                      <p className="text-xs text-text-primary/60 mt-0.5">
-                        Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}
-                      </p>
-                    </div>
-                    <CreditCard className="w-5 h-5 text-text-primary/20" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-text-primary/70">Usado</span>
-                      <span className="text-text-primary font-bold">R$ {brl(usado)} / R$ {brl(limite)}</span>
-                    </div>
-                    <div className="h-2 bg-surface-highest rounded-full overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={`Limite usado do cartão ${c.nome}`}>
-                      <div className={`h-full rounded-full transition-all duration-500 ${corBarra}`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="text-xs text-text-primary/60 font-mono text-right">{pct.toFixed(1)}% utilizado</p>
-                  </div>
-                  <button onClick={() => navigate('/cartoes')} className="w-full text-center text-xs font-bold uppercase tracking-widest text-primary hover:underline py-1">
-                    Ver lançamentos →
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Gráfico por categoria (resumo) */}
-      {chartData.length > 0 && cats.length > 0 && (
-        <div className={`rounded-2xl p-6 ${cardSurface}`}>
-          <h2 className={h2Cls}>Gastos por Categoria (período recente)</h2>
-          <GraficoAcessivel resumo={`Gráfico de barras empilhadas dos gastos por categoria em cada mês. ${chartData.map((m) => `${m.mes}: R$ ${brl(cats.reduce((s, c) => s + (m[c] || 0), 0))}`).join('; ')}.`}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-              <Tooltip contentStyle={ct.tooltip} formatter={(v, name) => [`R$ ${brl(v)}`, name]} />
-              <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'monospace', paddingTop: 12 }} />
-              {cats.map((cat, idx) => (
-                <Bar key={cat} dataKey={cat} stackId="a" fill={cores[idx % cores.length]} radius={idx === cats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-          </GraficoAcessivel>
-        </div>
-      )}
-
-      {/* ── §7 — Painéis BI ──────────────────────────────────────────── */}
-      <div className={`rounded-2xl p-6 ${cardSurface}`}>
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <div className="flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-secondary" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono">Análise BI</h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {FILTROS_RAPIDOS.map(({ id, label, meses }) => (
-              <button
-                key={id}
-                onClick={() => aplicarFiltroRapido(id, periodoMesesAtras(meses))}
-                className={`min-h-[44px] px-4 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-                  activeFilter === id
-                    ? 'bg-primary/20 text-primary border border-primary/30'
-                    : 'border border-text-primary/10 text-text-primary/70 hover:text-text-primary hover:border-text-primary/20'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              onClick={() => { setActiveFilter('custom'); setShowDateModal(true); }}
-              className={`flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
-                activeFilter === 'custom'
-                  ? 'bg-secondary/20 text-secondary border border-secondary/30'
-                  : 'border border-text-primary/10 text-text-primary/70 hover:text-text-primary hover:border-text-primary/20'
-              }`}
-            >
-              <SlidersHorizontal className="w-3 h-3" /> Personalizado
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <PeriodoSelector value={periodo} onChange={(p) => { setActiveFilter('custom'); setPeriodo(p); carregarBi(p); }} />
-        </div>
-
-        {loadingBi ? (
-          <div className="flex items-center justify-center py-12 gap-3 text-text-primary/60">
-            <Loader2 className="w-5 h-5 animate-spin" /> <span className="text-sm">Carregando análises...</span>
-          </div>
-        ) : bi ? (
-          <div className="space-y-8">
-
-            {/* Painel 1 — Evolução Mensal */}
-            {bi.evolucaoMensal?.length > 0 && (
-              <div>
-                <h3 className={h2Cls}>Evolução Mensal da Fatura</h3>
-                <GraficoAcessivel resumo={`Gráfico de linha da evolução mensal da fatura. ${bi.evolucaoMensal.map((d) => `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}: R$ ${brl(d.totalLiquido)}`).join('; ')}.`}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={bi.evolucaoMensal.map((d) => ({ ...d, label: `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}`, total: parseFloat(d.totalLiquido) }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                    <Tooltip contentStyle={ct.tooltip} formatter={(v) => [`R$ ${brl(v)}`, 'Total líquido']} />
-                    <Line type="monotone" dataKey="total" stroke={cores[0]} strokeWidth={2} dot={{ fill: cores[0], r: 3 }} activeDot={{ r: 5 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-                </GraficoAcessivel>
-              </div>
-            )}
-
-            {/* Painéis 2 e 3 lado a lado */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Painel 2 — Distribuição de Limite */}
-              {bi.distribuicaoLimite?.length > 0 && (
-                <div>
-                  <h3 className={h2Cls}>Distribuição de Limite</h3>
-                  <GraficoAcessivel resumo={`Gráfico de pizza da distribuição do limite entre cartões. ${bi.distribuicaoLimite.map((d) => `${d.nomeCartao}: R$ ${brl(d.limite)}`).join('; ')}.`}>
-                  <ResponsiveContainer width="100%" height={isMobile ? 220 : 180}>
-                    <PieChart>
-                      <Pie
-                        data={bi.distribuicaoLimite.map((d) => ({ name: d.nomeCartao, value: parseFloat(d.limite) }))}
-                        cx="50%" cy={isMobile ? '42%' : '50%'} outerRadius={70} dataKey="value"
-                        label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {bi.distribuicaoLimite.map((_, i) => <Cell key={i} fill={cores[i % cores.length]} />)}
-                      </Pie>
-                      {isMobile && <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'monospace' }} />}
-                      <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={ct.tooltip} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  </GraficoAcessivel>
-                </div>
-              )}
-
-              {/* Painel 3 — Gastos por Parceiro */}
-              {bi.gastosPorParceiro?.length > 0 && (
-                <div>
-                  <h3 className={h2Cls}>Top 10 Parceiros</h3>
-                  <GraficoAcessivel resumo={`Gráfico de barras dos 10 parceiros com mais gastos. ${bi.gastosPorParceiro.map((d) => `${d.nomeParceiro}: R$ ${brl(d.total)}`).join('; ')}.`}>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={bi.gastosPorParceiro.map((d) => {
-                      const max = isMobile ? 10 : 15;
-                      return { nome: d.nomeParceiro.length > max ? d.nomeParceiro.slice(0, max) + '…' : d.nomeParceiro, total: parseFloat(d.total) };
-                    })} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                      <XAxis type="number" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                      <YAxis type="category" dataKey="nome" width={isMobile ? 70 : 90} tick={{ fontSize: 12, fill: ct.tickStrong, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={ct.tooltip} formatter={(v) => [`R$ ${brl(v)}`, 'Total']} />
-                      <Bar dataKey="total" fill={cores[1]} radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  </GraficoAcessivel>
-                </div>
-              )}
-            </div>
-
-            {/* Painéis 4 e 5 lado a lado */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Painel 4 — Próximas Faturas */}
-              {bi.proximasFaturas?.length > 0 && (
-                <div>
-                  <h3 className={h2Cls}>Próximas Faturas</h3>
-                  <ul className="space-y-2">
-                    {bi.proximasFaturas.map((f, i) => {
-                      const cor = f.diasRestantes <= 3 ? 'text-error border-error/20 bg-error/5' : f.diasRestantes <= 7 ? 'text-warning border-warning/20 bg-warning/5' : 'text-primary border-primary/20 bg-primary/5';
-                      return (
-                        <li key={i} className={`rounded-xl px-4 py-3 border ${cor} flex justify-between items-center`}>
-                          <div>
-                            <p className="text-sm font-bold">{f.nomeCartao}</p>
-                            <p className="text-xs opacity-70">Vence em {f.diasRestantes === 0 ? 'hoje' : `${f.diasRestantes} dia(s)`}</p>
-                          </div>
-                          <span className="font-mono font-bold text-sm">R$ {brl(f.valorAcumulado)}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-
-              {/* Painel 5 — Projeção do Mês */}
-              {bi.projecaoMes && (
-                <div>
-                  <h3 className={h2Cls}>Projeção do Mês Corrente</h3>
-                  <div className="space-y-3">
-                    {[
-                      { label: 'Acumulado até hoje', value: bi.projecaoMes.totalAcumulado, color: 'text-text-primary' },
-                      { label: 'Média diária', value: bi.projecaoMes.mediaDiaria, color: 'text-secondary' },
-                      { label: 'Projeção final', value: bi.projecaoMes.projecaoFinal, color: 'text-error' },
-                    ].map((item) => (
-                      <div key={item.label} className="flex justify-between items-center p-3 rounded-xl bg-surface-medium/40 border border-text-primary/10">
-                        <span className="text-xs text-text-primary/60">{item.label}</span>
-                        <span className={`font-mono font-bold text-sm ${item.color}`}>R$ {brl(item.value)}</span>
-                      </div>
-                    ))}
-                    <div className="mt-2">
-                      <div className="flex justify-between text-xs text-text-primary/60 mb-1">
-                        <span>{bi.projecaoMes.diasDecorridos} dias decorridos</span>
-                        <span>{bi.projecaoMes.diasRestantes} dias restantes</span>
-                      </div>
-                      <div className="h-2 bg-surface-highest rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all duration-500"
-                          style={{ width: `${Math.min(100, (bi.projecaoMes.diasDecorridos / (bi.projecaoMes.diasDecorridos + bi.projecaoMes.diasRestantes)) * 100)}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Painel 6 — Impacto de Parcelamentos */}
-            {bi.impactoParcelamentos?.length > 0 && (
-              <div>
-                <h3 className={h2Cls}>Comprometimento Futuro por Parcelamentos</h3>
-                <GraficoAcessivel resumo={`Gráfico de barras do valor já comprometido com parcelas nos próximos meses. ${bi.impactoParcelamentos.map((d) => `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}: R$ ${brl(d.totalComprometido)}`).join('; ')}.`}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={bi.impactoParcelamentos.map((d) => ({ label: `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}`, total: parseFloat(d.totalComprometido), parcelas: d.qtdParcelas }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                    <Tooltip contentStyle={ct.tooltip} formatter={(v, name) => [name === 'total' ? `R$ ${brl(v)}` : v, name === 'total' ? 'Total comprometido' : 'Qtd parcelas']} />
-                    <Bar dataKey="total" fill={cores[4]} radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-                </GraficoAcessivel>
-              </div>
-            )}
-
-            {/* Painel 7 — Assinaturas vs. Avulsos */}
-            {bi.assinaturasVsAvulsos && (
-              <div>
-                <h3 className={h2Cls}>Assinaturas vs. Gastos Avulsos</h3>
-                <div className="flex flex-col md:flex-row items-center gap-6">
-                  <GraficoAcessivel className="w-full" resumo={`Gráfico de pizza: assinaturas R$ ${brl(bi.assinaturasVsAvulsos.totalAssinaturas)} e gastos avulsos R$ ${brl(bi.assinaturasVsAvulsos.totalAvulsos)}.`}>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Assinaturas', value: parseFloat(bi.assinaturasVsAvulsos.totalAssinaturas) },
-                          { name: 'Avulsos', value: parseFloat(bi.assinaturasVsAvulsos.totalAvulsos) },
-                        ]}
-                        cx="50%" cy="50%" outerRadius={65} dataKey="value"
-                        label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        <Cell fill={cores[0]} />
-                        <Cell fill={cores[1]} />
-                      </Pie>
-                      <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={ct.tooltip} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  </GraficoAcessivel>
-                  <div className="space-y-2 text-sm w-full md:w-auto">
-                    <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-primary inline-block shrink-0" /><span className="text-text-primary/60">Assinaturas:</span><span className="font-mono font-bold text-primary">R$ {brl(bi.assinaturasVsAvulsos.totalAssinaturas)}</span></div>
-                    <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-secondary inline-block shrink-0" /><span className="text-text-primary/60">Avulsos:</span><span className="font-mono font-bold text-secondary">R$ {brl(bi.assinaturasVsAvulsos.totalAvulsos)}</span></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
-        ) : erroBi ? (
-          <div className="flex flex-col items-center gap-3 py-10 text-center">
-            <AlertTriangle className="w-8 h-8 text-error/70" />
-            <p className="text-sm text-text-primary/60">Não foi possível carregar as análises deste período.</p>
-            <button
-              onClick={() => carregarBi(periodo)}
-              className="min-h-[44px] px-5 rounded-lg text-xs font-bold uppercase tracking-widest bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-colors"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        ) : (
-          <p className="text-sm text-text-primary/60 text-center py-8">Sem dados para o período selecionado.</p>
-        )}
-      </div>
-
-      {cartoes.length === 0 && (
-        <div className="text-center py-20 text-text-primary/60 space-y-3">
-          <CreditCard className="w-10 h-10 mx-auto opacity-20" />
-          <p className="text-sm">Nenhum cartão cadastrado ainda.</p>
-          <button onClick={() => navigate('/cartoes')} className="text-primary font-bold text-xs uppercase tracking-widest hover:underline">
-            Cadastrar cartão
-          </button>
-        </div>
-      )}
-
-      {showDateModal && (
-        <DateRangeModal
-          onApply={(p) => {
-            setShowDateModal(false);
-            setPeriodo(p);
-            carregarBi(p);
-          }}
-          onCancel={() => { setShowDateModal(false); setActiveFilter('3m'); }}
+      {/* Primário: 3 números. O limite aparece só aqui (uma vez). */}
+      <KpiGrid cols={3}>
+        <KpiCard
+          label="Próximas faturas"
+          valor={emAberto}
+          icon={Receipt}
+          tom="primary"
+          destaque
+          loading={biCarregando}
+          ajuda="Soma da próxima fatura de cada cartão, com o que já foi lançado até agora."
         />
-      )}
+        <KpiCard
+          label="Limite usado"
+          valor={usado}
+          icon={CreditCard}
+          tom={tomLimite(fracaoUso) === 'expense' ? 'expense' : 'neutro'}
+          ajuda="Compras ainda não pagas, incluindo parcelas futuras, somadas em todos os cartões."
+        >
+          <span className="flex items-center gap-2">
+            <ProgressBar valor={fracaoUso} tom={tomLimite(fracaoUso)} altura={6} label="Uso do limite total" className="w-20 sm:w-24 shrink-0" />
+            <span className="tabular-nums">{formatarNumero(fracaoUso * 100, 'percent', { casas: 0 })} de {formatarMoeda(limite, { casas: 0 })}</span>
+          </span>
+        </KpiCard>
+        {limite - usado < 0 ? (
+          <KpiCard label="Acima do limite em" valor={usado - limite} icon={Wallet} tom="expense" ajuda="Os gastos não pagos passaram do limite somado dos cartões. Novas compras podem ser recusadas." />
+        ) : (
+          <KpiCard label="Limite disponível" valor={limite - usado} icon={Wallet} tom="income" ajuda="Quanto ainda dá para gastar somando todos os cartões." />
+        )}
+      </KpiGrid>
+
+      {/* Secundário: evolução + próximas faturas */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="lg:col-span-8" icon={LineChart} title="Evolução das faturas" subtitle={`Total de cada fatura · ${rotulo.toLowerCase()}`} loading={biCarregando}>
+          <div>
+            {erroBi ?? (bi?.evolucaoMensal?.length
+              ? <EvolucaoFatura dados={bi.evolucaoMensal} />
+              : <p className="text-sm text-text-primary/65">Sem faturas no período.</p>)}
+          </div>
+        </Card>
+        <Card className="lg:col-span-4" icon={CalendarClock} title="Próximas faturas" subtitle="O que vence primeiro" loading={biCarregando}>
+          {erroBi ? null : <ProximasFaturas itens={bi?.proximasFaturas ?? []} alertas={bi?.alertasFechamento ?? []} />}
+          {erroBi && <p className="text-sm text-text-primary/65">Indisponível no momento.</p>}
+        </Card>
+      </div>
+
+      {/* Detalhe: categorias (respeita o período) + parceiros */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="lg:col-span-8" icon={PieChart} title="Gastos por categoria" subtitle={`Por mês da fatura · ${rotulo.toLowerCase()}`} loading={cargaResumo.carregandoInicial}>
+          {cargaResumo.erro ? (
+            <AlertaErro compacto mensagem={cargaResumo.erro.message} onTentarNovamente={cargaResumo.recarregar} />
+          ) : (cargaResumo.dados ?? []).length ? (
+            <GastosPorCategoria resumo={cargaResumo.dados} />
+          ) : (
+            <p className="text-sm text-text-primary/65">Sem gastos no período.</p>
+          )}
+        </Card>
+        <Card className="lg:col-span-4" icon={Store} title="Onde mais gastou" subtitle="Parceiros com maior gasto no período" loading={biCarregando}>
+          {erroBi ? <p className="text-sm text-text-primary/65">Indisponível no momento.</p>
+            : parceiros.length ? <Ranking itens={parceiros} rotulo="Parceiros com maior gasto" />
+              : <p className="text-sm text-text-primary/65">Sem gastos no período.</p>}
+        </Card>
+      </div>
+
+      {/* Parcelamentos + assinaturas x avulsos */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+        <Card className="lg:col-span-7" icon={Layers} title="Compras parceladas" subtitle="Parcelas pagas, quanto falta e quando termina" loading={cargaParcelas.carregandoInicial}>
+          {bi?.impactoParcelamentos?.length > 0 && (
+            <div className="mb-5">
+              <p className="c4-eyebrow mb-2">Já comprometido nos próximos meses</p>
+              <Comprometimento dados={bi.impactoParcelamentos} />
+            </div>
+          )}
+          {cargaParcelas.erro
+            ? <AlertaErro compacto mensagem={cargaParcelas.erro.message} onTentarNovamente={cargaParcelas.recarregar} />
+            : <ParcelamentosLista itens={cargaParcelas.dados ?? []} />}
+        </Card>
+        <Card className="lg:col-span-5" icon={Receipt} title="Assinaturas e compras avulsas" subtitle="Quanto do gasto no período é recorrente" loading={biCarregando}>
+          {erroBi ? <p className="text-sm text-text-primary/65">Indisponível no momento.</p>
+            : assinaturas + avulsos > 0 ? (
+              <DonutChart
+                titulo="Assinaturas e compras avulsas no período"
+                rotuloCentro="Total no período"
+                tamanho={170}
+                mostrarZeradas
+                className="lg:flex-col lg:items-stretch [&>div:first-child]:self-center"
+                fatias={[
+                  { id: 'assinaturas', nome: 'Assinaturas', valor: assinaturas, cor: 'var(--color-chart-2)' },
+                  { id: 'avulsos', nome: 'Compras avulsas', valor: avulsos, cor: 'var(--color-chart-1)' },
+                ]}
+              />
+            ) : <p className="text-sm text-text-primary/65">Sem gastos no período.</p>}
+        </Card>
+      </div>
     </div>
   );
 }

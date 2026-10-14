@@ -1,10 +1,10 @@
 # CONTRATOS — Payloads backend ↔ n8n (Áurea)
 
-> **Fonte de verdade** dos contratos de payload trocados entre o backend Spring do Core 4 ERP
+> **Fonte de verdade** dos contratos de payload trocados entre o backend Spring do Core 4
 > e os workflows do n8n (v2.28.3). Deriva do Anexo A do `Plano_Migracao_n8n.md`.
 > Qualquer mudança em request/response de webhook DEVE ser refletida aqui **antes** de ir para produção.
 >
-> **Princípio inegociável:** o n8n nunca acessa o banco do ERP diretamente. Toda leitura/escrita de
+> **Princípio inegociável:** o n8n nunca acessa o banco da aplicação diretamente. Toda leitura/escrita de
 > dado financeiro passa pela API REST do backend, autenticada com o **JWT do usuário** repassado no
 > header `Authorization: Bearer`. O n8n é orquestrador; o backend é a única porta para os dados.
 

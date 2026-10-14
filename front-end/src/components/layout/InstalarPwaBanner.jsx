@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Download, Share, Plus, X, Smartphone } from 'lucide-react';
+import { Download, Share, Plus, X } from 'lucide-react';
+import BrandMark from '../ui/BrandMark';
 import { usePwa } from '../../hooks/usePwa';
 
 const CHAVE_DISPENSA = 'pwa-instalar-dispensado-ate';
@@ -46,14 +47,14 @@ export default function InstalarPwaBanner() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[900] p-3 sm:p-4 pointer-events-none">
-      <div className="pointer-events-auto mx-auto max-w-md rounded-2xl border border-primary/30 bg-surface shadow-2xl shadow-black/40 p-4">
+      <div role="region" aria-label="Instalar o aplicativo" className="pointer-events-auto mx-auto max-w-md rounded-2xl border border-border-strong c4-glass shadow-elevated p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 grid place-items-center w-10 h-10 rounded-xl bg-primary/15 text-primary">
-            <Smartphone className="w-5 h-5" />
+          <div aria-hidden="true" className="flex-shrink-0 grid place-items-center w-11 h-11 rounded-xl bg-surface border border-border-strong">
+            <BrandMark size={30} />
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-text-primary">Instalar o Core 4 ERP</p>
+            <p className="text-sm font-bold text-text-primary">Instalar o Core 4</p>
 
             {mostrarAndroid ? (
               <>
@@ -64,9 +65,9 @@ export default function InstalarPwaBanner() {
                   <button
                     type="button"
                     onClick={aoInstalar}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-on-primary hover:opacity-90 transition-opacity"
+                    className="inline-flex items-center gap-1.5 min-h-11 rounded-xl bg-gradient-primary px-4 text-sm font-semibold text-on-primary shadow-[var(--shadow-primary)] hover:brightness-110 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   >
-                    <Download className="w-4 h-4" /> Instalar app
+                    <Download className="w-4 h-4" aria-hidden="true" /> Instalar app
                   </button>
                   <button
                     type="button"

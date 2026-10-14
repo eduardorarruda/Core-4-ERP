@@ -1,8 +1,8 @@
-# Core 4 ERP
+# Core 4
 
 > Aplicativo web (PWA) de gestão financeira para pessoas físicas e pequenas empresas, em português do Brasil. Reúne contas a pagar e a receber, contas correntes, cartões de crédito, conciliação bancária, investimentos, relatórios e uma assistente com IA. É um projeto acadêmico (TCC) de código aberto, sob licença MIT.
 
-O Core 4 ERP é um protótipo funcional, não um produto comercial. Os dados de cada empresa (ou pessoa física) ficam isolados, com perfis de acesso, permissões e trilha de auditoria.
+O Core 4 é um protótipo funcional, não um produto comercial. Os dados de cada empresa (ou pessoa física) ficam isolados, com perfis de acesso, permissões e trilha de auditoria.
 
 ## Funcionalidades
 

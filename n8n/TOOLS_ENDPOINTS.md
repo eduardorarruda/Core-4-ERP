@@ -1,4 +1,4 @@
-# TOOLS → ENDPOINTS — Mapa das 48 @Tool para a API REST
+# TOOLS → ENDPOINTS — Mapa das 51 @Tool para a API REST
 
 > Cada "tool" dos agentes n8n é um nó **HTTP Request Tool** apontando para
 > `http://backend:8080/api/...` (rede docker interna `app`), com os headers
@@ -9,7 +9,7 @@
 > multi-tenancy e auditoria — **sem reimplementar nada no n8n**.
 >
 > Mapa gerado da varredura dos controllers em
-> `core4erp/src/main/java/br/com/core4erp/**/controller/*.java` e das 5 classes de @Tool
+> `core4erp/src/main/java/br/com/core4erp/**/controller/*.java` e das 6 classes de @Tool
 > (`chat/tools/`). Base URL de todas as rotas: `http://backend:8080`.
 
 ## Convenções desta tabela
@@ -112,6 +112,9 @@
 | # | @Tool | Classe origem | Método + Path REST | Permissão | Obs. |
 |---|---|---|---|---|---|
 | 48 | `gerarRelatorioExcel` | RelatorioTools | `GET /api/relatorios/{tipo}?dataInicio=&dataFim=` (retorna `.xlsx`) | RELATORIO_*_EXPORTAR | Tool é genérica (dataInicio/dataFim); `{tipo}` ∈ fluxo-caixa, contas-abertas, extrato, dre, investimentos, cartoes, posicao-financeira, assinaturas. O agente escolhe o tipo pela intenção. |
+| 49 | `consultarOrcamentos` | AnaliseFinanceiraTools | `GET /api/orcamentos?mes=AAAA-MM` | ORCAMENTO_VISUALIZAR | Nó n8n `consultarOrcamentos` (ANALISTA). `mes` opcional (padrão: mês atual). Limite, gasto, %, restante, status OK/ATENCAO/ESTOURADO. |
+| 50 | `consultarInsights` | AnaliseFinanceiraTools | `GET /api/insights?mes=AAAA-MM` | DASHBOARD_VISUALIZAR | Nó n8n `consultarInsights` (ANALISTA). Ritmo vs mês anterior/média 3 meses, projeção, categorias fora do normal, frases. |
+| 51 | `consultarParcelamentos` | AnaliseFinanceiraTools | `GET /api/cartoes/parcelamentos` | CARTAO_VISUALIZAR | Só no pipeline interno por ora (sem nó no n8n). |
 | — | Retrieval RAG | (não é HTTP tool) | **Nó Qdrant Vector Store** — retrieval com **filtro `empresaId`** | — | Coleção `core4erp_rag`. Embeddings `text-embedding-3-small`. **Filtro empresaId OBRIGATÓRIO** (regra de ouro §3.3). |
 | — | Agregações | ConsultaTools/Relatorio | `GET /api/dashboard`, `GET /api/relatorios/dre/dados`, `/fluxo-caixa/dados`, `/api/cartoes/dashboard/resumo` (JSON) | vários RELATORIO_*_VISUALIZAR | Números atuais **sempre** de tool nesta resposta; RAG só para contexto histórico/documentos. |
 

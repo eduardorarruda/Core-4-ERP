@@ -1,562 +1,190 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Sparkles, Send, Paperclip, Trash2, Download, FileSpreadsheet, Loader2, X,
-  Plus, MessageSquare, Search, Pencil, Check, PanelLeft, Copy, Square, RotateCcw,
-} from 'lucide-react';
-import { chat, clearAuth } from '../lib/api';
+import React, { useEffect, useRef, useState } from 'react';
+import { Check, PanelLeft, Pencil, Trash2, X } from 'lucide-react';
 import { useToast } from '../hooks/useToast';
-import AvisoIa from '../components/chat/AvisoIa';
+import { useConfirm } from '../hooks/useConfirm';
+import { useAuth } from '../hooks/useAuth';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useMovimentoReduzido } from '../hooks/useAcessibilidade';
+import Button from '../components/ui/Button';
+import Skeleton from '../components/ui/Skeleton';
+import Drawer from '../components/ui/Drawer';
+import AvisoIa from '../components/chat/AvisoIa';
+import AureaAvatar from '../components/chat/AureaAvatar';
+import BoasVindasAurea from '../components/chat/BoasVindasAurea';
+import ComposerAurea from '../components/chat/ComposerAurea';
+import ListaConversas from '../components/chat/ListaConversas';
+import { MensagemAssistente, MensagemUsuario } from '../components/chat/MensagemAurea';
+import { useConversaAurea } from '../components/chat/useConversaAurea';
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? '';
-const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
-const TIPOS_ACEITOS = '.xlsx,.xls,.csv,.ofx,.pdf,.md';
-const MAX_ANEXO_MB = 5;
-const MAX_ANEXO_BYTES = MAX_ANEXO_MB * 1024 * 1024;
-const CANAL = 'ASSISTENTE';
+function CabecalhoConversa({ conversa, ocupado, onAbrirLista, onRenomear, onExcluir }) {
+  const [editando, setEditando] = useState(false);
+  const [titulo, setTitulo] = useState('');
 
-const SUGESTOES = [
-  'Qual o meu saldo?',
-  'Quais contas estão atrasadas?',
-  'Onde eu mais gasto?',
-  'Resumo das minhas finanças',
-];
+  const iniciar = () => { setTitulo(conversa?.titulo ?? ''); setEditando(true); };
+  const salvar = () => { onRenomear(titulo); setEditando(false); };
 
-/** Markdown simples (negrito, listas, quebras) — seguro (React escapa o texto). */
-function Markdown({ text }) {
-  const linhas = (text || '').split('\n');
-  const out = [];
-  let bullets = null;
-  const inline = (s) =>
-    s.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-      part.startsWith('**') && part.endsWith('**')
-        ? <strong key={i}>{part.slice(2, -2)}</strong>
-        : <span key={i}>{part}</span>
-    );
-  const flush = () => {
-    if (bullets) { out.push(<ul key={`u${out.length}`} className="list-disc pl-5 space-y-0.5 my-1">{bullets}</ul>); bullets = null; }
-  };
-  linhas.forEach((l, idx) => {
-    const m = l.match(/^\s*[-*]\s+(.*)$/);
-    if (m) { bullets = bullets || []; bullets.push(<li key={idx}>{inline(m[1])}</li>); }
-    else { flush(); if (l.trim() === '') out.push(<div key={idx} className="h-2" />); else out.push(<p key={idx} className="my-0.5">{inline(l)}</p>); }
-  });
-  flush();
-  return <div className="text-[15px] leading-relaxed">{out}</div>;
-}
-
-function downloadDaResposta(texto) {
-  const m = (texto || '').match(RELATORIO_PATH);
-  return m ? m[0] : null;
-}
-
-/** Agrupa conversas por data (Hoje / Ontem / 7 dias / Anteriores). */
-function agrupar(list) {
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  const ontem = new Date(hoje); ontem.setDate(ontem.getDate() - 1);
-  const semana = new Date(hoje); semana.setDate(semana.getDate() - 7);
-  const grupos = [['Hoje', []], ['Ontem', []], ['Últimos 7 dias', []], ['Anteriores', []]];
-  list.forEach((c) => {
-    const d = new Date(c.atualizadoEm);
-    if (d >= hoje) grupos[0][1].push(c);
-    else if (d >= ontem) grupos[1][1].push(c);
-    else if (d >= semana) grupos[2][1].push(c);
-    else grupos[3][1].push(c);
-  });
-  return grupos.filter(([, items]) => items.length);
+  return (
+    <header className="flex items-center gap-2 px-3 sm:px-5 min-h-16 py-2 border-b border-border shrink-0 c4-glass">
+      <Button variant="ghost" size="icon" onClick={onAbrirLista} aria-label="Abrir lista de conversas" className="md:hidden shrink-0">
+        <PanelLeft className="w-5 h-5" aria-hidden="true" />
+      </Button>
+      <AureaAvatar size="md" ativo={ocupado} />
+      {editando ? (
+        <form className="flex items-center gap-1 flex-1 min-w-0" onSubmit={(e) => { e.preventDefault(); salvar(); }}>
+          <label className="flex-1 min-w-0">
+            <span className="sr-only">Título da conversa</span>
+            <input
+              autoFocus
+              value={titulo}
+              maxLength={120}
+              onChange={(e) => setTitulo(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setEditando(false); }}
+              className="w-full min-h-11 bg-surface border border-primary/40 rounded-xl px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            />
+          </label>
+          <Button type="submit" variant="ghost" size="icon" aria-label="Salvar título"><Check className="w-4 h-4" aria-hidden="true" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setEditando(false)} aria-label="Cancelar"><X className="w-4 h-4" aria-hidden="true" /></Button>
+        </form>
+      ) : (
+        <>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-semibold text-text-primary font-display truncate">{conversa?.titulo || 'Áurea'}</h1>
+            <p className="text-xs text-text-primary/60 truncate">{ocupado ? 'Escrevendo…' : 'Assistente financeira do Core 4'}</p>
+          </div>
+          {conversa && (
+            <div className="flex items-center gap-0.5 shrink-0">
+              <Button variant="ghost" size="icon" onClick={iniciar} aria-label="Renomear conversa"><Pencil className="w-4 h-4" aria-hidden="true" /></Button>
+              <Button variant="ghost" size="icon" onClick={onExcluir} disabled={ocupado} aria-label="Excluir conversa" className="hover:text-error">
+                <Trash2 className="w-4 h-4" aria-hidden="true" />
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </header>
+  );
 }
 
 export default function Assistente() {
-  const [conversas, setConversas] = useState([]);
-  const [conversaAtiva, setConversaAtiva] = useState(null);
-  const [mensagens, setMensagens] = useState([]);
-  const [input, setInput] = useState('');
-  const [ocupado, setOcupado] = useState(false);
-  const [carregandoMsgs, setCarregandoMsgs] = useState(false);
-  const [processandoArquivo, setProcessandoArquivo] = useState(null);
-  const [arquivoAnexado, setArquivoAnexado] = useState(null);
-  const [busca, setBusca] = useState('');
-  const [editando, setEditando] = useState(false);
-  const [tituloEdit, setTituloEdit] = useState('');
-  const [listaAberta, setListaAberta] = useState(false); // drawer no mobile
-  const [copiado, setCopiado] = useState(null);
-  const [confirmandoExclusao, setConfirmandoExclusao] = useState(null); // id aguardando confirmação
-  const [podeParar, setPodeParar] = useState(false); // true enquanto um stream abortável está ativo
-
   const toast = useToast();
+  const confirmar = useConfirm();
+  const { usuario } = useAuth();
+  const desktop = useMediaQuery('(min-width: 768px)');
+  const [busca, setBusca] = useState('');
+  const [listaAberta, setListaAberta] = useState(false);
   const fimRef = useRef(null);
-  const fileRef = useRef(null);
-  const textareaRef = useRef(null);
-  const abortRef = useRef(null); // AbortController do stream em andamento
-  const telaMedia = useMediaQuery('(min-width: 768px)');
+  const reduzir = useMovimentoReduzido();
 
-  // Lista de conversas no mobile é uma gaveta: Esc fecha
+  const c = useConversaAurea({ onErro: (msg) => toast.error(msg) });
+  const conversa = c.conversas.find((x) => x.id === c.ativa) ?? null;
+  const vazio = c.mensagens.length === 0;
+  const ultimoId = c.mensagens[c.mensagens.length - 1]?.id;
+  const ultimoTexto = c.mensagens[c.mensagens.length - 1]?.text;
+
+  // Acompanha a resposta enquanto ela chega
   useEffect(() => {
-    if (!listaAberta) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') setListaAberta(false); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [listaAberta]);
+    if (!c.mensagens.length) return;
+    fimRef.current?.scrollIntoView({ behavior: reduzir ? 'auto' : 'smooth', block: 'end' });
+  }, [c.mensagens.length, ultimoTexto, reduzir]);
 
-  useEffect(() => { fimRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensagens, ocupado]);
+  const fecharLista = () => setListaAberta(false);
+  const selecionar = (id) => { c.selecionar(id); fecharLista(); };
+  const nova = async () => { await c.novaConversa(); fecharLista(); };
 
-  // Auto-expande o textarea conforme o conteúdo (até max-h-40).
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
-  }, [input]);
-
-  async function copiar(texto, i) {
-    try {
-      await navigator.clipboard.writeText(texto || '');
-      setCopiado(i);
-      setTimeout(() => setCopiado((c) => (c === i ? null : c)), 1500);
-    } catch {
-      toast.error('Não foi possível copiar. Selecione o texto e copie manualmente.');
-    }
-  }
-
-  function refreshConversas() {
-    // Atualização de fundo (títulos/ordem): se falhar, a lista atual continua válida
-    chat.conversas(CANAL).then((l) => setConversas(l || [])).catch((err) => {
-      if (import.meta.env.DEV) console.warn('Falha ao atualizar conversas:', err);
+  async function excluirAtual() {
+    if (!conversa) return;
+    const ok = await confirmar({
+      title: 'Excluir conversa?',
+      message: `A conversa “${conversa.titulo || 'sem título'}” e as mensagens dela serão excluídas. Seus dados financeiros não mudam.`,
+      confirmLabel: 'Excluir',
+      variant: 'danger',
     });
+    if (ok && (await c.excluir(conversa.id))) toast.success('Conversa excluída.');
   }
 
-  const selecionar = useCallback(async (id) => {
-    setConversaAtiva(id); setListaAberta(false); setEditando(false); setConfirmandoExclusao(null);
-    setCarregandoMsgs(true);
-    try {
-      const msgs = await chat.mensagensConversa(id);
-      setMensagens((msgs || []).map((m) => ({ role: m.role, text: m.texto })));
-    } catch {
-      setMensagens([]);
-      toast.error('Não foi possível abrir esta conversa. Tente novamente.');
-    }
-    finally { setCarregandoMsgs(false); }
-  }, [toast]);
+  const enviar = (texto, arquivo) => (arquivo ? c.enviarComArquivo(texto, arquivo) : c.enviarTexto(texto));
 
-  useEffect(() => {
-    chat.conversas(CANAL)
-      .then((list) => { setConversas(list || []); if (list?.length) selecionar(list[0].id); })
-      .catch(() => toast.error('Não foi possível carregar suas conversas. Recarregue a página.'));
-  }, [selecionar, toast]);
-
-  async function novaConversa() {
-    setEditando(false);
-    try {
-      const c = await chat.criarConversa(CANAL);
-      setConversas((prev) => [c, ...prev]);
-      setConversaAtiva(c.id); setMensagens([]); setListaAberta(false);
-    } catch {
-      toast.error('Não foi possível iniciar uma nova conversa. Tente novamente.');
-    }
-  }
-
-  async function garantirConversa() {
-    if (conversaAtiva) return conversaAtiva;
-    const c = await chat.criarConversa(CANAL);
-    setConversas((prev) => [c, ...prev]);
-    setConversaAtiva(c.id);
-    return c.id;
-  }
-
-  // Atualiza o texto da última mensagem do assistente. `patch` permite marcar/limpar
-  // metadados (ex.: { erro: true, pergunta } para habilitar o botão "Tentar novamente").
-  function atualizarUltima(text, patch = {}) {
-    setMensagens((m) => {
-      const c = [...m];
-      for (let i = c.length - 1; i >= 0; i--) { if (c[i].role === 'assistant') { c[i] = { ...c[i], text, ...patch }; break; } }
-      return c;
-    });
-  }
-
-  // Executa o streaming SSE sobre o último balão do assistente (que já deve existir).
-  // Encapsula fetch + abort aqui — exceção conhecida ao padrão lib/api.js.
-  async function executarStream(msg, cid) {
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setOcupado(true); setPodeParar(true);
-    let acc = '';
-    try {
-      const resp = await fetch(`${BASE_URL}/api/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ mensagem: msg, canal: CANAL, conversaId: cid }),
-        signal: controller.signal,
-      });
-      if (resp.status === 401) { clearAuth(); window.location.href = '/login'; return; }
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        atualizarUltima(err.mensagem || 'Não foi possível processar sua mensagem. Tente novamente.', { erro: true, pergunta: msg });
-        return;
-      }
-      const reader = resp.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        const lines = buf.split('\n'); buf = lines.pop();
-        for (const line of lines) {
-          if (!line.startsWith('data:')) continue;
-          const p = line.slice(5).trim();
-          if (!p) continue;
-          let delta = '';
-          try { delta = JSON.parse(p).t ?? ''; } catch { delta = p; }
-          acc += delta;
-          atualizarUltima(acc);
-        }
-      }
-    } catch (e) {
-      if (e?.name === 'AbortError') {
-        // Interrompido pelo usuário: mantém o que já chegou; se nada chegou, avisa.
-        if (!acc) atualizarUltima('Resposta interrompida.');
-      } else {
-        atualizarUltima('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.', { erro: true, pergunta: msg });
-      }
-    } finally {
-      abortRef.current = null;
-      setOcupado(false); setPodeParar(false);
-      refreshConversas();
-    }
-  }
-
-  async function enviarTexto(texto) {
-    const msg = (texto ?? input).trim();
-    if (!msg || ocupado) return;
-    setInput('');
-    const cid = await garantirConversa();
-    setMensagens((m) => [...m, { role: 'user', text: msg }, { role: 'assistant', text: '' }]);
-    await executarStream(msg, cid);
-  }
-
-  // Reenvia a última pergunta que falhou, reaproveitando o balão do assistente com erro.
-  async function retentar(pergunta) {
-    if (ocupado || !pergunta) return;
-    const cid = await garantirConversa();
-    atualizarUltima('', { erro: false, pergunta: undefined });
-    await executarStream(pergunta, cid);
-  }
-
-  function pararStream() {
-    abortRef.current?.abort();
-  }
-
-  async function enviarComArquivo(texto, arquivo) {
-    setInput(''); setArquivoAnexado(null);
-    const cid = await garantirConversa();
-    setMensagens((m) => [...m, { role: 'user', text: texto, arquivo: arquivo.name }, { role: 'assistant', text: '' }]);
-    setOcupado(true); setProcessandoArquivo(arquivo.name);
-    try {
-      const resp = await chat.enviarAnexo(arquivo, texto, cid);
-      atualizarUltima(resp?.resposta || 'Arquivo processado.');
-    } catch (e) {
-      atualizarUltima(e.message || 'Não foi possível processar o arquivo.');
-    } finally {
-      setOcupado(false); setProcessandoArquivo(null);
-      refreshConversas();
-    }
-  }
-
-  function enviar() {
-    const texto = input.trim();
-    if (ocupado || !texto) return;
-    if (arquivoAnexado) enviarComArquivo(texto, arquivoAnexado);
-    else enviarTexto(texto);
-  }
-
-  async function excluir(id) {
-    setConfirmandoExclusao(null);
-    // Remoção otimista: guarda o estado anterior para rollback caso a API falhe.
-    const anterior = conversas;
-    const eraAtiva = id === conversaAtiva;
-    setConversas((prev) => prev.filter((c) => c.id !== id));
-    if (eraAtiva) { setConversaAtiva(null); setMensagens([]); }
-    try {
-      await chat.excluirConversa(id);
-    } catch {
-      // Falhou: restaura a conversa na lista e a seleção, avisando o usuário.
-      setConversas(anterior);
-      if (eraAtiva) setConversaAtiva(id);
-      toast.error('Não foi possível excluir a conversa. Tente novamente.');
-    }
-  }
-
-  function iniciarEdicao() {
-    const c = conversas.find((x) => x.id === conversaAtiva);
-    setTituloEdit(c?.titulo ?? ''); setEditando(true);
-  }
-  async function salvarTitulo() {
-    const t = tituloEdit.trim();
-    if (!t || !conversaAtiva) { setEditando(false); return; }
-    try {
-      const c = await chat.renomearConversa(conversaAtiva, t);
-      setConversas((prev) => prev.map((x) => (x.id === c.id ? c : x)));
-    } catch {
-      toast.error('Não foi possível renomear a conversa. Tente novamente.');
-    }
-    setEditando(false);
-  }
-
-  const conversaObj = conversas.find((c) => c.id === conversaAtiva) || null;
-  const filtradas = busca.trim()
-    ? conversas.filter((c) => (c.titulo || '').toLowerCase().includes(busca.trim().toLowerCase()))
-    : conversas;
-  const grupos = agrupar(filtradas);
-  const semConversa = conversaAtiva == null;
-  const vazio = mensagens.length === 0;
+  const lista = (
+    <ListaConversas
+      conversas={c.conversas}
+      ativa={c.ativa}
+      carregando={c.carregandoLista}
+      busca={busca}
+      onBusca={setBusca}
+      onSelecionar={selecionar}
+      onNova={nova}
+    />
+  );
 
   return (
-    <div className="flex h-full w-full bg-surface overflow-hidden">
-      {/* Overlay mobile */}
-      {listaAberta && (
-        <div aria-hidden="true" className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden" onClick={() => setListaAberta(false)} />
+    <div className="flex h-full w-full overflow-hidden">
+      {desktop ? (
+        <aside aria-label="Conversas" className="w-72 shrink-0 h-full bg-surface-low/70 border-r border-border">{lista}</aside>
+      ) : (
+        <Drawer open={listaAberta} onClose={fecharLista} side="left" size="sm" title="Conversas">
+          <div className="-mx-5 -my-4 h-full">{lista}</div>
+        </Drawer>
       )}
 
-      {/* ── Barra lateral de conversas ── */}
-      <aside
-        aria-label="Conversas"
-        inert={!telaMedia && !listaAberta ? true : undefined}
-        className={`${listaAberta ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-40 md:z-0 h-full w-72 shrink-0 bg-surface-low border-r border-text-primary/5 flex flex-col transition-transform duration-200`}>
-        <div className="p-3">
-          <button type="button" onClick={novaConversa}
-            className="w-full flex items-center gap-2 px-3 min-h-11 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:opacity-90 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-low">
-            <Plus className="w-4 h-4" aria-hidden="true" /> Nova conversa
-          </button>
-        </div>
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 px-3 min-h-11 rounded-lg border border-text-primary/15 text-text-primary/70 focus-within:ring-2 focus-within:ring-primary">
-            <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar conversa" aria-label="Buscar conversa" type="search"
-              className="bg-transparent outline-none text-sm w-full placeholder:text-text-primary/50 text-text-primary" />
-          </div>
-        </div>
+      <section aria-label="Conversa com a Áurea" className="flex-1 flex flex-col min-w-0 h-full">
+        <CabecalhoConversa
+          key={conversa?.id ?? 'nova'}
+          conversa={conversa}
+          ocupado={c.ocupado}
+          onAbrirLista={() => setListaAberta(true)}
+          onRenomear={(t) => conversa && c.renomear(conversa.id, t)}
+          onExcluir={excluirAtual}
+        />
 
-        <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-3 space-y-3">
-          {conversas.length === 0 && (
-            <p className="text-xs text-text-primary/70 text-center mt-6 px-4">Nenhuma conversa ainda. Comece uma nova.</p>
-          )}
-          {grupos.map(([label, items]) => (
-            <div key={label}>
-              <h2 className="text-xs uppercase tracking-wider text-text-primary/60 px-3 mb-1">{label}</h2>
-              <div className="space-y-0.5">
-                {items.map((c) => (
-                  <div key={c.id}
-                    className={`group flex items-center gap-1 pr-1 rounded-lg transition-colors ${
-                      c.id === conversaAtiva ? 'bg-surface-medium' : 'hover:bg-surface-medium/50'}`}>
-                    <button
-                      type="button"
-                      onClick={() => selecionar(c.id)}
-                      aria-current={c.id === conversaAtiva ? 'true' : undefined}
-                      className="flex-1 min-w-0 flex items-center gap-2 pl-3 pr-1 min-h-11 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <MessageSquare className={`w-4 h-4 shrink-0 ${c.id === conversaAtiva ? 'text-primary' : 'text-text-primary/60'}`} aria-hidden="true" />
-                      <span className="flex-1 text-sm text-text-primary/80 truncate">{c.titulo}</span>
-                    </button>
-                    {confirmandoExclusao === c.id ? (
-                      <span className="flex items-center gap-0.5 shrink-0">
-                        <span className="text-xs text-text-primary/70 mr-0.5">Excluir?</span>
-                        <button type="button" onClick={() => excluir(c.id)} aria-label={`Confirmar exclusão de ${c.titulo}`}
-                          className="w-11 h-11 lg:w-8 lg:h-8 grid place-items-center rounded text-error hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Check className="w-4 h-4" aria-hidden="true" /></button>
-                        <button type="button" onClick={() => setConfirmandoExclusao(null)} aria-label="Cancelar exclusão"
-                          className="w-11 h-11 lg:w-8 lg:h-8 grid place-items-center rounded text-text-primary/70 hover:bg-surface-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><X className="w-4 h-4" aria-hidden="true" /></button>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmandoExclusao(c.id)}
-                        aria-label={`Excluir conversa ${c.titulo}`}
-                        className="w-11 h-11 lg:w-8 lg:h-8 grid place-items-center rounded text-text-primary/60 hover:text-error transition-opacity shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                    )}
-                  </div>
-                ))}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            aria-label="Mensagens da conversa"
+            className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6"
+          >
+            {c.carregandoMsgs ? (
+              <div className="space-y-5" aria-hidden="true">
+                <Skeleton className="h-12 w-2/3 ml-auto rounded-2xl" />
+                <Skeleton className="h-24 w-5/6 rounded-2xl" />
+                <Skeleton className="h-12 w-1/2 ml-auto rounded-2xl" />
               </div>
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      {/* ── Área da conversa ── */}
-      <section className="flex-1 flex flex-col min-w-0 h-full">
-        {/* Cabeçalho */}
-        <header className="flex items-center gap-2 px-4 py-3 border-b border-text-primary/5 shrink-0">
-          <button type="button" onClick={() => setListaAberta(true)} className="md:hidden min-w-11 min-h-11 grid place-items-center rounded-lg text-text-primary/70 hover:bg-surface-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Abrir lista de conversas" aria-expanded={listaAberta}>
-            <PanelLeft className="w-5 h-5" />
-          </button>
-          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4 text-primary" />
-          </div>
-          {editando ? (
-            <div className="flex items-center gap-1 flex-1 min-w-0">
-              <input autoFocus value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') salvarTitulo(); if (e.key === 'Escape') setEditando(false); }}
-                aria-label="Título da conversa"
-                className="flex-1 min-w-0 min-h-11 bg-surface border border-primary/30 rounded-lg px-2 py-1 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary" />
-              <button type="button" onClick={salvarTitulo} className="w-11 h-11 grid place-items-center rounded-lg text-primary hover:bg-surface-medium shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Salvar título"><Check className="w-4 h-4" aria-hidden="true" /></button>
-              <button onClick={() => setEditando(false)} className="w-11 h-11 grid place-items-center rounded-lg text-text-primary/70 hover:bg-surface-medium shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Cancelar renomeação"><X className="w-4 h-4" aria-hidden="true" /></button>
-            </div>
-          ) : (
-            <>
-              <h1 className="flex-1 text-[15px] font-semibold text-text-primary font-display truncate">
-                {conversaObj ? conversaObj.titulo : 'Áurea'}
-              </h1>
-              {conversaObj && (
-                <button type="button" onClick={iniciarEdicao} className="w-11 h-11 grid place-items-center rounded-lg text-text-primary/70 hover:text-text-primary hover:bg-surface-medium shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label="Renomear conversa">
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
-            </>
-          )}
-        </header>
-
-        {/* Mensagens */}
-        <div className="flex-1 overflow-y-auto no-scrollbar">
-          <div className="max-w-3xl mx-auto px-4 py-6 space-y-5" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens da conversa">
-            {carregandoMsgs ? (
-              <div className="flex justify-center py-10 text-text-primary/60" role="status"><Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" /><span className="sr-only">Carregando mensagens</span></div>
-            ) : (semConversa || vazio) ? (
-              <div className="flex flex-col items-center justify-center text-center gap-4 py-16">
-                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-primary" />
-                </div>
-                <div>
-                  <p className="text-lg font-semibold text-text-primary font-display">Como posso ajudar?</p>
-                  <p className="text-sm text-text-primary/70 max-w-md mt-1">
-                    Pergunte sobre suas finanças, ou anexe uma planilha, extrato (.ofx), PDF ou .md — eu analiso e faço os cadastros e lançamentos.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-center max-w-lg">
-                  {SUGESTOES.map((s) => (
-                    <button key={s} onClick={() => enviarTexto(s)}
-                      className="text-sm px-3.5 min-h-11 rounded-xl border border-text-primary/15 text-text-primary/80 hover:border-primary/30 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : mensagens.map((m, i) => {
-              const url = m.role === 'assistant' ? downloadDaResposta(m.text) : null;
-              const textoLimpo = url ? m.text.replace(RELATORIO_PATH, '').replace(/\[[^\]]*\]\(\s*\)/g, '') : m.text;
-              if (m.role === 'user') {
-                return (
-                  <div key={i} className="flex justify-end">
-                    <div className="max-w-[85%] rounded-2xl rounded-br-md bg-surface-medium border border-text-primary/5 px-4 py-2.5">
-                      {m.arquivo && (
-                        <span className="flex items-center gap-2 text-sm font-medium mb-1 text-text-primary/70">
-                          <FileSpreadsheet className="w-4 h-4 shrink-0" /> {m.arquivo}
-                        </span>
-                      )}
-                      {m.text && <Markdown text={m.text} />}
-                    </div>
-                  </div>
-                );
-              }
-              const carregandoResposta = !m.text && ocupado;
-              return (
-                <div key={i} className="group/msg flex gap-3 items-start animate-fade-in-up">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Sparkles className="w-4 h-4 text-primary" />
-                  </div>
-                  <div className="min-w-0 flex-1 text-text-primary/90">
-                    {carregandoResposta ? (
-                      <span className="inline-flex items-center gap-2 text-sm text-text-primary/70">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {processandoArquivo ? `Analisando ${processandoArquivo}…` : 'Pensando…'}
-                      </span>
-                    ) : <Markdown text={textoLimpo} />}
-                    {url && (
-                      <a href={url} download
-                        className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-primary text-on-primary rounded-xl hover:opacity-90 transition-opacity text-sm font-semibold no-underline">
-                        <Download className="w-4 h-4" /> Baixar Relatório (.xlsx)
-                      </a>
-                    )}
-                    {m.erro && m.pergunta && !ocupado && (
-                      <button onClick={() => retentar(m.pergunta)}
-                        className="mt-2 inline-flex items-center gap-2 px-3.5 min-h-11 rounded-xl border border-primary/30 text-primary hover:bg-primary/10 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        aria-label="Tentar enviar novamente">
-                        <RotateCcw className="w-4 h-4" /> Tentar novamente
-                      </button>
-                    )}
-                    {!carregandoResposta && textoLimpo && !m.erro && (
-                      <button onClick={() => copiar(textoLimpo, i)}
-                        className="mt-1 -ml-2 inline-flex items-center gap-1 min-h-11 px-2 rounded-lg text-xs text-text-primary/60 hover:text-text-primary opacity-100 lg:opacity-0 lg:group-hover/msg:opacity-100 lg:focus-visible:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        aria-label="Copiar resposta">
-                        {copiado === i
-                          ? <><Check className="w-3 h-3" /> Copiado</>
-                          : <><Copy className="w-3 h-3" /> Copiar</>}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            ) : vazio ? (
+              <BoasVindasAurea nome={usuario?.nome} onSugestao={c.enviarTexto} desabilitado={c.ocupado} />
+            ) : c.mensagens.map((m) => (
+              m.role === 'user' ? (
+                <MensagemUsuario key={m.id} texto={m.text} arquivo={m.arquivo} />
+              ) : (
+                <MensagemAssistente
+                  key={m.id}
+                  texto={m.text}
+                  erro={m.erro}
+                  escrevendo={c.escrevendoId === m.id}
+                  pensandoRotulo={c.processandoArquivo ? `Lendo ${c.processandoArquivo}` : undefined}
+                  ultima={m.id === ultimoId}
+                  ocupado={c.ocupado}
+                  onTentarNovamente={m.pergunta ? () => c.tentarNovamente(m.id, m.pergunta) : undefined}
+                  onResponder={c.enviarTexto}
+                />
+              )
+            ))}
             <div ref={fimRef} />
           </div>
         </div>
 
-        {/* Composer */}
-        <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+        <div className="shrink-0 px-3 sm:px-6 pt-2 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-4">
           <div className="max-w-3xl mx-auto">
             <AvisoIa className="mb-2" />
-            {arquivoAnexado && (
-              <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 border border-primary/20 text-sm text-text-primary w-fit max-w-full">
-                <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
-                <span className="truncate font-medium">{arquivoAnexado.name}</span>
-                <span className="text-text-primary/70 shrink-0 hidden sm:inline">— escreva o que fazer e envie</span>
-                <button type="button" onClick={() => setArquivoAnexado(null)} disabled={ocupado} aria-label="Remover arquivo anexado"
-                  className="ml-1 -my-2 -mr-2 min-w-11 min-h-11 grid place-items-center rounded-lg hover:bg-primary/20 text-text-primary/70 hover:text-text-primary shrink-0 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            <div className="flex items-end gap-2 border border-text-primary/15 rounded-2xl px-2 py-2 bg-surface-low focus-within:ring-2 focus-within:ring-primary transition-colors">
-              <input ref={fileRef} type="file" accept={TIPOS_ACEITOS} className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!f) return;
-                  if (f.size > MAX_ANEXO_BYTES) {
-                    toast.error(`O arquivo é muito grande. O tamanho máximo é ${MAX_ANEXO_MB} MB.`);
-                    return;
-                  }
-                  setArquivoAnexado(f);
-                }} />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={ocupado} title="Anexar planilha, OFX, PDF ou .md" aria-label="Anexar arquivo (planilha, OFX, PDF ou .md)"
-                className="w-11 h-11 grid place-items-center rounded-xl text-text-primary/70 hover:text-primary transition-colors disabled:opacity-40 shrink-0">
-                <Paperclip className="w-5 h-5" />
-              </button>
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar(); } }}
-                placeholder={arquivoAnexado ? 'Descreva o que fazer com o arquivo…' : 'Escreva para a Áurea…'}
-                aria-label="Mensagem para a Áurea"
-                rows={1}
-                className="flex-1 bg-transparent px-1 py-2 text-[15px] text-text-primary outline-none placeholder:text-text-primary/50 resize-none max-h-40"
-              />
-              {podeParar ? (
-                <button onClick={pararStream} aria-label="Parar resposta"
-                  className="w-11 h-11 rounded-xl bg-surface-medium text-text-primary flex items-center justify-center hover:bg-surface-high transition-colors shrink-0">
-                  <Square className="w-4 h-4 fill-current" />
-                </button>
-              ) : (
-                <button onClick={enviar} disabled={ocupado || !input.trim()} aria-label="Enviar"
-                  className="w-11 h-11 rounded-xl bg-primary text-on-primary flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0">
-                  {ocupado ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-text-primary/60 mt-2 text-center">
-              Enter envia · Shift+Enter quebra linha · aceita .xlsx, .xls, .csv, .ofx, .pdf, .md (máx. {MAX_ANEXO_MB} MB)
-            </p>
+            <ComposerAurea
+              key={c.ativa ?? 'nova'}
+              onEnviar={enviar}
+              onParar={c.parar}
+              ocupado={c.ocupado}
+              podeParar={c.ocupado && !c.processandoArquivo}
+              onErroAnexo={(msg) => toast.error(msg)}
+              autoFocus={desktop}
+            />
           </div>
         </div>
       </section>

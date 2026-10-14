@@ -1,4 +1,4 @@
-# Core 4 ERP — stack de produção (ver DEPLOY.md).
+# Core 4 — stack de produção (ver DEPLOY.md).
 #
 # Segmentação de rede (cada serviço só enxerga o que precisa):
 #   edge       → cloudflared, frontend                      (entrada pública via túnel)

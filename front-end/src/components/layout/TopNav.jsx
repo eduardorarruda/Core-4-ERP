@@ -1,61 +1,38 @@
-import React, { useRef, useState, useEffect, useCallback, useContext, useId } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Settings, LogOut, Sun, Moon, Search, HelpCircle } from 'lucide-react';
+import React, { useContext, useEffect, useId, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronRight, Eye, EyeOff, HelpCircle, LogOut, Moon, Search, Settings, Sun } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
+import { useModoPrivado } from '../../hooks/useAtalhos';
 import { ThemeContext } from '../../context/ThemeContext';
+import { trilhaDaRota } from '../../lib/navigation';
+import { PopPresence } from '../motion/Movimento';
 import NotificacoesPopover from './NotificacoesPopover';
-import Button from '../ui/Button';
+import BrandMark from '../ui/BrandMark';
+import Avatar from '../ui/Avatar';
+import Tooltip from '../ui/Tooltip';
+import BotaoAcessibilidade from '../acessibilidade/BotaoAcessibilidade';
 
-const ROUTE_NAMES = {
-  '/dashboard': 'Dashboard',
-  '/parceiros': 'Parceiros',
-  '/categorias': 'Categorias',
-  '/contas-correntes': 'Contas Correntes',
-  '/contas': 'Lançamentos',
-  '/cartoes': 'Cartões',
-  '/investimentos': 'Investimentos',
-  '/assinaturas': 'Assinaturas',
-  '/calendario': 'Calendário',
-  '/reports': 'Relatórios',
-  '/audit': 'Auditoria',
-  '/configuracoes': 'Configurações',
-  '/ajuda': 'Central de Ajuda',
-};
+/**
+ * Barra superior. Desktop: trilha "Grupo › Tela" (o título fica só no PageHeader), busca,
+ * privacidade, tema, ajuda, notificações e menu do avatar. Mobile: menu, símbolo e ações.
+ * Configurações, Ajuda e Sair ficam AQUI (menu do avatar) — o menu lateral não repete.
+ */
+// Ícones da barra em px (44 = alvo mínimo): com texto ampliado eles não crescem e a barra cabe em 320px
+const BOTAO_ICONE = 'relative w-[44px] h-[44px] grid place-items-center rounded-xl transition-colors text-text-primary/65 hover:text-text-primary hover:bg-text-primary/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+const ITEM_MENU = 'flex items-center gap-3 w-full px-3 min-h-11 rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:bg-text-primary/[0.06]';
 
-const BOTAO_ICONE = 'min-w-11 min-h-11 grid place-items-center rounded-lg transition-colors text-text-primary/70 hover:text-text-primary hover:bg-surface-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
-
-function getInitials(nome) {
-  if (!nome) return '?';
-  return nome.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
-}
-
-export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
+export default function TopNav({ onCommandPaletteOpen }) {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { pathname } = useLocation();
   const { usuario, logout, adminSistema } = useAuth();
   const { theme, toggleTheme } = useContext(ThemeContext);
+  const { privado, alternarPrivado } = useModoPrivado();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef(null);
   const botaoAvatarRef = useRef(null);
   const menuId = useId();
-
-  const pageName = ROUTE_NAMES[location.pathname] ?? 'Core 4 ERP';
-
-  useEffect(() => {
-    document.title = `${pageName} | Core 4 ERP`;
-  }, [pageName]);
-
-  const handleKbShortcut = useCallback((e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-      e.preventDefault();
-      onCommandPaletteOpen?.();
-    }
-  }, [onCommandPaletteOpen]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKbShortcut);
-    return () => document.removeEventListener('keydown', handleKbShortcut);
-  }, [handleKbShortcut]);
+  const trilha = trilhaDaRota(pathname);
 
   // Menu do usuário: fecha ao clicar fora e com Esc (devolvendo o foco ao avatar)
   useEffect(() => {
@@ -76,141 +53,154 @@ export default function TopNav({ onMenuClick, onCommandPaletteOpen }) {
     };
   }, [open]);
 
+  const irPara = (rota) => { setOpen(false); navigate(rota); };
+
   return (
-    <div className="sticky top-0 z-40">
-      {/* Altura mínima + safe area: no iPhone com notch o conteúdo não fica espremido */}
-      <header className="w-full bg-surface-low/90 backdrop-blur-xl flex justify-between items-center min-h-[calc(3.5rem+env(safe-area-inset-top))] px-4 lg:px-8 border-b border-text-primary/5 pt-safe">
-        {/* Left */}
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={onMenuClick}
-            aria-label="Abrir menu"
-            className={`lg:hidden ${BOTAO_ICONE}`}
-          >
-            <Menu className="w-5 h-5" aria-hidden="true" />
-          </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-bold text-text-primary/80 font-display truncate">{pageName}</span>
-          </div>
+    <header className="sticky top-0 z-40 c4-glass border-b pt-safe">
+      <div className="flex items-center gap-2 h-16 px-3 sm:px-4 lg:px-8">
+        {/* Esquerda */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {/* No celular o menu abre pela barra inferior (BottomNav › Menu) — sem botão duplicado aqui */}
+          <span className="lg:hidden pl-1" aria-hidden="true"><BrandMark size={30} /></span>
+          {trilha.length > 0 && (
+            <nav aria-label="Você está em" className="hidden lg:block min-w-0">
+              <ol className="flex items-center gap-1.5 text-sm">
+                {trilha.map((parte, i) => (
+                  <li key={parte} className="flex items-center gap-1.5 min-w-0">
+                    {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-text-primary/30 shrink-0" aria-hidden="true" />}
+                    <span
+                      aria-current={i === trilha.length - 1 ? 'page' : undefined}
+                      className={cn('truncate', i === trilha.length - 1 ? 'text-text-primary/85 font-medium' : 'text-text-primary/65')}
+                    >
+                      {parte}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )}
         </div>
 
-        {/* Center: search trigger */}
-        <button
-          type="button"
-          onClick={onCommandPaletteOpen}
-          className="hidden md:flex items-center gap-3 px-4 min-h-11 rounded-xl bg-surface-medium border border-text-primary/5 text-text-primary/70 text-sm hover:border-primary/20 hover:text-text-primary transition-all w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          aria-label="Abrir busca global (Ctrl+K)"
-        >
-          <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
-          <span className="flex-1 text-left text-xs">Buscar...</span>
-          <kbd className="hidden lg:inline-flex text-xs font-bold bg-surface-high px-1.5 py-0.5 rounded border border-text-primary/10 text-text-primary/70 font-mono">
-            ⌘K
-          </kbd>
-        </button>
-
-        {/* Right */}
-        <div className="flex items-center gap-0.5 lg:gap-1">
-          {/* Mobile search */}
+        {/* Direita */}
+        <div className="flex items-center gap-0.5 sm:gap-1">
           <button
             type="button"
             onClick={onCommandPaletteOpen}
-            aria-label="Buscar"
-            className={`md:hidden ${BOTAO_ICONE}`}
+            aria-keyshortcuts="Control+K"
+            className="hidden md:flex lg:hidden items-center gap-2.5 h-10 pl-3 pr-2 mr-1 w-56 rounded-xl text-sm text-text-primary/55 bg-text-primary/[0.04] border border-border hover:border-border-strong hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
+            <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span className="flex-1 text-left">Buscar…</span>
+            <kbd className="c4-kbd" aria-hidden="true">Ctrl K</kbd>
+          </button>
+          <button type="button" onClick={onCommandPaletteOpen} aria-label="Buscar" className={cn(BOTAO_ICONE, 'md:hidden')}>
             <Search className="w-5 h-5" aria-hidden="true" />
           </button>
 
-          {/* Theme toggle */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
-            title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
-            className={BOTAO_ICONE}
-          >
-            {theme === 'dark' ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
-          </button>
+          <Tooltip conteudo={privado ? 'Mostrar valores (Alt+P)' : 'Esconder valores (Alt+P)'} lado="bottom">
+            <button
+              type="button"
+              onClick={alternarPrivado}
+              aria-pressed={privado}
+              aria-label="Modo privacidade: esconder valores"
+              className={cn(BOTAO_ICONE, 'hidden sm:grid', privado && 'text-primary')}
+            >
+              {privado ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
+            </button>
+          </Tooltip>
 
-          {/* Ajuda */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/ajuda')}
-            aria-label="Abrir a Central de Ajuda"
-            title="Central de Ajuda"
-            className="text-text-primary/70 hover:text-text-primary"
-          >
-            <HelpCircle className="w-5 h-5" aria-hidden="true" />
-          </Button>
+          <Tooltip conteudo={theme === 'dark' ? 'Tema claro (Alt+T)' : 'Tema escuro (Alt+T)'} lado="bottom">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+              className={cn(BOTAO_ICONE, 'hidden sm:grid')}
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" aria-hidden="true" /> : <Moon className="w-5 h-5" aria-hidden="true" />}
+            </button>
+          </Tooltip>
 
-          {/* Notificações (sino) */}
+          {/* Acessibilidade: visível em todos os tamanhos e sempre no mesmo lugar (Alt+A) */}
+          <BotaoAcessibilidade />
+
+          <Tooltip conteudo="Central de Ajuda" lado="bottom">
+            <button type="button" onClick={() => navigate('/ajuda')} aria-label="Abrir a Central de Ajuda" className={cn(BOTAO_ICONE, 'hidden sm:grid')}>
+              <HelpCircle className="w-5 h-5" aria-hidden="true" />
+            </button>
+          </Tooltip>
+
           <NotificacoesPopover />
 
-          {/* Avatar — área de toque de 44px com o círculo visual menor dentro */}
-          <div className="relative" ref={wrapperRef}>
+          {/* Avatar + menu da conta */}
+          <div className="relative ml-1" ref={wrapperRef}>
             <button
               ref={botaoAvatarRef}
               type="button"
               onClick={() => setOpen((v) => !v)}
-              aria-label="Menu do usuário"
               aria-haspopup="menu"
               aria-expanded={open}
               aria-controls={open ? menuId : undefined}
-              className="min-w-11 min-h-11 grid place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="w-[44px] h-[44px] grid place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <span className="w-8 h-8 lg:w-9 lg:h-9 rounded-full overflow-hidden flex items-center justify-center bg-primary/15 border border-primary/25">
-                {usuario?.fotoPerfil ? (
-                  <img src={usuario.fotoPerfil} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs font-bold text-primary select-none font-display" aria-hidden="true">
-                    {getInitials(usuario?.nome)}
-                  </span>
-                )}
+              <span aria-hidden="true">
+                <Avatar nome={usuario?.nome} src={usuario?.fotoPerfil} size="md" className={cn('w-[36px] h-[36px] transition-shadow', open && 'ring-2 ring-primary/60')} />
               </span>
+              <span className="sr-only">Menu da conta</span>
             </button>
 
-            {open && (
-              <div
-                id={menuId}
-                role="menu"
-                aria-label="Opções da conta"
-                className="absolute right-0 mt-2 w-56 rounded-xl border border-text-primary/10 shadow-elevated overflow-hidden z-50 animate-scale-in bg-surface-low/95 backdrop-blur-md"
-              >
-                {usuario && (
-                  <div className="px-4 py-3 border-b border-text-primary/10" role="none">
-                    <p className="text-xs font-bold text-text-primary truncate">{usuario.nome}</p>
-                    <p className="text-xs text-text-primary/70 truncate font-mono">{usuario.email}</p>
+            <PopPresence
+              aberto={open}
+              origem="top right"
+              id={menuId}
+              role="menu"
+              aria-label="Opções da conta"
+              className="absolute right-0 mt-2 w-64 p-1.5 rounded-2xl border border-border-strong bg-surface-low/95 backdrop-blur-xl shadow-elevated z-50"
+            >
+              {usuario && (
+                <div className="flex items-center gap-3 px-3 py-3 mb-1 border-b border-border" role="none">
+                  <Avatar nome={usuario.nome} src={usuario.fotoPerfil} size="lg" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-text-primary truncate">{usuario.nome}</p>
+                    <p className="text-xs text-text-primary/60 truncate">{usuario.email}</p>
                     {adminSistema && (
-                      <p className="text-xs text-primary uppercase tracking-wider font-bold mt-0.5 font-mono">
-                        Admin do sistema
-                      </p>
+                      <span className="inline-flex mt-1 px-1.5 py-0.5 rounded-md text-[0.6875rem] font-semibold bg-primary/12 text-primary">Admin do sistema</span>
                     )}
                   </div>
-                )}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setOpen(false); navigate('/configuracoes'); }}
-                  className="flex items-center gap-3 w-full px-4 min-h-11 text-sm text-text-primary/80 hover:bg-surface-high hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:bg-surface-high"
-                >
-                  <Settings className="w-4 h-4" aria-hidden="true" />
-                  Configurações da conta
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={logout}
-                  className="flex items-center gap-3 w-full px-4 min-h-11 text-sm text-error hover:bg-surface-high transition-colors focus-visible:outline-none focus-visible:bg-surface-high"
-                >
-                  <LogOut className="w-4 h-4" aria-hidden="true" />
-                  Sair
-                </button>
-              </div>
-            )}
+                </div>
+              )}
+              <button type="button" role="menuitem" onClick={() => irPara('/configuracoes')} className={cn(ITEM_MENU, 'text-text-primary/85 hover:bg-text-primary/[0.06]')}>
+                <Settings className="w-4 h-4 text-text-primary/60" aria-hidden="true" /> Configurações
+              </button>
+              <button type="button" role="menuitem" onClick={() => irPara('/ajuda')} className={cn(ITEM_MENU, 'text-text-primary/85 hover:bg-text-primary/[0.06]')}>
+                <HelpCircle className="w-4 h-4 text-text-primary/60" aria-hidden="true" /> Central de Ajuda
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={alternarPrivado}
+                className={cn(ITEM_MENU, 'sm:hidden text-text-primary/85 hover:bg-text-primary/[0.06]')}
+              >
+                {privado ? <Eye className="w-4 h-4 text-text-primary/60" aria-hidden="true" /> : <EyeOff className="w-4 h-4 text-text-primary/60" aria-hidden="true" />}
+                {privado ? 'Mostrar valores' : 'Esconder valores'}
+              </button>
+              {/* No celular o tema sai da barra (falta espaço com texto ampliado) e fica aqui */}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={toggleTheme}
+                className={cn(ITEM_MENU, 'sm:hidden text-text-primary/85 hover:bg-text-primary/[0.06]')}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4 text-text-primary/60" aria-hidden="true" /> : <Moon className="w-4 h-4 text-text-primary/60" aria-hidden="true" />}
+                {theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+              </button>
+              <div className="my-1 h-px bg-border" role="none" />
+              <button type="button" role="menuitem" onClick={logout} className={cn(ITEM_MENU, 'text-error hover:bg-error/10')}>
+                <LogOut className="w-4 h-4" aria-hidden="true" /> Sair
+              </button>
+            </PopPresence>
           </div>
         </div>
-      </header>
-    </div>
+      </div>
+    </header>
   );
 }

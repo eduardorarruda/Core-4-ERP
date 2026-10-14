@@ -1,13 +1,15 @@
 import React from 'react';
-import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard, Wallet, Repeat } from 'lucide-react';
+import { TrendingUp, FileText, BookOpen, BarChart2, PieChart, CreditCard, Wallet, Repeat, FileBarChart, CalendarRange } from 'lucide-react';
 import { relatorios, categorias, parceiros, cartoes, contasCorrentes, investimentos } from '../lib/api';
 import PageHeader from '../components/ui/PageHeader';
 import ReportCard from '../components/reports/ReportCard';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
 import EmptyState from '../components/ui/EmptyState';
-import { FileText as FileTextIcon } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
+import PeriodoSelector from '../components/ui/PeriodoSelector';
+import { Stagger, StaggerItem } from '../components/motion/Movimento';
+import { usePeriodoUrl } from '../hooks/usePeriodoUrl';
 import { useAuth } from '../hooks/useAuth';
+import { formatDate } from '../lib/formatters';
 
 const fetchCategorias = () =>
   categorias.listar().then((cs) => cs.map((c) => ({ value: String(c.id), label: c.descricao })));
@@ -28,13 +30,13 @@ const fetchCarteiraInvestimento = () =>
   investimentos.listar().then((cs) => cs.map((c) => ({ value: String(c.id), label: c.nome })));
 
 const TIPO_OPTS = [
-  { value: 'RECEBER', label: 'Somente Receitas / A Receber' },
-  { value: 'PAGAR', label: 'Somente Despesas / A Pagar' },
+  { value: 'RECEBER', label: 'Só entradas (a receber)' },
+  { value: 'PAGAR', label: 'Só saídas (a pagar)' },
 ];
 
 const STATUS_OPTS = [
-  { value: 'PENDENTE', label: 'Somente Pendentes' },
-  { value: 'ATRASADO', label: 'Somente Atrasadas' },
+  { value: 'PENDENTE', label: 'Só em aberto' },
+  { value: 'ATRASADO', label: 'Só atrasadas' },
 ];
 
 const TIPO_TRANSACAO_OPTS = [
@@ -46,8 +48,9 @@ const TIPO_TRANSACAO_OPTS = [
 const REPORT_CARDS = [
   {
     id: 'R00',
-    title: 'Posição Financeira Completa',
-    description: 'Detalhamento de entradas, saídas, aportes, resgates e projeções por período.',
+    grupo: 'caixa',
+    title: 'Posição financeira completa',
+    description: 'Entradas, saídas, aportes, resgates e projeções no período.',
     icon: Wallet,
     onGetData: relatorios.dados.posicaoFinanceira,
     onDownloadXlsx: relatorios.posicaoFinanceira,
@@ -57,8 +60,9 @@ const REPORT_CARDS = [
   },
   {
     id: 'R01',
-    title: 'Fluxo de Caixa Realizado',
-    description: 'Entradas recebidas vs. saídas pagas por período, agrupadas por mês.',
+    grupo: 'caixa',
+    title: 'Fluxo de caixa realizado',
+    description: 'Entradas recebidas e saídas pagas, mês a mês.',
     icon: TrendingUp,
     onGetData: relatorios.dados.fluxoCaixa,
     onDownloadXlsx: relatorios.fluxoCaixa,
@@ -72,8 +76,9 @@ const REPORT_CARDS = [
   },
   {
     id: 'R02',
-    title: 'Contas a Pagar/Receber',
-    description: 'Posição atual de todas as contas com status Pendente e Atrasado.',
+    grupo: 'contas',
+    title: 'Contas a pagar e receber',
+    description: 'Contas em aberto e atrasadas com vencimento no período.',
     icon: FileText,
     onGetData: relatorios.dados.contasAbertas,
     onDownloadXlsx: relatorios.contasAbertas,
@@ -88,14 +93,15 @@ const REPORT_CARDS = [
   },
   {
     id: 'R03',
-    title: 'Extrato por Conta Corrente',
-    description: 'Movimentações de conta corrente (baixas e transferências) no período.',
+    grupo: 'caixa',
+    title: 'Extrato por conta bancária',
+    description: 'Baixas e transferências de cada conta bancária no período.',
     icon: BookOpen,
     onGetData: relatorios.dados.extrato,
     onDownloadXlsx: relatorios.extrato,
     filterConfig: [
       { key: 'tipo', label: 'Tipo', type: 'select', options: TIPO_OPTS },
-      { key: 'contaCorrenteId', label: 'Conta Corrente', type: 'async-select', fetchFn: fetchContasCorrentes },
+      { key: 'contaCorrenteId', label: 'Conta bancária', type: 'async-select', fetchFn: fetchContasCorrentes },
       { key: 'categoriaId', label: 'Categoria', type: 'async-select', fetchFn: fetchCategorias },
     ],
     visualizarPermissao: 'RELATORIO_EXTRATO_VISUALIZAR',
@@ -103,16 +109,17 @@ const REPORT_CARDS = [
   },
   {
     id: 'R04',
-    title: 'DRE Simplificado',
-    description: 'Receitas × Despesas por categoria no período, ordenado por resultado.',
+    grupo: 'resultado',
+    title: 'DRE simplificado',
+    description: 'Receitas e despesas por categoria no período, ordenadas pelo resultado.',
     icon: BarChart2,
     onGetData: relatorios.dados.dre,
     onDownloadXlsx: relatorios.dre,
     filterConfig: [
       {
         key: 'tipo', label: 'Exibir', type: 'select', options: [
-          { value: 'RECEBER', label: 'Somente Receitas' },
-          { value: 'PAGAR', label: 'Somente Despesas' },
+          { value: 'RECEBER', label: 'Só receitas' },
+          { value: 'PAGAR', label: 'Só despesas' },
         ],
       },
     ],
@@ -121,13 +128,14 @@ const REPORT_CARDS = [
   },
   {
     id: 'R05',
+    grupo: 'outros',
     title: 'Investimentos',
-    description: 'Aportes, resgates e rendimentos por carteira no período selecionado.',
+    description: 'Aportes, resgates e rendimentos por carteira no período.',
     icon: PieChart,
     onGetData: relatorios.dados.investimentos,
     onDownloadXlsx: relatorios.investimentos,
     filterConfig: [
-      { key: 'tipoTransacao', label: 'Tipo de Transação', type: 'select', options: TIPO_TRANSACAO_OPTS },
+      { key: 'tipoTransacao', label: 'Tipo de movimento', type: 'select', options: TIPO_TRANSACAO_OPTS },
       { key: 'contaInvestimentoId', label: 'Carteira', type: 'async-select', fetchFn: fetchCarteiraInvestimento },
     ],
     visualizarPermissao: 'RELATORIO_INVESTIMENTOS_VISUALIZAR',
@@ -135,8 +143,9 @@ const REPORT_CARDS = [
   },
   {
     id: 'R06',
-    title: 'Cartões de Crédito',
-    description: 'Lançamentos de cartão por fatura, agrupados por mês e categoria.',
+    grupo: 'outros',
+    title: 'Cartões de crédito',
+    description: 'Lançamentos do cartão por fatura, agrupados por mês e categoria.',
     icon: CreditCard,
     onGetData: relatorios.dados.cartoes,
     onDownloadXlsx: relatorios.cartoes,
@@ -149,16 +158,19 @@ const REPORT_CARDS = [
   },
   {
     id: 'R07',
-    title: 'Assinaturas Recorrentes',
-    description: 'Listagem de todas as assinaturas com custo mensal e anual projetado.',
+    grupo: 'outros',
+    semPeriodo: true,
+    title: 'Assinaturas',
+    description: 'Todas as assinaturas com custo mensal e anual.',
     icon: Repeat,
     onGetData: (_i, _f, params) => relatorios.dados.assinaturas(params?.ativas),
     onDownloadXlsx: (_i, _f, params) => relatorios.assinaturas(params?.ativas),
     filterConfig: [
       {
-        key: 'ativas', label: 'Status', type: 'select', options: [
-          { value: 'true', label: 'Somente Ativas' },
-          { value: 'false', label: 'Somente Inativas' },
+        // Todas = parâmetro omitido; true = só ativas; false = só inativas
+        key: 'ativas', label: 'Situação', type: 'select', rotuloTodos: 'Todas', options: [
+          { value: 'true', label: 'Ativas' },
+          { value: 'false', label: 'Inativas' },
         ],
       },
     ],
@@ -167,42 +179,84 @@ const REPORT_CARDS = [
   },
 ];
 
-export default function Reports() {
-  const toast = useToast();
-  const { temPermissao } = useAuth();
+const GRUPOS = [
+  { id: 'caixa', titulo: 'Caixa', desc: 'O que entrou e saiu das contas.' },
+  { id: 'resultado', titulo: 'Resultado', desc: 'Receitas e despesas por categoria.' },
+  { id: 'contas', titulo: 'Contas', desc: 'O que está em aberto.' },
+  { id: 'outros', titulo: 'Cartões, investimentos e assinaturas', desc: '' },
+];
 
-  const temAlgumRelatorio = REPORT_CARDS.some((card) => temPermissao(card.visualizarPermissao));
+const ATALHOS = ['mes', 'mes-passado', '3m', '6m', '12m', 'ano'];
+
+export default function Reports() {
+  const { temPermissao } = useAuth();
+  const [periodo, setPeriodo] = usePeriodoUrl('mes');
+
+  const visiveis = REPORT_CARDS.filter((card) => temPermissao(card.visualizarPermissao));
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Relatórios Financeiros"
-        subtitle="Visualize online, exporte em PDF ou Excel para o período desejado."
+        icon={FileBarChart}
+        title="Relatórios"
+        subtitle="Veja na tela ou baixe em PDF e Excel. O período escolhido vale para todos."
       />
 
-      {!temAlgumRelatorio ? (
+      {visiveis.length === 0 ? (
         <EmptyState
-          icon={FileTextIcon}
+          icon={FileText}
           title="Nenhum relatório disponível"
-          description="Você não tem acesso a relatórios. Fale com o administrador para solicitar permissão."
+          description="Você ainda não tem acesso a relatórios. Peça a permissão ao administrador da empresa."
         />
       ) : (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {REPORT_CARDS.map((card) => (
-          <PermissaoGuard key={card.id} permissao={card.visualizarPermissao}>
-            <ReportCard
-              title={card.title}
-              description={card.description}
-              icon={card.icon}
-              onGetData={card.onGetData}
-              onDownloadXlsx={card.onDownloadXlsx}
-              filterConfig={card.filterConfig}
-              canExport={temPermissao(card.exportarPermissao)}
-              onError={(msg) => toast.error(msg)}
-            />
-          </PermissaoGuard>
-        ))}
-      </div>
+        <>
+          <div className="c4-card c4-glass p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 lg:sticky lg:top-4 z-10">
+            <div className="flex items-center gap-3 min-w-0">
+              <span aria-hidden="true" className="grid place-items-center w-10 h-10 rounded-xl bg-primary/[0.12] text-primary shrink-0">
+                <CalendarRange className="w-5 h-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">Período dos relatórios</p>
+                <p className="text-xs text-text-primary/60 truncate">{formatDate(periodo.inicio)} a {formatDate(periodo.fim)} · Assinaturas mostram a situação de hoje</p>
+              </div>
+            </div>
+            <div className="sm:ml-auto">
+              <PeriodoSelector value={periodo} onChange={setPeriodo} granularidade="dia" atalhos={ATALHOS} label="Período dos relatórios" align="end" />
+            </div>
+          </div>
+
+          {GRUPOS.map((g) => {
+            const cards = visiveis.filter((c) => c.grupo === g.id);
+            if (cards.length === 0) return null;
+            return (
+              <section key={g.id} aria-labelledby={`grupo-rel-${g.id}`} className="space-y-3">
+                <div>
+                  <h2 id={`grupo-rel-${g.id}`} className="font-display text-lg font-semibold">{g.titulo}</h2>
+                  {g.desc && <p className="text-sm text-text-primary/60">{g.desc}</p>}
+                </div>
+                <Stagger aoRolar className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
+                  {cards.map((card) => (
+                    <StaggerItem key={card.id} className="min-w-0">
+                      <PermissaoGuard permissao={card.visualizarPermissao}>
+                        <ReportCard
+                          title={card.title}
+                          description={card.description}
+                          icon={card.icon}
+                          periodo={periodo}
+                          semPeriodo={card.semPeriodo}
+                          onGetData={card.onGetData}
+                          onDownloadXlsx={card.onDownloadXlsx}
+                          filterConfig={card.filterConfig}
+                          canExport={temPermissao(card.exportarPermissao)}
+                        />
+                      </PermissaoGuard>
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </section>
+            );
+          })}
+        </>
       )}
     </div>
   );

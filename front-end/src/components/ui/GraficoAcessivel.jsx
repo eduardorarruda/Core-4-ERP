@@ -13,8 +13,11 @@ export default function GraficoAcessivel({ resumo, tabela, className, children }
       <div role="img" aria-label={resumo} className={className}>
         {children}
       </div>
+      {/* Tabela dentro de um <div> sr-only: em <table> o "width: 1px" não vale e ela
+          vazava para a direita, criando rolagem horizontal (WCAG 1.4.10) */}
       {tabela?.linhas?.length > 0 && (
-        <table className="sr-only">
+        <div className="sr-only">
+        <table>
           <caption>{tabela.titulo}</caption>
           <thead>
             <tr>{tabela.colunas.map((c) => <th key={c} scope="col">{c}</th>)}</tr>
@@ -29,6 +32,7 @@ export default function GraficoAcessivel({ resumo, tabela, className, children }
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </>
   );

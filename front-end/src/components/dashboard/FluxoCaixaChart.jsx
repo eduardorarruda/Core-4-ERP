@@ -1,91 +1,110 @@
-import { AreaChart, Area, XAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TrendingUp, TrendingDown } from 'lucide-react';
-import BentoCard from '../ui/BentoCard';
-import { brl } from '../../lib/formatters';
-import { cn } from '../../lib/utils';
-import { chartTheme, readCssVar } from './chartTheme';
+import React, { useId } from 'react';
+import { Link } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ArrowDownLeft, ArrowUpRight, LineChart } from 'lucide-react';
+import Card from '../ui/Card';
+import ChartTooltip, { BrilhoLinha, GradienteArea, PontoFinal } from '../ui/ChartTooltip';
 import GraficoAcessivel from '../ui/GraficoAcessivel';
+import { CORES_GRAFICO, areaProps, eixoXProps, eixoYProps, formatarEixoMoeda, gradeProps, tooltipProps } from '../../lib/chartTheme';
+import { formatarMoeda } from '../../lib/formatters';
+import { cn } from '../../lib/utils';
 
-export default function FluxoCaixaChart({ cashFlowData, carregando, isDark, totalEntradas6m, totalSaidas6m, resultado6m, mediaEntradas }) {
-  const { gridColor, axisColor, tooltipStyle } = chartTheme(isDark);
-  const colorEntradas = readCssVar('--color-chart-1', isDark ? '#6EFFC0' : '#047857');
-  const colorSaidas = readCssVar('--color-error', isDark ? '#FFB4AB' : '#DC2626');
+/**
+ * Entradas × saídas realizadas nos últimos 6 meses (um gráfico só no Início).
+ * As linhas se desenham (1,3 s), a de entradas com brilho; saídas tracejadas para não
+ * depender só da cor. Rodapé com uma linha de totais.
+ *
+ * dados: [{ rotulo: 'out', rotuloLongo: 'outubro de 2026', entradas, saidas }]
+ */
+function Legenda({ cor, rotulo, tracejado, Icone }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-text-primary/75">
+      <svg width="18" height="8" aria-hidden="true">
+        <line x1="1" y1="4" x2="17" y2="4" stroke={cor} strokeWidth="2.5" strokeLinecap="round" strokeDasharray={tracejado ? '4 3' : undefined} />
+      </svg>
+      <Icone className="w-3.5 h-3.5" aria-hidden="true" style={{ color: cor }} />
+      {rotulo}
+    </span>
+  );
+}
+
+export default function FluxoCaixaChart({ dados = [], carregando = false, className }) {
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const ids = { ent: `fcE${uid}`, sai: `fcS${uid}`, brilho: `fcB${uid}` };
+  const totalEntradas = dados.reduce((s, m) => s + m.entradas, 0);
+  const totalSaidas = dados.reduce((s, m) => s + m.saidas, 0);
+  const resultado = totalEntradas - totalSaidas;
 
   return (
-    <BentoCard
-      className="col-span-12 lg:col-span-8 animate-fade-in-up animate-stagger-1"
+    <Card
+      className={className}
       loading={carregando}
-      title="Fluxo de Caixa — Últimos 6 Meses"
-      headerAction={
-        <div className="flex gap-2">
-          <span className="px-2 sm:px-3 py-1 bg-surface-low rounded-full text-xs font-bold text-primary">ENTRADAS</span>
-          <span className="px-2 sm:px-3 py-1 bg-surface-low rounded-full text-xs font-bold text-text-primary/60">SAÍDAS</span>
+      icon={LineChart}
+      title="Entradas e saídas"
+      subtitle="Dinheiro que entrou e saiu das contas nos últimos 6 meses"
+      footer={
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="text-text-primary/65">6 meses:</span>
+          <span className="tabular-nums"><span className="text-text-primary/65">entradas </span><strong className="text-income valor-privado">+{formatarMoeda(totalEntradas, { sinal: 'nunca' })}</strong></span>
+          <span className="tabular-nums"><span className="text-text-primary/65">saídas </span><strong className="text-expense valor-privado">−{formatarMoeda(totalSaidas, { sinal: 'nunca' })}</strong></span>
+          <span className="tabular-nums"><span className="text-text-primary/65">resultado </span><strong className={cn('valor-privado', resultado >= 0 ? 'text-income' : 'text-expense')}>{formatarMoeda(resultado, { sinal: 'sempre' })}</strong></span>
+          <Link to="/reports" className="ml-auto text-sm font-medium text-primary hover:underline underline-offset-4 min-h-11 inline-flex items-center">
+            Relatório de fluxo de caixa
+          </Link>
         </div>
       }
     >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-2" aria-hidden="true">
+        <Legenda cor={CORES_GRAFICO.entrada} rotulo="Entradas" Icone={ArrowDownLeft} />
+        <Legenda cor={CORES_GRAFICO.saida} rotulo="Saídas" tracejado Icone={ArrowUpRight} />
+      </div>
       <GraficoAcessivel
-        className="w-full mt-4"
-        resumo={`Gráfico de área do fluxo de caixa dos últimos 6 meses: entradas somam R$ ${brl(totalEntradas6m)}, saídas somam R$ ${brl(totalSaidas6m)} e o resultado é R$ ${brl(resultado6m)}.`}
+        resumo={`Entradas e saídas dos últimos 6 meses. Entradas somam ${formatarMoeda(totalEntradas)}, saídas ${formatarMoeda(totalSaidas)}, resultado ${formatarMoeda(resultado)}.`}
         tabela={{
-          titulo: 'Fluxo de caixa por mês',
-          colunas: ['Mês', 'Entradas', 'Saídas'],
-          linhas: cashFlowData.map((m) => [m.name, `R$ ${brl(m.entradas)}`, `R$ ${brl(m.saidas)}`]),
+          titulo: 'Entradas e saídas por mês',
+          colunas: ['Mês', 'Entradas', 'Saídas', 'Resultado'],
+          linhas: dados.map((m) => [m.rotuloLongo, formatarMoeda(m.entradas), formatarMoeda(m.saidas), formatarMoeda(m.entradas - m.saidas)]),
         }}
       >
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={cashFlowData}>
-            <defs>
-              <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={colorEntradas} stopOpacity={isDark ? 0.3 : 0.2} />
-                <stop offset="95%" stopColor={colorEntradas} stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={colorSaidas} stopOpacity={isDark ? 0.3 : 0.15} />
-                <stop offset="95%" stopColor={colorSaidas} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-            <XAxis dataKey="name" stroke={axisColor} fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
-            {mediaEntradas > 0 && (
-              <ReferenceLine y={mediaEntradas} stroke={colorEntradas} strokeDasharray="4 4" strokeOpacity={0.4} />
-            )}
-            <Area type="monotone" dataKey="entradas" stroke={colorEntradas} fillOpacity={1} fill="url(#colorEntradas)" strokeWidth={2} />
-            <Area type="monotone" dataKey="saidas" stroke={colorSaidas} fillOpacity={1} fill="url(#colorSaidas)" strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div className="h-64 sm:h-72 -mx-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={dados} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
+              <defs>
+                <GradienteArea id={ids.ent} cor={CORES_GRAFICO.entrada} opacidade={0.34} />
+                <GradienteArea id={ids.sai} cor={CORES_GRAFICO.saida} opacidade={0.16} />
+                <BrilhoLinha id={ids.brilho} intensidade={4} />
+              </defs>
+              <CartesianGrid {...gradeProps} />
+              <XAxis dataKey="rotulo" {...eixoXProps} />
+              <YAxis {...eixoYProps} tickFormatter={formatarEixoMoeda} />
+              <Tooltip
+                {...tooltipProps}
+                content={<ChartTooltip formato="currency" nomes={{ entradas: 'Entradas', saidas: 'Saídas' }} rotuloFormatter={(r) => dados.find((d) => d.rotulo === r)?.rotuloLongo ?? r} />}
+              />
+              <Area
+                dataKey="saidas"
+                name="Saídas"
+                stroke={CORES_GRAFICO.saida}
+                strokeDasharray="6 4"
+                fill={`url(#${ids.sai})`}
+                {...areaProps}
+                animationDuration={1300}
+              />
+              <Area
+                dataKey="entradas"
+                name="Entradas"
+                stroke={CORES_GRAFICO.entrada}
+                fill={`url(#${ids.ent})`}
+                filter={`url(#${ids.brilho})`}
+                {...areaProps}
+                strokeWidth={2.5}
+                animationDuration={1300}
+                dot={<PontoFinal total={dados.length} cor={CORES_GRAFICO.entrada} />}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </GraficoAcessivel>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-text-primary/5">
-        <div className="bg-surface-low rounded-xl p-4 space-y-1">
-          <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Entradas</span>
-          </div>
-          <p className="text-base font-bold text-primary">R$ {brl(totalEntradas6m)}</p>
-          <p className="text-xs text-text-primary/60">acumulado 6 meses</p>
-        </div>
-        <div className="bg-surface-low rounded-xl p-4 space-y-1">
-          <div className="flex items-center gap-1.5">
-            <TrendingDown className="w-3.5 h-3.5 text-error" />
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Saídas</span>
-          </div>
-          <p className="text-base font-bold text-error">R$ {brl(totalSaidas6m)}</p>
-          <p className="text-xs text-text-primary/60">acumulado 6 meses</p>
-        </div>
-        <div className={cn('bg-surface-low rounded-xl p-4 space-y-1', resultado6m < 0 && 'border border-error/20')}>
-          <div className="flex items-center gap-1.5">
-            {resultado6m >= 0
-              ? <TrendingUp className="w-3.5 h-3.5 text-secondary" />
-              : <TrendingDown className="w-3.5 h-3.5 text-error" />}
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Resultado</span>
-          </div>
-          <p className={cn('text-base font-bold', resultado6m >= 0 ? 'text-secondary' : 'text-error')}>
-            {resultado6m >= 0 ? '+' : ''}R$ {brl(resultado6m)}
-          </p>
-          <p className="text-xs text-text-primary/60">saldo do período</p>
-        </div>
-      </div>
-    </BentoCard>
+    </Card>
   );
 }

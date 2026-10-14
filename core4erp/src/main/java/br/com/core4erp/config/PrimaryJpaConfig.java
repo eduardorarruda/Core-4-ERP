@@ -36,6 +36,7 @@ import java.util.Properties;
                 "br.com.core4erp.empresa",
                 "br.com.core4erp.investimento",
                 "br.com.core4erp.notificacao",
+                "br.com.core4erp.orcamento",
                 "br.com.core4erp.parceiro",
                 "br.com.core4erp.plano",
                 "br.com.core4erp.usuario"
@@ -60,6 +61,7 @@ public class PrimaryJpaConfig {
             "br.com.core4erp.empresa",
             "br.com.core4erp.investimento",
             "br.com.core4erp.notificacao",
+            "br.com.core4erp.orcamento",
             "br.com.core4erp.parceiro",
             "br.com.core4erp.plano",
             "br.com.core4erp.usuario"

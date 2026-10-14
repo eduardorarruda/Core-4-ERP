@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.tools.cadastro;
 
+import br.com.core4erp.chat.tools.DadosNaoConfiaveisResultConverter;
 import br.com.core4erp.categoria.dto.CategoriaRequestDto;
 import br.com.core4erp.categoria.dto.CategoriaResponseDto;
 import br.com.core4erp.categoria.service.CategoriaService;
@@ -115,7 +116,7 @@ public class CadastroTools {
             Consulta dados públicos de uma empresa a partir do CNPJ (razão social, nome fantasia,
             endereço, telefone). Use ANTES de registrar um parceiro quando o usuário informar apenas
             o CNPJ, para obter a razão social automaticamente — nunca invente o nome.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public BrasilApiService.CnpjData consultarCnpj(
             @ToolParam(description = "CNPJ da empresa (com ou sem máscara)") String cnpj) {
         log.info("[CHAT-AUDIT] user={} tool=consultarCnpj", securityCtx.getUsuarioId());

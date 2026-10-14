@@ -1,6 +1,7 @@
 package br.com.core4erp.chat.config;
 
 import br.com.core4erp.chat.tools.cadastro.CadastroTools;
+import br.com.core4erp.chat.tools.consulta.AnaliseFinanceiraTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.gestao.GestaoFinanceiraTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
@@ -29,12 +30,13 @@ public class McpServerConfig {
 
     @Bean
     public ToolCallbackProvider core4ToolCallbacks(ConsultaTools consultaTools,
+                                                   AnaliseFinanceiraTools analiseFinanceiraTools,
                                                    CadastroTools cadastroTools,
                                                    GestaoFinanceiraTools gestaoFinanceiraTools,
                                                    LancamentoTools lancamentoTools,
                                                    RelatorioTools relatorioTools) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(consultaTools, cadastroTools, gestaoFinanceiraTools,
+                .toolObjects(consultaTools, analiseFinanceiraTools, cadastroTools, gestaoFinanceiraTools,
                         lancamentoTools, relatorioTools)
                 .build();
     }

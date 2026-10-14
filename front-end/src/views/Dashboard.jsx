@@ -1,231 +1,230 @@
-import React, { useEffect, useState, useContext, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertTriangle, RefreshCw, Landmark, Wallet, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AlertOctagon, AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarClock, CreditCard, Home, Landmark, RefreshCw, Scale } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
-import SaldoDetalhadoPanel from '../components/dashboard/SaldoDetalhadoPanel';
-import KpiCards from '../components/dashboard/KpiCards';
-import FluxoCaixaChart from '../components/dashboard/FluxoCaixaChart';
-import ResultadosCaixaChart from '../components/dashboard/ResultadosCaixaChart';
-import ResultadoMesPanel from '../components/dashboard/ResultadoMesPanel';
-import DespesasPanel from '../components/dashboard/DespesasPanel';
-import CarteiraPanel from '../components/dashboard/CarteiraPanel';
-import AssinaturasPanel from '../components/dashboard/AssinaturasPanel';
-import AcessoRapidoPanel from '../components/dashboard/AcessoRapidoPanel';
-import PermissaoGuard from '../components/ui/PermissaoGuard';
 import Button from '../components/ui/Button';
-import { dashboard, investimentos, assinaturas as assinaturasApi } from '../lib/api';
+import AlertaErro from '../components/ui/AlertaErro';
+import KpiCard, { KpiGrid } from '../components/ui/KpiCard';
+import FaixaAlertas from '../components/dashboard/FaixaAlertas';
+import FluxoCaixaChart from '../components/dashboard/FluxoCaixaChart';
+import FluxoSankey from '../components/dashboard/FluxoSankey';
+import SaldoDetalhadoPanel from '../components/dashboard/SaldoDetalhadoPanel';
+import ProximosVencimentos from '../components/dashboard/ProximosVencimentos';
+import CarteiraPanel from '../components/dashboard/CarteiraPanel';
+import OrcamentosResumo from '../components/dashboard/OrcamentosResumo';
+import AssinaturasPanel from '../components/dashboard/AssinaturasPanel';
+import BaixaRapidaModal from '../components/dashboard/BaixaRapidaModal';
+import { useDadosInicio } from '../components/dashboard/useDadosInicio';
+import { diasAte, paraIsoLocal, proximaDataDoDia } from '../components/dashboard/datasVisaoGeral';
+import { formatarMoeda, formatarNumero } from '../lib/formatters';
+import { MESES_ABREV, MESES_COMPLETOS } from '../lib/constants';
 import { cn } from '../lib/utils';
-import { ThemeContext } from '../context/ThemeContext';
-import { MESES_ABREV } from '../lib/constants';
-import { readCssVar } from '../components/dashboard/chartTheme';
+
+/*
+ * Faturas fechando: calculado aqui a partir de GET /api/cartoes (já carregado pelo Início) em vez de
+ * chamar o BI de cartões (7 painéis, bem mais caro) só para isso. Mesma regra do `alertasFechamento`
+ * do BI (CartaoCreditoService): até 7 dias, 0 = "fecha hoje", próximo dia de fechamento a partir de hoje.
+ * Única diferença: aqui o dia 29–31 é ajustado ao último dia de meses curtos (o BI não ajusta).
+ */
+const DIAS_ALERTA_FATURA = 7;
+const plural = (n, um, varios) => `${n} ${n === 1 ? um : varios}`;
+
+/** Alertas que pedem ação agora — cada um leva à tela onde se resolve. */
+function montarAlertas({ resumo, contas, cartoes, orcamento }) {
+  const alertas = [];
+  const atrasadas = Number(resumo?.contasAtrasadas ?? 0);
+  if (atrasadas > 0) {
+    const valor = contas.filter((c) => diasAte(c.dataVencimento) < 0 || c.status === 'ATRASADO')
+      .reduce((s, c) => s + Number(c.valorOriginal ?? 0), 0);
+    alertas.push({
+      id: 'atrasadas', gravidade: 'critico', icon: AlertTriangle, to: '/contas',
+      titulo: `${plural(atrasadas, 'conta atrasada', 'contas atrasadas')}`,
+      detalhe: valor > 0 ? `Somam ${formatarMoeda(valor)} · dê baixa ou renegocie` : 'Dê baixa ou renegocie',
+    });
+  }
+  const hoje = Number(resumo?.contasVencendoHoje ?? 0);
+  if (hoje > 0) {
+    alertas.push({ id: 'hoje', gravidade: 'atencao', icon: CalendarClock, to: '/contas', titulo: `${plural(hoje, 'conta vence', 'contas vencem')} hoje`, detalhe: 'Pague hoje para evitar juros' });
+  }
+  cartoes.forEach((c) => {
+    const dias = diasAte(paraIsoLocal(proximaDataDoDia(c.diaFechamento)));
+    if (dias <= DIAS_ALERTA_FATURA) {
+      alertas.push({
+        id: `fatura-${c.id}`, gravidade: 'info', icon: CreditCard, to: '/cartoes/dashboard',
+        titulo: dias === 0 ? `Fatura do ${c.nome} fecha hoje` : `Fatura do ${c.nome} fecha em ${plural(dias, 'dia', 'dias')}`,
+        detalhe: `Compras depois disso vão para a próxima fatura`,
+      });
+    }
+  });
+  const estourados = (orcamento?.itens ?? []).filter((o) => o.status === 'ESTOURADO');
+  if (estourados.length > 0) {
+    alertas.push({
+      id: 'orcamentos', gravidade: 'atencao', icon: AlertOctagon, to: '/orcamentos',
+      titulo: `${plural(estourados.length, 'orçamento estourou', 'orçamentos estouraram')}`,
+      detalhe: estourados.slice(0, 2).map((o) => o.categoria?.descricao).join(', '),
+    });
+  }
+  return alertas;
+}
+
+function rotuloMes(m) {
+  return { rotulo: MESES_ABREV[m.mes - 1], rotuloLongo: `${MESES_COMPLETOS[m.mes - 1]} de ${m.ano}` };
+}
 
 export default function Dashboard() {
-  const { theme } = useContext(ThemeContext);
-  const [dados, setDados] = useState(null);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState(false);
-  const [carteira, setCarteira] = useState([]);
-  const [assinaturasLista, setAssinaturasLista] = useState([]);
-  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const dadosInicio = useDadosInicio();
+  const { pode, resumo, saldo, carteiras, assinaturas, contas, orcamento, cartoes, atualizar, atualizadoEm, recarregarContas } = dadosInicio;
+  const [contaBaixa, setContaBaixa] = useState(null);
 
-  // Carrega tudo. `signal.cancelled` evita atualizar estado após desmontar.
-  const fetchAll = useCallback((signal) => {
-    setCarregando(true);
-    setErro(false);
-    Promise.all([
-      dashboard.resumo().catch(() => null),
-      investimentos.listar().catch(() => []),
-      assinaturasApi.listar().catch(() => []),
-    ]).then(([d, inv, assin]) => {
-      if (signal?.cancelled) return;
-      // Falha ao carregar o resumo principal não deve virar "R$ 0,00" silencioso.
-      if (d) {
-        setDados(d);
-        setErro(false);
-      } else {
-        setErro(true);
-      }
-      setCarteira(inv ?? []);
-      setAssinaturasLista(assin ?? []);
-      setLastUpdate(new Date());
-    }).finally(() => {
-      if (!signal?.cancelled) setCarregando(false);
-    });
-  }, []);
+  const d = resumo.dados;
+  const fluxo = useMemo(() => (d?.fluxoMensal ?? []).map((m) => ({
+    ...rotuloMes(m),
+    entradas: Number(m.totalRecebido ?? 0),
+    saidas: Number(m.totalPago ?? 0),
+  })), [d]);
+  const categorias = useMemo(() => (d?.despesasPorCategoria ?? []).map((c) => ({ nome: c.categoria, valor: Number(c.total ?? 0) })), [d]);
 
-  useEffect(() => {
-    const signal = { cancelled: false };
-    fetchAll(signal);
-    return () => { signal.cancelled = true; };
-  }, [fetchAll]);
+  const mes = fluxo[fluxo.length - 1];
+  const anterior = fluxo[fluxo.length - 2];
+  const entradas = mes?.entradas ?? 0;
+  const saidas = mes?.saidas ?? 0;
+  const resultado = entradas - saidas;
+  const taxaSobra = entradas > 0 ? (resultado / entradas) * 100 : null;
+  const limiteTotal = Number(d?.limiteTotalCartoes ?? 0);
+  const limiteUsado = Number(d?.limiteUsadoTotalCartoes ?? 0);
 
-  const isDark = theme === 'dark';
-  // Paleta categórica derivada dos tokens do tema (sem hex duplicado por tema).
-  const COLORS = useMemo(() => [
-    readCssVar('--color-chart-1', isDark ? '#6EFFC0' : '#047857'),
-    readCssVar('--color-secondary', isDark ? '#ACC7FF' : '#2563EB'),
-    readCssVar('--color-error', isDark ? '#FFB4AB' : '#DC2626'),
-    readCssVar('--color-warning', isDark ? '#FFD37A' : '#B45309'),
-    isDark ? '#D8A8FF' : '#7C3AED',
-    isDark ? '#A8FFD8' : '#0891B2',
-  ], [isDark]);
-  const emptyPieColor = readCssVar('--color-surface-highest', isDark ? '#353534' : '#D4D4D8');
+  const alertas = useMemo(
+    () => montarAlertas({ resumo: d, contas: contas.dados ?? [], cartoes: cartoes.dados ?? [], orcamento: orcamento.dados }),
+    [d, contas.dados, cartoes.dados, orcamento.dados],
+  );
 
-  const fluxoMensal = useMemo(() => dados?.fluxoMensal ?? [], [dados]);
-
-  const cashFlowData = useMemo(() => fluxoMensal.map((m) => ({
-    name: MESES_ABREV[m.mes - 1],
-    entradas: Number(m.totalRecebido),
-    saidas: Number(m.totalPago),
-  })), [fluxoMensal]);
-
-  const resultsData = useMemo(() => fluxoMensal.map((m) => ({
-    name: MESES_ABREV[m.mes - 1],
-    income: Number(m.totalRecebido),
-    expense: Number(m.totalPago),
-  })), [fluxoMensal]);
-
-  const despesas = dados?.despesasPorCategoria ?? [];
-  const pieData = despesas.length > 0
-    ? despesas.map((d, i) => ({ name: d.categoria, value: Number(d.total), color: COLORS[i % COLORS.length] }))
-    : [{ name: 'Sem Despesas', value: 1, color: emptyPieColor }];
-
-  const mesAtual = fluxoMensal[fluxoMensal.length - 1];
-  const receitasMes = Number(mesAtual?.totalRecebido ?? 0);
-  const despesasMes = Number(mesAtual?.totalPago ?? 0);
-  const totalDespesasCat = despesas.reduce((acc, d) => acc + Number(d.total), 0);
-
-  const saldo = Number(dados?.saldoTotalContasCorrentes ?? 0);
-  const vencendoHoje = dados?.contasVencendoHoje ?? 0;
-  const atrasadas = dados?.contasAtrasadas ?? 0;
-
-  const totalEntradas6m = cashFlowData.reduce((s, m) => s + m.entradas, 0);
-  const totalSaidas6m   = cashFlowData.reduce((s, m) => s + m.saidas, 0);
-  const resultado6m     = totalEntradas6m - totalSaidas6m;
-  const mediaEntradas   = cashFlowData.length > 0 ? totalEntradas6m / cashFlowData.length : 0;
-
-  const patrimonioTotal = carteira.reduce((s, c) => s + Number(c.saldoAtual ?? 0), 0);
-
-  const assinaturasAtivas = assinaturasLista
-    .filter((a) => a.ativa)
-    .sort((a, b) => Number(b.valor) - Number(a.valor));
-  const totalMensalAssin = assinaturasAtivas.reduce((s, a) => s + Number(a.valor), 0);
-  const assinPorCat = assinaturasAtivas.reduce((acc, a) => {
-    acc[a.categoriaDescricao] = (acc[a.categoriaDescricao] || 0) + Number(a.valor);
-    return acc;
-  }, {});
-  const pieAssinaturas = Object.entries(assinPorCat).map(([name, value], i) => ({
-    name, value, color: COLORS[i % COLORS.length],
-  }));
-
-  const kpis = [
-    { label: 'Saldo em Contas',    value: saldo,          chip: saldo >= 0 ? '▲ Positivo' : '▼ Negativo', chipOk: saldo >= 0,  icon: Landmark,       color: 'primary' },
-    { label: 'Receitas do Mês',    value: receitasMes,    chip: '▲ Entradas',  chipOk: true,              icon: ArrowUpCircle,  color: 'primary' },
-    { label: 'Despesas do Mês',    value: despesasMes,    chip: '▼ Saídas',    chipOk: false,             icon: ArrowDownCircle, color: 'error' },
-    { label: 'Patrimônio Investido', value: patrimonioTotal, chip: '▲ Carteira', chipOk: true,            icon: Wallet,         color: 'secondary' },
-  ];
+  const carregando = resumo.carregando || saldo.carregando || contas.carregando;
+  const inicial = resumo.carregandoInicial;
+  const painelInferior = [pode.investimentos, pode.orcamentos, pode.assinaturas].filter(Boolean).length;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dashboard"
-        subtitle="Visão geral do seu ecossistema financeiro"
+        icon={Home}
+        title="Início"
+        subtitle="O que pede atenção, quanto entrou e saiu e o que vem por aí."
         actions={
           <div className="flex items-center gap-3">
-            <span className="text-xs text-text-primary/60 hidden sm:block">
-              Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            <span className="text-xs text-text-primary/60 hidden sm:block" aria-live="polite">
+              {carregando ? 'Atualizando…' : `Atualizado às ${atualizadoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
             </span>
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fetchAll()}
+              variant="secondary"
+              onClick={atualizar}
               disabled={carregando}
-              aria-label="Atualizar dashboard"
-              className="border border-text-primary/5 text-text-primary/60 hover:text-text-primary"
+              leftIcon={<RefreshCw className={cn('w-4 h-4', carregando && 'motion-safe:animate-spin')} aria-hidden="true" />}
             >
-              <RefreshCw className={cn('w-4 h-4', carregando && 'animate-spin')} />
+              Atualizar
             </Button>
           </div>
         }
       />
 
-      {erro ? (
-        <div
-          role="alert"
-          className="rounded-[18px] border border-error/30 bg-error/10 p-8 flex flex-col items-center gap-4 text-center"
-        >
-          <AlertTriangle className="w-8 h-8 text-error" />
-          <div>
-            <p className="text-sm font-bold text-text-primary">Não foi possível carregar o dashboard</p>
-            <p className="text-xs text-text-primary/60 mt-1">
-              Verifique sua conexão com a internet e tente novamente.
-            </p>
-          </div>
-          <Button variant="secondary" onClick={() => fetchAll()} loading={carregando} leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}>
-            Tentar novamente
-          </Button>
-        </div>
+      {resumo.erro && !d ? (
+        <AlertaErro mensagem="Não deu para carregar o resumo. Verifique a conexão e tente de novo." onTentarNovamente={atualizar} />
       ) : (
-      <>
-      <KpiCards kpis={kpis} carregando={carregando} />
+        <>
+          <FaixaAlertas alertas={alertas} />
 
-      {(vencendoHoje > 0 || atrasadas > 0) && (
-        <div className="flex flex-wrap gap-3 animate-fade-in-up animate-stagger-1">
-          {atrasadas > 0 && (
-            <Link to="/contas" className="flex items-center gap-2 px-4 py-2 min-h-11 bg-error/10 border border-error/30 rounded-xl text-error text-xs font-bold hover:bg-error/20 transition-colors">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-error animate-pulse-dot" />
-                {atrasadas} conta{atrasadas > 1 ? 's' : ''} atrasada{atrasadas > 1 ? 's' : ''}
-              </span>
-            </Link>
-          )}
-          {vencendoHoje > 0 && (
-            <Link to="/contas" className="flex items-center gap-2 px-4 py-2 min-h-11 bg-warning/10 border border-warning/30 rounded-xl text-warning text-xs font-bold hover:bg-warning/20 transition-colors">
-              <AlertTriangle className="w-4 h-4" />
-              {vencendoHoje} conta{vencendoHoje > 1 ? 's' : ''} vencendo hoje
-            </Link>
-          )}
-        </div>
-      )}
+          <section aria-labelledby="kpis-titulo">
+            <h2 id="kpis-titulo" className="sr-only">Resumo do mês</h2>
+            <KpiGrid cols={4}>
+              <KpiCard
+                destaque
+                label="Saldo em contas"
+                valor={d?.saldoTotalContasCorrentes}
+                icon={Landmark}
+                tom="primary"
+                loading={inicial}
+                ajuda="Soma do saldo de todas as contas bancárias hoje."
+              />
+              <KpiCard
+                label="Entradas do mês"
+                valor={entradas}
+                anterior={anterior?.entradas}
+                icon={ArrowDownLeft}
+                tom="income"
+                loading={inicial}
+                ajuda="Dinheiro recebido no mês (contas a receber com baixa)."
+              />
+              <KpiCard
+                label="Saídas do mês"
+                valor={saidas}
+                anterior={anterior?.saidas}
+                inverterDelta
+                icon={ArrowUpRight}
+                tom="expense"
+                loading={inicial}
+                ajuda="Dinheiro pago no mês (contas a pagar com baixa). Contas que ainda vão vencer não entram."
+              />
+              <KpiCard
+                label="Sobrou no mês"
+                valor={resultado}
+                colorirSinal
+                icon={Scale}
+                tom={resultado >= 0 ? 'income' : 'expense'}
+                loading={inicial}
+                ajuda="Entradas menos saídas do mês."
+              >
+                {taxaSobra != null && (
+                  <span className={cn('font-medium', taxaSobra >= 0 ? 'text-income' : 'text-expense')}>
+                    {taxaSobra >= 0
+                      ? `Sobrou ${formatarNumero(taxaSobra, 'percent', { casas: 0 })} do que entrou`
+                      : `Saiu ${formatarNumero(-taxaSobra, 'percent', { casas: 0 })} a mais do que entrou`}
+                  </span>
+                )}
+              </KpiCard>
+            </KpiGrid>
+          </section>
 
-      <div className="grid grid-cols-12 gap-4 lg:gap-6">
-        <FluxoCaixaChart
-          cashFlowData={cashFlowData}
-          carregando={carregando}
-          isDark={isDark}
-          totalEntradas6m={totalEntradas6m}
-          totalSaidas6m={totalSaidas6m}
-          resultado6m={resultado6m}
-          mediaEntradas={mediaEntradas}
-        />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+            {pode.contas && (
+              <ProximosVencimentos
+                id="proximos-vencimentos"
+                className="lg:col-span-12 xl:col-span-6"
+                contas={contas.dados ?? []}
+                carregando={contas.carregandoInicial}
+                onBaixar={setContaBaixa}
+              />
+            )}
+            <FluxoCaixaChart dados={fluxo} carregando={inicial} className={cn('lg:col-span-12', pode.contas && 'xl:col-span-6')} />
 
-        <PermissaoGuard permissao="DASHBOARD_CARTAO_VISUALIZAR">
-          <div className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-2">
-            <SaldoDetalhadoPanel />
+            <FluxoSankey entradas={entradas} categorias={categorias} carregando={inicial} className={cn('lg:col-span-12', pode.saldo && 'xl:col-span-8')} />
+            {pode.saldo && (
+              <SaldoDetalhadoPanel
+                className="lg:col-span-12 xl:col-span-4"
+                dados={saldo.dados}
+                carregando={saldo.carregando}
+                erro={saldo.erro}
+                onTentarNovamente={saldo.recarregar}
+                limiteLivre={limiteTotal > 0 ? limiteTotal - limiteUsado : null}
+              />
+            )}
           </div>
-        </PermissaoGuard>
 
-        <ResultadosCaixaChart resultsData={resultsData} carregando={carregando} isDark={isDark} />
-
-        <ResultadoMesPanel receitasMes={receitasMes} despesasMes={despesasMes} saldo={saldo} carregando={carregando} />
-
-        <DespesasPanel pieData={pieData} totalDespesasCat={totalDespesasCat} carregando={carregando} isDark={isDark} />
-
-        <CarteiraPanel carteira={carteira} patrimonioTotal={patrimonioTotal} carregando={carregando} />
-
-        <AssinaturasPanel
-          assinaturasAtivas={assinaturasAtivas}
-          totalMensalAssin={totalMensalAssin}
-          pieAssinaturas={pieAssinaturas}
-          carregando={carregando}
-          isDark={isDark}
-        />
-
-        <AcessoRapidoPanel atrasadas={atrasadas} carregando={carregando} />
-      </div>
-      </>
+          {painelInferior > 0 && (
+            <div className={cn('grid grid-cols-1 gap-4 lg:gap-6', painelInferior >= 2 && 'md:grid-cols-2', painelInferior >= 3 && 'xl:grid-cols-3')}>
+              {pode.investimentos && (
+                <CarteiraPanel
+                  carteiras={carteiras.dados ?? []}
+                  saldoContas={Number(d?.saldoTotalContasCorrentes ?? 0)}
+                  dividaCartoes={limiteUsado}
+                  carregando={carteiras.carregandoInicial}
+                />
+              )}
+              {pode.orcamentos && <OrcamentosResumo orcamento={orcamento.dados} carregando={orcamento.carregandoInicial} />}
+              {pode.assinaturas && <AssinaturasPanel assinaturas={assinaturas.dados ?? []} carregando={assinaturas.carregandoInicial} />}
+            </div>
+          )}
+        </>
       )}
+
+      <BaixaRapidaModal key={contaBaixa?.id ?? 'nenhuma'} conta={contaBaixa} onClose={() => setContaBaixa(null)} onBaixada={recarregarContas} />
     </div>
   );
 }
+

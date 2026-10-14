@@ -417,11 +417,15 @@ public class RelatorioService {
 
     @Requer("RELATORIO_ASSINATURAS_VISUALIZAR")
     @Transactional(readOnly = true)
-    public RelatorioResponseDto getDadosAssinaturas(Boolean soAtivas) {
+    /**
+     * @param ativas {@code null} = todas (ativas e inativas); {@code true} = só ativas;
+     *               {@code false} = só inativas.
+     */
+    public RelatorioResponseDto getDadosAssinaturas(Boolean ativas) {
         Long uid = tenantCtx.getEmpresaId();
-        List<Assinatura> lista = (soAtivas == null || soAtivas)
-                ? assinaturaRepo.findAllByEmpresaIdAndAtiva(uid, true)
-                : assinaturaRepo.findAllByEmpresaId(uid);
+        List<Assinatura> lista = (ativas == null)
+                ? assinaturaRepo.findAllByEmpresaId(uid)
+                : assinaturaRepo.findAllByEmpresaIdAndAtiva(uid, ativas);
 
         Map<String, BigDecimal> porCategoria = new LinkedHashMap<>();
         BigDecimal totalAtivas = BigDecimal.ZERO;

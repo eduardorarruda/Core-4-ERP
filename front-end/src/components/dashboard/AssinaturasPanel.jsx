@@ -1,64 +1,68 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Repeat } from 'lucide-react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import BentoCard from '../ui/BentoCard';
-import { brl } from '../../lib/formatters';
-import { chartTheme } from './chartTheme';
-import GraficoAcessivel from '../ui/GraficoAcessivel';
+import { CreditCard, Repeat } from 'lucide-react';
+import Card from '../ui/Card';
+import EmptyState from '../ui/EmptyState';
+import { AnimatedNumber } from '../motion/Movimento';
+import { formatarMoeda } from '../../lib/formatters';
+import { paraIsoLocal, proximaDataDoDia, rotuloVencimento } from './datasVisaoGeral';
 
-export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, pieAssinaturas, carregando, isDark }) {
-  const { tooltipStyle } = chartTheme(isDark);
+/**
+ * Assinaturas no Início: custo mensal + as 3 maiores (com o próximo vencimento e o cartão, uma vez).
+ * Só aparece com ASSINATURA_VISUALIZAR (o Dashboard decide).
+ *
+ * Props: assinaturas (ativas), carregando, className.
+ */
+export default function AssinaturasPanel({ assinaturas = [], carregando = false, className }) {
+  const ordenadas = [...assinaturas].sort((a, b) => Number(b.valor) - Number(a.valor));
+  const total = ordenadas.reduce((s, a) => s + Number(a.valor ?? 0), 0);
+  const top = ordenadas.slice(0, 3);
+  const resto = ordenadas.length - top.length;
 
   return (
-    <BentoCard
-      className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-5"
+    <Card
+      className={className}
       loading={carregando}
-      title="Assinaturas Recorrentes"
-      headerAction={
-        <Link to="/assinaturas" className="text-xs font-bold uppercase tracking-widest text-text-primary/70 hover:text-primary transition-colors">
-          Gerenciar →
+      icon={Repeat}
+      title="Assinaturas"
+      subtitle={`${ordenadas.length} ${ordenadas.length === 1 ? 'ativa' : 'ativas'}`}
+      actions={
+        <Link to="/assinaturas" className="text-sm font-medium text-primary hover:underline underline-offset-4 min-h-11 inline-flex items-center">
+          Gerenciar
         </Link>
       }
     >
-      <div className="bg-error/10 border border-error/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4 mt-2">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-error mb-0.5">Custo Mensal</p>
-          <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(totalMensalAssin)}</p>
-          <p className="text-xs text-text-primary/70 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
-        </div>
-        <Repeat className="w-8 h-8 text-error opacity-40" />
-      </div>
-
-      {pieAssinaturas.length > 0 && (
-        <GraficoAcessivel resumo={`Gráfico de rosca do custo mensal das assinaturas por categoria. ${pieAssinaturas.map((d) => `${d.name}: R$ ${brl(d.value)}`).join('; ')}.`}>
-        <ResponsiveContainer width="100%" height={160}>
-          <PieChart>
-            <Pie data={pieAssinaturas} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value" stroke="none">
-              {pieAssinaturas.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
-            </Pie>
-            <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
-          </PieChart>
-        </ResponsiveContainer>
-        </GraficoAcessivel>
-      )}
-
-      <div className="space-y-2 mt-2">
-        {assinaturasAtivas.slice(0, 4).map((a) => (
-          <div key={a.id} className="flex items-center justify-between bg-surface-low rounded-lg px-3 py-2">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-text-primary truncate">{a.descricao}</p>
-              <p className="text-xs text-text-primary/70">dia {a.diaVencimento}</p>
-            </div>
-            <span className="text-xs font-bold text-error shrink-0 ml-2">R$ {brl(a.valor)}</span>
+      {ordenadas.length === 0 ? (
+        <EmptyState compact icon={Repeat} title="Nenhuma assinatura ativa" description="Cadastre serviços recorrentes em Assinaturas para ver o custo mensal aqui." />
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs text-text-primary/65">Custo por mês</p>
+            <AnimatedNumber value={total} className="font-display text-2xl font-semibold" />
           </div>
-        ))}
-        {assinaturasAtivas.length > 4 && (
-          <p className="text-xs text-text-primary/60 text-center">+{assinaturasAtivas.length - 4} assinatura(s)</p>
-        )}
-        {assinaturasAtivas.length === 0 && (
-          <p className="text-sm text-text-primary/70 text-center py-4">Nenhuma assinatura ativa</p>
-        )}
-      </div>
-    </BentoCard>
+          <ul className="divide-y divide-border">
+            {top.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{a.descricao}</p>
+                  <p className="text-xs text-text-primary/60 truncate flex items-center gap-1">
+                    {rotuloVencimento(paraIsoLocal(proximaDataDoDia(a.diaVencimento)))}
+                    {a.cartaoCreditoNome && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <CreditCard className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        <span className="truncate">no {a.cartaoCreditoNome}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold tabular-nums text-expense valor-privado shrink-0">−{formatarMoeda(a.valor, { sinal: 'nunca' })}</span>
+              </li>
+            ))}
+          </ul>
+          {resto > 0 && <p className="text-xs text-text-primary/60">e mais {resto} {resto === 1 ? 'assinatura' : 'assinaturas'}</p>}
+        </div>
+      )}
+    </Card>
   );
 }

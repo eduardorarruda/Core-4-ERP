@@ -1,71 +1,78 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { SlidersHorizontal, ChevronDown } from 'lucide-react';
-import { labelCls, inputSmCls } from '../ui/FormField';
+import React, { useState } from 'react';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import FormField, { FormSelect } from '../ui/FormField';
+import Button from '../ui/Button';
+import { Revelar } from '../motion/Movimento';
+import { useCarga } from '../../hooks/useCarga';
+import { cn } from '../../lib/utils';
 
-export default function ReportFilters({ config = [], values, onChange, open, onToggle, onError }) {
-  const [asyncOptions, setAsyncOptions] = useState({});
-  const fetchedRef = useRef(false);
+/**
+ * Filtros extras de um relatório (o período fica no topo da página, um só para todos).
+ * Recolhidos em "Filtros (n)"; as opções assíncronas só carregam ao abrir.
+ *
+ * config: [{ key, label, type: 'select' | 'async-select', options?, fetchFn?, semTodos?, padrao?, rotuloTodos? }]
+ *  - semTodos: não oferece "Todos" (o backend não aceita vazio) — usa `padrao`
+ *  - rotuloTodos: texto da opção vazia (padrão "Todos"; ex.: "Todas")
+ */
+function OpcoesAssincronas({ campo, value, onChange, idBase }) {
+  const { dados, erro, carregando, recarregar } = useCarga(() => campo.fetchFn(), [campo.key], { inicial: [] });
+  return (
+    <FormField label={campo.label} htmlFor={`${idBase}-${campo.key}`} error={erro ? 'Não deu para carregar as opções.' : undefined}>
+      <div className="flex gap-2">
+        <FormSelect small id={`${idBase}-${campo.key}`} value={value ?? ''} onChange={(e) => onChange(campo.key, e.target.value || undefined)} disabled={carregando}>
+          <option value="">{carregando ? 'Carregando…' : 'Todos'}</option>
+          {(dados ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </FormSelect>
+        {erro && <Button type="button" size="sm" variant="ghost" onClick={recarregar}>Tentar de novo</Button>}
+      </div>
+    </FormField>
+  );
+}
 
-  useEffect(() => {
-    if (!open || fetchedRef.current) return;
-    fetchedRef.current = true;
-    config.forEach(async (f) => {
-      if (f.type === 'async-select') {
-        try {
-          const opts = await f.fetchFn();
-          setAsyncOptions(prev => ({ ...prev, [f.key]: opts }));
-        } catch {
-          // Não engolir a falha: avisa o usuário para que ele saiba que o filtro
-          // pode estar incompleto, em vez de mostrar uma lista vazia silenciosa.
-          onError?.(`Não foi possível carregar as opções do filtro "${f.label}". Tente reabrir os filtros.`);
-        }
-      }
-    });
-  }, [open, config, onError]);
-
+export default function ReportFilters({ config = [], values, onChange, idBase }) {
+  const [aberto, setAberto] = useState(false);
   if (config.length === 0) return null;
 
-  const activeCount = Object.values(values).filter(v => v !== '' && v !== undefined && v !== null).length;
+  const ativos = config.filter((f) => !f.semTodos && values[f.key] !== undefined && values[f.key] !== '').length;
+  const painelId = `${idBase}-filtros`;
 
   return (
-    <div className="space-y-3">
+    <div>
       <button
         type="button"
-        onClick={onToggle}
-        className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-text-primary/60 hover:text-text-primary transition-colors"
+        onClick={() => setAberto((v) => !v)}
+        aria-expanded={aberto}
+        aria-controls={painelId}
+        className="inline-flex items-center gap-1.5 min-h-11 -ml-1 px-1 rounded-lg text-sm font-medium text-text-primary/75 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
-        <SlidersHorizontal className="w-3.5 h-3.5" />
+        <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
         Filtros
-        {activeCount > 0 && (
-          <span className="ml-1 bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-xs font-bold">
-            {activeCount}
+        {ativos > 0 && (
+          <span className="rounded-full bg-primary/15 text-primary px-1.5 text-xs font-semibold tabular-nums">
+            {ativos}<span className="sr-only"> ativos</span>
           </span>
         )}
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={cn('w-4 h-4 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />
       </button>
-
-      {open && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-text-primary/5">
-          {config.map(f => {
-            const opts = f.type === 'async-select' ? (asyncOptions[f.key] || []) : (f.options || []);
-            return (
-              <div key={f.key} className="space-y-1">
-                <label className={labelCls}>{f.label}</label>
-                <select
-                  className={`${inputSmCls} appearance-none cursor-pointer`}
-                  value={values[f.key] ?? ''}
-                  onChange={e => onChange(f.key, e.target.value || undefined)}
-                >
-                  <option value="">Todos</option>
-                  {opts.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })}
+      <Revelar aberto={aberto} id={painelId}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+          {config.map((f) => (f.type === 'async-select' ? (
+            <OpcoesAssincronas key={f.key} campo={f} value={values[f.key]} onChange={onChange} idBase={idBase} />
+          ) : (
+            <FormField key={f.key} label={f.label} htmlFor={`${idBase}-${f.key}`}>
+              <FormSelect
+                small
+                id={`${idBase}-${f.key}`}
+                value={values[f.key] ?? f.padrao ?? ''}
+                onChange={(e) => onChange(f.key, e.target.value || undefined)}
+              >
+                {!f.semTodos && <option value="">{f.rotuloTodos ?? 'Todos'}</option>}
+                {(f.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </FormSelect>
+            </FormField>
+          )))}
         </div>
-      )}
+      </Revelar>
     </div>
   );
 }

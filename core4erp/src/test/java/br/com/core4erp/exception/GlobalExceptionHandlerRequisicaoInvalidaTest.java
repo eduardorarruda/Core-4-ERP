@@ -39,11 +39,26 @@ class GlobalExceptionHandlerRequisicaoInvalidaTest {
         String listar(@RequestParam String filtro) {
             return filtro;
         }
+
+        @GetMapping("/api/teste-formato")
+        String formatoInvalido(@RequestParam String texto) {
+            return texto.formatted(); // texto dinâmico como string de formato: bug de servidor simulado
+        }
     }
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new ControllerFalso())
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
+
+    @Test
+    void illegalFormatException_naoViraFormatSpecifier400() throws Exception {
+        // IllegalFormatException estende IllegalArgumentException; o handler específico vence e
+        // devolve erro interno amigável (nunca 400 com "Format specifier '% e'").
+        mvc.perform(get("/api/teste-formato").param("texto", "subiu 50% e caiu"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.codigo").value("ERRO_INTERNO"))
+                .andExpect(jsonPath("$.mensagem").value("Não foi possível concluir sua solicitação agora. Tente novamente."));
+    }
 
     @Test
     void jsonMalformado_400RequisicaoInvalida() throws Exception {

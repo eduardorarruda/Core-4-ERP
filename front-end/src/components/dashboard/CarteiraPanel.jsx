@@ -1,62 +1,59 @@
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { PieChart as PieIcon } from 'lucide-react';
-import BentoCard from '../ui/BentoCard';
-import { brl } from '../../lib/formatters';
+import { PiggyBank } from 'lucide-react';
+import Card from '../ui/Card';
+import DonutChart from '../ui/DonutChart';
+import EmptyState from '../ui/EmptyState';
+import { formatarMoeda } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 
-const TIPO_LABEL = { RENDA_FIXA: 'Renda Fixa', RENDA_VARIAVEL: 'Renda Variável', FUNDOS: 'Fundos', CRIPTO: 'Cripto', OUTROS: 'Outros' };
-const TIPO_COLOR = { RENDA_FIXA: 'text-secondary', RENDA_VARIAVEL: 'text-primary', FUNDOS: 'text-warning', CRIPTO: 'text-purple-400', OUTROS: 'text-text-primary/60' };
+/**
+ * Patrimônio: rosca do que está investido por tipo (o `tipoNome` que a API devolve — tipos
+ * customizados) e, no rodapé, o patrimônio líquido (contas + investimentos − limite usado nos
+ * cartões). Só aparece com INVESTIMENTO_VISUALIZAR (o Dashboard decide).
+ *
+ * Props: carteiras (ContaInvestimento[]), saldoContas, dividaCartoes (limite usado), carregando, className.
+ */
+const CORES_TIPO = ['var(--color-invest)', 'var(--color-chart-2)', 'var(--color-chart-5)', 'var(--color-chart-1)', 'var(--color-chart-4)', 'var(--color-chart-6)'];
 
-export default function CarteiraPanel({ carteira, patrimonioTotal, carregando }) {
+export default function CarteiraPanel({ carteiras = [], saldoContas = 0, dividaCartoes = 0, carregando = false, className }) {
+  const fatias = useMemo(() => {
+    const porTipo = carteiras.reduce((acc, c) => {
+      const tipo = c.tipoNome?.trim() || 'Sem tipo';
+      return { ...acc, [tipo]: (acc[tipo] ?? 0) + Number(c.saldoAtual ?? 0) };
+    }, {});
+    return Object.entries(porTipo)
+      .sort((a, b) => b[1] - a[1])
+      .map(([nome, valor], i) => ({ id: nome, nome, valor, cor: CORES_TIPO[i % CORES_TIPO.length] }));
+  }, [carteiras]);
+
+  const investido = fatias.reduce((s, f) => s + f.valor, 0);
+  const liquido = Number(saldoContas) + investido - Number(dividaCartoes);
+
   return (
-    <BentoCard
-      className="col-span-12 lg:col-span-4 animate-fade-in-up animate-stagger-4"
+    <Card
+      className={className}
       loading={carregando}
-      title="Carteira de Investimentos"
-      headerAction={
-        <Link to="/investimentos" className="text-xs font-bold uppercase tracking-widest text-text-primary/70 hover:text-primary transition-colors">
-          Ver tudo →
+      icon={PiggyBank}
+      title="Patrimônio investido"
+      subtitle={`${carteiras.length} ${carteiras.length === 1 ? 'carteira' : 'carteiras'}, por tipo de investimento`}
+      actions={
+        <Link to="/investimentos" className="text-sm font-medium text-primary hover:underline underline-offset-4 min-h-11 inline-flex items-center">
+          Ver carteiras
         </Link>
       }
+      footer={investido > 0 ? (
+        <p className="text-sm text-text-primary/70 leading-relaxed">
+          Somando o saldo das contas e descontando o que já foi usado dos cartões, seu patrimônio líquido é{' '}
+          <strong className={cn('tabular-nums valor-privado', liquido < 0 ? 'text-expense' : 'text-text-primary')}>{formatarMoeda(liquido)}</strong>.
+        </p>
+      ) : null}
     >
-      <div className="bg-primary/10 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between mb-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-0.5">Patrimônio Total</p>
-          <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(patrimonioTotal)}</p>
-        </div>
-        <PieIcon className="w-8 h-8 text-primary opacity-40" />
-      </div>
-
-      {carteira.length === 0 ? (
-        <div className="py-6 text-center">
-          <p className="text-sm text-text-primary/70">Nenhuma carteira cadastrada</p>
-          <Link to="/investimentos" className="text-xs text-primary hover:underline mt-1 block">Cadastrar investimento</Link>
-        </div>
+      {investido <= 0 ? (
+        <EmptyState compact tom="invest" icon={PiggyBank} title="Nenhum investimento ainda" description="Cadastre uma carteira em Investimentos para acompanhar quanto você tem guardado." />
       ) : (
-        <div className="space-y-2">
-          {carteira.map((c) => {
-            const pct = patrimonioTotal > 0 ? (Number(c.saldoAtual) / patrimonioTotal) * 100 : 0;
-            const color = TIPO_COLOR[c.tipo] ?? 'text-text-primary/60';
-            return (
-              <div key={c.id} className="bg-surface-low rounded-lg px-3 py-2.5 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={cn('text-xs font-bold uppercase tracking-widest shrink-0', color)}>
-                      {TIPO_LABEL[c.tipo] ?? c.tipo}
-                    </span>
-                    <span className="text-xs text-text-primary/80 truncate font-medium">{c.nome}</span>
-                  </div>
-                  <span className="text-xs font-bold text-text-primary shrink-0 ml-2">R$ {brl(c.saldoAtual)}</span>
-                </div>
-                <div className="h-1 w-full bg-surface-medium rounded-full overflow-hidden">
-                  <div className="h-full bg-primary/60 rounded-full transition-all duration-700" style={{ width: `${pct.toFixed(1)}%` }} />
-                </div>
-                <p className="text-xs text-text-primary/60 text-right">{pct.toFixed(1)}% do total</p>
-              </div>
-            );
-          })}
-        </div>
+        <DonutChart titulo="Patrimônio investido por tipo" fatias={fatias} rotuloCentro="Investido" tamanho={168} className="sm:flex-col" />
       )}
-    </BentoCard>
+    </Card>
   );
 }

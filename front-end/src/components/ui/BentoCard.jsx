@@ -1,69 +1,156 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { cn } from '../../lib/utils';
 import SkeletonCard from './SkeletonCard';
+
+/**
+ * Cartão de painel do Core 4 (`.c4-card`: borda em degradê por máscara + brilho de 1px no topo).
+ * Título em Sora, subtítulo explicativo, ações no canto, selo de variação opcional.
+ * Também exportado como `Card` (components/ui/Card.jsx).
+ *
+ * Props:
+ * - title, subtitle (ou description), eyebrow (rótulo pequeno acima do título)
+ * - icon: ícone lucide ao lado do título (componente ou elemento)
+ * - headerAction (ou actions): nós no canto direito do cabeçalho
+ * - footer: rodapé separado por linha fina (links "Ver tudo", totais)
+ * - children, className, bodyClassName
+ * - padding: 'none' | 'sm' | 'md' (padrão) | 'lg'
+ * - loading: mostra o esqueleto no lugar do conteúdo
+ * - accentChip:  texto do selo de variação ("▲ 12%", "+R$ 300") — ▲/+ → cor de entrada; senão saída
+ * - accentColor: fio de cor na borda esquerda ('primary' | 'income' | 'expense' | 'invest' | 'secondary' | 'warning' | cor CSS)
+ * - destaque: gradientes radiais esmeralda/prata (o cartão principal da tela)
+ * - interactive: hover que eleva (use com onClick ou envolvendo um Link)
+ * - onClick: torna o cartão clicável (vira <button> semântico se `as` não for informado)
+ * - as: elemento raiz ('section' padrão; 'article', 'div', 'li'…)
+ */
+const ACENTOS = {
+  primary: 'var(--color-primary)',
+  income: 'var(--color-income)',
+  expense: 'var(--color-expense)',
+  invest: 'var(--color-invest)',
+  secondary: 'var(--color-secondary)',
+  warning: 'var(--color-warning)',
+};
+
+const PADDINGS = {
+  none: '',
+  sm: 'p-4',
+  md: 'p-5 sm:p-6',
+  lg: 'p-6 sm:p-8',
+};
+
+function chipPositivo(chip) {
+  const texto = String(chip).trim();
+  return texto.startsWith('▲') || texto.startsWith('+');
+}
+
+function IconeTitulo({ icon }) {
+  if (!icon) return null;
+  if (React.isValidElement(icon)) {
+    return <span aria-hidden="true" className="grid place-items-center w-8 h-8 rounded-lg bg-primary/[0.1] text-primary border border-primary/20 shrink-0 [&>svg]:w-4 [&>svg]:h-4">{icon}</span>;
+  }
+  const Icone = icon;
+  return (
+    <span aria-hidden="true" className="grid place-items-center w-8 h-8 rounded-lg bg-primary/[0.1] text-primary border border-primary/20 shrink-0">
+      <Icone className="w-4 h-4" />
+    </span>
+  );
+}
 
 export default function BentoCard({
   children,
   className,
+  bodyClassName,
   title,
   subtitle,
+  description,
+  eyebrow,
+  icon,
   headerAction,
+  actions,
+  footer,
+  padding = 'md',
   loading,
   accentColor,
   accentChip,
+  destaque = false,
+  interactive = false,
+  onClick,
+  as,
 }) {
+  const tituloId = useId();
   if (loading) {
     return <SkeletonCard className={className} />;
   }
 
+  const acento = accentColor ? (ACENTOS[accentColor] ?? accentColor) : null;
+  const acoes = headerAction ?? actions;
+  const apoio = subtitle ?? description;
+  const clicavel = Boolean(onClick);
+  const Raiz = as ?? (clicavel ? 'button' : 'section');
+  const pad = PADDINGS[padding] ?? PADDINGS.md;
+  const Titulo = Raiz === 'button' ? 'span' : 'h2';
+
   return (
-    <section
+    <Raiz
+      aria-labelledby={title && Raiz !== 'button' ? tituloId : undefined}
+      type={Raiz === 'button' ? 'button' : undefined}
+      onClick={onClick}
       className={cn(
-        'rounded-[18px] p-6 flex flex-col',
-        'transition-all duration-200',
+        'c4-card flex flex-col text-left min-w-0',
+        pad,
+        destaque && 'c4-card--destaque',
+        (interactive || clicavel) && 'c4-card--interativo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
         className
       )}
-      style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: accentColor
-          ? `2px solid ${accentColor}33`
-          : '1px solid rgba(250,250,250,0.08)',
-        backdropFilter: 'blur(8px)',
-        boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2)',
-        ...(accentColor && !accentChip ? { borderLeftWidth: 2, borderLeftColor: accentColor } : {}),
-      }}
     >
-      {(title || headerAction || accentChip) && (
-        <div className="flex justify-between items-start mb-6">
-          <div className="min-w-0">
-            {title && (
-              <h2 className="text-lg font-semibold tracking-tight text-text-primary font-display">{title}</h2>
-            )}
-            {subtitle && (
-              <p className="text-xs text-text-primary/70 uppercase font-bold tracking-widest mt-1 font-mono">{subtitle}</p>
-            )}
+      {acento && (
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-5 bottom-5 w-[3px] rounded-r-full bg-[var(--c4-acento)] shadow-[0_0_14px_var(--c4-acento)]"
+          style={{ '--c4-acento': acento }}
+        />
+      )}
+      {(title || acoes || accentChip || eyebrow) && (
+        <div className={cn('flex flex-wrap justify-between items-start gap-x-4 gap-y-3', padding === 'none' ? 'p-5 pb-0 mb-4' : 'mb-5')}>
+          <div className="flex items-start gap-3 min-w-0 flex-1 basis-[12rem]">
+            <IconeTitulo icon={icon} />
+            <div className="min-w-0">
+              {eyebrow && <p className="c4-eyebrow mb-1">{eyebrow}</p>}
+              {title && (
+                <Titulo id={tituloId} className="block break-words text-base sm:text-[1.0625rem] font-semibold tracking-tight text-text-primary font-display leading-snug">
+                  {title}
+                </Titulo>
+              )}
+              {apoio && (
+                <p className="mt-0.5 break-words text-sm text-text-primary/60 leading-snug text-pretty">{apoio}</p>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-4">
-            {accentChip && (
-              <span style={{
-                fontSize: 10, fontWeight: 600,
-                padding: '2px 8px', borderRadius: 4,
-                background: accentChip.startsWith('▲') || accentChip.startsWith('+')
-                  ? 'rgba(110,255,192,.12)' : 'rgba(255,180,171,.12)',
-                color: accentChip.startsWith('▲') || accentChip.startsWith('+')
-                  ? '#6EFFC0' : '#FFB4AB',
-                fontFamily: 'monospace',
-              }}>
-                {accentChip}
-              </span>
-            )}
-            {headerAction}
-          </div>
+          {(accentChip || acoes) && (
+            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
+              {accentChip && (
+                <span className={cn(
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                  chipPositivo(accentChip) ? 'text-income bg-income/[0.12]' : 'text-expense bg-expense/[0.12]'
+                )}>
+                  {accentChip}
+                </span>
+              )}
+              {acoes}
+            </div>
+          )}
         </div>
       )}
-      <div className="flex-1">
+      <div className={cn('flex-1 min-h-0', bodyClassName)}>
         {children}
       </div>
-    </section>
+      {footer && (
+        <div className={cn('mt-5 pt-4 border-t border-border text-sm', padding === 'none' && 'px-5 pb-4')}>
+          {footer}
+        </div>
+      )}
+    </Raiz>
   );
 }
+
+export { BentoCard };

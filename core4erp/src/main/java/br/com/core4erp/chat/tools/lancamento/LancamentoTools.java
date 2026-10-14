@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.tools.lancamento;
 
+import br.com.core4erp.chat.tools.DadosNaoConfiaveisResultConverter;
 import br.com.core4erp.cartaoCredito.dto.LancamentoRequestDto;
 import br.com.core4erp.cartaoCredito.dto.LancamentoResponseDto;
 import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
@@ -290,7 +291,7 @@ public class LancamentoTools {
             inclui as contas PENDENTE com vencimento passado (atrasadas de fato, mesmo que o status
             ainda não tenha sido sincronizado). Use para obter o ID antes de editar, excluir ou
             estornar uma conta.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<ContaResponseDto> consultarContas(
             @ToolParam(description = "Tipo: PAGAR ou RECEBER (opcional)") String tipo,
             @ToolParam(description = "Status: PENDENTE, PAGO, RECEBIDO, ATRASADO (opcional)") String status) {

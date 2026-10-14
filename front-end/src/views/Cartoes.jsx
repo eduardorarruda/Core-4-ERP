@@ -1,813 +1,352 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
-import ConfirmModal from '../components/ui/ConfirmModal';
-import Modal from '../components/ui/Modal';
-import Button from '../components/ui/Button';
-import FormField, { inputCls } from '../components/ui/FormField';
-import CategoriaOptions from '../components/ui/CategoriaOptions';
-import PageHeader from '../components/ui/PageHeader';
-import Badge from '../components/ui/Badge';
-import DataTable from '../components/ui/DataTable';
-import EmptyState from '../components/ui/EmptyState';
-import { brl } from '../lib/formatters';
+import { CreditCard, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { cartoes as cartoesApi, contasCorrentes as contasApi } from '../lib/api';
+import { useCarga } from '../hooks/useCarga';
+import { useConfirm } from '../hooks/useConfirm';
 import { useToast } from '../hooks/useToast';
+import { usePermissao } from '../hooks/usePermissao';
+import { formatarMoeda } from '../lib/formatters';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
+import Drawer from '../components/ui/Drawer';
+import EmptyState from '../components/ui/EmptyState';
+import AlertaErro from '../components/ui/AlertaErro';
+import FilterBar from '../components/ui/FilterBar';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
+import Skeleton from '../components/ui/Skeleton';
+import { Stagger, StaggerItem } from '../components/motion/Movimento';
+import LancamentoCartaoForm from '../components/forms/LancamentoCartaoForm';
+import CartoesTabs from '../components/cartoes/CartoesTabs';
+import CartaoPlastico from '../components/cartoes/CartaoPlastico';
+import CartaoFormModal from '../components/cartoes/CartaoFormModal';
+import ImportarPlanilhaModal from '../components/cartoes/ImportarPlanilhaModal';
+import LinhaDoTempoFaturas from '../components/cartoes/LinhaDoTempoFaturas';
+import FaturaResumo from '../components/cartoes/FaturaResumo';
+import LancamentosTabela from '../components/cartoes/LancamentosTabela';
+import { useValorAtrasado } from '../hooks/useValorAtrasado';
+import { agruparFaturas, chaveFatura, rotuloFatura } from '../components/cartoes/faturas';
 
-const emptyLancForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: true, tipo: 'SAIDA' };
-const emptyEditForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', tipo: 'SAIDA' };
+/*
+ * Cartões → "Faturas e lançamentos" (/cartoes, CARTAO_LANCAR).
+ * Galeria de cartões (plástico 3D) → faturas do cartão escolhido (linha do tempo) → resumo da
+ * fatura com barra por categoria → lançamentos dessa fatura (um único filtro: a fatura escolhida
+ * + busca no servidor, com espera de 300 ms). Estado na URL: ?cartao=1&fatura=2026-10&novo=lancamento.
+ */
 
-const GRADIENTS = [
-  'from-violet-600 to-indigo-700',
-  'from-rose-500 to-pink-700',
-  'from-emerald-500 to-teal-700',
-  'from-amber-500 to-orange-700',
-  'from-sky-500 to-blue-700',
-];
+function AcoesCartao({ cartao, onEditar, onExcluir }) {
+  return (
+    <div className="flex">
+      <PermissaoGuard permissao="CARTAO_EDITAR">
+        <Button variant="ghost" size="icon-sm" onClick={() => onEditar(cartao)} aria-label={`Editar ${cartao.nome}`} className="text-text-primary/75 hover:bg-text-primary/10">
+          <Pencil className="w-4 h-4" aria-hidden="true" />
+        </Button>
+      </PermissaoGuard>
+      <PermissaoGuard permissao="CARTAO_DELETAR">
+        <Button variant="ghost" size="icon-sm" onClick={() => onExcluir(cartao)} aria-label={`Excluir ${cartao.nome}`} className="text-text-primary/75 hover:bg-text-primary/10">
+          <Trash2 className="w-4 h-4" aria-hidden="true" />
+        </Button>
+      </PermissaoGuard>
+    </div>
+  );
+}
 
-function cardGradient(id) {
-  return GRADIENTS[(id - 1) % GRADIENTS.length];
+function CarregandoGaleria() {
+  return (
+    <div role="status" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+      <span className="sr-only">Carregando cartões…</span>
+      {[0, 1, 2].map((i) => <Skeleton key={i} className="aspect-[1.586/1] rounded-3xl" />)}
+    </div>
+  );
 }
 
 export default function Cartoes() {
   const toast = useToast();
-  const [lista, setLista] = useState([]);
-  const [ccs, setCcs] = useState([]);
-  const [cats, setCats] = useState([]);
-  const [pars, setPars] = useState([]);
-  const [form, setForm] = useState({ nome: '', limite: '', diaFechamento: '', diaVencimento: '', contaCorrenteId: '' });
-  const [cartaoSel, setCartaoSel] = useState(null);
-  const [lancamentos, setLancamentos] = useState([]);
-  const [todosLancamentos, setTodosLancamentos] = useState([]);
-  const [lancForm, setLancForm] = useState(emptyLancForm);
-  const [editLancId, setEditLancId] = useState(null);
-  const [editForm, setEditForm] = useState(emptyEditForm);
-  const [editErrors, setEditErrors] = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const [salvandoLanc, setSalvandoLanc] = useState(false);
-  const [salvandoEdit, setSalvandoEdit] = useState(false);
-  const [salvandoFatura, setSalvandoFatura] = useState(false);
-  const [carregandoLancamentos, setCarregandoLancamentos] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [showForm, setShowForm] = useState(false);
-  const [filterMes, setFilterMes] = useState('');
-  const [filterAno, setFilterAno] = useState('');
+  const confirmar = useConfirm();
+  const pode = usePermissao();
+  const [params, setParams] = useSearchParams();
+  const [versao, setVersao] = useState(0);
   const [busca, setBusca] = useState('');
-  const [showImport, setShowImport] = useState(false);
-  const [importFile, setImportFile] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState(null);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const termo = useValorAtrasado(busca.trim(), 300);
+  const [editando, setEditando] = useState(null);
+  const [modalCartao, setModalCartao] = useState(null); // { modo, cartao? }
+  const [importando, setImportando] = useState(false);
+  const [fechando, setFechando] = useState(false);
 
-  useEffect(() => {
-    Promise.all([api.listar(), ccApi.listar(), catApi.listar(), parApi.listar()])
-      .then(([l, cs, ca, ps]) => {
-        setLista(l); setCcs(cs); setCats(ca); setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'));
-        // Restaura o cartão selecionado a partir da URL (?cartao=<id>) — preserva o
-        // contexto ao atualizar a página, usar voltar/avançar ou abrir um deep-link.
-        const cartaoId = searchParams.get('cartao');
-        if (cartaoId) {
-          const c = l.find((x) => String(x.id) === cartaoId);
-          if (c) abrirCartao(c);
-        }
-      })
-      .catch((e) => toast.error(e.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ── Dados ───────────────────────────────────────────────────────────────
+  const cargaCartoes = useCarga(() => cartoesApi.listar(), [versao]);
+  const cartoes = useMemo(() => cargaCartoes.dados ?? [], [cargaCartoes.dados]);
+  const cartao = cartoes.find((c) => String(c.id) === params.get('cartao')) ?? cartoes[0] ?? null;
 
-  async function recarregarLancamentos(params = {}) {
-    if (!cartaoSel) return;
-    const l = await api.lancamentos.listar(cartaoSel.id, params);
-    setLancamentos(l);
-  }
+  const cargaTodos = useCarga(() => cartoesApi.lancamentos.listar(cartao.id), [cartao?.id, versao], { ativo: Boolean(cartao), inicial: [] });
+  const faturas = useMemo(() => agruparFaturas(cargaTodos.dados ?? []), [cargaTodos.dados]);
+  const fatura = faturas.find((f) => f.chave === params.get('fatura'))
+    ?? faturas.find((f) => f.situacao === 'aberta')
+    ?? faturas[faturas.length - 1]
+    ?? null;
+  const lancsDaFatura = useMemo(
+    () => (fatura ? (cargaTodos.dados ?? []).filter((l) => chaveFatura(l.anoFatura, l.mesFatura) === fatura.chave) : []),
+    [cargaTodos.dados, fatura],
+  );
 
-  // Recarrega a lista COMPLETA (sem filtro) — usada após criar/editar/excluir/fechar, pois é dela
-  // que sai o cálculo das faturas em aberto.
-  async function recarregarTudo() {
-    if (!cartaoSel) return;
-    setCarregandoLancamentos(true);
-    try {
-      const l = await api.lancamentos.listar(cartaoSel.id);
-      setLancamentos(l);
-      setTodosLancamentos(l);
-    } finally {
-      setCarregandoLancamentos(false);
-    }
-  }
+  // Lista da tabela: UM filtro (servidor) — fatura escolhida + busca
+  const cargaTabela = useCarga(
+    () => cartoesApi.lancamentos.listar(cartao.id, { mes: fatura.mes, ano: fatura.ano, ...(termo ? { busca: termo } : {}) }),
+    [cartao?.id, fatura?.chave, termo, versao],
+    { ativo: Boolean(cartao && fatura), inicial: [] },
+  );
 
-  async function importarPlanilha() {
-    if (!importFile || !cartaoSel) return;
-    setImporting(true);
-    setImportResult(null);
-    try {
-      const res = await api.lancamentos.importar(cartaoSel.id, importFile);
-      setImportResult(res);
-      if (res.lancamentosCriados > 0) {
-        toast.success(`${res.lancamentosCriados} lançamento(s) importado(s)`);
-        // Atualiza lançamentos, limite do cartão e os dropdowns (categorias/parceiros novos).
-        await recarregarTudo();
-        const [l, ca, ps] = await Promise.all([api.listar(), catApi.listar(), parApi.listar()]);
-        setLista(l);
-        setCats(ca);
-        setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'));
-        setCartaoSel((prev) => l.find((x) => x.id === prev?.id) || prev);
-      }
-    } catch (err) {
-      toast.error(err.message || 'Não foi possível importar a planilha.');
-    } finally {
-      setImporting(false);
-    }
-  }
+  const contasCarga = useCarga(() => contasApi.listar(), ['contas'], { ativo: Boolean(modalCartao), inicial: [] });
 
-  function abrirImport() {
-    setImportFile(null);
-    setImportResult(null);
-    setShowImport(true);
-  }
+  // ── URL ─────────────────────────────────────────────────────────────────
+  const mudarParams = (mudar) => setParams((atual) => {
+    const p = new URLSearchParams(atual);
+    mudar(p);
+    return p;
+  }, { replace: true });
+  const escolherCartao = (c) => mudarParams((p) => { p.set('cartao', String(c.id)); p.delete('fatura'); });
+  const escolherFatura = (chave) => mudarParams((p) => p.set('fatura', chave));
+  const novoAberto = params.get('novo') === 'lancamento' && Boolean(cartao);
+  const abrirNovo = () => mudarParams((p) => p.set('novo', 'lancamento'));
+  const fecharDrawer = () => { setEditando(null); mudarParams((p) => p.delete('novo')); };
 
-  function validateCartaoForm() {
-    const errs = {};
-    if (!form.nome.trim()) errs.nome = 'Nome é obrigatório';
-    if (!form.limite || parseFloat(form.limite) <= 0) errs.limite = 'Limite deve ser maior que zero';
-    const d1 = Number(form.diaFechamento);
-    if (!d1 || d1 < 1 || d1 > 31) errs.diaFechamento = 'Dia deve ser entre 1 e 31';
-    const d2 = Number(form.diaVencimento);
-    if (!d2 || d2 < 1 || d2 > 31) errs.diaVencimento = 'Dia deve ser entre 1 e 31';
-    if (!form.contaCorrenteId) errs.contaCorrenteId = 'Selecione uma conta corrente';
-    return errs;
-  }
+  const recarregar = () => setVersao((v) => v + 1);
 
-  function validateLancForm() {
-    const errs = {};
-    if (!lancForm.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
-    if (!lancForm.valor || parseFloat(lancForm.valor) <= 0) errs.valor = 'Valor deve ser maior que zero';
-    if (!lancForm.dataCompra) errs.dataCompra = 'Data é obrigatória';
-    if (!lancForm.categoriaId) errs.categoriaId = 'Selecione uma categoria';
-    if (!lancForm.parceiroId) errs.parceiroId = 'Selecione um parceiro';
-    const parc = Number(lancForm.quantidadeParcelas);
-    if (!parc || parc < 1) errs.quantidadeParcelas = 'Mínimo 1 parcela';
-    return errs;
-  }
-
-  async function criarCartao(e) {
-    e.preventDefault();
-    const errs = validateCartaoForm();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setErrors({});
-    setSalvando(true);
-    try {
-      await api.criar({ ...form, limite: parseFloat(form.limite), diaFechamento: Number(form.diaFechamento), diaVencimento: Number(form.diaVencimento), contaCorrenteId: Number(form.contaCorrenteId) });
-      setForm({ nome: '', limite: '', diaFechamento: '', diaVencimento: '', contaCorrenteId: '' });
-      setShowForm(false);
-      setLista(await api.listar());
-      toast.success('Cartão criado!');
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  function deletarCartao(id) {
-    setConfirmAction({
-      title: 'Excluir cartão',
-      message: 'Tem certeza que deseja excluir este cartão? Esta ação não pode ser desfeita.',
+  // ── Ações ───────────────────────────────────────────────────────────────
+  async function excluirLancamento(l) {
+    const ok = await confirmar({
+      title: 'Excluir lançamento?',
+      message: `"${l.descricao}" sai da fatura de ${rotuloFatura(l.anoFatura, l.mesFatura, { curto: false })}.${l.totalParcelas > 1 ? ' Só esta parcela é excluída.' : ''}`,
       confirmLabel: 'Excluir',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        try {
-          await api.deletar(id);
-          setLista(await api.listar());
-          toast.success('Cartão excluído!');
-        } catch (e) {
-          toast.error(e.message);
-        }
-      },
+      variant: 'danger',
     });
-  }
-
-  async function abrirCartao(c) {
-    setCartaoSel(c);
-    setEditLancId(null);
-    setErrors({});
-    // Persiste o cartão aberto na URL (idempotente ao restaurar via deep-link).
-    setSearchParams({ cartao: String(c.id) });
-    setCarregandoLancamentos(true);
-    setLancamentos([]);
-    setTodosLancamentos([]);
+    if (!ok) return;
     try {
-      const l = await api.lancamentos.listar(c.id);
-      setLancamentos(l);
-      setTodosLancamentos(l);
+      await cartoesApi.lancamentos.deletar(cartao.id, l.id);
+      toast.success('Lançamento excluído.');
+      recarregar();
     } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setCarregandoLancamentos(false);
+      toast.error(e.message || 'Não foi possível excluir o lançamento.');
     }
   }
 
-  function fecharCartao() {
-    setCartaoSel(null);
-    setEditLancId(null);
-    setSearchParams({});
-  }
-
-  async function criarLancamento(e) {
-    e.preventDefault();
-    const errs = validateLancForm();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setErrors({});
-    setSalvandoLanc(true);
-    try {
-      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor, tipo: lancForm.tipo });
-      await recarregarTudo();
-      setLancForm(emptyLancForm);
-      toast.success('Lançamento criado!');
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvandoLanc(false);
-    }
-  }
-
-  function validateEditForm() {
-    const errs = {};
-    if (!editForm.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
-    if (!editForm.valor || parseFloat(editForm.valor) <= 0) errs.valor = 'Valor deve ser maior que zero';
-    if (!editForm.dataCompra) errs.dataCompra = 'Data é obrigatória';
-    if (!editForm.categoriaId) errs.categoriaId = 'Selecione uma categoria';
-    if (!editForm.parceiroId) errs.parceiroId = 'Selecione um parceiro';
-    return errs;
-  }
-
-  function iniciarEdicao(l) {
-    setEditLancId(l.id);
-    setEditErrors({});
-    setEditForm({ descricao: l.descricao, valor: String(l.valor), dataCompra: l.dataCompra, categoriaId: String(l.categoriaId), parceiroId: l.parceiroId ? String(l.parceiroId) : '', tipo: l.tipo || 'SAIDA' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  async function salvarEdicao(e) {
-    e.preventDefault();
-    const errs = validateEditForm();
-    if (Object.keys(errs).length) { setEditErrors(errs); return; }
-    setEditErrors({});
-    setSalvandoEdit(true);
-    try {
-      await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), categoriaId: Number(editForm.categoriaId), parceiroId: Number(editForm.parceiroId), tipo: editForm.tipo });
-      await recarregarTudo();
-      setEditLancId(null);
-      toast.success('Lançamento atualizado!');
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvandoEdit(false);
-    }
-  }
-
-  function deletarLancamento(id) {
-    setConfirmAction({
-      title: 'Excluir lançamento',
-      message: 'Tem certeza que deseja excluir este lançamento?',
-      confirmLabel: 'Excluir',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        try {
-          await api.lancamentos.deletar(cartaoSel.id, id);
-          await recarregarTudo();
-          toast.success('Lançamento excluído!');
-        } catch (e) {
-          toast.error(e.message);
-        }
-      },
+  async function excluirCartao(c) {
+    const ok = await confirmar({
+      title: `Excluir o ${c.nome}?`,
+      message: 'O cartão sai da lista. Só é possível excluir um cartão sem fatura em aberto.',
+      confirmLabel: 'Excluir cartão',
+      variant: 'danger',
     });
+    if (!ok) return;
+    try {
+      await cartoesApi.deletar(c.id);
+      toast.success('Cartão excluído.');
+      mudarParams((p) => { p.delete('cartao'); p.delete('fatura'); });
+      recarregar();
+    } catch (e) {
+      toast.error(e.message || 'Não foi possível excluir o cartão.');
+    }
   }
 
-  function fecharFatura(mes, ano) {
-    setConfirmAction({
-      title: 'Fechar fatura',
-      message: `Fechar a fatura de ${String(mes).padStart(2, '0')}/${ano}? Isso gera uma conta a pagar e bloqueia novos lançamentos nesta fatura.`,
+  async function fecharFatura(f) {
+    const ok = await confirmar({
+      title: `Fechar a fatura de ${rotuloFatura(f.ano, f.mes, { curto: false })}?`,
+      message: `Vamos gerar uma conta a pagar de ${formatarMoeda(f.total)} e a fatura não aceitará mais lançamentos.`,
       confirmLabel: 'Fechar fatura',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        setSalvandoFatura(true);
-        try {
-          await api.fecharFatura(cartaoSel.id, { mes: Number(mes), ano: Number(ano) });
-          await recarregarTudo();
-          // Atualiza limite usado/livre exibido no cabeçalho e na lista de cartões.
-          const novaLista = await api.listar();
-          setLista(novaLista);
-          const atualizado = novaLista.find((c) => c.id === cartaoSel.id);
-          if (atualizado) setCartaoSel(atualizado);
-          toast.success('Fatura fechada! Conta a pagar gerada.');
-        } catch (e) {
-          toast.error(e.message);
-        } finally {
-          setSalvandoFatura(false);
-        }
-      },
+      variant: 'warning',
     });
+    if (!ok) return;
+    setFechando(true);
+    try {
+      await cartoesApi.fecharFatura(cartao.id, { mes: f.mes, ano: f.ano });
+      toast.success('Fatura fechada. A conta a pagar já está em Contas a pagar e receber.');
+      recarregar();
+    } catch (e) {
+      toast.error(e.message || 'Não foi possível fechar a fatura.');
+    } finally {
+      setFechando(false);
+    }
   }
 
-  const lancsFiltrados = lancamentos.filter((l) => {
-    if (filterMes && String(l.mesFatura) !== filterMes) return false;
-    if (filterAno && String(l.anoFatura) !== filterAno) return false;
-    return true;
-  });
+  function aoSalvarLancamento(_, dto) {
+    const editar = Boolean(editando);
+    toast.success(editar ? 'Lançamento atualizado.' : dto.quantidadeParcelas > 1 ? `Compra lançada em ${dto.quantidadeParcelas} parcelas.` : 'Lançamento adicionado.');
+    fecharDrawer();
+    recarregar();
+  }
 
-  // Faturas em aberto (não fechadas), agrupadas por mês/ano, com o total LÍQUIDO de cada uma
-  // (soma das SAÍDAS menos as ENTRADAS). Ordenadas da mais antiga para a mais recente — a primeira
-  // é a "atual", a próxima a ser fechada.
-  const faturasAbertas = useMemo(() => {
-    const mapa = new Map();
-    for (const l of todosLancamentos) {
-      if (l.faturaFechada) continue;
-      const chave = `${l.anoFatura}-${l.mesFatura}`;
-      const atual = mapa.get(chave) || { mes: l.mesFatura, ano: l.anoFatura, total: 0, qtd: 0 };
-      const v = Number(l.valor) || 0;
-      atual.total += l.tipo === 'ENTRADA' ? -v : v;
-      atual.qtd += 1;
-      mapa.set(chave, atual);
-    }
-    return Array.from(mapa.values()).sort((a, b) => a.ano - b.ano || a.mes - b.mes);
-  }, [todosLancamentos]);
-
-  const columns = [
-    {
-      key: 'descricao',
-      label: 'Descrição',
-      render: (v, row) => (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-text-primary font-medium">{v}</span>
-          {row.assinaturaId && (
-            <Badge variant="info">
-              <span className="flex items-center gap-1"><Repeat className="w-2.5 h-2.5" /> Assinatura</span>
-            </Badge>
-          )}
-          {row.faturaFechada && (
-            <Badge variant="warning">
-              <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" /> Fechada</span>
-            </Badge>
+  // ── Render ──────────────────────────────────────────────────────────────
+  const podeLancar = pode('CARTAO_LANCAR');
+  const cabecalho = (
+    <PageHeader
+      title="Cartões"
+      subtitle="Faturas, limites e lançamentos de cada cartão."
+      icon={CreditCard}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <PermissaoGuard permissao="CARTAO_CRIAR">
+            <Button variant="secondary" onClick={() => setModalCartao({ modo: 'criar' })} leftIcon={<Plus className="w-4 h-4" aria-hidden="true" />}>
+              Novo cartão
+            </Button>
+          </PermissaoGuard>
+          {cartao && podeLancar && (
+            <Button onClick={abrirNovo} leftIcon={<Plus className="w-4 h-4" aria-hidden="true" />}>Novo lançamento</Button>
           )}
         </div>
-      ),
-    },
-    { key: 'valor', label: 'Valor', render: (v, row) => (
-      <span className={`font-mono font-bold ${row.tipo === 'ENTRADA' ? 'text-primary' : 'text-error'}`}>
-        {row.tipo === 'ENTRADA' ? '+' : '-'} R$ {brl(v)}
-      </span>
-    )},
-    { key: 'mesFatura', label: 'Fatura', render: (v, row) => `${String(v).padStart(2, '0')}/${row.anoFatura}` },
-    { key: 'numeroParcela', label: 'Parcela', render: (v, row) => `${v}/${row.totalParcelas}` },
-    {
-      key: 'id',
-      label: 'Ações',
-      render: (id, row) => (
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => iniciarEdicao(row)}
-            disabled={row.faturaFechada}
-            aria-label="Editar lançamento"
-            title={row.faturaFechada ? 'Fatura fechada' : 'Editar'}
-            className="text-text-primary/60 hover:text-primary hover:bg-primary/10"
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => deletarLancamento(id)}
-            disabled={row.faturaFechada}
-            aria-label="Excluir lançamento"
-            title={row.faturaFechada ? 'Fatura fechada' : 'Excluir'}
-            className="text-text-primary/60 hover:text-error hover:bg-error/10"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+      }
+    >
+      <CartoesTabs />
+    </PageHeader>
+  );
+
+  let conteudo;
+  if (cargaCartoes.carregandoInicial) {
+    conteudo = <CarregandoGaleria />;
+  } else if (cargaCartoes.erro && !cartoes.length) {
+    conteudo = <AlertaErro mensagem={cargaCartoes.erro.message} onTentarNovamente={cargaCartoes.recarregar} />;
+  } else if (!cartoes.length) {
+    conteudo = (
+      <EmptyState
+        icon={CreditCard}
+        title="Nenhum cartão cadastrado"
+        description="Cadastre um cartão para lançar compras, acompanhar as faturas e ver quanto do limite ainda está livre."
+        action={pode('CARTAO_CRIAR') ? { label: 'Adicionar cartão', onClick: () => setModalCartao({ modo: 'criar' }), icon: Plus } : undefined}
+      />
+    );
+  } else {
+    conteudo = (
+      <div className="space-y-8">
+        <section aria-labelledby="titulo-galeria">
+          <h2 id="titulo-galeria" className="sr-only">Seus cartões</h2>
+          <Stagger className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {cartoes.map((c) => (
+              <StaggerItem key={c.id}>
+                <CartaoPlastico
+                  cartao={c}
+                  selecionado={c.id === cartao.id}
+                  onSelecionar={escolherCartao}
+                  acoes={<AcoesCartao cartao={c} onEditar={(x) => setModalCartao({ modo: 'editar', cartao: x })} onExcluir={excluirCartao} />}
+                />
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </section>
+
+        <section aria-labelledby="titulo-faturas" className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2 id="titulo-faturas" className="font-display text-lg font-semibold text-text-primary">Faturas do {cartao.nome}</h2>
+              <p className="text-sm text-text-primary/60">Escolha uma fatura para ver os lançamentos dela.</p>
+            </div>
+          </div>
+
+          {cargaTodos.erro ? (
+            <AlertaErro mensagem={cargaTodos.erro.message} onTentarNovamente={recarregar} compacto />
+          ) : cargaTodos.carregando && !faturas.length ? (
+            <div className="flex gap-2" role="status"><span className="sr-only">Carregando faturas…</span>{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="w-36 h-[5.5rem] rounded-2xl" />)}</div>
+          ) : !fatura ? (
+            <EmptyState
+              compact
+              icon={CreditCard}
+              title="Este cartão ainda não tem lançamentos"
+              description="Lance a primeira compra ou importe uma planilha para começar a montar as faturas."
+              action={podeLancar ? { label: 'Novo lançamento', onClick: abrirNovo, icon: Plus } : undefined}
+              secondaryAction={{ label: 'Importar planilha', onClick: () => setImportando(true) }}
+            />
+          ) : (
+            <>
+              <LinhaDoTempoFaturas faturas={faturas} valor={fatura.chave} onChange={escolherFatura} />
+              <FaturaResumo
+                cartao={cartao}
+                fatura={fatura}
+                lancamentos={lancsDaFatura}
+                fechando={fechando}
+                onFechar={fecharFatura}
+                onImportar={() => setImportando(true)}
+              />
+            </>
+          )}
+        </section>
+
+        {fatura && (
+          <section aria-labelledby="titulo-lancamentos" className="space-y-4">
+            <h2 id="titulo-lancamentos" className="font-display text-lg font-semibold text-text-primary">
+              Lançamentos de {rotuloFatura(fatura.ano, fatura.mes, { curto: false })}
+            </h2>
+            <FilterBar
+              busca={{ value: busca, onChange: setBusca, placeholder: 'Buscar por descrição, categoria ou parceiro', label: 'Buscar lançamentos' }}
+              filtrosAtivos={busca ? 1 : 0}
+              onLimpar={() => setBusca('')}
+            />
+            <div aria-busy={cargaTabela.carregando} className={cargaTabela.carregando && !cargaTabela.carregandoInicial ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+              {cargaTabela.erro ? (
+                <AlertaErro mensagem={cargaTabela.erro.message} onTentarNovamente={cargaTabela.recarregar} />
+              ) : (
+                <LancamentosTabela
+                  rotulo={`Lançamentos da fatura de ${rotuloFatura(fatura.ano, fatura.mes, { curto: false })}`}
+                  lancamentos={cargaTabela.dados ?? []}
+                  carregando={cargaTabela.carregandoInicial}
+                  podeEditar={podeLancar}
+                  onEditar={setEditando}
+                  onExcluir={excluirLancamento}
+                  vazio={termo ? (
+                    <EmptyState compact icon={Search} title="Nada encontrado" description={`Nenhum lançamento desta fatura combina com "${termo}".`} action={{ label: 'Limpar busca', onClick: () => setBusca('') }} />
+                  ) : undefined}
+                />
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Cartões de Crédito"
-        subtitle="Gerencie seus cartões e lançamentos"
-        actions={
-          !cartaoSel && (
-            <button
-              onClick={() => { setForm({ nome: '', limite: '', diaFechamento: '', diaVencimento: '', contaCorrenteId: '' }); setErrors({}); setShowForm((v) => !v); }}
-              className="flex items-center gap-2 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest px-4 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Cartão
-            </button>
-          )
-        }
+      {cabecalho}
+      {conteudo}
+
+      <Drawer
+        open={Boolean(editando) || novoAberto}
+        onClose={fecharDrawer}
+        title={editando ? 'Editar lançamento' : 'Novo lançamento'}
+        description={cartao ? cartao.nome : undefined}
+        size="md"
+      >
+        {cartao && (editando || novoAberto) && (
+          <LancamentoCartaoForm
+            key={editando?.id ?? `novo-${cartao.id}`}
+            modo={editando ? 'editar' : 'criar'}
+            cartaoId={cartao.id}
+            inicial={editando ?? undefined}
+            diaFechamento={cartao.diaFechamento}
+            onSalvo={aoSalvarLancamento}
+            onCancelar={fecharDrawer}
+            compacto
+          />
+        )}
+      </Drawer>
+
+      <CartaoFormModal
+        open={Boolean(modalCartao)}
+        modo={modalCartao?.modo}
+        cartao={modalCartao?.cartao}
+        contas={contasCarga.dados ?? []}
+        onFechar={() => setModalCartao(null)}
+        onSalvo={(salvo) => {
+          toast.success(modalCartao?.modo === 'editar' ? 'Cartão atualizado.' : 'Cartão adicionado.');
+          setModalCartao(null);
+          if (salvo?.id) escolherCartao(salvo);
+          recarregar();
+        }}
       />
 
-      {/* Form novo cartão */}
-      {!cartaoSel && showForm && (
-        <div className="rounded-[18px] p-6 space-y-4 animate-scale-in bg-surface-low border border-text-primary/10 shadow-card">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70 font-mono">Novo Cartão</h2>
-          <form onSubmit={criarCartao}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-              <FormField label="Nome" required error={errors.nome}>
-                <input className={inputCls} value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} />
-              </FormField>
-              <FormField label="Limite (R$)" required error={errors.limite}>
-                <input type="number" step="0.01" className={inputCls} value={form.limite} onChange={(e) => setForm((f) => ({ ...f, limite: e.target.value }))} />
-              </FormField>
-              <FormField label="Dia Fechamento" required error={errors.diaFechamento}>
-                <input type="number" min="1" max="31" className={inputCls} value={form.diaFechamento} onChange={(e) => setForm((f) => ({ ...f, diaFechamento: e.target.value }))} />
-              </FormField>
-              <FormField label="Dia Vencimento" required error={errors.diaVencimento}>
-                <input type="number" min="1" max="31" className={inputCls} value={form.diaVencimento} onChange={(e) => setForm((f) => ({ ...f, diaVencimento: e.target.value }))} />
-              </FormField>
-              <FormField label="Conta Corrente" required error={errors.contaCorrenteId}>
-                <select className={`${inputCls} appearance-none`} value={form.contaCorrenteId} onChange={(e) => setForm((f) => ({ ...f, contaCorrenteId: e.target.value }))}>
-                  <option value="">Selecione</option>
-                  {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
-                </select>
-              </FormField>
-            </div>
-            <div className="flex gap-3">
-              <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                {salvando ? 'Criando...' : 'Criar Cartão'}
-              </button>
-              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Lista de cartões */}
-      {!cartaoSel && (
-        lista.length === 0 ? (
-          <EmptyState icon={CreditCard} title="Nenhum cartão cadastrado" description="Adicione seus cartões de crédito para controlar os gastos." />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {lista.map((c) => {
-              const usoPct = Math.min(100, (Number(c.limiteUsado) / Number(c.limite)) * 100);
-              return (
-                <div
-                  key={c.id}
-                  className="group relative rounded-2xl overflow-hidden hover:shadow-elevated transition-all hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-surface"
-                >
-                  <div className={`bg-gradient-to-br ${cardGradient(c.id)} p-5 space-y-4`}>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        {/* Botão "esticado": o cartão inteiro é clicável e acessível por teclado */}
-                        <button
-                          type="button"
-                          onClick={() => abrirCartao(c)}
-                          className="font-bold text-white text-base drop-shadow text-left outline-none after:absolute after:inset-0 after:content-['']"
-                        >
-                          {c.nome}
-                          <span className="sr-only">: abrir lançamentos do cartão</span>
-                        </button>
-                        <p className="text-white/80 text-xs mt-0.5">Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}</p>
-                        <p className="text-white/70 text-xs">{c.contaCorrenteDescricao}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => deletarCartao(c.id)}
-                        aria-label={`Excluir cartão ${c.nome}`}
-                        className="relative z-10 min-w-11 min-h-11 grid place-items-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-                      >
-                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                      </button>
-                    </div>
-
-                    <CreditCard className="w-8 h-8 text-white/25" aria-hidden="true" />
-
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs text-white/70">
-                        <span>Limite total</span>
-                        <span className="font-bold text-white">R$ {brl(c.limite)}</span>
-                      </div>
-                      <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="h-full bg-white/80 rounded-full transition-all duration-700"
-                          style={{ width: `${usoPct.toFixed(1)}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-white/60">Usado R$ {brl(c.limiteUsado)}</span>
-                        <span className="text-white/80 font-medium">Livre R$ {brl(c.limiteLivre)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
-      )}
-
-      {/* Detalhe do cartão selecionado */}
-      {cartaoSel && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="rounded-[18px] p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-3 justify-between bg-surface-low border border-text-primary/10">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="live-dot" style={{ width: 5, height: 5 }} />
-                <h2 className="text-lg font-bold text-text-primary font-display truncate">{cartaoSel.nome}</h2>
-              </div>
-              <p className="text-xs text-text-primary/60 font-mono uppercase tracking-widest mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
-                <span>Limite <span className="text-text-primary/70">R$ {brl(cartaoSel.limite)}</span></span>
-                <span className="text-text-primary/60 hidden sm:inline">·</span>
-                <span>Usado <span className="text-error/80">R$ {brl(cartaoSel.limiteUsado)}</span></span>
-                <span className="text-text-primary/60 hidden sm:inline">·</span>
-                <span>Livre <span className="text-primary/80">R$ {brl(cartaoSel.limiteLivre)}</span></span>
-              </p>
-            </div>
-            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-              <Button
-                variant="ghost"
-                onClick={abrirImport}
-                leftIcon={<Upload className="w-3.5 h-3.5" />}
-                className="border border-primary/25 text-primary/90 hover:text-primary hover:bg-primary/10"
-              >
-                Importar planilha
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={fecharCartao}
-                aria-label="Fechar cartão"
-                className="text-text-primary/60 hover:text-text-primary bg-surface-high/40"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Formulário de edição inline */}
-          {editLancId && (
-            <div className="rounded-[18px] p-6 space-y-4 animate-scale-in bg-primary/5 border border-primary/20" style={{ backdropFilter: 'blur(8px)' }}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-primary">Editar Lançamento</h3>
-                <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold self-start sm:self-auto">
-                  <button type="button" onClick={() => setEditForm((f) => ({ ...f, tipo: 'SAIDA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
-                    Saída
-                  </button>
-                  <button type="button" onClick={() => setEditForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
-                    Entrada
-                  </button>
-                </div>
-              </div>
-              <form onSubmit={salvarEdicao}>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                  <FormField label="Descrição" required error={editErrors.descricao}>
-                    <input className={inputCls} value={editForm.descricao} onChange={(e) => setEditForm((f) => ({ ...f, descricao: e.target.value }))} />
-                  </FormField>
-                  <FormField label="Valor (R$)" required error={editErrors.valor}>
-                    <input type="number" step="0.01" className={inputCls} value={editForm.valor} onChange={(e) => setEditForm((f) => ({ ...f, valor: e.target.value }))} />
-                  </FormField>
-                  <FormField label="Data Compra" required error={editErrors.dataCompra}>
-                    <input type="date" className={inputCls} value={editForm.dataCompra} onChange={(e) => setEditForm((f) => ({ ...f, dataCompra: e.target.value }))} />
-                  </FormField>
-                  <FormField label="Categoria" required error={editErrors.categoriaId}>
-                    <select className={`${inputCls} appearance-none`} value={editForm.categoriaId} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))}>
-                      <option value="">Selecione</option>
-                      <CategoriaOptions cats={cats} />
-                    </select>
-                  </FormField>
-                  <FormField label="Parceiro / Fornecedor" required error={editErrors.parceiroId}>
-                    <select className={`${inputCls} appearance-none`} value={editForm.parceiroId} onChange={(e) => setEditForm((f) => ({ ...f, parceiroId: e.target.value }))}>
-                      <option value="">— Selecionar —</option>
-                      {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
-                    </select>
-                  </FormField>
-                </div>
-                <div className="flex gap-3">
-                  <Button type="submit" loading={salvandoEdit}>
-                    {salvandoEdit ? 'Salvando...' : 'Salvar'}
-                  </Button>
-                  <Button type="button" variant="ghost" onClick={() => setEditLancId(null)} className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
-                    Cancelar
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Novo lançamento */}
-            <form onSubmit={criarLancamento} className="rounded-[18px] p-6 space-y-3 bg-surface-low border border-text-primary/10">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/70 font-mono">Novo Lançamento</h3>
-                <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold">
-                  <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'SAIDA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
-                    Saída
-                  </button>
-                  <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
-                    Entrada
-                  </button>
-                </div>
-              </div>
-              <FormField label="Descrição" required error={errors.descricao}>
-                <input className={inputCls} value={lancForm.descricao} onChange={(e) => setLancForm((f) => ({ ...f, descricao: e.target.value }))} />
-              </FormField>
-              <FormField label="Valor (R$)" required error={errors.valor}>
-                <input type="number" step="0.01" className={inputCls} value={lancForm.valor} onChange={(e) => setLancForm((f) => ({ ...f, valor: e.target.value }))} />
-              </FormField>
-              <FormField label="Data Compra" required error={errors.dataCompra}>
-                <input type="date" className={inputCls} value={lancForm.dataCompra} onChange={(e) => setLancForm((f) => ({ ...f, dataCompra: e.target.value }))} />
-              </FormField>
-              <FormField label="Nº Parcelas" required error={errors.quantidadeParcelas}>
-                <input type="number" min="1" className={inputCls} value={lancForm.quantidadeParcelas} onChange={(e) => setLancForm((f) => ({ ...f, quantidadeParcelas: e.target.value }))} />
-              </FormField>
-              {Number(lancForm.quantidadeParcelas) > 1 && (
-                <label className="flex items-center gap-2 text-sm text-text-primary/70 cursor-pointer">
-                  <input type="checkbox" checked={lancForm.dividirValor} onChange={(e) => setLancForm((f) => ({ ...f, dividirValor: e.target.checked }))} className="w-4 h-4 accent-primary" />
-                  Dividir valor entre parcelas
-                </label>
-              )}
-              <FormField label="Categoria" required error={errors.categoriaId}>
-                <select className={`${inputCls} appearance-none`} value={lancForm.categoriaId} onChange={(e) => setLancForm((f) => ({ ...f, categoriaId: e.target.value }))}>
-                  <option value="">Selecione</option>
-                  <CategoriaOptions cats={cats} />
-                </select>
-              </FormField>
-              <FormField label="Parceiro / Fornecedor" required error={errors.parceiroId}>
-                <select className={`${inputCls} appearance-none`} value={lancForm.parceiroId} onChange={(e) => setLancForm((f) => ({ ...f, parceiroId: e.target.value }))}>
-                  <option value="">— Selecionar —</option>
-                  {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
-                </select>
-              </FormField>
-              <Button type="submit" loading={salvandoLanc} leftIcon={<Plus className="w-3.5 h-3.5" />}>
-                {salvandoLanc ? 'Lançando...' : 'Lançar'}
-              </Button>
-            </form>
-
-            {/* Fatura em aberto */}
-            <div className="rounded-[18px] p-6 space-y-3 bg-warning/5 border border-warning/20" style={{ backdropFilter: 'blur(8px)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-warning">Fatura em Aberto</h3>
-              {faturasAbertas.length === 0 ? (
-                <p className="text-sm text-text-primary/70 py-6 text-center">Nenhuma fatura em aberto neste cartão.</p>
-              ) : (
-                <div className="space-y-2">
-                  {faturasAbertas.map((f, i) => (
-                    <div key={`${f.ano}-${f.mes}`} className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 bg-surface-medium/40 border border-text-primary/10">
-                      <div className="min-w-0">
-                        <p className="text-xs text-text-primary/70 font-mono uppercase tracking-widest">
-                          Fatura {String(f.mes).padStart(2, '0')}/{f.ano}
-                          {i === 0 && faturasAbertas.length > 1 && <span className="text-primary/70"> · atual</span>}
-                        </p>
-                        <p className="text-xl font-bold text-text-primary font-mono">R$ {brl(f.total)}</p>
-                        <p className="text-xs text-text-primary/60">{f.qtd} lançamento{f.qtd > 1 ? 's' : ''}</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => fecharFatura(f.mes, f.ano)}
-                        disabled={salvandoFatura || f.total <= 0}
-                        title={f.total <= 0 ? 'Fatura sem valor a fechar' : 'Fechar esta fatura'}
-                        className="min-h-[44px] font-bold px-4 rounded-xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-sm flex items-center gap-2 shrink-0 bg-warning/20 text-warning border border-warning/30"
-                      >
-                        {salvandoFatura ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-                        Fechar
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Filtro de lançamentos */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60">Filtrar:</p>
-            <select
-              className={`${inputCls} !w-auto min-w-[90px]`}
-              value={filterMes}
-              onChange={(e) => { setFilterMes(e.target.value); recarregarLancamentos({ mes: e.target.value || undefined, ano: filterAno || undefined, busca: busca || undefined }); }}
-            >
-              <option value="">Mês</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              className={`${inputCls} !w-auto min-w-[90px]`}
-              placeholder="Ano"
-              value={filterAno}
-              onChange={(e) => { setFilterAno(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: e.target.value || undefined, busca: busca || undefined }); }}
-            />
-            <input
-              type="search"
-              className={`${inputCls} !w-auto min-w-[160px]`}
-              placeholder="Buscar descrição, categoria..."
-              value={busca}
-              onChange={(e) => { setBusca(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: filterAno || undefined, busca: e.target.value || undefined }); }}
-            />
-            {(filterMes || filterAno || busca) && (
-              <button onClick={() => { setFilterMes(''); setFilterAno(''); setBusca(''); recarregarLancamentos(); }} className="text-xs text-text-primary/60 hover:text-text-primary transition-colors underline underline-offset-2">
-                Limpar filtros
-              </button>
-            )}
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={lancsFiltrados}
-            loading={carregandoLancamentos}
-            caption="Lançamentos do cartão"
-            emptyState={<EmptyState icon={CreditCard} title="Nenhum lançamento" description="Adicione o primeiro lançamento neste cartão." />}
-          />
-        </div>
-      )}
-
-      <Modal
-        open={showImport}
-        onClose={() => { if (!importing) setShowImport(false); }}
-        closeOnEsc={!importing}
-        closeOnOverlay={!importing}
-        title="Importar planilha"
-        description={`Cartão ${cartaoSel?.nome ?? ''}`}
-      >
-          <div className="space-y-5">
-            {!importResult ? (
-              <>
-                <div className="text-xs text-text-primary/70 leading-relaxed rounded-xl p-3 bg-surface-high/30 border border-text-primary/10">
-                  <FileSpreadsheet className="w-4 h-4 text-primary inline mr-1.5 -mt-0.5" aria-hidden="true" />
-                  A planilha (.xlsx) deve ter as colunas: <span className="text-text-primary/80 font-medium">Data da Compra, Descrição, Valor, Categoria, CGC PARCEIRO, Número de Parcelas</span>.
-                  <br />Categorias e parceiros que não existirem são criados automaticamente (parceiro pelo CNPJ, com dados da Receita).
-                </div>
-                <label className="block rounded-xl border border-dashed border-text-primary/20 hover:border-primary/40 transition-colors p-6 text-center cursor-pointer">
-                  <input type="file" accept=".xlsx,.xls" className="hidden"
-                         onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
-                  <Upload className="w-6 h-6 mx-auto text-text-primary/40 mb-2" />
-                  <span className="text-sm text-text-primary/70">
-                    {importFile ? importFile.name : 'Clique para escolher a planilha'}
-                  </span>
-                </label>
-                <div className="flex gap-3 justify-end">
-                  <Button variant="ghost" onClick={() => setShowImport(false)} disabled={importing}
-                          className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
-                    Cancelar
-                  </Button>
-                  <Button onClick={importarPlanilha} loading={importing} disabled={!importFile}
-                          leftIcon={<Upload className="w-3.5 h-3.5" />}>
-                    {importing ? 'Importando...' : 'Importar'}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl p-3 bg-primary/10 border border-primary/20">
-                    <p className="text-2xl font-bold text-primary">{importResult.lancamentosCriados}</p>
-                    <p className="text-xs text-text-primary/70">lançamentos criados</p>
-                  </div>
-                  <div className="rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
-                    <p className="text-2xl font-bold text-text-primary/80">{importResult.linhasImportadas}<span className="text-sm text-text-primary/60">/{importResult.totalLinhas}</span></p>
-                    <p className="text-xs text-text-primary/70">linhas importadas</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-primary/70">
-                  {importResult.categoriasCriadas > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.categoriasCriadas} categoria(s) nova(s)</span>}
-                  {importResult.parceirosCriados > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.parceirosCriados} parceiro(s) novo(s)</span>}
-                  {importResult.ignorados > 0 && <span>{importResult.ignorados} já existiam (ignoradas)</span>}
-                </div>
-                {importResult.erros?.length > 0 && (
-                  <div className="rounded-xl p-3 bg-error/8 border border-error/20 max-h-48 overflow-y-auto">
-                    <p className="text-xs font-bold uppercase tracking-wider text-error/80 mb-2 flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />{importResult.erros.length} linha(s) com erro
-                    </p>
-                    <ul className="space-y-1 text-xs text-text-primary/60">
-                      {importResult.erros.map((er, i) => (
-                        <li key={i}><span className="text-text-primary/60">Linha {er.linha}:</span> {er.motivo}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <div className="flex gap-3 justify-end">
-                  <Button variant="ghost" onClick={() => { setImportFile(null); setImportResult(null); }}
-                          className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
-                    Importar outra
-                  </Button>
-                  <Button onClick={() => setShowImport(false)}>Concluir</Button>
-                </div>
-              </>
-            )}
-          </div>
-      </Modal>
-
-      {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
+      <ImportarPlanilhaModal
+        open={importando}
+        cartao={cartao}
+        onFechar={() => setImportando(false)}
+        onImportado={(res) => { toast.success(`${res.lancamentosCriados} lançamento(s) importado(s).`); recarregar(); }}
+      />
     </div>
   );
 }

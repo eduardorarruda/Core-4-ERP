@@ -1,12 +1,36 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 
+/**
+ * Selo de estado (pago, vencido, pendente…). Texto em caixa normal, 12px, cor semântica só
+ * para estado. Variantes de significado fixo do app: income (entrou), expense (saiu),
+ * invest (investido) — as mesmas cores dos números e gráficos.
+ *
+ * Props: variant ('success' | 'primary' | 'warning' | 'error' | 'info' | 'neutral' | 'income' | 'expense' | 'invest'),
+ *        size ('sm' | 'md'), dot (bolinha à esquerda), className.
+ */
 const VARIANTS = {
-  success: 'bg-primary/15 text-primary border border-primary/20',
-  warning: 'bg-amber-400/15 text-amber-400 border border-amber-400/20',
-  error: 'bg-error/15 text-error border border-error/20',
-  info: 'bg-secondary/15 text-secondary border border-secondary/20',
-  neutral: 'bg-surface-highest text-text-primary/60 border border-text-primary/10',
+  success: 'bg-primary/[0.12] text-primary border-primary/25',
+  primary: 'bg-primary/[0.12] text-primary border-primary/25',
+  warning: 'bg-warning/[0.12] text-warning border-warning/25',
+  error: 'bg-error/[0.12] text-error border-error/25',
+  info: 'bg-secondary/[0.12] text-secondary border-secondary/25',
+  neutral: 'bg-text-primary/[0.06] text-text-primary/70 border-text-primary/[0.10]',
+  income: 'bg-income/[0.12] text-income border-income/25',
+  expense: 'bg-expense/[0.12] text-expense border-expense/25',
+  invest: 'bg-invest/[0.12] text-invest border-invest/25',
+};
+
+const DOT = {
+  success: 'bg-primary',
+  primary: 'bg-primary',
+  warning: 'bg-warning',
+  error: 'bg-error animate-pulse-dot',
+  info: 'bg-secondary',
+  neutral: 'bg-text-primary/45',
+  income: 'bg-income',
+  expense: 'bg-expense',
+  invest: 'bg-invest',
 };
 
 const SIZES = {
@@ -15,23 +39,16 @@ const SIZES = {
 };
 
 export default function Badge({ variant = 'neutral', size = 'sm', children, className, dot = false }) {
+  const v = VARIANTS[variant] ? variant : 'neutral';
   return (
     <span className={cn(
-      'inline-flex items-center gap-1.5 rounded-full font-bold uppercase tracking-wider',
-      VARIANTS[variant] ?? VARIANTS.neutral,
+      // c4-badge: com texto ampliado (painel de acessibilidade) o selo pode quebrar linha em vez de vazar (1.4.10)
+      'c4-badge inline-flex items-center gap-1.5 max-w-full rounded-full border font-semibold leading-tight whitespace-nowrap',
+      VARIANTS[v],
       SIZES[size] ?? SIZES.sm,
       className
     )}>
-      {dot && (
-        <span className={cn(
-          'w-1.5 h-1.5 rounded-full shrink-0',
-          variant === 'error' && 'bg-error animate-pulse-dot',
-          variant === 'success' && 'bg-primary',
-          variant === 'warning' && 'bg-amber-400',
-          variant === 'info' && 'bg-secondary',
-          variant === 'neutral' && 'bg-text-primary/40',
-        )} />
-      )}
+      {dot && <span aria-hidden="true" className={cn('w-1.5 h-1.5 rounded-full shrink-0', DOT[v])} />}
       {children}
     </span>
   );

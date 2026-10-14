@@ -1,48 +1,95 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
+import { FadeIn } from '../motion/Movimento';
 import { cn } from '../../lib/utils';
 
-export default function PageHeader({ title, subtitle, actions, breadcrumb, icon, className }) {
+/**
+ * Cabeçalho de tela do Core 4 — "explicativo por padrão".
+ *
+ * Props:
+ * - title:      nome da tela (Sora, grande)
+ * - subtitle (ou description): UMA frase em texto normal dizendo para que a tela serve
+ * - eyebrow:    rótulo pequeno acima do título (ex.: nome do módulo) — opcional
+ * - icon:       ícone em ladrilho esmeralda — elemento (`<CreditCard />`) ou componente (`CreditCard`)
+ * - actions:    botões à direita (no celular quebram para baixo do título)
+ * - breadcrumb: trilha acima do título — strings ou { label, to } (o último é a tela atual)
+ * - children:   conteúdo logo abaixo do cabeçalho (ex.: <Tabs.Links> do módulo)
+ * - className
+ *
+ * Entrada animada (fade + 8px) que respeita "reduzir movimento".
+ */
+function renderIcone(icon) {
+  if (React.isValidElement(icon)) return icon;
+  const Icone = icon;
+  return <Icone />;
+}
+
+function Trilha({ itens }) {
   return (
-    <div className={cn('flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 anim-in', className)}>
-      <div className="space-y-1 min-w-0">
-        {breadcrumb && breadcrumb.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
-            {breadcrumb.map((crumb, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <span className="text-text-primary/60 text-xs font-mono">·</span>}
-                <span className={cn(
-                  'text-xs font-bold uppercase tracking-widest font-mono',
-                  i === breadcrumb.length - 1 ? 'text-primary' : 'text-text-primary/60'
-                )}>
-                  {crumb}
+    <nav aria-label="Caminho até esta tela" className="mb-2">
+      <ol className="flex flex-wrap items-center gap-1 text-xs text-text-primary/60">
+        {itens.map((item, i) => {
+          const ultimo = i === itens.length - 1;
+          const label = typeof item === 'string' ? item : item.label;
+          const to = typeof item === 'string' ? null : item.to;
+          return (
+            <li key={`${label}-${i}`} className="flex items-center gap-1">
+              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-text-primary/35" aria-hidden="true" />}
+              {to && !ultimo ? (
+                <Link to={to} className="rounded hover:text-primary transition-colors">{label}</Link>
+              ) : (
+                <span aria-current={ultimo ? 'page' : undefined} className={cn(ultimo && 'text-text-primary/80 font-medium')}>
+                  {label}
                 </span>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-3">
-          {icon ? (
-            <span className="grid place-items-center w-9 h-9 rounded-xl bg-gradient-primary text-on-primary shrink-0 [&>svg]:w-5 [&>svg]:h-5" aria-hidden="true">
-              {icon}
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+export default function PageHeader({ title, subtitle, description, eyebrow, actions, breadcrumb, icon, children, className }) {
+  const apoio = subtitle ?? description;
+  return (
+    <FadeIn as="header" className={cn('space-y-4', className)}>
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      {/* @container: o título encolhe com a largura da coluna (texto 175% em 320px não estoura — WCAG 1.4.10) */}
+      <div className="@container min-w-0 flex-1">
+        {breadcrumb?.length > 0 && <Trilha itens={breadcrumb} />}
+        {eyebrow && !breadcrumb?.length && <p className="c4-eyebrow mb-2">{eyebrow}</p>}
+        <div className="flex items-center gap-[14px]">
+          {icon && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'relative grid place-items-center w-[44px] h-[44px] shrink-0 rounded-[14px] text-on-primary',
+                'bg-gradient-primary shadow-[var(--shadow-primary)] ring-1 ring-inset ring-text-primary/10',
+                '[&>svg]:w-[20px] [&>svg]:h-[20px]',
+              )}
+            >
+              {renderIcone(icon)}
             </span>
-          ) : (
-            <span className="live-dot" style={{ width: 5, height: 5, flexShrink: 0 }} />
           )}
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary font-display leading-tight">
+          <h1 className="min-w-0 break-words text-[min(1.625rem,9.5cqi)] sm:text-[min(2rem,7cqi)] font-semibold tracking-[-0.025em] text-text-primary font-display leading-tight">
             {title}
           </h1>
         </div>
-        {subtitle && (
-          <p className="text-xs uppercase tracking-widest text-text-primary/60 font-mono pl-[17px]">
-            {subtitle}
+        {apoio && (
+          <p className={cn('mt-1.5 text-sm sm:text-[0.95rem] text-text-primary/65 leading-relaxed max-w-2xl text-pretty', icon && 'sm:pl-[58px]')}>
+            {apoio}
           </p>
         )}
       </div>
       {actions && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 min-w-0 max-w-full">
           {actions}
         </div>
       )}
     </div>
+    {children}
+    </FadeIn>
   );
 }

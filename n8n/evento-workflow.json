@@ -95,7 +95,7 @@
       "parameters": {
         "fromEmail": "aurea@core4erp.codes",
         "toEmail": "={{ $json.destinatarioDono || 'dono@core4erp.codes' }}",
-        "subject": "=Core 4 ERP — conta baixada: {{ $json.detalhe }}",
+        "subject": "=Core 4 — conta baixada: {{ $json.detalhe }}",
         "emailFormat": "text",
         "text": "=Uma conta foi baixada pela empresa {{ $json.empresaId }}.\n\nDetalhe: {{ $json.detalhe }}\nOrigem: {{ $json.origemIa ? 'Assistente Áurea' : 'Tela' }}\nQuando: {{ $json.timestamp }}\n\n(Alerta automático — ajuste o limiar de alto valor quando o payload trouxer o valor.)",
         "options": {}

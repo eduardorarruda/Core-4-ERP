@@ -1,96 +1,60 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, ShieldCheck, Lock, Info, ShieldQuestion } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Eye, Info, Lock, Pencil, Plus, ShieldCheck, ShieldQuestion, Trash2 } from 'lucide-react';
 import { perfisAcesso } from '../lib/api';
-import PageHeader from '../components/ui/PageHeader';
-import DataTable from '../components/ui/DataTable';
-import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import EmptyState from '../components/ui/EmptyState';
+import { useCarga } from '../hooks/useCarga';
 import { useToast } from '../hooks/useToast';
 import { useConfirm } from '../hooks/useConfirm';
+import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
+import Drawer from '../components/ui/Drawer';
+import EmptyState from '../components/ui/EmptyState';
+import AlertaErro from '../components/ui/AlertaErro';
+import ComoFunciona from '../components/ui/ComoFunciona';
+import SkeletonCard from '../components/ui/SkeletonCard';
+import { Stagger, StaggerItem } from '../components/motion/Movimento';
+import FormField, { FormInput } from '../components/ui/FormField';
+import MatrizPermissoes from '../components/configuracoes/MatrizPermissoes';
+import { GRUPOS, ID_NOTA_BLOQUEIO, MODULOS, montarMatriz } from '../components/configuracoes/permissoesCatalogo';
+import { MSG_ESCALADA, mensagemErroPermissao, nomePerfil } from '../components/configuracoes/perfilUtils';
+import { useConcessao } from '../components/configuracoes/useConcessao';
 
-const MODULO_LABEL = {
-  CONTA: 'Lançamentos',
-  CONTA_CORRENTE: 'Contas Correntes',
-  CARTAO: 'Cartões',
-  CARTAO_CONCILIACAO: 'Conciliação de Cartão',
-  CATEGORIA: 'Categorias',
-  PARCEIRO: 'Parceiros',
-  INVESTIMENTO: 'Investimentos',
-  ASSINATURA: 'Assinaturas',
-  CONCILIACAO: 'Conciliação Bancária',
-  RELATORIO: 'Relatórios',
-  RELATORIO_FLUXO_CAIXA: 'Relatório: Fluxo de Caixa',
-  RELATORIO_CONTAS_ABERTAS: 'Relatório: Contas Abertas',
-  RELATORIO_EXTRATO: 'Relatório: Extrato',
-  RELATORIO_DRE: 'Relatório: DRE',
-  RELATORIO_INVESTIMENTOS: 'Relatório: Investimentos',
-  RELATORIO_CARTOES: 'Relatório: Cartões',
-  RELATORIO_POSICAO_FINANCEIRA: 'Relatório: Posição Financeira',
-  RELATORIO_ASSINATURAS: 'Relatório: Assinaturas',
-  USUARIO: 'Usuários',
-  CONFIGURACAO: 'Configurações',
-  AUDITORIA: 'Auditoria',
-  CALENDARIO: 'Calendário',
-  DASHBOARD: 'Dashboard Geral',
-  DASHBOARD_CARTAO: 'Dashboard de Cartões',
-};
+const VISUALIZAR = 'VISUALIZAR';
 
-// Rótulos amigáveis em pt-BR para as ações (evita expor o código cru ao usuário).
-const ACAO_LABEL = {
-  VISUALIZAR: 'Visualizar',
-  CRIAR: 'Criar',
-  EDITAR: 'Editar',
-  DELETAR: 'Excluir',
-  BAIXAR: 'Dar baixa',
-  ESTORNAR: 'Estornar',
-  TRANSFERIR: 'Transferir',
-  LANCAR: 'Lançar',
-  FECHAR_FATURA: 'Fechar fatura',
-  IMPORTAR: 'Importar',
-  VINCULAR: 'Vincular',
-  CONVIDAR: 'Convidar',
-  REMOVER: 'Remover',
-  EXPORTAR: 'Exportar',
-  GERENCIAR: 'Gerenciar',
-};
+function GavetaPerfil({ perfil, somenteLeitura, todasPermissoes, onClose, onSave }) {
+  const concessao = useConcessao();
+  const originais = useMemo(
+    () => new Set(perfil ? todasPermissoes.filter((p) => perfil.permissoes.includes(p.codigo)).map((p) => p.id) : []),
+    [perfil, todasPermissoes],
+  );
+  const [form, setForm] = useState(() => ({
+    nome: perfil?.nome ?? '',
+    descricao: perfil?.descricao ?? '',
+    permissaoIds: new Set(originais),
+  }));
+  const [erros, setErros] = useState({});
+  const [erroGeral, setErroGeral] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
-const acaoLabel = (acao) =>
-  ACAO_LABEL[acao] ??
-  (acao ? acao.charAt(0) + acao.slice(1).toLowerCase().replace(/_/g, ' ') : acao);
+  const matriz = useMemo(() => montarMatriz(todasPermissoes), [todasPermissoes]);
+  const grupos = useMemo(() => {
+    const g = {};
+    todasPermissoes.forEach((p) => { (g[p.modulo] ??= []).push(p); });
+    return g;
+  }, [todasPermissoes]);
 
-const INPUT_CLS =
-  'block w-full h-11 px-3.5 bg-surface border border-text-primary/10 rounded-xl text-sm text-text-primary ' +
-  'placeholder:text-text-primary/50 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition';
-const LABEL_CLS = 'block text-xs font-medium text-text-primary/60 mb-1.5';
+  // Escalada de privilégio: só concede o que você tem — acessos que o perfil já tinha continuam livres
+  const podeAlternar = (p) => concessao.pode(p.codigo) || originais.has(p.id);
+  const bloqueada = (p) => {
+    if (!podeAlternar(p)) return true;
+    if (p.acao === VISUALIZAR) return false;
+    // Ação depende do "Ver" do módulo: se o "Ver" está desmarcado e você não pode concedê-lo, trava
+    const ver = grupos[p.modulo]?.find((x) => x.acao === VISUALIZAR);
+    return Boolean(ver && !form.permissaoIds.has(ver.id) && !podeAlternar(ver));
+  };
+  const temBloqueio = !somenteLeitura && todasPermissoes.some((p) => bloqueada(p));
 
-const FORM_VAZIO = { nome: '', descricao: '', permissaoIds: new Set() };
-
-function agruparPorModulo(permissoes) {
-  return permissoes.reduce((acc, p) => {
-    if (!acc[p.modulo]) acc[p.modulo] = [];
-    acc[p.modulo].push(p);
-    return acc;
-  }, {});
-}
-
-function ModalPerfil({ perfil, todasPermissoes, onClose, onSave }) {
-  const [form, setForm] = useState(() => {
-    if (perfil) {
-      const ids = new Set(
-        todasPermissoes.filter((p) => perfil.permissoes.includes(p.codigo)).map((p) => p.id)
-      );
-      return { nome: perfil.nome, descricao: perfil.descricao ?? '', permissaoIds: ids };
-    }
-    return { ...FORM_VAZIO, permissaoIds: new Set() };
-  });
-  const [erro, setErro] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const grupos = agruparPorModulo(todasPermissoes);
-
-  // --- Lógica de negócio preservada integralmente ---
+  // --- Regra de dependência do VISUALIZAR (CLAUDE.md §4) — preservada ---
   const togglePermissao = (id) => {
     setForm((prev) => {
       const ids = new Set(prev.permissaoIds);
@@ -98,15 +62,15 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave }) {
       if (ids.has(id)) {
         ids.delete(id);
         // Ao remover VISUALIZAR, remove todas as outras do mesmo módulo
-        if (permissao?.acao === 'VISUALIZAR') {
+        if (permissao?.acao === VISUALIZAR) {
           const idsModulo = grupos[permissao.modulo]?.map((p) => p.id) ?? [];
           idsModulo.forEach((mid) => ids.delete(mid));
         }
       } else {
         ids.add(id);
         // Ao adicionar qualquer ação não-VISUALIZAR, auto-adiciona VISUALIZAR do módulo
-        if (permissao && permissao.acao !== 'VISUALIZAR') {
-          const visualizar = grupos[permissao.modulo]?.find((p) => p.acao === 'VISUALIZAR');
+        if (permissao && permissao.acao !== VISUALIZAR) {
+          const visualizar = grupos[permissao.modulo]?.find((p) => p.acao === VISUALIZAR);
           if (visualizar) ids.add(visualizar.id);
         }
       }
@@ -114,318 +78,254 @@ function ModalPerfil({ perfil, todasPermissoes, onClose, onSave }) {
     });
   };
 
-  const toggleModulo = (modulo) => {
-    const idsModulo = grupos[modulo].map((p) => p.id);
-    const todosMarcados = idsModulo.every((id) => form.permissaoIds.has(id));
+  // "Tudo" do módulo: marca/desmarca só o que você pode alternar
+  const toggleModulo = (linha) => {
+    const editaveis = linha.todas.filter((p) => !bloqueada(p)).map((p) => p.id);
+    const todosMarcados = editaveis.every((id) => form.permissaoIds.has(id));
     setForm((prev) => {
       const ids = new Set(prev.permissaoIds);
-      if (todosMarcados) idsModulo.forEach((id) => ids.delete(id));
-      else idsModulo.forEach((id) => ids.add(id));
+      if (todosMarcados) editaveis.forEach((id) => ids.delete(id));
+      else editaveis.forEach((id) => ids.add(id));
       return { ...prev, permissaoIds: ids };
     });
   };
 
-  const submit = async () => {
-    setErro('');
-    if (!form.nome.trim()) {
-      setErro('Dê um nome ao perfil.');
-      return;
-    }
-    if (form.permissaoIds.size === 0) {
-      setErro('Selecione pelo menos uma permissão para o perfil.');
-      return;
-    }
-    setLoading(true);
+  async function salvar() {
+    const novos = {};
+    if (!form.nome.trim()) novos.nome = 'Dê um nome ao perfil (ex.: Vendedor).';
+    setErros(novos);
+    setErroGeral(form.permissaoIds.size === 0 ? 'Marque pelo menos um acesso para o perfil.' : '');
+    if (Object.keys(novos).length || form.permissaoIds.size === 0) return;
+    setSalvando(true);
     try {
-      await onSave({ nome: form.nome, descricao: form.descricao, permissaoIds: [...form.permissaoIds] });
+      await onSave({ nome: form.nome.trim(), descricao: form.descricao.trim(), permissaoIds: [...form.permissaoIds] });
     } catch (e) {
-      setErro(e?.message || 'Não foi possível salvar o perfil. Tente novamente.');
-      setLoading(false);
+      setErroGeral(mensagemErroPermissao(e, 'Não foi possível salvar o perfil. Tente novamente.'));
+      setSalvando(false);
     }
-  };
+  }
+
+  const titulo = somenteLeitura ? `Perfil ${nomePerfil(perfil?.nome)}` : perfil ? 'Editar perfil' : 'Novo perfil';
+  const total = form.permissaoIds.size;
 
   return (
-    <Modal open onClose={onClose} title={perfil ? 'Editar perfil' : 'Novo perfil'} size="lg">
+    <Drawer
+      open
+      onClose={onClose}
+      title={titulo}
+      description={somenteLeitura ? 'Perfil padrão do sistema: só para consulta.' : `${total} de ${todasPermissoes.length} acessos marcados.`}
+      size="lg"
+      closeOnEsc={!salvando}
+      closeOnOverlay={!salvando}
+      footer={somenteLeitura ? <Button variant="secondary" onClick={onClose}>Fechar</Button> : (
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={salvando}>Cancelar</Button>
+          <Button onClick={salvar} loading={salvando}>{perfil ? 'Salvar' : 'Criar perfil'}</Button>
+        </>
+      )}
+    >
       <div className="space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="perfil-nome" className={LABEL_CLS}>Nome do perfil</label>
-            <input
-              id="perfil-nome"
-              className={`${INPUT_CLS} uppercase`}
-              value={form.nome}
-              onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-              placeholder="Ex: VENDEDOR"
-              maxLength={50}
-            />
+        {!somenteLeitura && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField label="Nome do perfil" required error={erros.nome} help="Aparece na lista de operadores.">
+              <FormInput value={form.nome} maxLength={50} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} error={erros.nome} />
+            </FormField>
+            <FormField label="Descrição" help="Opcional. Para que serve este perfil.">
+              <FormInput value={form.descricao} maxLength={200} onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))} />
+            </FormField>
           </div>
-          <div>
-            <label htmlFor="perfil-descricao" className={LABEL_CLS}>Descrição</label>
-            <input
-              id="perfil-descricao"
-              className={INPUT_CLS}
-              value={form.descricao}
-              onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
-              placeholder="Descreva o perfil"
-              maxLength={200}
-            />
-          </div>
+        )}
+
+        <div className="flex items-start gap-2.5 rounded-xl border border-info/25 bg-info/10 px-3.5 py-3 text-sm text-text-primary/80 leading-relaxed">
+          <Info className="w-4 h-4 mt-0.5 shrink-0 text-info" aria-hidden="true" />
+          <p>
+            Marcar qualquer ação de um módulo marca também <strong>Ver</strong>. Desmarcar <strong>Ver</strong> tira todas as ações do módulo.
+          </p>
         </div>
 
-        <div>
-          <div className="flex items-center justify-between gap-3 mb-1.5">
-            <span className="text-sm font-semibold text-text-primary">Permissões</span>
-          </div>
-          {/* Explica a dependência automática (comportamento já existente) */}
-          <div className="flex items-start gap-2 rounded-xl bg-secondary/10 border border-secondary/20 px-3.5 py-2.5 mb-3">
-            <Info className="w-4 h-4 text-secondary shrink-0 mt-0.5" aria-hidden="true" />
-            <p className="text-xs text-text-primary/70 leading-relaxed">
-              Ao marcar qualquer ação, a permissão <strong>Visualizar</strong> do mesmo grupo é adicionada
-              automaticamente. Ao desmarcar <strong>Visualizar</strong>, as demais ações do grupo são removidas.
-            </p>
-          </div>
+        {temBloqueio && (
+          <p id={ID_NOTA_BLOQUEIO} className="flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning/10 px-3.5 py-3 text-sm text-text-primary/85 leading-relaxed">
+            <Lock className="w-4 h-4 mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+            <span>Acessos com cadeado: {MSG_ESCALADA}</span>
+          </p>
+        )}
 
-          <div className="flex flex-col gap-3 max-h-[45vh] overflow-y-auto pr-1">
-            {Object.entries(grupos).map(([modulo, perms]) => {
-              const marcadas = perms.filter((p) => form.permissaoIds.has(p.id)).length;
-              const todos = marcadas === perms.length;
-              const alguns = !todos && marcadas > 0;
-              return (
-                <div key={modulo} className="bg-surface-medium border border-text-primary/5 rounded-xl p-4">
-                  <button
-                    type="button"
-                    onClick={() => toggleModulo(modulo)}
-                    aria-pressed={todos}
-                    className="flex items-center gap-3 w-full text-left mb-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
-                  >
-                    <span
-                      className={
-                        'w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 transition ' +
-                        (todos
-                          ? 'bg-primary border-primary'
-                          : alguns
-                            ? 'bg-warning/20 border-warning'
-                            : 'border-text-primary/25 bg-transparent')
-                      }
-                    >
-                      {todos && (
-                        <svg width="11" height="9" viewBox="0 0 10 8" fill="none" aria-hidden="true">
-                          <path d="M1 4l3 3 5-6" stroke="var(--color-on-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      )}
-                      {alguns && <span className="w-2 h-0.5 rounded-full bg-warning" />}
-                    </span>
-                    <span className="text-sm font-bold text-text-primary font-display">
-                      {MODULO_LABEL[modulo] ?? modulo}
-                    </span>
-                    <span className="ml-auto text-xs font-mono text-text-primary/60">
-                      {marcadas}/{perms.length}
-                    </span>
-                  </button>
+        <MatrizPermissoes
+          matriz={matriz}
+          marcadas={form.permissaoIds}
+          bloqueada={somenteLeitura ? () => false : bloqueada}
+          onToggle={togglePermissao}
+          onToggleModulo={toggleModulo}
+          somenteLeitura={somenteLeitura}
+        />
 
-                  <div className="flex flex-wrap gap-2">
-                    {perms.map((p) => {
-                      const marcado = form.permissaoIds.has(p.id);
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => togglePermissao(p.id)}
-                          aria-pressed={marcado}
-                          className={
-                            'inline-flex items-center gap-2 min-h-[40px] px-3.5 rounded-lg text-xs font-medium border transition ' +
-                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ' +
-                            (marcado
-                              ? 'bg-primary/10 border-primary/40 text-primary'
-                              : 'bg-transparent border-text-primary/10 text-text-primary/70 hover:border-text-primary/25 hover:text-text-primary/80')
-                          }
-                        >
-                          <span className={'w-2 h-2 rounded-full shrink-0 ' + (marcado ? 'bg-primary' : 'bg-text-primary/20')} />
-                          {acaoLabel(p.acao)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <ErroBox>{erro}</ErroBox>
-
-        <Modal.Footer>
-          <Button variant="ghost" onClick={onClose} disabled={loading}>Cancelar</Button>
-          <Button onClick={submit} loading={loading}>Salvar</Button>
-        </Modal.Footer>
+        {erroGeral && <AlertaErro titulo="Não deu para salvar" mensagem={erroGeral} compacto />}
       </div>
-    </Modal>
+    </Drawer>
   );
 }
 
-function ErroBox({ children }) {
-  if (!children) return null;
+/** Resumo de acessos por área (ex.: "Dinheiro 18 · Relatórios 4"). */
+function ResumoAreas({ codigos, todasPermissoes }) {
+  const porArea = useMemo(() => {
+    const cont = {};
+    todasPermissoes.forEach((p) => {
+      if (!codigos.includes(p.codigo)) return;
+      const g = MODULOS[p.modulo]?.grupo ?? 'outros';
+      cont[g] = (cont[g] ?? 0) + 1;
+    });
+    return GRUPOS.filter((g) => cont[g.id]).map((g) => ({ ...g, n: cont[g.id] }));
+  }, [codigos, todasPermissoes]);
+  if (!porArea.length) return null;
   return (
-    <div role="alert" className="rounded-xl bg-error/10 border border-error/25 text-error text-sm px-3.5 py-2.5 leading-relaxed">
-      {children}
-    </div>
+    <ul className="flex flex-wrap gap-1.5" aria-label="Acessos por área">
+      {porArea.map((g) => (
+        <li key={g.id} className="text-xs px-2 py-1 rounded-md bg-surface-medium text-text-primary/75">
+          {g.nome} <span className="font-semibold tabular-nums text-text-primary">{g.n}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function CartaoPerfil({ perfil, todasPermissoes, onAbrir, onExcluir }) {
+  const sistema = perfil.protegido;
+  const n = perfil.permissoes?.length ?? 0;
+  return (
+    <article className="c4-card h-full p-5 flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <span className={`grid place-items-center w-10 h-10 shrink-0 rounded-xl ${sistema ? 'bg-invest/12 text-invest' : 'bg-primary/12 text-primary'}`} aria-hidden="true">
+          <ShieldCheck className="w-5 h-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold text-text-primary font-display truncate">{nomePerfil(perfil.nome)}</h2>
+          <p className="text-sm text-text-primary/65 line-clamp-2">{perfil.descricao || 'Sem descrição.'}</p>
+        </div>
+        {sistema
+          ? <Badge variant="neutral"><Lock className="w-3 h-3" aria-hidden="true" /> Padrão</Badge>
+          : <Badge variant="success">Da empresa</Badge>}
+      </div>
+      <div className="space-y-2">
+        <p className="text-sm text-text-primary/80"><span className="font-semibold tabular-nums text-text-primary">{n}</span> {n === 1 ? 'acesso' : 'acessos'}</p>
+        <ResumoAreas codigos={perfil.permissoes ?? []} todasPermissoes={todasPermissoes} />
+      </div>
+      <div className="mt-auto flex gap-2 pt-1">
+        {sistema ? (
+          <Button variant="secondary" size="sm" onClick={() => onAbrir(perfil, true)} leftIcon={<Eye className="w-4 h-4" aria-hidden="true" />}>
+            Ver acessos <span className="sr-only">do perfil {nomePerfil(perfil.nome)}</span>
+          </Button>
+        ) : (
+          <>
+            <Button variant="secondary" size="sm" onClick={() => onAbrir(perfil, false)} leftIcon={<Pencil className="w-4 h-4" aria-hidden="true" />}>
+              Editar <span className="sr-only">perfil {perfil.nome}</span>
+            </Button>
+            <Button variant="danger-ghost" size="sm" onClick={() => onExcluir(perfil)} leftIcon={<Trash2 className="w-4 h-4" aria-hidden="true" />}>
+              Excluir <span className="sr-only">perfil {perfil.nome}</span>
+            </Button>
+          </>
+        )}
+      </div>
+    </article>
   );
 }
 
 export default function GestaoPerfis() {
   const toast = useToast();
-  const confirm = useConfirm();
+  const confirmar = useConfirm();
+  const [gaveta, setGaveta] = useState(null); // { perfil|null, somenteLeitura }
 
-  const [perfis, setPerfis] = useState([]);
-  const [todasPermissoes, setTodasPermissoes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editando, setEditando] = useState(null);
-  const [modalAberto, setModalAberto] = useState(false);
-  const [erro, setErro] = useState('');
+  const { dados, erro, carregando, recarregar } = useCarga(
+    () => Promise.all([perfisAcesso.listar(), perfisAcesso.listarPermissoes()]),
+    [],
+  );
+  const perfis = Array.isArray(dados?.[0]) ? dados[0] : [];
+  const todasPermissoes = Array.isArray(dados?.[1]) ? dados[1] : [];
+  const ordenados = [...perfis].sort((a, b) => Number(a.protegido) - Number(b.protegido) || a.nome.localeCompare(b.nome));
 
-  const carregar = useCallback(() => {
-    setLoading(true);
-    setErro('');
-    Promise.all([
-      perfisAcesso.listar().catch(() => []),
-      perfisAcesso.listarPermissoes().catch(() => []),
-    ]).then(([p, pm]) => {
-      setPerfis(Array.isArray(p) ? p : []);
-      setTodasPermissoes(Array.isArray(pm) ? pm : []);
-    }).catch(() => setErro('Não foi possível carregar os dados. Tente novamente em instantes.'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { carregar(); }, [carregar]);
-
-  const abrirCriar = () => { setEditando(null); setModalAberto(true); };
-  const abrirEditar = (p) => { setEditando(p); setModalAberto(true); };
-
-  // Lança erro para o modal exibir internamente; sucesso fecha o modal + toast.
   const salvar = async (dto) => {
+    const editando = gaveta?.perfil;
     if (editando) await perfisAcesso.atualizar(editando.id, dto);
     else await perfisAcesso.criar(dto);
-    setModalAberto(false);
+    setGaveta(null);
     toast.success(editando ? 'Perfil atualizado.' : 'Perfil criado.');
-    carregar();
+    recarregar();
   };
 
-  const deletar = async (p) => {
-    const ok = await confirm({
-      title: 'Excluir perfil',
-      message: `Deseja excluir o perfil "${p.nome}"? Esta ação não pode ser desfeita. Operadores que usam este perfil precisarão ser reatribuídos a outro.`,
+  const excluir = async (p) => {
+    const ok = await confirmar({
+      title: `Excluir o perfil ${p.nome}?`,
+      message: 'Perfis em uso por algum operador ou convite pendente não podem ser excluídos: troque o perfil dessas pessoas antes.',
       confirmLabel: 'Excluir',
-      cancelLabel: 'Cancelar',
       variant: 'danger',
     });
     if (!ok) return;
     try {
       await perfisAcesso.deletar(p.id);
       toast.success(`Perfil "${p.nome}" excluído.`);
-      carregar();
+      recarregar();
     } catch (err) {
-      toast.error(err?.message || 'Não foi possível excluir o perfil.');
+      toast.error(mensagemErroPermissao(err, 'Não foi possível excluir o perfil.'));
     }
   };
-
-  const colunas = [
-    {
-      key: 'nome',
-      label: 'Perfil',
-      sortable: true,
-      render: (v, p) => (
-        <div className="flex items-center gap-2">
-          <ShieldCheck className={'w-4 h-4 shrink-0 ' + (p.protegido ? 'text-warning' : 'text-primary')} aria-hidden="true" />
-          <span className="font-bold text-text-primary">{v}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'descricao',
-      label: 'Descrição',
-      render: (v) => <span className="text-text-primary/60 line-clamp-2">{v ?? '—'}</span>,
-    },
-    {
-      key: 'permissoes',
-      label: 'Permissões',
-      render: (v) => <Badge variant="info">{v?.length ?? 0} permissões</Badge>,
-    },
-    {
-      key: 'protegido',
-      label: 'Tipo',
-      render: (v) => (v
-        ? <Badge variant="neutral"><Lock className="w-3 h-3" /> Sistema</Badge>
-        : <Badge variant="success">Personalizado</Badge>),
-    },
-    {
-      key: 'acoes',
-      label: 'Ações',
-      render: (v, p) => (
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={() => abrirEditar(p)}
-            disabled={p.protegido}
-            aria-label={p.protegido ? 'Perfil do sistema não pode ser editado' : `Editar perfil ${p.nome}`}
-            title={p.protegido ? 'Perfil do sistema não pode ser editado' : 'Editar'}
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => deletar(p)}
-            disabled={p.protegido}
-            aria-label={p.protegido ? 'Perfil do sistema não pode ser excluído' : `Excluir perfil ${p.nome}`}
-            title={p.protegido ? 'Perfil do sistema não pode ser excluído' : 'Excluir'}
-            className={p.protegido ? '' : 'text-error hover:bg-error/10'}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
-  const vazio = (
-    <EmptyState
-      icon={ShieldQuestion}
-      title="Nenhum perfil encontrado"
-      description="Crie perfis para definir o que cada operador pode acessar na empresa."
-    />
-  );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Perfis de Acesso"
-        subtitle="Perfis e permissões dos operadores"
-        actions={
-          <Button onClick={abrirCriar} leftIcon={<Plus className="w-4 h-4" />}>
+        title="Perfis de acesso"
+        subtitle="O que cada pessoa da empresa pode ver e fazer."
+        icon={ShieldCheck}
+        actions={(
+          <Button onClick={() => setGaveta({ perfil: null, somenteLeitura: false })} disabled={carregando} leftIcon={<Plus className="w-4 h-4" aria-hidden="true" />}>
             Novo perfil
           </Button>
-        }
+        )}
       />
 
-      {erro && (
-        <div role="alert" className="rounded-xl bg-error/10 border border-error/25 text-error text-sm px-4 py-3">
-          {erro}
+      <ComoFunciona
+        titulo="Como funcionam os perfis"
+        recolhivel
+        chave="perfis-acesso"
+        itens={[
+          { icon: ShieldCheck, texto: 'Cada operador tem um perfil. O perfil define o que ele vê e faz em cada módulo.' },
+          { icon: Lock, texto: 'Os perfis padrão não mudam. Para ajustar, crie um perfil da empresa.' },
+          { icon: Info, texto: 'Você só consegue dar acessos que você mesmo tem.' },
+        ]}
+      />
+
+      {erro && <AlertaErro mensagem={erro.message} onTentarNovamente={recarregar} />}
+
+      {carregando && !dados ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-hidden="true">
+          {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
         </div>
+      ) : !erro && ordenados.length === 0 ? (
+        <EmptyState
+          icon={ShieldQuestion}
+          title="Nenhum perfil ainda"
+          description="Crie perfis para definir o que cada operador pode acessar."
+          action={{ label: 'Novo perfil', onClick: () => setGaveta({ perfil: null, somenteLeitura: false }), icon: Plus }}
+        />
+      ) : (
+        <Stagger as="ul" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" aria-label="Perfis de acesso">
+          {ordenados.map((p) => (
+            <StaggerItem as="li" key={p.id}>
+              <CartaoPerfil
+                perfil={p}
+                todasPermissoes={todasPermissoes}
+                onAbrir={(perfil, somenteLeitura) => setGaveta({ perfil, somenteLeitura })}
+                onExcluir={excluir}
+              />
+            </StaggerItem>
+          ))}
+        </Stagger>
       )}
 
-      <div className="hidden md:block">
-        <DataTable caption="Perfis de acesso da empresa" columns={colunas} data={perfis} loading={loading} emptyState={vazio} keyExtractor={(r) => r.id} />
-      </div>
-      <div className="md:hidden">
-        <DataTable caption="Perfis de acesso da empresa" columns={colunas} data={perfis} loading={loading} emptyState={vazio} cardView keyExtractor={(r) => r.id} />
-      </div>
-
-      {modalAberto && (
-        <ModalPerfil
-          perfil={editando}
+      {gaveta && (
+        <GavetaPerfil
+          perfil={gaveta.perfil}
+          somenteLeitura={gaveta.somenteLeitura}
           todasPermissoes={todasPermissoes}
-          onClose={() => setModalAberto(false)}
+          onClose={() => setGaveta(null)}
           onSave={salvar}
         />
       )}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export function useTheme() {
   const [theme, setTheme] = useState(() => {
@@ -23,7 +23,8 @@ export function useTheme() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+  // Estável entre renders: é dependência dos atalhos globais (tecla T)
+  const toggleTheme = useCallback(() => setTheme(t => t === 'dark' ? 'light' : 'dark'), []);
 
   return { theme, toggleTheme };
 }

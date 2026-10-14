@@ -1,13 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <style>
-    .t{fill:#131313;stroke:#6EFFC0;stroke-opacity:.25}.f{fill:#6EFFC0}.o{fill:none;stroke:#6EFFC0;stroke-width:1.6}
-    @media (prefers-color-scheme:light){.t{fill:#F4F4F5;stroke:#047857}.f{fill:#047857}.o{stroke:#047857}}
-  </style>
-  <rect class="t" x=".5" y=".5" width="31" height="31" rx="7.5"/>
-  <g transform="translate(5 5)">
-    <rect class="f" x="1" y="1" width="9" height="9" rx="2"/>
-    <rect class="o" x="12" y="1" width="9" height="9" rx="2"/>
-    <rect class="o" x="1" y="12" width="9" height="9" rx="2"/>
-    <rect class="f" x="12" y="12" width="9" height="9" rx="2" opacity=".4"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs><radialGradient id="bgg" cx=".28" cy=".18" r="1"><stop offset="0" stop-color="#0E2A2B"/><stop offset=".55" stop-color="#061214"/><stop offset="1" stop-color="#030A0B"/></radialGradient>
+<radialGradient id="glw" cx=".5" cy=".55" r=".5"><stop offset="0" stop-color="#14E29C" stop-opacity=".18"/><stop offset="1" stop-color="#14E29C" stop-opacity="0"/></radialGradient></defs>
+<rect width="1024" height="1024" rx="245.76" fill="url(#bgg)"/>
+<rect width="1024" height="1024" rx="245.76" fill="url(#glw)"/>
+<rect x="1.5" y="1.5" width="1021" height="1021" rx="244.26" fill="none" stroke="#14E29C" stroke-opacity=".22" stroke-width="3"/>
+<g transform="translate(100.8022695035461 137.7824680851064) scale(1.103886524822695)"><defs>
+<linearGradient id="mc" gradientUnits="userSpaceOnUse" x1="120" y1="40" x2="470" y2="660"><stop offset="0" stop-color="#3CF5B8"/><stop offset=".42" stop-color="#14E29C"/><stop offset=".68" stop-color="#0BA877"/><stop offset=".84" stop-color="#93A7B3"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient>
+<linearGradient id="ms" gradientUnits="userSpaceOnUse" x1="680" y1="30" x2="280" y2="460"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".5" stop-color="#D3DEE4"/><stop offset="1" stop-color="#93A7B3"/></linearGradient>
+<linearGradient id="me" gradientUnits="userSpaceOnUse" x1="600" y1="205" x2="600" y2="640"><stop offset="0" stop-color="#3CF5B8"/><stop offset=".55" stop-color="#14E29C"/><stop offset="1" stop-color="#0BA877"/></linearGradient>
+<linearGradient id="mb" gradientUnits="userSpaceOnUse" x1="300" y1="380" x2="715" y2="452"><stop offset="0" stop-opacity="0"/><stop offset="1" stop-opacity=".18"/></linearGradient>
+</defs><path fill="url(#mc)" d="M575 30H340A310 310 0 0 0 340 650H470V540H340A200 200 0 0 1 340 140H465Z"/><path fill="url(#me)" d="M562 283L640 205V560L562 638Z"/><path fill="url(#ms)" d="M668 28V128L416 380H715V452H288Q252 452 270 424L668 28Z"/><path fill="#fff" opacity=".22" d="M668 28L270 424L300 424L668 66Z"/><path fill="url(#mb)" d="M416 380H715V452H288Q252 452 270 424Z"/></g></svg>

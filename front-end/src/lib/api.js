@@ -83,7 +83,11 @@ function marcarSenhaProvisoria() {
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
-async function request(path, options = {}) {
+/**
+ * Chamada à API: cookie JWT, empresa ativa (X-Empresa-Id), 401 → login, mensagem de erro traduzida.
+ * Opções extras: `skipAuthRedirect`, `timeout` (ms), `blob` (resposta binária).
+ */
+export async function request(path, options = {}) {
   const { skipAuthRedirect, timeout = 30000, blob: expectBlob = false, ...fetchOptions } = options;
   const isFormData = fetchOptions.body instanceof FormData;
 
@@ -107,8 +111,8 @@ async function request(path, options = {}) {
       signal: controller.signal,
     });
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Tempo limite da requisição esgotado');
-    throw err;
+    if (err.name === 'AbortError') throw new Error('O servidor demorou para responder. Tente de novo.', { cause: err });
+    throw new Error('Sem conexão com o servidor. Verifique a internet e tente de novo.', { cause: err });
   } finally {
     clearTimeout(timeoutId);
   }
@@ -168,6 +172,9 @@ export const auth = {
     }),
 
   me: () => request('/api/auth/me'),
+
+  // Encerra a sessão em todos os aparelhos (invalida os tokens emitidos até agora)
+  logoutTodos: () => request('/api/auth/logout-todos', { method: 'POST', skipAuthRedirect: true }),
 
   refreshPermissoes: () => request('/api/auth/me/permissoes'),
 
@@ -312,6 +319,7 @@ export const cartoes = {
   atualizar: (id, dto) => request(`/api/cartoes/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/cartoes/${id}`, { method: 'DELETE' }),
   fecharFatura: (id, dto) => request(`/api/cartoes/${id}/fechar-fatura`, { method: 'POST', body: JSON.stringify(dto) }),
+  parcelamentos: () => request('/api/cartoes/parcelamentos'),
   lancamentos: {
     listar: (cartaoId, params = {}) => {
       const qs = new URLSearchParams(params).toString();
@@ -329,6 +337,22 @@ export const cartoes = {
   },
   dashboard: (qs) => request(`/api/cartoes/dashboard/resumo${qs ? `?${qs}` : ''}`),
   dashboardBI: (qs) => request(`/api/cartoes/dashboard/bi${qs ? `?${qs}` : ''}`),
+};
+
+// ── Orçamentos (por categoria, mês 'yyyy-MM') ─────────────────────────────────
+const qsMes = (mes) => (mes ? `?mes=${encodeURIComponent(mes)}` : '');
+
+export const orcamentos = {
+  listar: (mes) => request(`/api/orcamentos${qsMes(mes)}`),
+  sugestoes: (mes) => request(`/api/orcamentos/sugestoes${qsMes(mes)}`),
+  criar: (dto) => request('/api/orcamentos', { method: 'POST', body: JSON.stringify(dto) }),
+  atualizar: (id, dto) => request(`/api/orcamentos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  excluir: (id) => request(`/api/orcamentos/${id}`, { method: 'DELETE' }),
+};
+
+// ── Insights (leituras do mês) ────────────────────────────────────────────────
+export const insights = {
+  doMes: (mes) => request(`/api/insights${qsMes(mes)}`),
 };
 
 // ── Busca global ──────────────────────────────────────────────────────────────
@@ -425,6 +449,7 @@ export const conciliacao = {
   vincularItem: (id, itemId, dto) => request(`/api/conciliacao/${id}/itens/${itemId}/vincular`, { method: 'PUT', body: JSON.stringify(dto) }),
   criarContaItem: (id, itemId, dto) => request(`/api/conciliacao/${id}/itens/${itemId}/nova-conta`, { method: 'POST', body: JSON.stringify(dto) }),
   ignorarItem: (id, itemId) => request(`/api/conciliacao/${id}/itens/${itemId}/ignorar`, { method: 'PUT' }),
+  desfazerIgnorar: (id, itemId) => request(`/api/conciliacao/${id}/itens/${itemId}/desfazer-ignorar`, { method: 'PATCH' }),
   desvincularItem: (id, itemId) => request(`/api/conciliacao/${id}/itens/${itemId}/desvincular`, { method: 'PUT' }),
   finalizar: (id, dto) => request(`/api/conciliacao/${id}/finalizar`, { method: 'POST', body: JSON.stringify(dto ?? {}) }),
   cancelar: (id) => request(`/api/conciliacao/${id}`, { method: 'DELETE' }),
@@ -473,6 +498,7 @@ export const relatorios = {
   dre:           (inicio, fim, p) => downloadRelatorio(`/api/relatorios/dre?${relatorioQs(inicio, fim, p)}`),
   investimentos: (inicio, fim, p) => downloadRelatorio(`/api/relatorios/investimentos?${relatorioQs(inicio, fim, p)}`),
   cartoes:       (inicio, fim, p) => downloadRelatorio(`/api/relatorios/cartoes?${relatorioQs(inicio, fim, p)}`),
+  // ativas: true = só ativas, false = só inativas, null/undefined = todas (parâmetro omitido)
   assinaturas:   (ativas, p) => downloadRelatorio(`/api/relatorios/assinaturas?${relatorioQs('', '', { ativas, ...p })}`),
 
   // ── Dados JSON (visualização online e PDF) ────────────────────────────────
@@ -484,6 +510,6 @@ export const relatorios = {
     dre:           (inicio, fim, p) => request(`/api/relatorios/dre/dados?${relatorioQs(inicio, fim, p)}`),
     investimentos: (inicio, fim, p) => request(`/api/relatorios/investimentos/dados?${relatorioQs(inicio, fim, p)}`),
     cartoes:       (inicio, fim, p) => request(`/api/relatorios/cartoes/dados?${relatorioQs(inicio, fim, p)}`),
-    assinaturas:   (ativas) => request(`/api/relatorios/assinaturas/dados?ativas=${ativas ?? true}`),
+    assinaturas:   (ativas) => request(`/api/relatorios/assinaturas/dados?${relatorioQs('', '', { ativas })}`),
   },
 };

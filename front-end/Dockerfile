@@ -1,7 +1,7 @@
 # Build do SPA (Vite). Node 22 LTS — mesma major usada no desenvolvimento.
 FROM node:22.23.3-alpine AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 COPY . .
 RUN npm run build

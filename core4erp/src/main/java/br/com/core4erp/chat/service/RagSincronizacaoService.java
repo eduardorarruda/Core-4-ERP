@@ -276,13 +276,15 @@ public class RagSincronizacaoService {
 
         String topCategoria = despesaPorCategoria.entrySet().stream()
                 .max(Comparator.comparing(Map.Entry::getValue))
-                .map(e -> "%s (%s)".formatted(e.getKey(), brl(e.getValue())))
+                .map(e -> e.getKey() + " (" + brl(e.getValue()) + ")")
                 .orElse("nenhuma");
 
-        return ("Resumo financeiro de %s — receitas totais %s; despesas totais %s; "
-                + "resultado do mês %s; maior categoria de despesa: %s; lançamentos no mês: %d.")
-                .formatted(mes, brl(receitas), brl(despesas), brl(receitas.subtract(despesas)),
-                        topCategoria, contas.size());
+        // Concatenação: o nome da categoria vem do usuário e pode conter "%" (nunca usar formatted).
+        return "Resumo financeiro de " + mes + " — receitas totais " + brl(receitas)
+                + "; despesas totais " + brl(despesas)
+                + "; resultado do mês " + brl(receitas.subtract(despesas))
+                + "; maior categoria de despesa: " + topCategoria
+                + "; lançamentos no mês: " + contas.size() + ".";
     }
 
     /** Roll-up: subcategoria soma no total da categoria-pai (consistente com relatórios/dashboard). */

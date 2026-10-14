@@ -61,20 +61,6 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
         SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
              - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
         FROM LancamentoCartao l
-        WHERE l.cartaoCredito.id = :cartaoId
-        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
-        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
-    """)
-    BigDecimal sumValorByCartaoAndPeriod(@Param("cartaoId") Long cartaoId,
-                                         @Param("mesInicio") Integer mesInicio,
-                                         @Param("anoInicio") Integer anoInicio,
-                                         @Param("mesFim") Integer mesFim,
-                                         @Param("anoFim") Integer anoFim);
-
-    @Query("""
-        SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
-             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
-        FROM LancamentoCartao l
         WHERE l.empresaId = :eid
         AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
         AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
@@ -96,24 +82,30 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                                           @Param("mesFim") Integer mesFim,
                                                           @Param("anoFim") Integer anoFim);
 
-    /** Single query returning [cartaoId, totalLiquido] for a set of cards — avoids N+1 in listar(). */
+    /**
+     * Base do LIMITE USADO (§17 do CLAUDE.md): total líquido por cartão × fatura de TODOS os
+     * lançamentos do tenant — passado, fatura aberta, fechadas e futuras (parcelas 2..n) — com a
+     * flag {@code paga} = existe fatura desse cartão/mês/ano cuja conta gerada no fechamento está
+     * PAGO. Fatura sem linha em {@code tb_fatura_cartao} (aberta ou futura) = não paga. Uma consulta
+     * agregada só; a soma das não pagas e o piso em zero ficam em {@code LimiteCartaoService}.
+     */
     @Query("""
-        SELECT l.cartaoCredito.id,
+        SELECT new br.com.core4erp.cartaoCredito.repository.SaldoFaturaCartaoLinha(
+               l.cartaoCredito.id, l.anoFatura, l.mesFatura,
                COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
-             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0),
+               CASE WHEN EXISTS (
+                   SELECT 1 FROM FaturaCartao f JOIN f.conta c
+                   WHERE f.empresaId = :eid
+                     AND f.cartaoCredito.id = l.cartaoCredito.id
+                     AND f.mes = l.mesFatura AND f.ano = l.anoFatura
+                     AND c.status = br.com.core4erp.enums.StatusConta.PAGO
+               ) THEN true ELSE false END)
         FROM LancamentoCartao l
-        WHERE l.cartaoCredito.id IN :cartaoIds
-        AND l.empresaId = :eid
-        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
-        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
-        GROUP BY l.cartaoCredito.id
+        WHERE l.empresaId = :eid
+        GROUP BY l.cartaoCredito.id, l.anoFatura, l.mesFatura
     """)
-    List<Object[]> sumValorByCartaoIdsAndPeriod(@Param("cartaoIds") List<Long> cartaoIds,
-                                                @Param("eid") Long eid,
-                                                @Param("mesInicio") Integer mesInicio,
-                                                @Param("anoInicio") Integer anoInicio,
-                                                @Param("mesFim") Integer mesFim,
-                                                @Param("anoFim") Integer anoFim);
+    List<SaldoFaturaCartaoLinha> saldosPorFaturaDoCartao(@Param("eid") Long eid);
 
     @Query("""
         SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
@@ -257,7 +249,9 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
         AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
         AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
     """)
-    Object[] assinaturasVsAvulsos(@Param("eid") Long eid,
+    // Linha única, mas tipada como lista: com Object[] o Spring Data embrulha a tupla
+    // (Object[]{Object[]{...}}) e o parse do BigDecimal estourava no BI (400 sempre).
+    List<Object[]> assinaturasVsAvulsos(@Param("eid") Long eid,
                                    @Param("mesInicio") Integer mesInicio,
                                    @Param("anoInicio") Integer anoInicio,
                                    @Param("mesFim") Integer mesFim,
@@ -283,4 +277,45 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                                 @Param("eid") Long eid,
                                                 @Param("mes") Integer mes,
                                                 @Param("ano") Integer ano);
+
+    // ── Compras parceladas ativas (GET /api/cartoes/parcelamentos) ─────────────
+
+    /**
+     * Grupos de parcelamento que ainda têm parcela em fatura do mês {@code ymAtual} (ano×12+mês) em
+     * diante, dos mais recentes (data da compra) para os mais antigos. Sempre chamado com
+     * {@link Pageable} — o teto de grupos fica no {@code ParcelamentoCartaoService}.
+     */
+    @Query("""
+        SELECT x.grupoParcelamento FROM LancamentoCartao x
+        WHERE x.empresaId = :eid
+          AND x.grupoParcelamento IS NOT NULL
+          AND x.totalParcelas > 1
+        GROUP BY x.grupoParcelamento
+        HAVING MAX(x.anoFatura * 12 + x.mesFatura) >= :ymAtual
+        ORDER BY MAX(x.dataCompra) DESC, x.grupoParcelamento
+        """)
+    List<String> gruposDeParcelamentosAtivos(@Param("eid") Long eid, @Param("ymAtual") int ymAtual,
+                                             Pageable pageable);
+
+    /**
+     * Todas as parcelas (SAIDA) dos grupos informados (vindos de {@link #gruposDeParcelamentosAtivos}).
+     * Uma consulta só, com cartão e parceiro já resolvidos (sem N+1); o agrupamento por
+     * {@code grupoParcelamento} é feito no service. Sempre com {@link Pageable} (teto de linhas).
+     */
+    @Query("""
+        SELECT new br.com.core4erp.cartaoCredito.repository.ParcelaLinha(
+               l.grupoParcelamento, l.numeroParcela, l.totalParcelas, l.valor, l.mesFatura, l.anoFatura,
+               l.descricao, l.dataCompra, c.id, c.nome, c.diaVencimento,
+               COALESCE(p.nomeFantasia, p.razaoSocial))
+        FROM LancamentoCartao l
+        JOIN l.cartaoCredito c
+        LEFT JOIN l.parceiro p
+        WHERE l.empresaId = :eid
+          AND l.tipo = br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao.SAIDA
+          AND l.totalParcelas > 1
+          AND l.grupoParcelamento IN :grupos
+        ORDER BY l.grupoParcelamento, l.numeroParcela
+        """)
+    List<ParcelaLinha> parcelasDosGrupos(@Param("eid") Long eid, @Param("grupos") List<String> grupos,
+                                         Pageable pageable);
 }

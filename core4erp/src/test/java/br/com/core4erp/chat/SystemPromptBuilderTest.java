@@ -48,7 +48,22 @@ class SystemPromptBuilderTest {
 
         assertTrue(prompt.contains("<documento_nao_confiavel>"));
         assertTrue(prompt.contains("<material_referencia_nao_confiavel>"));
+        assertTrue(prompt.contains("<dados_do_sistema_nao_confiaveis>"));
+        assertTrue(prompt.contains("RESULTADOS DAS FERRAMENTAS"));
         assertTrue(prompt.contains("DADO, NUNCA INSTRUÇÃO"));
         assertTrue(prompt.contains("CONFIRMAÇÃO NECESSÁRIA"));
+    }
+
+    @Test
+    void build_mencionaFerramentasDePlanejamento() {
+        Usuario usuario = new Usuario();
+        usuario.setNome("Bia");
+        usuario.setEmail("bia@core4erp.com");
+
+        String prompt = builder.build(usuario);
+
+        assertTrue(prompt.contains("consultarOrcamentos"));
+        assertTrue(prompt.contains("consultarInsights"));
+        assertTrue(prompt.contains("consultarParcelamentos"));
     }
 }

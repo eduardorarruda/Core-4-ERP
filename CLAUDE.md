@@ -1,6 +1,11 @@
-# CLAUDE.md — Core 4 ERP
+# CLAUDE.md — Core 4
 
 Guia de contexto para IAs assistindo no desenvolvimento. Leia antes de qualquer tarefa.
+
+> O produto se chama **Core 4** (sem "ERP") em todo texto visível ao usuário. Pastas, pacotes Java,
+> domínios e e-mails (`core4erp/`, `br.com.core4erp`, `core4erp.codes`) continuam com o nome técnico.
+> Identidade visual e design system: `front-end/src/components/ui/README.md` (tokens, marca, primitivos,
+> movimento e a seção "Acessibilidade (modo A11y · WCAG 2.2 AA)").
 
 ---
 
@@ -32,7 +37,14 @@ Guia de contexto para IAs assistindo no desenvolvimento. Leia antes de qualquer 
 
 ## 1. Visão Geral do Projeto
 
-Sistema ERP de gestão financeira pessoal full-stack. Permite controle de contas a pagar/receber, conciliação bancária e de cartão (OFX), investimentos, assinaturas recorrentes, relatórios e um assistente de IA integrado.
+Sistema de gestão financeira full-stack (pessoal e empresarial). Permite controle de contas a pagar/receber, conciliação bancária e de cartão (OFX), investimentos, assinaturas recorrentes, relatórios e um assistente de IA integrado.
+
+**Marca:** o nome do produto é **Core 4** (com espaço; no wordmark gráfico, "Core4" com o "4" em esmeralda).
+Logo e símbolo ficam em `front-end/src/assets/brand/` (componentes `BrandMark`/`BrandLogo`). A palavra
+"ERP" **não** é usada em nenhum texto visível ao usuário (telas, e-mails, prompts da IA, relatórios, OpenAPI,
+mensagens do n8n). Identificadores técnicos mantêm o nome antigo e não devem ser renomeados: pacote
+`br.com.core4erp`, pasta/artefato `core4erp`, serviços/containers Docker, bancos, variáveis de ambiente,
+domínio `core4erp.codes` e migrations Flyway já aplicadas.
 
 **Domínio:** Português Brasileiro. Todas as entidades, DTOs, endpoints, variáveis e mensagens ao usuário devem ser em pt-BR.
 
@@ -61,16 +73,18 @@ Sistema ERP de gestão financeira pessoal full-stack. Permite controle de contas
 | Componente | Tecnologia | Versão |
 |---|---|---|
 | Linguagem | JavaScript (JSX) | ES2022+ |
-| Framework | React | 19.0.0 |
-| Build | Vite | 6.4.x |
-| Estilização | Tailwind CSS | 4.1.14 |
+| Framework | React | 19.3.x |
+| Build | Vite (+ vite-plugin-pwa 2) | 8.3.x |
+| Estilização | Tailwind CSS (`@tailwindcss/vite`) | 4.3.x |
 | Roteamento | React Router DOM | 7.18.x |
-| Ícones | Lucide React | latest |
-| Animações | Motion | latest |
-| Gráficos | Recharts | 3.8.1 |
-| PDF | jsPDF + jspdf-autotable | 4.2.1 / 5.0.7 |
-| Datas | date-fns | 4.1.0 |
-| Chat UI | @assistant-ui/react | 0.12.25 |
+| Ícones | Lucide React | 1.57.x |
+| Animações | Motion (motion.dev — `import … from 'motion/react'`) | 14.2.x |
+| Gráficos | Recharts | 3.10.x |
+| PDF | jsPDF + jspdf-autotable | 4.2.x / 5.0.x |
+| Datas | date-fns | 4.4.x |
+| Fontes (@fontsource) | Sora (títulos/números), DM Sans (texto), JetBrains Mono (valores/códigos); Atkinson Hyperlegible Next e Lexend (modo de acessibilidade, carregadas sob demanda) | 5.3.x |
+| Lint | ESLint + eslint-plugin-react-hooks | 10.x / 7.x |
+| Chat UI (Áurea) | componentes próprios em `components/chat/` + SSE em `streamAurea.js` (sem `@assistant-ui`) | — |
 
 ### Infraestrutura
 - Docker + Docker Compose (multi-stage builds)
@@ -111,7 +125,11 @@ Cada módulo de domínio segue a mesma estrutura interna:
 ```
 
 **Módulos de domínio existentes:**
-`auth`, `usuario`, `empresa`, `categoria`, `parceiro`, `conta`, `contaCorrente`, `cartaoCredito`, `investimento`, `assinatura`, `conciliacao`, `conciliacaoCartao`, `notificacao`, `chat`, `relatorio`, `dashboard`, `busca`, `plano`
+`auth`, `usuario`, `empresa`, `categoria`, `parceiro`, `conta`, `contaCorrente`, `cartaoCredito`, `investimento`, `assinatura`, `conciliacao`, `conciliacaoCartao`, `notificacao`, `chat`, `relatorio`, `dashboard`, `busca`, `plano`, `orcamento`, `insights`
+
+> **Módulo novo com entidade/repositório** precisa entrar nas **duas** listas de pacotes do `config/PrimaryJpaConfig`
+> (`@EnableJpaRepositories.basePackages` e `PRIMARY_PACKAGES`). Fora delas o contexto não sobe ("No qualifying bean of
+> type ...Repository") — e os testes unitários com mocks não percebem. `PrimaryJpaConfigPacotesTest` trava as listas iguais.
 
 **Infraestrutura transversal:**
 ```
@@ -132,17 +150,25 @@ utils/        → CNPJ, telefone, contexto de requisição
 
 ### Frontend: `front-end/src/`
 ```
-views/        → páginas completas (uma por rota)
+views/        → páginas completas (uma por rota; algumas são só "cascas" finas, ex.: conciliação)
 components/   → componentes reutilizáveis, agrupados por domínio
-  ui/         → componentes genéricos (DataTable, Toast, Modal, PermissaoGuard, etc.)
-  layout/     → Sidebar, TopNav
-  dashboard/  → painéis do dashboard
-  conciliacao/ e conciliacaoCartao/ → fluxos de conciliação
-  chat/       → interface do assistente IA
-  reports/    → filtros e cards de relatório
-hooks/        → custom hooks React
-context/      → React Context (Theme, Auth)
-lib/          → utilitários puros (api.js, formatters.js, pdfUtils.js, permissaoMessages.js)
+  ui/           → design system (Button, Card, KpiCard, PageHeader, FilterBar, PeriodoSelector, DataTable,
+                  Modal, Drawer, EmptyState, AlertaErro, GraficoAcessivel, BrandMark/BrandLogo…) — ver ui/README.md
+  motion/       → Movimento.jsx (FadeIn, Stagger, AnimatedNumber, …) + presets.js — única forma de animar
+  layout/       → Sidebar, TopNav, BottomNav, RodapeApp, NotificacoesPopover, PWA
+  forms/        → ContaForm, BaixaForm, LancamentoCartaoForm (criar = editar, mesmo componente)
+  financeiro/   → formulários e peças de Contas, Contas bancárias (TransferenciaForm), Investimentos (Pote),
+                  Categorias, Parceiros, Assinaturas
+  cartoes/      → CartoesTabs, CartaoPlastico, FaturaResumo, LinhaDoTempoFaturas, ParcelamentosLista, GraficosCartao…
+  conciliacao/  → ConciliacaoWorkspace + modos.js (banco e cartão no mesmo código), ConciliacaoTabs, RevisaoSessao…
+  dashboard/    → Início (FaixaAlertas, FluxoSankey, ProximosVencimentos…), Insights e Orçamentos
+  chat/         → Áurea (ChatLauncher/ChatSidebar, MensagemAurea, ComposerAurea, ConfirmacaoAcao, streamAurea.js)
+  configuracoes/→ abas de Configurações, MatrizPermissoes, SeletorPerfil, auditoriaUtils
+  acessibilidade/→ PainelAcessibilidade, preferencias.js, padroesGrafico.js, LinksPular, AnunciadorRota…
+  reports/      → ReportCard, ReportFilters, ReportModal, ReportPreview
+hooks/        → custom hooks (useAuth, usePermissao, useCarga, usePeriodoUrl, useAcessibilidade, useConfirm, useToast…)
+context/      → AuthContext, AcessibilidadeContext, ThemeContext
+lib/          → utilitários puros (api.js, navigation.js, periodo.js, chartTheme.js, formatters.js, pdfUtils.js…)
 ```
 
 **Arquivos-chave do frontend:**
@@ -154,12 +180,23 @@ src/lib/safeUrl.js           — valida href vindo de dados (IA/cadastros): só 
 src/views/Privacidade.jsx, Termos.jsx — páginas públicas /privacidade e /termos (LGPD; versão aceita no registro)
 src/components/ui/GraficoAcessivel.jsx — envolve gráficos Recharts com resumo + tabela sr-only (acessibilidade)
 src/lib/routeUtils.js        — ROUTE_PRIORITY + getFirstAccessibleRoute(temPermissao)
-src/App.jsx                  — AdminRoute, PermissaoRoute, ContaEmpresaRoute, NavigateToFirstAccessible, ProtectedLayout
-src/components/layout/
-  Sidebar.jsx                — itens com {permissao: 'CODIGO', empresaOnly: true} filtrados
-  TopNav.jsx                 — mostra "Admin Sistema" se adminSistema=true
-src/components/ui/
-  PermissaoGuard.jsx         — renderização condicional (UX); validação real está no backend
+src/App.jsx                  — PermissaoRoute, ContaEmpresaRoute, NavigateToFirstAccessible, ProtectedLayout (helpers comPermissao/soEmpresa)
+src/lib/navigation.js        — FONTE ÚNICA da navegação: NAV (grupos Visão geral/Dinheiro/Cadastros/Empresa, item com
+                               permissao | permissoesAlguma | destinos[], empresaOnly), NAV_CONTA (menu do avatar) e
+                               NAV_ACOES (ações "?novo=" da busca; só aparecem com ativa: true). Sidebar, BottomNav,
+                               CommandPalette, trilha da TopNav e document.title leem daqui. Tela nova = item em NAV + rota no App.jsx
+src/context/AcessibilidadeContext.jsx — modo de acessibilidade: preferências em localStorage, atributos data-* no <html>, MotionConfig da raiz, Alt+A
+src/hooks/useAcessibilidade.js — useAcessibilidade() (efetivo, abrirPainel, anunciar) e useMovimentoReduzido()
+src/hooks/useCarga.js        — carga assíncrona sem setState síncrono em efeito (dados, erro, carregando, recarregar, setDados)
+src/hooks/usePeriodoUrl.js   — período na URL (?de=&ate=) para o PeriodoSelector
+src/lib/periodo.js           — atalhos de período (mes, 3m, 6m, 12m, ano), paraMesAno, rotuloPeriodo, validarPeriodo
+src/lib/chartTheme.js        — props/cores dos gráficos Recharts (--color-chart-*), usePadroesGrafico
+src/components/motion/       — Movimento.jsx + presets.js (respeitam movimento reduzido)
+src/components/forms/        — ContaForm, BaixaForm, LancamentoCartaoForm (modo criar|editar)
+src/components/conciliacao/ConciliacaoWorkspace.jsx + modos.js — conciliação bancária E de cartão num só código;
+                               as 6 views Conciliacao*/ConciliacaoCartao* são cascas finas (<ConciliacaoWorkspace modo="banco|cartao" …/>)
+src/components/ui/PermissaoGuard.jsx — renderização condicional (UX); validação real está no backend
+src/views/Insights.jsx, Orcamentos.jsx — telas novas (2026-10); Acessibilidade.jsx — declaração pública /acessibilidade
 ```
 
 ---
@@ -219,7 +256,7 @@ empresa/
   service/ConviteService.java          — convite e aceite de novos operadores
 ```
 
-**Códigos de permissão (tb_permissao, V19 + V30 + V31):**
+**Códigos de permissão (tb_permissao, V19 + V30 + V31 + V52):**
 ```
 CONTA_VISUALIZAR/CRIAR/EDITAR/DELETAR/BAIXAR/ESTORNAR
 CONTA_CORRENTE_VISUALIZAR/CRIAR/EDITAR/DELETAR/TRANSFERIR
@@ -246,24 +283,39 @@ CONFIGURACAO_EDITAR
 CALENDARIO_VISUALIZAR                              ← V30 (tela /calendario)
 DASHBOARD_VISUALIZAR                               ← V31 (GET /api/dashboard)
 DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/saldo-detalhado)
+ORCAMENTO_VISUALIZAR / ORCAMENTO_EDITAR            ← V52 (tela /orcamentos; VISUALIZAR: todos os perfis do sistema;
+                                                         EDITAR: PROPRIETARIO, ADMIN, FINANCEIRO)
 ```
+`GET /api/insights` reaproveita `DASHBOARD_VISUALIZAR`; `GET /api/cartoes/parcelamentos` reaproveita `CARTAO_VISUALIZAR`.
 
-**Mapeamento tela → permissão (frontend):**
+**Mapeamento tela → permissão (frontend, `App.jsx`):**
 ```
-/dashboard                  → PermissaoRoute("DASHBOARD_VISUALIZAR"); SaldoDetalhadoPanel usa PermissaoGuard("DASHBOARD_CARTAO_VISUALIZAR")
-/cartoes/dashboard          → CARTAO_VISUALIZAR
-/cartoes (lançamentos)      → CARTAO_LANCAR
-/cartoes/conciliacao        → CARTAO_CONCILIACAO_VISUALIZAR
-/categorias                 → CATEGORIA_VISUALIZAR  (PermissaoRoute)
-/investimentos              → INVESTIMENTO_VISUALIZAR (PermissaoRoute)
-/reports                    → sem PermissaoRoute; cada card usa PermissaoGuard(RELATORIO_*_VISUALIZAR)
-                              botão Excel visível só com RELATORIO_*_EXPORTAR
-/calendario                 → CALENDARIO_VISUALIZAR
+/dashboard (Início)         → DASHBOARD_VISUALIZAR; SaldoDetalhadoPanel só carrega com DASHBOARD_CARTAO_VISUALIZAR;
+                              resumo de cartões com CARTAO_VISUALIZAR; "Baixar" nos vencimentos com CONTA_BAIXAR
+/insights                   → DASHBOARD_VISUALIZAR
+/orcamentos                 → ORCAMENTO_VISUALIZAR; criar/editar/excluir via PermissaoGuard("ORCAMENTO_EDITAR")
+/calendario                 → CALENDARIO_VISUALIZAR ("Baixar" com CONTA_BAIXAR)
+/reports                    → sem PermissaoRoute; cada card com RELATORIO_*_VISUALIZAR, Excel só com RELATORIO_*_EXPORTAR
+                              (o item do menu aparece se tiver qualquer um dos 8 RELATORIO_*_VISUALIZAR)
+/assistente (Áurea), /configuracoes, /ajuda → só autenticado
+/contas                     → CONTA_VISUALIZAR; botões CONTA_CRIAR / EDITAR / DELETAR / BAIXAR / ESTORNAR por linha
+/contas-correntes           → CONTA_CORRENTE_VISUALIZAR; CRIAR/EDITAR/DELETAR; "Transferir" com CONTA_CORRENTE_TRANSFERIR
+                              (transferências saíram da tela de Contas e vivem aqui — exige ≥ 2 contas)
+/cartoes (faturas e lançamentos) → CARTAO_LANCAR; CARTAO_CRIAR/EDITAR/DELETAR (cartão), CARTAO_FECHAR_FATURA (FaturaResumo)
+/cartoes/dashboard          → CARTAO_VISUALIZAR (inclui "Compras parceladas"); abas de Cartões via CartoesTabs conforme permissão
+/conciliacao, /conciliacao/historico, /conciliacao/:id, /conciliacao/:id/relatorio → CONCILIACAO_VISUALIZAR
+/cartoes/conciliacao (+ /historico, /:id, /:id/relatorio)                         → CARTAO_CONCILIACAO_VISUALIZAR
+                              Conciliação unificada: ConciliacaoTabs mostra "Conta bancária" · "Cartão" conforme a
+                              permissão de cada rota; importar/vincular por CONCILIACAO_* ou CARTAO_CONCILIACAO_* (modos.js)
+/investimentos              → INVESTIMENTO_VISUALIZAR; CRIAR/EDITAR/DELETAR; tipos com INVESTIMENTO_TIPO_GERENCIAR
+/assinaturas                → ASSINATURA_VISUALIZAR; CRIAR/EDITAR/DELETAR
+/categorias, /parceiros     → CATEGORIA_VISUALIZAR / PARCEIRO_VISUALIZAR; CRIAR/EDITAR/DELETAR de cada módulo
 /audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute + ContaEmpresaRoute)
-/empresa/operadores         → USUARIO_VISUALIZAR    (PermissaoRoute + ContaEmpresaRoute)
+/empresa/operadores         → USUARIO_VISUALIZAR    (PermissaoRoute + ContaEmpresaRoute); USUARIO_CONVIDAR/EDITAR/REMOVER
 /empresa/perfis             → CONFIGURACAO_EDITAR   (PermissaoRoute + ContaEmpresaRoute)
-/admin/planos               → AdminRoute (adminSistema)
+públicas                    → /login, /register, /redefinir-senha, /aceitar-convite, /privacidade, /termos, /acessibilidade
 ```
+Botões de ação sem permissão **não aparecem** (`PermissaoGuard`/`usePermissao`) — é só UX; `@Requer` no backend continua valendo.
 
 **Regra de dependência VISUALIZAR em Perfis (GestaoPerfis.jsx):**
 - Ao habilitar qualquer ação que não seja VISUALIZAR em um módulo → VISUALIZAR desse módulo é adicionado automaticamente.
@@ -287,19 +339,7 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 - **Atribuição de perfil**: sempre via `PerfilAtribuicaoService.resolverParaAtribuir()` (perfil do sistema ou da própria empresa — `findAtribuivelNaEmpresa`, nunca `findById`; nunca PROPRIETARIO) e `bloquearAutoAlteracao()` (ninguém altera/remove o próprio vínculo).
 - Nomes de perfis do sistema são reservados (criar **e** renomear); perfil em uso (membro ou convite pendente) não pode ser excluído (409).
 
-**Rotas frontend:**
-- `/admin/planos` → `AdminRoute`
-- `/empresa/operadores` → `PermissaoRoute("USUARIO_VISUALIZAR")`
-- `/empresa/perfis` → `PermissaoRoute("CONFIGURACAO_EDITAR")`
-- `/audit` → `PermissaoRoute("AUDITORIA_VISUALIZAR")` (não AdminRoute)
-- `/calendario` → `PermissaoRoute("CALENDARIO_VISUALIZAR")`
-- `/categorias` → `PermissaoRoute("CATEGORIA_VISUALIZAR")`
-- `/investimentos` → `PermissaoRoute("INVESTIMENTO_VISUALIZAR")`
-- `/cartoes/dashboard` → `PermissaoRoute("CARTAO_VISUALIZAR")`
-- `/cartoes` → `PermissaoRoute("CARTAO_LANCAR")`
-- `/cartoes/conciliacao` e sub-rotas → `PermissaoRoute("CARTAO_CONCILIACAO_VISUALIZAR")`
-- `/reports` → sem PermissaoRoute; PermissaoGuard por card (RELATORIO_*_VISUALIZAR / EXPORTAR)
-- `/dashboard` → `PermissaoRoute("DASHBOARD_VISUALIZAR")`; SaldoDetalhadoPanel gateado por DASHBOARD_CARTAO_VISUALIZAR
+**Rotas frontend:** ver o mapeamento acima (fonte: `App.jsx`; menu: `lib/navigation.js`). Não há `AdminRoute`/`/admin/planos` no front.
 
 **Operadores — reativação:**
 - `PATCH /api/empresa/operadores/{usuarioId}/reativar` — requer `USUARIO_EDITAR`
@@ -363,6 +403,7 @@ tb_usuario_empresa, tb_usuario_empresa_permissao    → vínculo usuário ↔ em
 tb_auditoria
 tb_plano, tb_pagamento_mock
 tb_convite
+tb_orcamento            → limite mensal por categoria principal (V52; soft delete `ativo`, 1 ativo por empresa+categoria)
 ```
 
 ### Flyway — Regras Obrigatórias
@@ -370,7 +411,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V52** (conferir a pasta antes de criar).
+- **Próxima migration disponível: V53** (conferir a pasta antes de criar).
 - Flyway é configurado em código (`PrimaryJpaConfig`, o `FlywayAutoConfiguration` está excluído) mas **lê `spring.flyway.*`**: dev é tolerante (`out-of-order=true`, `ignore-migration-patterns=*:missing`); `prod` é estrito (`out-of-order=false`, `*:future`).
 
 **Sequência de migrations:**
@@ -424,6 +465,7 @@ V48     indices_fk_quentes
 V49     reset_token_hash                  (reset_token passa a ser SHA-256; invalida pendentes)
 V50     add_tipo_notificacao_membro_adicionado
 V51     criptografia_dados_bancarios_ofx  (agência/conta do OFX, acct_id do cartão + acct_id_ofx_hash)
+V52     create_tb_orcamento               (tb_orcamento + permissões ORCAMENTO_VISUALIZAR/EDITAR)
 ```
 
 Não existe banco de log: os logs vão para o stdout (ver §10).
@@ -452,7 +494,8 @@ Não existe banco de log: os logs vão para o stdout (ver §10).
 - **Roll-up obrigatório**: toda agregação por categoria soma a subcategoria no total da categoria-pai
   via `COALESCE(categoria_pai_id, id)` (com **LEFT JOIN** no pai — inner join derrubaria as raízes).
   Aplicado em `ContaRepository.despesasPorCategoria`, `LancamentoCartaoRepository.resumoDashboardPorCategoria`,
-  `RelatorioService` (DRE + assinaturas) e `ContaSpec.categoriaId` (filtrar pelo pai inclui as filhas).
+  `RelatorioService` (DRE + assinaturas), `ContaSpec.categoriaId` (filtrar pelo pai inclui as filhas) e
+  `orcamento/repository/GastoRepository` (Orçamento + Insights).
 - **Classificação por IA** (`ClassificacaoIaService`): sugere categoria a partir da descrição/parceiro,
   com saída estruturada; o id devolvido é **revalidado contra o catálogo ativo da empresa** (IA não
   burla tenant) e confiança < 0,5 é descartada. Falha da OpenAI → sem categoria, nunca 500.
@@ -591,7 +634,21 @@ private String hashEmail(String email) {
 - Props desestruturadas na assinatura da função.
 - Estado local com `useState`; estado compartilhado via Context ou prop drilling explícito.
 - Efeitos colaterais em `useEffect` com array de dependências correto.
+- **Carga de dados com `useCarga(fn, deps)`** (`hooks/useCarga.js`) — nunca `setState` síncrono dentro de efeito
+  (regras do `eslint-plugin-react-hooks` v6+ para React 19, ex.: `set-state-in-effect`). `npx eslint src` deve dar 0 erros.
 - `temPermissao()` usa `useCallback` com deps `[loginState, permissoes]` — sem stale closure.
+- Formulários de domínio em `components/forms/` (`ContaForm`, `BaixaForm`, `LancamentoCartaoForm`) e
+  `components/financeiro/*Form` — o mesmo componente cria e edita (`modo`); sempre em `Modal`/`Drawer`, nunca no topo da página.
+
+### Padrões de tela (detalhes em `components/ui/README.md`)
+- `PageHeader` (um `<h1>` por tela) com **uma** ação primária; `FilterBar` única logo abaixo.
+- **Um único `PeriodoSelector` por tela**, com estado na URL via `usePeriodoUrl` — nunca dois filtros para a mesma data.
+  Telas sem período: Início, Calendário (navega por mês), Assinaturas e cadastros.
+- Estados: skeleton ao carregar, `EmptyState` vazio, `AlertaErro` (com "Tentar novamente") no erro — nada de "Carregando..." solto.
+- Exclusão sempre com `useConfirm()`; botões só `components/ui/Button`; tabelas com `DataTable` (cards no mobile).
+- Marca só via `BrandMark` (símbolo) / `BrandLogo` (símbolo + wordmark); nome em texto: **Core 4**.
+- Valores financeiros sensíveis com a classe `valor-privado` (borrados no modo privacidade, Alt+P).
+- Ações rápidas da busca: `NAV_ACOES` em `lib/navigation.js`; a tela lê `?novo=` e abre o formulário.
 
 ### Chamadas de API
 - **Sempre use `lib/api.js`** — nunca `fetch` direto nos componentes.
@@ -606,14 +663,37 @@ private String hashEmail(String email) {
 - Nunca formate dinheiro ou datas inline com lógica manual.
 
 ### Estilização
-- Tailwind CSS classes diretamente no JSX.
-- Sem CSS modules ou styled-components.
-- Tema claro/escuro gerenciado por `ThemeContext` — use `useTheme()` para classes condicionais.
+- Tailwind CSS classes diretamente no JSX. Sem CSS modules ou styled-components.
+- **Só tokens** (`bg-surface*`, `text-text-primary/NN`, `text-income/expense/invest`, `var(--color-*)`, raios da escala):
+  **nada de hex/rgba fixo nem `px` em fonte** — senão tema claro, alto contraste, daltonismo e tamanho de texto quebram.
+- Tema claro/escuro gerenciado por `ThemeContext` (escuro por padrão; Alt+T).
 - Componentes genéricos de UI ficam em `components/ui/` — reutilize antes de criar novos.
+- **Movimento só via `components/motion`** (presets) + `motion/react`; para decidir em JS use
+  `useMovimentoReduzido()` (não `useReducedMotion`, que só olha o sistema). UI comum ≤ 300 ms; nada de `animate-*` infinito novo.
+
+### Acessibilidade (WCAG 2.2 AA — não pode regredir)
+- O modo de acessibilidade (`AcessibilidadeContext`, painel com Alt+A, declaração em `/acessibilidade`) aplica atributos
+  no `<html>`: `data-texto`, `data-contraste="alto"`, `data-movimento`, `data-fonte="legibilidade|dislexia"`,
+  `data-espacamento`, `data-daltonismo`, `data-padroes`, `data-leitura="simplificada"`, `data-sublinhar-links`,
+  `data-foco`, `data-alvos="amplos"`, `data-cursor`. O CSS faz o resto — a tela só acompanha se usar tokens.
+- Status = **texto + ícone** (nunca só cor); entrada/saída com sinal (+/−). Ícone decorativo `aria-hidden`; brilho/ilustração com `data-decorativo`.
+- Gráficos: `GraficoAcessivel` (resumo + tabela sr-only), cores `--color-chart-*` via `lib/chartTheme.js`,
+  `usePadroesGrafico` quando houver séries lado a lado; legenda com texto.
+- Alvos ≥ 24px (≥ 44px no toque); foco visível; tudo por teclado; nada só no hover; headings sem pular nível.
+- Reflow: 320px de largura e texto 175% sem rolagem lateral (evite `truncate`/`whitespace-nowrap` em texto essencial).
+- Formulário: rótulo visível (`FormField`), ajuda/erro por `aria-describedby`, `autocomplete` correto, sem bloquear colar.
+
+### Glossário de interface (usar exatamente)
+**Contas a pagar e receber** (conta a pagar / a receber; nunca "Lançamentos") · **Lançamento do cartão** ·
+**Contas bancárias** (não "Contas correntes" na UI) · **Baixar** / **Estornar baixa** · **Entradas** / **Saídas**
+(Receita/Despesa só em DRE e categorias) · **Excluir** (não "Remover"/"permanentemente") · **Áurea** · **Início** ·
+**Core 4** (nunca "Core 4 ERP").
 
 ### Estado e permissões
-- **sessionStorage** para estado do usuário (`loginState`) — limpa ao fechar aba.
-- Permissões vêm do `sessionStorage` → para sincronização em tempo real, fazer polling de `/api/auth/me`.
+- **localStorage** guarda só o estado do usuário (`loginState`, `usuario`) para valer em todas as abas; o **JWT fica
+  apenas no cookie HttpOnly** (nunca em storage). `lib/api.js` migra sessões antigas de `sessionStorage`.
+- Permissões em tempo real: o `AuthProvider` (`context/AuthContext.jsx`) faz **um único** polling de
+  `GET /api/auth/me/permissoes` a cada 30 s, pausado com a aba oculta — não crie outro polling em telas.
 - `PermissaoGuard` é apenas UX — a validação real está sempre no backend.
 
 ---
@@ -675,6 +755,7 @@ chat/tools/
 2. Usuário vincula cada item OFX a uma conta existente ou cria nova inline.
 3. Após vinculação: status → `CONCILIADO`, saldo da conta corrente é atualizado.
 4. Itens não reconhecidos podem ser ignorados (status `IGNORADO`).
+5. Frontend: banco e cartão usam o mesmo `ConciliacaoWorkspace` (diferenças em `conciliacao/modos.js`), com abas por permissão.
 
 ### Fluxo de Cartão de Crédito
 - `tb_cartaoCredito` → tem N `tb_faturaCartao` → cada fatura tem N `tb_lancamentoCartao`.
@@ -685,19 +766,68 @@ chat/tools/
   - `fecharFatura` usa o total líquido; fatura com total ≤ 0 não pode ser fechada.
 - Regra de alocação de fatura: `FaturaHelper.calcularFatura(dataCompra, diaFechamento)` — se `dia >= diaFechamento`, vai para o mês seguinte. Usada em `CartaoCreditoService` e `ConciliacaoCartaoService`.
 
+### Listagem de contas (`GET /api/contas`)
+- Filtros opcionais: `tipo`, `status`, `numeroDocumento`, `vencimentoInicio`/`vencimentoFim`, `parceiroId`,
+  `valorMin`/`valorMax`, `categoriaId` e `busca` (texto livre: `LOWER(descricao)`, razão social/nome fantasia do
+  parceiro via **LEFT JOIN** ou `numeroDocumento` — nenhuma é coluna cifrada). `busca` sofre trim, é cortada em 100
+  caracteres, é ignorada se em branco e tem `% _ \` escapados (`ContaSpec.escaparLike`, `ESCAPE '\'`).
+
 ### Transferências entre Contas
 - Uma transferência gera dois lançamentos: débito na origem, crédito no destino.
 - Ambos vinculados pelo `transferencia_id`.
 - Deletar transferência deve deletar ambos os lançamentos atomicamente (`@Transactional`).
+- Frontend: a ação "Transferir" fica em **Contas bancárias** (`/contas-correntes`, `TransferenciaForm`), com `CONTA_CORRENTE_TRANSFERIR`.
 
 ### Assinaturas Recorrentes
 - Cada assinatura tem `diaVencimento` e pode estar vinculada a um cartão de crédito.
 - Geração de contas recorrentes é responsabilidade do service de assinatura.
 
+### Orçamento, Insights e Parcelamentos (V52, 2026-10)
+
+**Definição única de GASTO** — CTE `GastoRepository.CTE_GASTO` (native, sempre `empresa_id` + intervalo de datas),
+usada por Orçamento **e** Insights:
+- contas a pagar (`tipo=PAGAR`, status PENDENTE/ATRASADO/PAGO) pela `data_vencimento` (mesmo critério do card
+  "despesas por categoria" do Dashboard), **exceto** as contas geradas pelo fechamento de fatura
+  (`tb_fatura_cartao.conta_id`) — elas somam a fatura inteira na categoria do 1º lançamento e duplicariam o cartão;
+- lançamentos de cartão SAIDA − ENTRADA na `data_compra`; a parcela k>1 conta no dia 1 do k-ésimo mês a partir
+  da compra (cada parcela pesa no seu mês);
+- roll-up `COALESCE(categoria_pai_id, id)`. "Realizado até hoje" = linhas com data ≤ hoje (contas com vencimento
+  futuro no mês contam no gasto do mês, mas não no realizado). "Hoje" = fuso `America/Sao_Paulo` (`MesReferencia.FUSO`).
+
+**Orçamento** (`orcamento/`, `tb_orcamento`): limite mensal recorrente por categoria **principal** (subcategoria → 400;
+categoria de outra empresa → 404 via `findByIdAndEmpresaId`; duplicado → 409 `ORCAMENTO_JA_EXISTE`). Categoria não
+tem tipo receita/despesa nem cor no modelo — não há como validar "é de despesa". Regras puras em `OrcamentoCalculadora`:
+ritmo = dia/dias do mês (100 em mês passado, 0 em futuro); **ESTOURADO** se gasto do mês > limite; **ATENCAO** (só no
+mês corrente) se realizado até hoje > limite × ritmo; senão **OK**; projeção = gasto do mês + cartão até hoje projetado
+no ritmo (contas fixas não são extrapoladas); sugestão = média dos 3 meses completos anteriores arredondada para cima
+em múltiplos de R$ 10.
+```
+GET    /api/orcamentos?mes=AAAA-MM      ORCAMENTO_VISUALIZAR  → OrcamentoMesResponseDto (itens por % desc, totais, gastoSemOrcamento)
+GET    /api/orcamentos/sugestoes?mes=   ORCAMENTO_VISUALIZAR  → categorias raiz ativas com gasto e sem orçamento + sugestaoLimite
+POST   /api/orcamentos                  ORCAMENTO_EDITAR      {categoriaId, valorLimite} → 201 item do mês atual
+PUT    /api/orcamentos/{id}             ORCAMENTO_EDITAR      {categoriaId, valorLimite} → 200 item do mês atual
+DELETE /api/orcamentos/{id}             ORCAMENTO_EDITAR      → 204 (soft delete)
+```
+
+**Insights** (`insights/`): `GET /api/insights?mes=AAAA-MM` (`DASHBOARD_VISUALIZAR`) — 3 consultas agregadas (diário,
+mensal por categoria, top 5 gastos) + cálculo puro em `InsightsCalculadora`: KPIs, ritmo (acumulado até hoje vs. mesmo
+ponto do mês anterior e média de 3 meses, com curva dia a dia), gasto por dia da semana (90 dias), categorias fora do
+normal (≥ 20% **e** ≥ R$ 50 acima da média de 3 meses, z-score informativo; NOVA = sem histórico e ≥ R$ 50), maiores
+gastos, projeção (realizado + agendado + ritmo diário do **cartão** × dias restantes) e frases determinísticas pt-BR
+(`FrasesInsight`, sem IA; tipos ALERTA/ATENCAO/POSITIVO/INFO).
+
+**Compras parceladas**: `GET /api/cartoes/parcelamentos` (`CARTAO_VISUALIZAR`) — derivado de `tb_lancamento_cartao`
+(`grupo_parcelamento`, `numero_parcela`, `total_parcelas`; sem schema novo). Ativo = tem parcela em fatura do mês atual
+em diante. `parcelaAtual` = maior nº de parcela em fatura ≤ mês atual; próximas parcelas com vencimento pela regra do
+fechamento (`FaturaHelper.dataVencimento`: fatura do mês M vence no `diaVencimento` de M+1).
+
 ### Relatórios (`relatorio/`)
 - `RelatorioService` agrega dados financeiros (contas, categorias, parceiros) por período.
 - `ExcelRelatorioService` gera arquivo `.xlsx` via Apache POI — retorna `byte[]` no controller com `Content-Disposition: attachment`.
 - Toda query de relatório DEVE filtrar por `empresaId` (via `tenantCtx.getEmpresaId()`) e pelo intervalo de datas (`data_competencia` ou `data_pagamento` — especificar qual).
+- R07 Assinaturas (`GET /api/relatorios/assinaturas/dados` e `GET /api/relatorios/assinaturas` XLSX): `ativas` é
+  **opcional** — omitido = todas (ativas e inativas); `true` = só ativas; `false` = só inativas. (Antes o default era
+  `true` e `false` trazia todas.)
 
 ### Dashboard (`dashboard/`)
 - `DashboardService` fornece saldo total, saldo por conta corrente, receitas/despesas do mês e projeção de vencimentos.
@@ -762,11 +892,17 @@ Lista completa e comentada: `.env.example` (raiz).
 | `AuditoriaController` — `@PageableDefault` no lugar de `PageRequest.of` manual | `implementation_plan.md` | **Implementado** |
 | Fix `/api/cartoes/dashboard/bi` — validação parâmetros parciais mes/ano | `implementation_plan.md` | **Implementado** |
 | `cpfCnpj` obrigatório (`@NotBlank`) em `ParceiroRequestDto` | `implementation_plan.md` | **Implementado** |
-| Dashboard Cartões — estado inicial 30 dias + botões rápidos + `DateRangeModal` | `implementation_plan.md` | **Implementado** |
+| Dashboard Cartões — estado inicial 30 dias + botões rápidos (`DateRangeModal` substituído por `PeriodoSelector` em 2026-10) | `implementation_plan.md` | **Implementado** |
 | `IconDropdown.jsx` — seleção de ícone com grid + busca + agrupamento | `implementation_plan.md` | **Implementado** |
 | `ModalCriacaoRapida` — parceiro agora exige `cpfCnpj`/`tipo`; categoria usa `IconDropdown` | `implementation_plan.md` | **Implementado** |
 | `FormularioNovaContaInline` — botões `+` Categoria e Parceiro (conciliação bancária) | `implementation_plan.md` | **Implementado** |
 | `Parceiros.jsx` — badge Receita Federal + highlight campos autopreenchidos | `implementation_plan.md` | **Implementado** |
+| Nova identidade **Core 4** (logo, `BrandMark`/`BrandLogo`, tokens, motion 14, design system em `components/ui/README.md`) | commits `c5f4aa8`, `18a53ad` (2026-10) | **Implementado** |
+| Telas **Insights** (`/insights`) e **Orçamentos** (`/orcamentos`, V52) | `18a53ad` (2026-10) | **Implementado** |
+| Parcelamentos de cartão ("Compras parceladas" k/n) + formulário único de lançamento | `18a53ad` (2026-10) | **Implementado** |
+| Conciliação unificada (banco + cartão em `ConciliacaoWorkspace`, abas por permissão, lote e desfazer; rotas mantidas) | `18a53ad` (2026-10) | **Implementado** |
+| Modo de acessibilidade (WCAG 2.2 AA: perfis, alto contraste, fontes de leitura, daltonismo, movimento reduzido, `/acessibilidade`) | `18a53ad` (2026-10) | **Implementado** |
+| Navegação única (`lib/navigation.js`), transferências em Contas bancárias, um `PeriodoSelector` por tela | `18a53ad` (2026-10) | **Implementado** |
 
 ---
 
@@ -826,9 +962,9 @@ Após a migration V32, `tb_perfil_acesso` tem campo `empresa_id` (nullable):
 
 ### Permissões em sessão ativa — polling frontend
 
-O backend já invalida o cache Caffeine em mudanças individuais de permissão (explicitamente, antes de persistir) e tem TTL de 30s. O frontend **não faz refresh automático** de permissões — armazena em `sessionStorage` desde o login.
+O backend já invalida o cache Caffeine em mudanças individuais de permissão (explicitamente, antes de persistir) e tem TTL de 30s. O frontend guarda as permissões no `loginState` (localStorage) desde o login.
 
-**Solução implementada:** `useAuth.js` faz polling de `GET /api/auth/me/permissoes` a cada 30s e atualiza o `sessionStorage` via `setLoginState()`, disparando `auth-change` para re-render. O endpoint retorna as permissões calculadas pelo `TenantContext` (já corrigidas pelo TenantFilter a cada request).
+**Solução implementada:** o `AuthProvider` (`context/AuthContext.jsx`) faz um único polling de `GET /api/auth/me/permissoes` a cada 30s (pausa com a aba oculta, retoma ao voltar) e atualiza o `loginState` via `setLoginState()` (cópia imutável, só a empresa ativa), disparando `auth-change` para re-render. O endpoint retorna as permissões calculadas pelo `TenantContext` (já corrigidas pelo TenantFilter a cada request).
 
 ### Hibernate 6 — campo `timestamp` como palavra reservada HQL
 
@@ -887,7 +1023,7 @@ return repo.findAllByEmpresaId(eid, pageable);
 
 ### Roteamento inteligente pós-login — getFirstAccessibleRoute
 
-`PermissaoRoute` e `AdminRoute` redirecionam para `<NavigateToFirstAccessible />` em vez de hardcodar `/dashboard`. Isso evita loop infinito quando o usuário não tem `DASHBOARD_VISUALIZAR`.
+`PermissaoRoute` e `ContaEmpresaRoute` redirecionam para `<NavigateToFirstAccessible />` em vez de hardcodar `/dashboard`. Isso evita loop infinito quando o usuário não tem `DASHBOARD_VISUALIZAR`.
 
 `getFirstAccessibleRoute(temPermissao)` está em `src/lib/routeUtils.js` — use ao precisar calcular a rota inicial após login ou ao redirecionar por falta de permissão.
 
@@ -980,6 +1116,26 @@ total_fatura = Σ(valor de tb_lancamento_cartao onde fatura_id = X)
 - Recalcular e persistir em `tb_fatura_cartao.valor_total` sempre que um lançamento for adicionado ou removido.
 - Fatura fechada gera automaticamente um registro em `tb_conta` (despesa a pagar).
 
+### Limite usado / livre de cartão de crédito
+```
+limite_usado = max(0, Σ(SAIDA) − Σ(ENTRADA) dos lançamentos do cartão em faturas NÃO pagas)
+limite_livre = limite − limite_usado   (pode ficar negativo se o cartão estourou o limite)
+```
+- **Não paga** = fatura aberta, fechada com a conta do fechamento ainda pendente/atrasada, **e todas as faturas
+  futuras** — inclusive as parcelas 2..n de compras parceladas (o limite é comprometido inteiro na compra, como num
+  cartão real). Compra feita após o fechamento (cai na fatura seguinte) já consome limite.
+- **Paga** = existe `tb_fatura_cartao` do cartão/mês/ano cuja `conta_id` aponta para `tb_conta.status = PAGO`.
+  `StatusFatura` só tem `ABERTA`/`FECHADA` — **não existe estado PAGA**; o pagamento é a baixa da conta gerada no
+  fechamento (estorno volta a conta para PENDENTE e reabre a fatura → volta a consumir limite). Fatura sem linha em
+  `tb_fatura_cartao` (aberta ou futura) = não paga. Lançamento liga à fatura por `cartao + mes_fatura/ano_fatura` (não há `fatura_id`).
+- Sem janela de datas: o histórico inteiro entra, e faturas pagas saem pelo critério acima (a regra antiga — soma dos
+  últimos 6 meses até o mês atual — ignorava fatura seguinte/parcelas futuras e contava faturas já pagas).
+- Piso em zero **por cartão** (crédito sobrando num cartão não libera limite de outro); o total do Dashboard é a soma
+  dos cartões já com piso. É uma **posição**, não um fluxo: ignora o filtro de período do `GET /api/dashboard`.
+- Fonte única: `LimiteCartaoService` (1 consulta agregada por tenant, `LancamentoCartaoRepository.saldosPorFaturaDoCartao`,
+  sem N+1). Usado em `GET /api/cartoes` (listar/detalhe/atualizar), na tool `consultarCartoes` do chat (reaproveita o
+  listar) e em `DashboardService.limiteUsadoTotalCartoes`. Nada mais calcula limite usado — não recriar a soma em outro lugar.
+
 ### Arredondamento
 | Tipo | Casas decimais | Método |
 |---|---|---|
@@ -1021,6 +1177,9 @@ FECHADA → PAGA   (ao registrar pagamento da fatura)
 - `FECHADA`: lançamentos bloqueados; gera `tb_conta` de despesa automaticamente.
 - `PAGA`: terminal. Estorno recria fatura com status `ABERTA`.
 - Nunca fazer transição direta `ABERTA → PAGA`.
+- ⚠️ **Implementação atual:** o enum `StatusFatura` só tem `ABERTA`/`FECHADA`. "Paga" é derivado da conta do
+  fechamento (`tb_fatura_cartao.conta_id` → `tb_conta.status = PAGO`); `ContaService.estornar` reabre a fatura
+  (`FaturaCartaoService.reabrir`). Ver §17 › Limite usado.
 
 ### Conciliação Bancária e de Cartão (`status`)
 ```
@@ -1178,6 +1337,15 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 ### Tools (Function Calling)
 - Cada tool é um `@Component` Spring com métodos `@Tool` — Spring AI injeta automaticamente no `ChatClient`.
 - Tools de **leitura** (`consulta/`): obtêm `empresaId` do `TenantContext`, filtram dados financeiros por ele.
+  - `ConsultaTools`: `consultarDashboard`, `consultarContasCorrentes`, `consultarCategorias`, `consultarCartoes`,
+    `consultarInvestimentos`, `consultarNotificacoes`, `consultarAssinaturas`, `consultarParceiros`.
+  - `AnaliseFinanceiraTools` (texto compacto pt-BR via `AnaliseFinanceiraFormatter`/`MoedaFormatter`):
+    `consultarOrcamentos(mes?)` (`OrcamentoService`, ORCAMENTO_VISUALIZAR), `consultarInsights(mes?)`
+    (`InsightsService`, DASHBOARD_VISUALIZAR), `consultarParcelamentos()` (`ParcelamentoCartaoService`,
+    CARTAO_VISUALIZAR). `mes` = "AAAA-MM" opcional. `AcessoNegadoException` vira mensagem amigável (sem código de
+    permissão) em vez de erro de tool. No n8n: nós `consultarOrcamentos`/`consultarInsights` no ANALISTA.
+  - Registro de tools: `ChatService` (`.tools(...)`, 2 pontos — síncrono e streaming) e `McpServerConfig`; classe
+    nova de tools também entra em `GateAcaoCriticaAspectTest.ferramentasReais()`.
 - Tools de **escrita** (`lancamento/`): validam `usuarioId` do `SecurityContext` **dentro da tool**, nunca confiam no parâmetro recebido do modelo.
 - Schema de tools é gerado automaticamente pelo Spring AI a partir da assinatura do método — manter parâmetros tipados e documentados com Javadoc (Spring AI usa como descrição).
 - Resultado de tools deve ser validado antes de repassar ao agente — se retornar null ou lista vazia, retornar mensagem descritiva, não null cru.
@@ -1217,6 +1385,18 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
   dado. **Portão técnico** `GateEscritaAnexoAspect`: num turno com anexo (`TurnoAnexoHolder`), toda tool que não começa
   com `consultar`/`gerarRelatorio` lança `ConfirmacaoNecessariaException` — escrita só no turno seguinte, após o "sim"
   (o histórico guarda só um resumo do arquivo). Tool nova é escrita por padrão (fail-safe).
+- **Prompt injection via dados cadastrados (resultado de tools)**: nomes/descrições (categoria, conta, parceiro, cartão,
+  assinatura, frases de insight, dados da BrasilAPI) são texto livre de usuários. Toda tool `consultar*` que devolve DTO usa
+  `@Tool(..., resultConverter = DadosNaoConfiaveisResultConverter.class)` → JSON envolto em `<dados_do_sistema_nao_confiaveis>`
+  (tags reservadas neutralizadas por `ConteudoNaoConfiavel`). Tools que devolvem texto com orientação (`AnaliseFinanceiraTools`)
+  envolvem só o trecho de dados (`ConteudoNaoConfiavel.envolverDadosSistema()`). **Tool `consultar*` nova DEVE usar o
+  converter** — `DadosNaoConfiaveisToolsTest` falha caso contrário.
+- **Erro de tool (`ChatToolErrorConfig`)**: falta de permissão → orientação amigável sem código; exceção de domínio
+  (`BusinessException`, `EntityNotFoundException`, IAE/ISE dos services, ≤ 300 caracteres, sem marcas técnicas) → repassada
+  envelopada como dado; `DataIntegrityViolationException` → texto fixo amigável; qualquer outra → "erro interno inesperado"
+  (detalhe só no log `[CHAT-TOOL-ERRO]`). Instrução anti-loop sempre presente.
+- `ParcelamentoCartaoService.listarAtivos` limita a 200 parcelamentos ativos (mais recentes) e 12.000 parcelas. Parcelas por
+  compra: no máximo 72 no cartão (`LancamentoRequestDto`) e 360 em contas (`ContaCreateDto`).
 - Output do modelo não deve ser retornado diretamente ao usuário sem sanitização de XSS (frontend já usa React que escapa por padrão).
 - Custo por requisição: configurar `maxTokens` no `ChatClient` para evitar respostas excessivamente longas.
 - Logar apenas metadados (conversa, tamanho, latência) — **nunca** o conteúdo das mensagens ou anexos (dados financeiros pessoais).
@@ -1224,6 +1404,18 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 ### Fallback
 - Se o modelo retornar JSON malformado em tool calls: logar erro com `requestId`, retornar HTTP 502 com mensagem genérica ao usuário.
 - Se a OpenAI estiver indisponível: retornar HTTP 503 com `Retry-After` — não tentar fallback para outro modelo sem decisão explícita de arquitetura.
+- **Falha da resposta nunca deixa a pergunta órfã** (`RespostaFalhaChat`): erro da OpenAI/timeout/stream/montagem do
+  prompt grava uma mensagem ASSISTANT com texto fixo amigável ("Não consegui responder agora. Tente novamente." ou o
+  de 429), nos dois caminhos (`processar` antes de propagar → 503; `processarStream` envia o mesmo texto no SSE e
+  completa — nunca 4xx). Stream que cai no meio grava o parcial + "_(A resposta foi interrompida…)_". Sem migration:
+  o marcador é reconhecido pelo texto exato — `carregarContexto` o descarta (não vai ao modelo) e
+  `GET /api/chat/conversas/{id}/mensagens` devolve `falha=true` nele (`ChatHistoricoItemDto.falha`).
+- **Nunca usar texto dinâmico como string de formato** (`String.format`/`.formatted`/`MessageFormat`): mensagem,
+  nome, RAG, anexo, categoria e frases de insight têm "%" ("50% a mais", "% e"). Prompts (`SystemPromptBuilder`,
+  `RagService.montarBlocoReferencia`, `ChatAnexoService.montarPromptAnexo`) e formatters de tools são por
+  concatenação/StringBuilder (testes `TextoComPercentualPromptTest`, `AnaliseFinanceiraFormatterPercentualTest`).
+  `IllegalFormatException` (subclasse de IllegalArgumentException) tem handler próprio no `GlobalExceptionHandler`
+  → 500 `ERRO_INTERNO` amigável, nunca 400 com "Format specifier".
 
 ---
 
@@ -1266,7 +1458,7 @@ Antes de abrir PR que adiciona ou modifica uma integração externa:
 ## 25. Como Rodar Localmente
 
 ```bash
-# Pré-requisitos: Java 21, Node 20, PostgreSQL 15+, arquivo .env configurado
+# Pré-requisitos: Java 21, Node 22 (o Dockerfile do front usa node:22), PostgreSQL 15+, arquivo .env configurado
 
 # Backend
 cd core4erp
@@ -1275,8 +1467,9 @@ cd core4erp
 # Frontend
 cd front-end
 npm install
-npm run dev
+npm run dev          # vite --port=5173 (proxy /api → 8080)
 # Acesse: http://localhost:5173
+# Antes de subir: npx eslint src (0 erros) e npm run build
 
 # Stack completa com Docker
 docker-compose up --build

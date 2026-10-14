@@ -1,6 +1,7 @@
 package br.com.core4erp.conta.dto;
 
 import br.com.core4erp.enums.TipoConta;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -32,6 +33,7 @@ public record ContaCreateDto(
         Long parceiroId,
 
         @PositiveOrZero
+        @Max(value = 360, message = "O parcelamento pode ter no máximo 360 parcelas.")
         Integer quantidadeParcelas,
 
         Integer intervaloMeses,

@@ -6,6 +6,7 @@ import br.com.core4erp.chat.dto.ChatResponseDto;
 import br.com.core4erp.chat.entity.ChatMensagem;
 import br.com.core4erp.chat.metrics.ChatMetrics;
 import br.com.core4erp.chat.tools.cadastro.CadastroTools;
+import br.com.core4erp.chat.tools.consulta.AnaliseFinanceiraTools;
 import br.com.core4erp.chat.tools.consulta.ConsultaTools;
 import br.com.core4erp.chat.tools.lancamento.LancamentoTools;
 import br.com.core4erp.chat.tools.relatorio.RelatorioDownloadHolder;
@@ -42,6 +43,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,6 +58,7 @@ public class ChatService {
     private final SecurityContextUtils securityCtx;
     private final ChatInputSanitizer sanitizer;
     private final ConsultaTools consultaTools;
+    private final AnaliseFinanceiraTools analiseFinanceiraTools;
     private final LancamentoTools lancamentoTools;
     private final RelatorioTools relatorioTools;
     private final CadastroTools cadastroTools;
@@ -95,6 +98,10 @@ public class ChatService {
         return t;
     });
 
+    /** Anexado (e gravado) quando o stream cai depois de já ter enviado parte da resposta. */
+    static final String AVISO_RESPOSTA_INTERROMPIDA =
+            "\n\n_(A resposta foi interrompida. Tente novamente.)_";
+
     private static final Pattern DOWNLOAD_URL_PATTERN =
             Pattern.compile("/api/chat/relatorios/[^\\s\"'<>]+\\.xlsx");
 
@@ -103,6 +110,7 @@ public class ChatService {
                        SecurityContextUtils securityCtx,
                        ChatInputSanitizer sanitizer,
                        ConsultaTools consultaTools,
+                       AnaliseFinanceiraTools analiseFinanceiraTools,
                        LancamentoTools lancamentoTools,
                        RelatorioTools relatorioTools,
                        CadastroTools cadastroTools,
@@ -124,6 +132,7 @@ public class ChatService {
         this.securityCtx = securityCtx;
         this.sanitizer = sanitizer;
         this.consultaTools = consultaTools;
+        this.analiseFinanceiraTools = analiseFinanceiraTools;
         this.lancamentoTools = lancamentoTools;
         this.relatorioTools = relatorioTools;
         this.cadastroTools = cadastroTools;
@@ -282,13 +291,18 @@ public class ChatService {
             TurnoChatHolder.definir(abrirTurno(conversaId, usuarioId, mensagemUsuario, limitePromptMontado > 0));
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
-                    .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
+                    .tools(consultaTools, analiseFinanceiraTools, lancamentoTools, relatorioTools, cadastroTools,
+                            gestaoFinanceiraTools)
                     .call()
                     .chatResponse();
 
             String respostaTexto = extrairTexto(response);
             String downloadUrl = RelatorioDownloadHolder.getAndClear(usuarioId);
             respostaTexto = anexarDownload(respostaTexto, downloadUrl);
+            if (respostaTexto.isBlank()) {
+                // Modelo devolveu vazio: grava o marcador para a pergunta não ficar sem resposta.
+                respostaTexto = RespostaFalhaChat.TEXTO_PADRAO;
+            }
 
             registrarUsage(response, usuarioId);
             memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
@@ -301,11 +315,31 @@ public class ChatService {
             return new ChatResponseDto(respostaTexto, downloadUrl, List.of());
         } catch (Exception e) {
             chatMetrics.registrarErro();
+            // A pergunta já foi gravada: grava também o marcador de falha, senão ao reabrir a
+            // conversa a pergunta aparece sem resposta. O erro segue para o GlobalExceptionHandler
+            // (503 amigável para erros da OpenAI).
+            registrarFalha(usuarioId, conversaId, canal, RespostaFalhaChat.textoPara(e),
+                    textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
             throw e;
         } finally {
             OrigemIaHolder.limpar();
             TurnoChatHolder.limpar();
             chatMetrics.finalizarTimer(timer);
+        }
+    }
+
+    /**
+     * Grava a resposta de falha ({@link RespostaFalhaChat}) no histórico e atualiza a conversa.
+     * Best-effort: um erro aqui (ex.: banco fora) só é logado — nunca mascara o erro original.
+     */
+    private void registrarFalha(Long usuarioId, Long conversaId, ChatMensagem.Canal canal,
+                                String textoFalha, String perguntaParaTitulo) {
+        try {
+            memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, textoFalha);
+            conversaService.aposMensagem(conversaId, perguntaParaTitulo);
+        } catch (Exception persistencia) {
+            log.warn("[CHAT] não foi possível gravar o marcador de falha conversaId={}: {}",
+                    conversaId, persistencia.getMessage());
         }
     }
 
@@ -327,9 +361,25 @@ public class ChatService {
         Long usuarioId = securityCtx.getUsuarioId();
         ChatMensagem.Canal canal = request.canalResolvido();
         Long conversaId = conversaService.resolverOuCriar(canal, request.conversaId()).getId();
-        String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
         String mensagemUsuario = sanitizer.sanitize(request.mensagem());
-        List<Message> allMessages = montarMensagens(conversaId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
+        // Montagem do prompt (system + RAG + histórico) ANTES de gravar a pergunta (senão ela entraria
+        // duplicada no contexto). Qualquer falha aqui vira resposta amigável no próprio stream — nunca
+        // um 4xx/5xx com mensagem técnica (ex.: IllegalFormatException → "Format specifier '% e'").
+        List<Message> allMessages;
+        try {
+            String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
+            allMessages = montarMensagens(conversaId, comContextoRag(systemPrompt, mensagemUsuario), mensagemUsuario);
+        } catch (RuntimeException e) {
+            chatMetrics.registrarErro();
+            chatMetrics.decrementarSessoes();
+            log.error("[CHAT-STREAM] falha ao montar o prompt usuarioId={} conversaId={}: {}",
+                    usuarioId, conversaId, e.getClass().getSimpleName(), e);
+            memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER, mensagemUsuario);
+            String textoFalha = RespostaFalhaChat.textoPara(e);
+            registrarFalha(usuarioId, conversaId, canal, textoFalha, mensagemUsuario);
+            enviarFalhaEEncerrar(emitter, textoFalha);
+            return;
+        }
         memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER, mensagemUsuario);
 
         SecurityContext securityContext = SecurityContextHolder.getContext();
@@ -352,6 +402,7 @@ public class ChatService {
             StringBuilder full = new StringBuilder();
             AtomicReference<Usage> usageRef = new AtomicReference<>();
             AtomicReference<String> finishRef = new AtomicReference<>();
+            AtomicBoolean respostaGravada = new AtomicBoolean(false);
             try {
                 // Restaura os contextos na thread que assina o fluxo. Com
                 // spring.reactor.context-propagation=auto (ver ChatAiConfig), eles são capturados
@@ -379,6 +430,7 @@ public class ChatService {
                             enviarDelta(emitter, respostaTexto);
                         }
                         memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
+                        respostaGravada.set(true);
                         conversaService.aposMensagem(conversaId, mensagemUsuario);
                         emitter.complete();
                         return;
@@ -396,7 +448,8 @@ public class ChatService {
                 TurnoChatHolder.definir(abrirTurno(conversaId, usuarioId, mensagemUsuario, false));
                 chatClient.prompt()
                         .messages(allMessages)
-                        .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
+                        .tools(consultaTools, analiseFinanceiraTools, lancamentoTools, relatorioTools, cadastroTools,
+                                gestaoFinanceiraTools)
                         .stream()
                         .chatResponse()
                         .toStream()
@@ -422,21 +475,33 @@ public class ChatService {
                     enviarDelta(emitter, aviso);
                 }
 
+                if (full.length() == 0) {
+                    // Stream terminou sem nenhum texto: marcador de falha em vez de bolha vazia.
+                    full.append(RespostaFalhaChat.TEXTO_PADRAO);
+                    enviarDelta(emitter, RespostaFalhaChat.TEXTO_PADRAO);
+                }
+
                 registrarUsage(usageRef.get(), usuarioId);
                 memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
+                respostaGravada.set(true);
                 conversaService.aposMensagem(conversaId, mensagemUsuario);
 
                 emitter.complete();
             } catch (Exception e) {
                 chatMetrics.registrarErro();
                 log.error("[CHAT-STREAM] erro ao processar mensagem usuarioId={}: {}", usuarioId, e.getMessage(), e);
-                try {
-                    // Em vez de derrubar o stream (tela em branco), envia uma mensagem amigável —
-                    // ex.: limite de tokens/min da OpenAI (429) vira "aguarde e tente de novo".
-                    if (full.length() == 0) enviarDelta(emitter, mensagemAmigavelErro(e));
-                    emitter.complete();
-                } catch (Exception emitterEncerrado) {
-                    log.debug("[CHAT-STREAM] emitter já encerrado ao enviar erro: {}", emitterEncerrado.getMessage());
+                // Em vez de derrubar o stream (tela em branco), responde com texto amigável — ex.: limite
+                // de tokens/min da OpenAI (429) vira "aguarde e tente de novo". O MESMO texto é gravado
+                // no histórico (antes, só a pergunta ficava salva e a conversa reaberta não tinha resposta).
+                // Se parte da resposta já tinha saído, grava o parcial + aviso de interrupção.
+                if (respostaGravada.get()) {
+                    // A resposta já está no histórico (falhou só o pós-processamento): só encerra.
+                    enviarFalhaEEncerrar(emitter, null);
+                } else {
+                    boolean semTexto = full.length() == 0;
+                    String aviso = semTexto ? RespostaFalhaChat.textoPara(e) : AVISO_RESPOSTA_INTERROMPIDA;
+                    registrarFalha(usuarioId, conversaId, canal, semTexto ? aviso : full + aviso, mensagemUsuario);
+                    enviarFalhaEEncerrar(emitter, aviso);
                 }
             } finally {
                 chatMetrics.decrementarSessoes();
@@ -524,8 +589,11 @@ public class ChatService {
     public List<ChatHistoricoItemDto> mensagensDaConversa(Long conversaId) {
         conversaService.owned(conversaId); // valida dono (404 se não for do usuário)
         return memoryService.mensagensDaConversa(conversaId).stream()
-                .map(m -> new ChatHistoricoItemDto(
-                        m.getRole() == ChatMensagem.Role.USER ? "user" : "assistant", m.getConteudo()))
+                .map(m -> {
+                    boolean usuario = m.getRole() == ChatMensagem.Role.USER;
+                    return new ChatHistoricoItemDto(usuario ? "user" : "assistant", m.getConteudo(),
+                            !usuario && RespostaFalhaChat.ehMarcador(m.getConteudo()));
+                })
                 .toList();
     }
 
@@ -568,13 +636,17 @@ public class ChatService {
                 usuarioId, prompt, completion, String.format(java.util.Locale.US, "%.6f", custo));
     }
 
-    /** Traduz erros técnicos (ex.: 429 da OpenAI) em uma frase clara para o usuário no stream. */
-    private String mensagemAmigavelErro(Throwable e) {
-        String m = e.getMessage() != null ? e.getMessage() : "";
-        if (m.contains("429") || m.contains("rate_limit") || m.contains("Rate limit")) {
-            return "O assistente recebeu muitas solicitações em pouco tempo. Aguarde alguns segundos e tente novamente.";
+    /**
+     * Envia o texto de falha (se houver) como último delta e encerra o stream; emitter já fechado
+     * (cliente desconectou) é ignorado.
+     */
+    private void enviarFalhaEEncerrar(SseEmitter emitter, String texto) {
+        try {
+            if (texto != null) enviarDelta(emitter, texto);
+            emitter.complete();
+        } catch (Exception emitterEncerrado) {
+            log.debug("[CHAT-STREAM] emitter já encerrado ao enviar erro: {}", emitterEncerrado.getMessage());
         }
-        return "O assistente está temporariamente indisponível. Tente novamente em instantes.";
     }
 
     // Remove qualquer referência a relatório que o modelo tenha escrito (markdown link com
