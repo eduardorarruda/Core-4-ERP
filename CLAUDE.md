@@ -122,7 +122,11 @@ Cada módulo de domínio segue a mesma estrutura interna:
 ```
 
 **Módulos de domínio existentes:**
-`auth`, `usuario`, `empresa`, `categoria`, `parceiro`, `conta`, `contaCorrente`, `cartaoCredito`, `investimento`, `assinatura`, `conciliacao`, `conciliacaoCartao`, `notificacao`, `chat`, `relatorio`, `dashboard`, `busca`, `plano`
+`auth`, `usuario`, `empresa`, `categoria`, `parceiro`, `conta`, `contaCorrente`, `cartaoCredito`, `investimento`, `assinatura`, `conciliacao`, `conciliacaoCartao`, `notificacao`, `chat`, `relatorio`, `dashboard`, `busca`, `plano`, `orcamento`, `insights`
+
+> **Módulo novo com entidade/repositório** precisa entrar nas **duas** listas de pacotes do `config/PrimaryJpaConfig`
+> (`@EnableJpaRepositories.basePackages` e `PRIMARY_PACKAGES`). Fora delas o contexto não sobe ("No qualifying bean of
+> type ...Repository") — e os testes unitários com mocks não percebem. `PrimaryJpaConfigPacotesTest` trava as listas iguais.
 
 **Infraestrutura transversal:**
 ```
@@ -230,7 +234,7 @@ empresa/
   service/ConviteService.java          — convite e aceite de novos operadores
 ```
 
-**Códigos de permissão (tb_permissao, V19 + V30 + V31):**
+**Códigos de permissão (tb_permissao, V19 + V30 + V31 + V52):**
 ```
 CONTA_VISUALIZAR/CRIAR/EDITAR/DELETAR/BAIXAR/ESTORNAR
 CONTA_CORRENTE_VISUALIZAR/CRIAR/EDITAR/DELETAR/TRANSFERIR
@@ -257,7 +261,10 @@ CONFIGURACAO_EDITAR
 CALENDARIO_VISUALIZAR                              ← V30 (tela /calendario)
 DASHBOARD_VISUALIZAR                               ← V31 (GET /api/dashboard)
 DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/saldo-detalhado)
+ORCAMENTO_VISUALIZAR / ORCAMENTO_EDITAR            ← V52 (tela /orcamentos; VISUALIZAR: todos os perfis do sistema;
+                                                         EDITAR: PROPRIETARIO, ADMIN, FINANCEIRO)
 ```
+`GET /api/insights` reaproveita `DASHBOARD_VISUALIZAR`; `GET /api/cartoes/parcelamentos` reaproveita `CARTAO_VISUALIZAR`.
 
 **Mapeamento tela → permissão (frontend):**
 ```
@@ -270,6 +277,9 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 /reports                    → sem PermissaoRoute; cada card usa PermissaoGuard(RELATORIO_*_VISUALIZAR)
                               botão Excel visível só com RELATORIO_*_EXPORTAR
 /calendario                 → CALENDARIO_VISUALIZAR
+/orcamentos                 → ORCAMENTO_VISUALIZAR (PermissaoRoute); edição inline/criar/remover via PermissaoGuard("ORCAMENTO_EDITAR")
+/insights                   → DASHBOARD_VISUALIZAR (PermissaoRoute)
+/cartoes/dashboard (painel "Compras parceladas") → CARTAO_VISUALIZAR
 /audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute + ContaEmpresaRoute)
 /empresa/operadores         → USUARIO_VISUALIZAR    (PermissaoRoute + ContaEmpresaRoute)
 /empresa/perfis             → CONFIGURACAO_EDITAR   (PermissaoRoute + ContaEmpresaRoute)
@@ -311,6 +321,8 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 - `/cartoes/conciliacao` e sub-rotas → `PermissaoRoute("CARTAO_CONCILIACAO_VISUALIZAR")`
 - `/reports` → sem PermissaoRoute; PermissaoGuard por card (RELATORIO_*_VISUALIZAR / EXPORTAR)
 - `/dashboard` → `PermissaoRoute("DASHBOARD_VISUALIZAR")`; SaldoDetalhadoPanel gateado por DASHBOARD_CARTAO_VISUALIZAR
+- `/orcamentos` → `PermissaoRoute("ORCAMENTO_VISUALIZAR")`; ações de escrita com `PermissaoGuard("ORCAMENTO_EDITAR")`
+- `/insights` → `PermissaoRoute("DASHBOARD_VISUALIZAR")`
 
 **Operadores — reativação:**
 - `PATCH /api/empresa/operadores/{usuarioId}/reativar` — requer `USUARIO_EDITAR`
@@ -374,6 +386,7 @@ tb_usuario_empresa, tb_usuario_empresa_permissao    → vínculo usuário ↔ em
 tb_auditoria
 tb_plano, tb_pagamento_mock
 tb_convite
+tb_orcamento            → limite mensal por categoria principal (V52; soft delete `ativo`, 1 ativo por empresa+categoria)
 ```
 
 ### Flyway — Regras Obrigatórias
@@ -381,7 +394,7 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V52** (conferir a pasta antes de criar).
+- **Próxima migration disponível: V53** (conferir a pasta antes de criar).
 - Flyway é configurado em código (`PrimaryJpaConfig`, o `FlywayAutoConfiguration` está excluído) mas **lê `spring.flyway.*`**: dev é tolerante (`out-of-order=true`, `ignore-migration-patterns=*:missing`); `prod` é estrito (`out-of-order=false`, `*:future`).
 
 **Sequência de migrations:**
@@ -435,6 +448,7 @@ V48     indices_fk_quentes
 V49     reset_token_hash                  (reset_token passa a ser SHA-256; invalida pendentes)
 V50     add_tipo_notificacao_membro_adicionado
 V51     criptografia_dados_bancarios_ofx  (agência/conta do OFX, acct_id do cartão + acct_id_ofx_hash)
+V52     create_tb_orcamento               (tb_orcamento + permissões ORCAMENTO_VISUALIZAR/EDITAR)
 ```
 
 Não existe banco de log: os logs vão para o stdout (ver §10).
@@ -463,7 +477,8 @@ Não existe banco de log: os logs vão para o stdout (ver §10).
 - **Roll-up obrigatório**: toda agregação por categoria soma a subcategoria no total da categoria-pai
   via `COALESCE(categoria_pai_id, id)` (com **LEFT JOIN** no pai — inner join derrubaria as raízes).
   Aplicado em `ContaRepository.despesasPorCategoria`, `LancamentoCartaoRepository.resumoDashboardPorCategoria`,
-  `RelatorioService` (DRE + assinaturas) e `ContaSpec.categoriaId` (filtrar pelo pai inclui as filhas).
+  `RelatorioService` (DRE + assinaturas), `ContaSpec.categoriaId` (filtrar pelo pai inclui as filhas) e
+  `orcamento/repository/GastoRepository` (Orçamento + Insights).
 - **Classificação por IA** (`ClassificacaoIaService`): sugere categoria a partir da descrição/parceiro,
   com saída estruturada; o id devolvido é **revalidado contra o catálogo ativo da empresa** (IA não
   burla tenant) e confiança < 0,5 é descartada. Falha da OpenAI → sem categoria, nunca 500.
@@ -704,6 +719,45 @@ chat/tools/
 ### Assinaturas Recorrentes
 - Cada assinatura tem `diaVencimento` e pode estar vinculada a um cartão de crédito.
 - Geração de contas recorrentes é responsabilidade do service de assinatura.
+
+### Orçamento, Insights e Parcelamentos (V52, 2026-10)
+
+**Definição única de GASTO** — CTE `GastoRepository.CTE_GASTO` (native, sempre `empresa_id` + intervalo de datas),
+usada por Orçamento **e** Insights:
+- contas a pagar (`tipo=PAGAR`, status PENDENTE/ATRASADO/PAGO) pela `data_vencimento` (mesmo critério do card
+  "despesas por categoria" do Dashboard), **exceto** as contas geradas pelo fechamento de fatura
+  (`tb_fatura_cartao.conta_id`) — elas somam a fatura inteira na categoria do 1º lançamento e duplicariam o cartão;
+- lançamentos de cartão SAIDA − ENTRADA na `data_compra`; a parcela k>1 conta no dia 1 do k-ésimo mês a partir
+  da compra (cada parcela pesa no seu mês);
+- roll-up `COALESCE(categoria_pai_id, id)`. "Realizado até hoje" = linhas com data ≤ hoje (contas com vencimento
+  futuro no mês contam no gasto do mês, mas não no realizado). "Hoje" = fuso `America/Sao_Paulo` (`MesReferencia.FUSO`).
+
+**Orçamento** (`orcamento/`, `tb_orcamento`): limite mensal recorrente por categoria **principal** (subcategoria → 400;
+categoria de outra empresa → 404 via `findByIdAndEmpresaId`; duplicado → 409 `ORCAMENTO_JA_EXISTE`). Categoria não
+tem tipo receita/despesa nem cor no modelo — não há como validar "é de despesa". Regras puras em `OrcamentoCalculadora`:
+ritmo = dia/dias do mês (100 em mês passado, 0 em futuro); **ESTOURADO** se gasto do mês > limite; **ATENCAO** (só no
+mês corrente) se realizado até hoje > limite × ritmo; senão **OK**; projeção = gasto do mês + cartão até hoje projetado
+no ritmo (contas fixas não são extrapoladas); sugestão = média dos 3 meses completos anteriores arredondada para cima
+em múltiplos de R$ 10.
+```
+GET    /api/orcamentos?mes=AAAA-MM      ORCAMENTO_VISUALIZAR  → OrcamentoMesResponseDto (itens por % desc, totais, gastoSemOrcamento)
+GET    /api/orcamentos/sugestoes?mes=   ORCAMENTO_VISUALIZAR  → categorias raiz ativas com gasto e sem orçamento + sugestaoLimite
+POST   /api/orcamentos                  ORCAMENTO_EDITAR      {categoriaId, valorLimite} → 201 item do mês atual
+PUT    /api/orcamentos/{id}             ORCAMENTO_EDITAR      {categoriaId, valorLimite} → 200 item do mês atual
+DELETE /api/orcamentos/{id}             ORCAMENTO_EDITAR      → 204 (soft delete)
+```
+
+**Insights** (`insights/`): `GET /api/insights?mes=AAAA-MM` (`DASHBOARD_VISUALIZAR`) — 3 consultas agregadas (diário,
+mensal por categoria, top 5 gastos) + cálculo puro em `InsightsCalculadora`: KPIs, ritmo (acumulado até hoje vs. mesmo
+ponto do mês anterior e média de 3 meses, com curva dia a dia), gasto por dia da semana (90 dias), categorias fora do
+normal (≥ 20% **e** ≥ R$ 50 acima da média de 3 meses, z-score informativo; NOVA = sem histórico e ≥ R$ 50), maiores
+gastos, projeção (realizado + agendado + ritmo diário do **cartão** × dias restantes) e frases determinísticas pt-BR
+(`FrasesInsight`, sem IA; tipos ALERTA/ATENCAO/POSITIVO/INFO).
+
+**Compras parceladas**: `GET /api/cartoes/parcelamentos` (`CARTAO_VISUALIZAR`) — derivado de `tb_lancamento_cartao`
+(`grupo_parcelamento`, `numero_parcela`, `total_parcelas`; sem schema novo). Ativo = tem parcela em fatura do mês atual
+em diante. `parcelaAtual` = maior nº de parcela em fatura ≤ mês atual; próximas parcelas com vencimento pela regra do
+fechamento (`FaturaHelper.dataVencimento`: fatura do mês M vence no `diaVencimento` de M+1).
 
 ### Relatórios (`relatorio/`)
 - `RelatorioService` agrega dados financeiros (contas, categorias, parceiros) por período.

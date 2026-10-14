@@ -283,4 +283,32 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                                 @Param("eid") Long eid,
                                                 @Param("mes") Integer mes,
                                                 @Param("ano") Integer ano);
+
+    // ── Compras parceladas ativas (GET /api/cartoes/parcelamentos) ─────────────
+
+    /**
+     * Todas as parcelas (SAIDA) dos parcelamentos que ainda têm parcela em fatura do mês
+     * {@code ymAtual} (ano×12+mês) em diante. Uma consulta só, com cartão e parceiro já
+     * resolvidos (sem N+1); o agrupamento por {@code grupoParcelamento} é feito no service.
+     */
+    @Query("""
+        SELECT new br.com.core4erp.cartaoCredito.repository.ParcelaLinha(
+               l.grupoParcelamento, l.numeroParcela, l.totalParcelas, l.valor, l.mesFatura, l.anoFatura,
+               l.descricao, l.dataCompra, c.id, c.nome, c.diaVencimento,
+               COALESCE(p.nomeFantasia, p.razaoSocial))
+        FROM LancamentoCartao l
+        JOIN l.cartaoCredito c
+        LEFT JOIN l.parceiro p
+        WHERE l.empresaId = :eid
+          AND l.tipo = br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao.SAIDA
+          AND l.totalParcelas > 1
+          AND l.grupoParcelamento IN (
+                SELECT x.grupoParcelamento FROM LancamentoCartao x
+                WHERE x.empresaId = :eid
+                  AND x.grupoParcelamento IS NOT NULL
+                  AND x.totalParcelas > 1
+                  AND (x.anoFatura * 12 + x.mesFatura) >= :ymAtual)
+        ORDER BY l.grupoParcelamento, l.numeroParcela
+        """)
+    List<ParcelaLinha> parcelasDeParcelamentosAtivos(@Param("eid") Long eid, @Param("ymAtual") int ymAtual);
 }

@@ -172,7 +172,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponseDto> handleBusiness(BusinessException e) {
         int status = switch (e.getCode()) {
-            case "CONVITE_PENDENTE", "USUARIO_JA_MEMBRO", "REGISTRO_EM_USO" -> 409;
+            case "CONVITE_PENDENTE", "USUARIO_JA_MEMBRO", "REGISTRO_EM_USO", "ORCAMENTO_JA_EXISTE" -> 409;
             case "LIMITE_PLANO", "OPERACAO_INVALIDA", "CONVITE_EXPIRADO" -> 422;
             case "PLANO_INATIVO", "SENHA_INCORRETA" -> 400;
             default -> 422;

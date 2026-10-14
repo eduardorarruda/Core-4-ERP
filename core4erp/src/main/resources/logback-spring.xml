@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Logging do Core 4 ERP — tudo vai para STDOUT (12-factor). Em produção o Docker captura o stdout e o
+  Logging do Core 4 — tudo vai para STDOUT (12-factor). Em produção o Docker captura o stdout e o
   promtail envia ao Loki; não há arquivo local (o antigo appender FILE com caminho fixo em
   ${user.home}/Documentos/... foi removido).
 

@@ -17,4 +17,13 @@ public final class FaturaHelper {
                 ? mesCompra.plusMonths(1)
                 : mesCompra;
     }
+
+    /**
+     * Vencimento da fatura do mês {@code mesFatura}: dia de vencimento do cartão no mês seguinte
+     * (mesma regra usada ao fechar a fatura em {@code CartaoCreditoService.fecharFatura}).
+     */
+    public static java.time.LocalDate dataVencimento(YearMonth mesFatura, int diaVencimento) {
+        YearMonth mesVencimento = mesFatura.plusMonths(1);
+        return mesVencimento.atDay(Math.min(diaVencimento, mesVencimento.lengthOfMonth()));
+    }
 }
