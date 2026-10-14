@@ -17,6 +17,8 @@ e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclus�
 
 [O que é](#-o-que-é) ·
 [Funcionalidades](#-funcionalidades) ·
+[Identidade visual](#-identidade-visual) ·
+[Acessibilidade](#-acessibilidade) ·
 [Arquitetura](#-arquitetura) ·
 [Como executar](#-como-executar) ·
 [Status](#-status-do-projeto) ·
@@ -34,14 +36,16 @@ e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclus�
 
 ## ✨ O que é
 
-- **Gestão financeira completa.** Contas a pagar e a receber, contas correntes, cartões de
-  crédito com faturas, investimentos e assinaturas recorrentes — num só lugar.
+- **Gestão financeira completa.** Contas a pagar e a receber, contas bancárias, cartões de
+  crédito com faturas e parcelamentos, investimentos, orçamentos por categoria e assinaturas
+  recorrentes — num só lugar.
 - **Conciliação que fecha a conta.** Importe o extrato OFX do banco ou do cartão e vincule cada
   item a um lançamento existente, ou crie o lançamento ali mesmo.
 - **Uma assistente que entende o seu dinheiro.** A Áurea (OpenAI via Spring AI) responde
   perguntas, lança contas, lê planilhas e extratos anexados e gera relatórios em Excel.
 - **Relatórios e painéis.** DRE, fluxo de caixa, extrato, posição financeira e mais — em tela,
-  Excel ou PDF. Dashboard geral e um painel de BI dedicado aos cartões.
+  Excel ou PDF. Tela de Início, Insights (o que mudou no seu dinheiro, em frases) e um painel de
+  BI dedicado aos cartões.
 - **Dados isolados e auditados.** Cada empresa (ou pessoa física) só enxerga os próprios dados,
   com perfis de acesso, permissões granulares e trilha de auditoria.
 - **Instalável e observável.** PWA para celular e desktop; métricas Prometheus, painéis Grafana,
@@ -56,10 +60,11 @@ e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclus�
 ### 💰 Finanças
 
 - Contas a pagar/receber com baixa, estorno e status
-- Contas correntes com transferências entre contas
-- Cartões de crédito: lançamentos, parcelamento e fechamento de fatura
+- Contas bancárias com transferências entre contas
+- Cartões de crédito: lançamentos, compras parceladas (k/n), linha do tempo e fechamento de fatura
 - **Importação de lançamentos de cartão por planilha** (`.xlsx`/`.xls`)
-- Conciliação bancária e de cartão por arquivo **OFX**
+- Conciliação bancária e de cartão por arquivo **OFX**, numa única tela (lote e desfazer)
+- Orçamentos por categoria com acompanhamento do mês
 - Investimentos com transações e tipos configuráveis
 - Assinaturas recorrentes (com vínculo opcional ao cartão)
 - Categorias hierárquicas (até 2 níveis) e parceiros com consulta de CNPJ (BrasilAPI)
@@ -85,11 +90,12 @@ e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclus�
 
 ### 📊 Operação
 
-- Dashboard com filtro de período e saldo detalhado
+- Início com alertas, entradas × saídas, fluxo (Sankey) e vencimentos por urgência
+- Insights automáticos e Orçamentos (limite × usado por categoria)
 - Dashboard de BI dos cartões (7 painéis)
 - 8 relatórios em Excel (Apache POI) e JSON; exportação em PDF no front-end
 - Busca global (paleta de comandos)
-- PWA instalável, tema claro/escuro e Central de Ajuda
+- PWA instalável, tema escuro/claro, modo privacidade (Alt+P), modo de acessibilidade e Central de Ajuda
 - Métricas Prometheus, painel Grafana do chat (uso, custo e latência), Loki/Promtail
 - Traces OpenTelemetry via OTLP (opcional)
 
@@ -109,6 +115,31 @@ e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclus�
 </td>
 </tr>
 </table>
+
+## 🎨 Identidade visual
+
+O produto se chama **Core 4** (sem "ERP" em texto visível). O símbolo é um "C" esmeralda abraçando um
+"4" prateado; o tema é escuro por padrão, com tema claro equivalente.
+
+- Logo de referência: [`front-end/src/assets/brand/core4-logo-referencia.webp`](front-end/src/assets/brand/core4-logo-referencia.webp);
+  símbolo em SVG em `front-end/public/brand/` (`core4-mark.svg`, `core4-mark-light.svg`).
+- Na interface, a marca vem sempre dos componentes `BrandMark` (símbolo) e `BrandLogo` (símbolo + wordmark).
+- Design system (tokens, tipografia Sora / DM Sans / JetBrains Mono, componentes, gráficos e movimento com
+  `motion`): [`front-end/src/components/ui/README.md`](front-end/src/components/ui/README.md).
+
+## ♿ Acessibilidade
+
+Meta: **WCAG 2.2 nível AA** em todas as telas, com design inclusivo e universal.
+
+- **Modo de acessibilidade** (botão na barra superior, na tela de login ou **Alt+A**): perfis prontos,
+  tamanho de texto até 175%, alto contraste, fontes de leitura (Atkinson Hyperlegible Next e Lexend),
+  paletas para daltonismo e texturas nos gráficos, movimento reduzido ou desligado, espaçamento de texto,
+  leitura simplificada, links sublinhados, foco destacado e alvos de toque amplos.
+- Também respeita as preferências do sistema (reduzir movimento, mais contraste, cores forçadas).
+- Navegação por teclado, links "Pular para…", anúncio de troca de página para leitores de tela,
+  gráficos com resumo e tabela acessível, status sempre com texto e ícone.
+- Declaração pública de acessibilidade em **`/acessibilidade`**; regras para quem desenvolve na seção
+  "Acessibilidade" de [`front-end/src/components/ui/README.md`](front-end/src/components/ui/README.md).
 
 ## 🏗️ Arquitetura
 
@@ -133,7 +164,7 @@ preservando permissões, isolamento por empresa e auditoria.
 | Pasta | O que tem |
 |---|---|
 | [`core4erp/`](core4erp) | Backend Spring Boot (Java 21, Gradle). Um pacote por domínio (`conta`, `cartaoCredito`, `chat`, `relatorio`…), migrations Flyway em `src/main/resources/db/migration` e a configuração de monitoramento em `monitoring/` |
-| [`front-end/`](front-end) | SPA React 19 + Vite 6 + Tailwind CSS 4, PWA, servida por nginx em produção |
+| [`front-end/`](front-end) | SPA React 19 + Vite 8 + Tailwind CSS 4 + motion, PWA, servida por nginx em produção |
 | [`n8n/`](n8n) | Workflows do n8n (chat orquestrado, ingestão RAG, eventos), contratos de payload e guia de montagem |
 | [`docs/`](docs) | Planos de engenharia e documentos de apoio |
 | [`Skill/`](Skill) | Guias de revisão (segurança, JPA, arquitetura, API…) usados no desenvolvimento assistido por IA |
@@ -145,7 +176,7 @@ preservando permissões, isolamento por empresa e auditoria.
 | Ferramenta | Versão |
 |---|---|
 | Java (JDK) | 21 |
-| Node.js | 20+ |
+| Node.js | 22 |
 | PostgreSQL | 15+ |
 | Qdrant | 1.18 (RAG — o backend cria a coleção na inicialização) |
 | Docker + Compose v2 | opcional, para a stack em containers |
@@ -235,7 +266,7 @@ npm install
 npm run dev
 ```
 
-App em `http://localhost:3000`.
+App em `http://localhost:5173` (o Vite encaminha `/api` para `http://localhost:8080`).
 
 ### Com Docker Compose
 
@@ -285,8 +316,9 @@ ponta, mas não passou pelo ciclo de endurecimento, testes e suporte de um produ
 **Funciona**
 
 - Autenticação, multiempresa com RBAC, convites e auditoria
-- Contas, contas correntes, transferências, cartões, faturas, importação por planilha
-- Conciliação bancária e de cartão por OFX
+- Contas, contas bancárias, transferências, cartões, faturas, parcelamentos, importação por planilha
+- Conciliação bancária e de cartão por OFX (tela única)
+- Insights, orçamentos por categoria e modo de acessibilidade
 - Investimentos, assinaturas, categorias e parceiros
 - Dashboards, relatórios em Excel/PDF e a Áurea com o orquestrador interno (Spring AI)
 - PWA, métricas Prometheus e painel Grafana do chat
@@ -304,8 +336,9 @@ ponta, mas não passou pelo ciclo de endurecimento, testes e suporte de um produ
 **Limitações conhecidas e próximos passos**
 
 - Cobertura de testes automatizados baixa — poucas classes de teste, focadas no chat e em utilitários.
-- A [auditoria de UI/UX](Auditoria_UIUX.md) aponta pendências no celular (textos e alvos de toque
-  pequenos), cores fixas que afetam o tema claro e duplicação entre as telas de conciliação.
+- A [auditoria de UI/UX](Auditoria_UIUX.md) orientou o redesign de 2026-10 (nova identidade, tokens no
+  lugar de cores fixas, conciliação unificada, alvos de toque e modo de acessibilidade); a varredura visual
+  final de todas as rotas (desktop, celular e 320px com texto ampliado) ainda está em andamento.
 - Fotos de perfil ficam em Base64 no banco — simples, mas não escala.
 - O pool de conexões padrão (3) foi pensado para bancos gratuitos; aumente com `DB_POOL_SIZE`.
 - O plano de migração do chat para o n8n está em [`Plano_Migracao_n8n.md`](Plano_Migracao_n8n.md).

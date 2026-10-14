@@ -4,7 +4,8 @@ Guia de contexto para IAs assistindo no desenvolvimento. Leia antes de qualquer 
 
 > O produto se chama **Core 4** (sem "ERP") em todo texto visível ao usuário. Pastas, pacotes Java,
 > domínios e e-mails (`core4erp/`, `br.com.core4erp`, `core4erp.codes`) continuam com o nome técnico.
-> Identidade visual: `docs/DESIGN_SYSTEM_CORE4.md`.
+> Identidade visual e design system: `front-end/src/components/ui/README.md` (tokens, marca, primitivos,
+> movimento e a seção "Acessibilidade (modo A11y · WCAG 2.2 AA)").
 
 ---
 
@@ -72,16 +73,18 @@ domínio `core4erp.codes` e migrations Flyway já aplicadas.
 | Componente | Tecnologia | Versão |
 |---|---|---|
 | Linguagem | JavaScript (JSX) | ES2022+ |
-| Framework | React | 19.0.0 |
-| Build | Vite | 6.4.x |
-| Estilização | Tailwind CSS | 4.1.14 |
+| Framework | React | 19.3.x |
+| Build | Vite (+ vite-plugin-pwa 2) | 8.3.x |
+| Estilização | Tailwind CSS (`@tailwindcss/vite`) | 4.3.x |
 | Roteamento | React Router DOM | 7.18.x |
-| Ícones | Lucide React | latest |
-| Animações | Motion | latest |
-| Gráficos | Recharts | 3.8.1 |
-| PDF | jsPDF + jspdf-autotable | 4.2.1 / 5.0.7 |
-| Datas | date-fns | 4.1.0 |
-| Chat UI | @assistant-ui/react | 0.12.25 |
+| Ícones | Lucide React | 1.57.x |
+| Animações | Motion (motion.dev — `import … from 'motion/react'`) | 14.2.x |
+| Gráficos | Recharts | 3.10.x |
+| PDF | jsPDF + jspdf-autotable | 4.2.x / 5.0.x |
+| Datas | date-fns | 4.4.x |
+| Fontes (@fontsource) | Sora (títulos/números), DM Sans (texto), JetBrains Mono (valores/códigos); Atkinson Hyperlegible Next e Lexend (modo de acessibilidade, carregadas sob demanda) | 5.3.x |
+| Lint | ESLint + eslint-plugin-react-hooks | 10.x / 7.x |
+| Chat UI (Áurea) | componentes próprios em `components/chat/` + SSE em `streamAurea.js` (sem `@assistant-ui`) | — |
 
 ### Infraestrutura
 - Docker + Docker Compose (multi-stage builds)
@@ -147,17 +150,25 @@ utils/        → CNPJ, telefone, contexto de requisição
 
 ### Frontend: `front-end/src/`
 ```
-views/        → páginas completas (uma por rota)
+views/        → páginas completas (uma por rota; algumas são só "cascas" finas, ex.: conciliação)
 components/   → componentes reutilizáveis, agrupados por domínio
-  ui/         → componentes genéricos (DataTable, Toast, Modal, PermissaoGuard, etc.)
-  layout/     → Sidebar, TopNav
-  dashboard/  → painéis do dashboard
-  conciliacao/ e conciliacaoCartao/ → fluxos de conciliação
-  chat/       → interface do assistente IA
-  reports/    → filtros e cards de relatório
-hooks/        → custom hooks React
-context/      → React Context (Theme, Auth)
-lib/          → utilitários puros (api.js, formatters.js, pdfUtils.js, permissaoMessages.js)
+  ui/           → design system (Button, Card, KpiCard, PageHeader, FilterBar, PeriodoSelector, DataTable,
+                  Modal, Drawer, EmptyState, AlertaErro, GraficoAcessivel, BrandMark/BrandLogo…) — ver ui/README.md
+  motion/       → Movimento.jsx (FadeIn, Stagger, AnimatedNumber, …) + presets.js — única forma de animar
+  layout/       → Sidebar, TopNav, BottomNav, RodapeApp, NotificacoesPopover, PWA
+  forms/        → ContaForm, BaixaForm, LancamentoCartaoForm (criar = editar, mesmo componente)
+  financeiro/   → formulários e peças de Contas, Contas bancárias (TransferenciaForm), Investimentos (Pote),
+                  Categorias, Parceiros, Assinaturas
+  cartoes/      → CartoesTabs, CartaoPlastico, FaturaResumo, LinhaDoTempoFaturas, ParcelamentosLista, GraficosCartao…
+  conciliacao/  → ConciliacaoWorkspace + modos.js (banco e cartão no mesmo código), ConciliacaoTabs, RevisaoSessao…
+  dashboard/    → Início (FaixaAlertas, FluxoSankey, ProximosVencimentos…), Insights e Orçamentos
+  chat/         → Áurea (ChatLauncher/ChatSidebar, MensagemAurea, ComposerAurea, ConfirmacaoAcao, streamAurea.js)
+  configuracoes/→ abas de Configurações, MatrizPermissoes, SeletorPerfil, auditoriaUtils
+  acessibilidade/→ PainelAcessibilidade, preferencias.js, padroesGrafico.js, LinksPular, AnunciadorRota…
+  reports/      → ReportCard, ReportFilters, ReportModal, ReportPreview
+hooks/        → custom hooks (useAuth, usePermissao, useCarga, usePeriodoUrl, useAcessibilidade, useConfirm, useToast…)
+context/      → AuthContext, AcessibilidadeContext, ThemeContext
+lib/          → utilitários puros (api.js, navigation.js, periodo.js, chartTheme.js, formatters.js, pdfUtils.js…)
 ```
 
 **Arquivos-chave do frontend:**
@@ -169,12 +180,23 @@ src/lib/safeUrl.js           — valida href vindo de dados (IA/cadastros): só 
 src/views/Privacidade.jsx, Termos.jsx — páginas públicas /privacidade e /termos (LGPD; versão aceita no registro)
 src/components/ui/GraficoAcessivel.jsx — envolve gráficos Recharts com resumo + tabela sr-only (acessibilidade)
 src/lib/routeUtils.js        — ROUTE_PRIORITY + getFirstAccessibleRoute(temPermissao)
-src/App.jsx                  — AdminRoute, PermissaoRoute, ContaEmpresaRoute, NavigateToFirstAccessible, ProtectedLayout
-src/components/layout/
-  Sidebar.jsx                — itens com {permissao: 'CODIGO', empresaOnly: true} filtrados
-  TopNav.jsx                 — mostra "Admin Sistema" se adminSistema=true
-src/components/ui/
-  PermissaoGuard.jsx         — renderização condicional (UX); validação real está no backend
+src/App.jsx                  — PermissaoRoute, ContaEmpresaRoute, NavigateToFirstAccessible, ProtectedLayout (helpers comPermissao/soEmpresa)
+src/lib/navigation.js        — FONTE ÚNICA da navegação: NAV (grupos Visão geral/Dinheiro/Cadastros/Empresa, item com
+                               permissao | permissoesAlguma | destinos[], empresaOnly), NAV_CONTA (menu do avatar) e
+                               NAV_ACOES (ações "?novo=" da busca; só aparecem com ativa: true). Sidebar, BottomNav,
+                               CommandPalette, trilha da TopNav e document.title leem daqui. Tela nova = item em NAV + rota no App.jsx
+src/context/AcessibilidadeContext.jsx — modo de acessibilidade: preferências em localStorage, atributos data-* no <html>, MotionConfig da raiz, Alt+A
+src/hooks/useAcessibilidade.js — useAcessibilidade() (efetivo, abrirPainel, anunciar) e useMovimentoReduzido()
+src/hooks/useCarga.js        — carga assíncrona sem setState síncrono em efeito (dados, erro, carregando, recarregar, setDados)
+src/hooks/usePeriodoUrl.js   — período na URL (?de=&ate=) para o PeriodoSelector
+src/lib/periodo.js           — atalhos de período (mes, 3m, 6m, 12m, ano), paraMesAno, rotuloPeriodo, validarPeriodo
+src/lib/chartTheme.js        — props/cores dos gráficos Recharts (--color-chart-*), usePadroesGrafico
+src/components/motion/       — Movimento.jsx + presets.js (respeitam movimento reduzido)
+src/components/forms/        — ContaForm, BaixaForm, LancamentoCartaoForm (modo criar|editar)
+src/components/conciliacao/ConciliacaoWorkspace.jsx + modos.js — conciliação bancária E de cartão num só código;
+                               as 6 views Conciliacao*/ConciliacaoCartao* são cascas finas (<ConciliacaoWorkspace modo="banco|cartao" …/>)
+src/components/ui/PermissaoGuard.jsx — renderização condicional (UX); validação real está no backend
+src/views/Insights.jsx, Orcamentos.jsx — telas novas (2026-10); Acessibilidade.jsx — declaração pública /acessibilidade
 ```
 
 ---
@@ -266,25 +288,34 @@ ORCAMENTO_VISUALIZAR / ORCAMENTO_EDITAR            ← V52 (tela /orcamentos; VI
 ```
 `GET /api/insights` reaproveita `DASHBOARD_VISUALIZAR`; `GET /api/cartoes/parcelamentos` reaproveita `CARTAO_VISUALIZAR`.
 
-**Mapeamento tela → permissão (frontend):**
+**Mapeamento tela → permissão (frontend, `App.jsx`):**
 ```
-/dashboard                  → PermissaoRoute("DASHBOARD_VISUALIZAR"); SaldoDetalhadoPanel usa PermissaoGuard("DASHBOARD_CARTAO_VISUALIZAR")
-/cartoes/dashboard          → CARTAO_VISUALIZAR
-/cartoes (lançamentos)      → CARTAO_LANCAR
-/cartoes/conciliacao        → CARTAO_CONCILIACAO_VISUALIZAR
-/categorias                 → CATEGORIA_VISUALIZAR  (PermissaoRoute)
-/investimentos              → INVESTIMENTO_VISUALIZAR (PermissaoRoute)
-/reports                    → sem PermissaoRoute; cada card usa PermissaoGuard(RELATORIO_*_VISUALIZAR)
-                              botão Excel visível só com RELATORIO_*_EXPORTAR
-/calendario                 → CALENDARIO_VISUALIZAR
-/orcamentos                 → ORCAMENTO_VISUALIZAR (PermissaoRoute); edição inline/criar/remover via PermissaoGuard("ORCAMENTO_EDITAR")
-/insights                   → DASHBOARD_VISUALIZAR (PermissaoRoute)
-/cartoes/dashboard (painel "Compras parceladas") → CARTAO_VISUALIZAR
+/dashboard (Início)         → DASHBOARD_VISUALIZAR; SaldoDetalhadoPanel só carrega com DASHBOARD_CARTAO_VISUALIZAR;
+                              resumo de cartões com CARTAO_VISUALIZAR; "Baixar" nos vencimentos com CONTA_BAIXAR
+/insights                   → DASHBOARD_VISUALIZAR
+/orcamentos                 → ORCAMENTO_VISUALIZAR; criar/editar/excluir via PermissaoGuard("ORCAMENTO_EDITAR")
+/calendario                 → CALENDARIO_VISUALIZAR ("Baixar" com CONTA_BAIXAR)
+/reports                    → sem PermissaoRoute; cada card com RELATORIO_*_VISUALIZAR, Excel só com RELATORIO_*_EXPORTAR
+                              (o item do menu aparece se tiver qualquer um dos 8 RELATORIO_*_VISUALIZAR)
+/assistente (Áurea), /configuracoes, /ajuda → só autenticado
+/contas                     → CONTA_VISUALIZAR; botões CONTA_CRIAR / EDITAR / DELETAR / BAIXAR / ESTORNAR por linha
+/contas-correntes           → CONTA_CORRENTE_VISUALIZAR; CRIAR/EDITAR/DELETAR; "Transferir" com CONTA_CORRENTE_TRANSFERIR
+                              (transferências saíram da tela de Contas e vivem aqui — exige ≥ 2 contas)
+/cartoes (faturas e lançamentos) → CARTAO_LANCAR; CARTAO_CRIAR/EDITAR/DELETAR (cartão), CARTAO_FECHAR_FATURA (FaturaResumo)
+/cartoes/dashboard          → CARTAO_VISUALIZAR (inclui "Compras parceladas"); abas de Cartões via CartoesTabs conforme permissão
+/conciliacao, /conciliacao/historico, /conciliacao/:id, /conciliacao/:id/relatorio → CONCILIACAO_VISUALIZAR
+/cartoes/conciliacao (+ /historico, /:id, /:id/relatorio)                         → CARTAO_CONCILIACAO_VISUALIZAR
+                              Conciliação unificada: ConciliacaoTabs mostra "Conta bancária" · "Cartão" conforme a
+                              permissão de cada rota; importar/vincular por CONCILIACAO_* ou CARTAO_CONCILIACAO_* (modos.js)
+/investimentos              → INVESTIMENTO_VISUALIZAR; CRIAR/EDITAR/DELETAR; tipos com INVESTIMENTO_TIPO_GERENCIAR
+/assinaturas                → ASSINATURA_VISUALIZAR; CRIAR/EDITAR/DELETAR
+/categorias, /parceiros     → CATEGORIA_VISUALIZAR / PARCEIRO_VISUALIZAR; CRIAR/EDITAR/DELETAR de cada módulo
 /audit                      → AUDITORIA_VISUALIZAR  (PermissaoRoute + ContaEmpresaRoute)
-/empresa/operadores         → USUARIO_VISUALIZAR    (PermissaoRoute + ContaEmpresaRoute)
+/empresa/operadores         → USUARIO_VISUALIZAR    (PermissaoRoute + ContaEmpresaRoute); USUARIO_CONVIDAR/EDITAR/REMOVER
 /empresa/perfis             → CONFIGURACAO_EDITAR   (PermissaoRoute + ContaEmpresaRoute)
-/admin/planos               → AdminRoute (adminSistema)
+públicas                    → /login, /register, /redefinir-senha, /aceitar-convite, /privacidade, /termos, /acessibilidade
 ```
+Botões de ação sem permissão **não aparecem** (`PermissaoGuard`/`usePermissao`) — é só UX; `@Requer` no backend continua valendo.
 
 **Regra de dependência VISUALIZAR em Perfis (GestaoPerfis.jsx):**
 - Ao habilitar qualquer ação que não seja VISUALIZAR em um módulo → VISUALIZAR desse módulo é adicionado automaticamente.
@@ -308,21 +339,7 @@ ORCAMENTO_VISUALIZAR / ORCAMENTO_EDITAR            ← V52 (tela /orcamentos; VI
 - **Atribuição de perfil**: sempre via `PerfilAtribuicaoService.resolverParaAtribuir()` (perfil do sistema ou da própria empresa — `findAtribuivelNaEmpresa`, nunca `findById`; nunca PROPRIETARIO) e `bloquearAutoAlteracao()` (ninguém altera/remove o próprio vínculo).
 - Nomes de perfis do sistema são reservados (criar **e** renomear); perfil em uso (membro ou convite pendente) não pode ser excluído (409).
 
-**Rotas frontend:**
-- `/admin/planos` → `AdminRoute`
-- `/empresa/operadores` → `PermissaoRoute("USUARIO_VISUALIZAR")`
-- `/empresa/perfis` → `PermissaoRoute("CONFIGURACAO_EDITAR")`
-- `/audit` → `PermissaoRoute("AUDITORIA_VISUALIZAR")` (não AdminRoute)
-- `/calendario` → `PermissaoRoute("CALENDARIO_VISUALIZAR")`
-- `/categorias` → `PermissaoRoute("CATEGORIA_VISUALIZAR")`
-- `/investimentos` → `PermissaoRoute("INVESTIMENTO_VISUALIZAR")`
-- `/cartoes/dashboard` → `PermissaoRoute("CARTAO_VISUALIZAR")`
-- `/cartoes` → `PermissaoRoute("CARTAO_LANCAR")`
-- `/cartoes/conciliacao` e sub-rotas → `PermissaoRoute("CARTAO_CONCILIACAO_VISUALIZAR")`
-- `/reports` → sem PermissaoRoute; PermissaoGuard por card (RELATORIO_*_VISUALIZAR / EXPORTAR)
-- `/dashboard` → `PermissaoRoute("DASHBOARD_VISUALIZAR")`; SaldoDetalhadoPanel gateado por DASHBOARD_CARTAO_VISUALIZAR
-- `/orcamentos` → `PermissaoRoute("ORCAMENTO_VISUALIZAR")`; ações de escrita com `PermissaoGuard("ORCAMENTO_EDITAR")`
-- `/insights` → `PermissaoRoute("DASHBOARD_VISUALIZAR")`
+**Rotas frontend:** ver o mapeamento acima (fonte: `App.jsx`; menu: `lib/navigation.js`). Não há `AdminRoute`/`/admin/planos` no front.
 
 **Operadores — reativação:**
 - `PATCH /api/empresa/operadores/{usuarioId}/reativar` — requer `USUARIO_EDITAR`
@@ -617,7 +634,21 @@ private String hashEmail(String email) {
 - Props desestruturadas na assinatura da função.
 - Estado local com `useState`; estado compartilhado via Context ou prop drilling explícito.
 - Efeitos colaterais em `useEffect` com array de dependências correto.
+- **Carga de dados com `useCarga(fn, deps)`** (`hooks/useCarga.js`) — nunca `setState` síncrono dentro de efeito
+  (regras do `eslint-plugin-react-hooks` v6+ para React 19, ex.: `set-state-in-effect`). `npx eslint src` deve dar 0 erros.
 - `temPermissao()` usa `useCallback` com deps `[loginState, permissoes]` — sem stale closure.
+- Formulários de domínio em `components/forms/` (`ContaForm`, `BaixaForm`, `LancamentoCartaoForm`) e
+  `components/financeiro/*Form` — o mesmo componente cria e edita (`modo`); sempre em `Modal`/`Drawer`, nunca no topo da página.
+
+### Padrões de tela (detalhes em `components/ui/README.md`)
+- `PageHeader` (um `<h1>` por tela) com **uma** ação primária; `FilterBar` única logo abaixo.
+- **Um único `PeriodoSelector` por tela**, com estado na URL via `usePeriodoUrl` — nunca dois filtros para a mesma data.
+  Telas sem período: Início, Calendário (navega por mês), Assinaturas e cadastros.
+- Estados: skeleton ao carregar, `EmptyState` vazio, `AlertaErro` (com "Tentar novamente") no erro — nada de "Carregando..." solto.
+- Exclusão sempre com `useConfirm()`; botões só `components/ui/Button`; tabelas com `DataTable` (cards no mobile).
+- Marca só via `BrandMark` (símbolo) / `BrandLogo` (símbolo + wordmark); nome em texto: **Core 4**.
+- Valores financeiros sensíveis com a classe `valor-privado` (borrados no modo privacidade, Alt+P).
+- Ações rápidas da busca: `NAV_ACOES` em `lib/navigation.js`; a tela lê `?novo=` e abre o formulário.
 
 ### Chamadas de API
 - **Sempre use `lib/api.js`** — nunca `fetch` direto nos componentes.
@@ -632,14 +663,37 @@ private String hashEmail(String email) {
 - Nunca formate dinheiro ou datas inline com lógica manual.
 
 ### Estilização
-- Tailwind CSS classes diretamente no JSX.
-- Sem CSS modules ou styled-components.
-- Tema claro/escuro gerenciado por `ThemeContext` — use `useTheme()` para classes condicionais.
+- Tailwind CSS classes diretamente no JSX. Sem CSS modules ou styled-components.
+- **Só tokens** (`bg-surface*`, `text-text-primary/NN`, `text-income/expense/invest`, `var(--color-*)`, raios da escala):
+  **nada de hex/rgba fixo nem `px` em fonte** — senão tema claro, alto contraste, daltonismo e tamanho de texto quebram.
+- Tema claro/escuro gerenciado por `ThemeContext` (escuro por padrão; Alt+T).
 - Componentes genéricos de UI ficam em `components/ui/` — reutilize antes de criar novos.
+- **Movimento só via `components/motion`** (presets) + `motion/react`; para decidir em JS use
+  `useMovimentoReduzido()` (não `useReducedMotion`, que só olha o sistema). UI comum ≤ 300 ms; nada de `animate-*` infinito novo.
+
+### Acessibilidade (WCAG 2.2 AA — não pode regredir)
+- O modo de acessibilidade (`AcessibilidadeContext`, painel com Alt+A, declaração em `/acessibilidade`) aplica atributos
+  no `<html>`: `data-texto`, `data-contraste="alto"`, `data-movimento`, `data-fonte="legibilidade|dislexia"`,
+  `data-espacamento`, `data-daltonismo`, `data-padroes`, `data-leitura="simplificada"`, `data-sublinhar-links`,
+  `data-foco`, `data-alvos="amplos"`, `data-cursor`. O CSS faz o resto — a tela só acompanha se usar tokens.
+- Status = **texto + ícone** (nunca só cor); entrada/saída com sinal (+/−). Ícone decorativo `aria-hidden`; brilho/ilustração com `data-decorativo`.
+- Gráficos: `GraficoAcessivel` (resumo + tabela sr-only), cores `--color-chart-*` via `lib/chartTheme.js`,
+  `usePadroesGrafico` quando houver séries lado a lado; legenda com texto.
+- Alvos ≥ 24px (≥ 44px no toque); foco visível; tudo por teclado; nada só no hover; headings sem pular nível.
+- Reflow: 320px de largura e texto 175% sem rolagem lateral (evite `truncate`/`whitespace-nowrap` em texto essencial).
+- Formulário: rótulo visível (`FormField`), ajuda/erro por `aria-describedby`, `autocomplete` correto, sem bloquear colar.
+
+### Glossário de interface (usar exatamente)
+**Contas a pagar e receber** (conta a pagar / a receber; nunca "Lançamentos") · **Lançamento do cartão** ·
+**Contas bancárias** (não "Contas correntes" na UI) · **Baixar** / **Estornar baixa** · **Entradas** / **Saídas**
+(Receita/Despesa só em DRE e categorias) · **Excluir** (não "Remover"/"permanentemente") · **Áurea** · **Início** ·
+**Core 4** (nunca "Core 4 ERP").
 
 ### Estado e permissões
-- **sessionStorage** para estado do usuário (`loginState`) — limpa ao fechar aba.
-- Permissões vêm do `sessionStorage` → para sincronização em tempo real, fazer polling de `/api/auth/me`.
+- **localStorage** guarda só o estado do usuário (`loginState`, `usuario`) para valer em todas as abas; o **JWT fica
+  apenas no cookie HttpOnly** (nunca em storage). `lib/api.js` migra sessões antigas de `sessionStorage`.
+- Permissões em tempo real: o `AuthProvider` (`context/AuthContext.jsx`) faz **um único** polling de
+  `GET /api/auth/me/permissoes` a cada 30 s, pausado com a aba oculta — não crie outro polling em telas.
 - `PermissaoGuard` é apenas UX — a validação real está sempre no backend.
 
 ---
@@ -701,6 +755,7 @@ chat/tools/
 2. Usuário vincula cada item OFX a uma conta existente ou cria nova inline.
 3. Após vinculação: status → `CONCILIADO`, saldo da conta corrente é atualizado.
 4. Itens não reconhecidos podem ser ignorados (status `IGNORADO`).
+5. Frontend: banco e cartão usam o mesmo `ConciliacaoWorkspace` (diferenças em `conciliacao/modos.js`), com abas por permissão.
 
 ### Fluxo de Cartão de Crédito
 - `tb_cartaoCredito` → tem N `tb_faturaCartao` → cada fatura tem N `tb_lancamentoCartao`.
@@ -721,6 +776,7 @@ chat/tools/
 - Uma transferência gera dois lançamentos: débito na origem, crédito no destino.
 - Ambos vinculados pelo `transferencia_id`.
 - Deletar transferência deve deletar ambos os lançamentos atomicamente (`@Transactional`).
+- Frontend: a ação "Transferir" fica em **Contas bancárias** (`/contas-correntes`, `TransferenciaForm`), com `CONTA_CORRENTE_TRANSFERIR`.
 
 ### Assinaturas Recorrentes
 - Cada assinatura tem `diaVencimento` e pode estar vinculada a um cartão de crédito.
@@ -836,11 +892,17 @@ Lista completa e comentada: `.env.example` (raiz).
 | `AuditoriaController` — `@PageableDefault` no lugar de `PageRequest.of` manual | `implementation_plan.md` | **Implementado** |
 | Fix `/api/cartoes/dashboard/bi` — validação parâmetros parciais mes/ano | `implementation_plan.md` | **Implementado** |
 | `cpfCnpj` obrigatório (`@NotBlank`) em `ParceiroRequestDto` | `implementation_plan.md` | **Implementado** |
-| Dashboard Cartões — estado inicial 30 dias + botões rápidos + `DateRangeModal` | `implementation_plan.md` | **Implementado** |
+| Dashboard Cartões — estado inicial 30 dias + botões rápidos (`DateRangeModal` substituído por `PeriodoSelector` em 2026-10) | `implementation_plan.md` | **Implementado** |
 | `IconDropdown.jsx` — seleção de ícone com grid + busca + agrupamento | `implementation_plan.md` | **Implementado** |
 | `ModalCriacaoRapida` — parceiro agora exige `cpfCnpj`/`tipo`; categoria usa `IconDropdown` | `implementation_plan.md` | **Implementado** |
 | `FormularioNovaContaInline` — botões `+` Categoria e Parceiro (conciliação bancária) | `implementation_plan.md` | **Implementado** |
 | `Parceiros.jsx` — badge Receita Federal + highlight campos autopreenchidos | `implementation_plan.md` | **Implementado** |
+| Nova identidade **Core 4** (logo, `BrandMark`/`BrandLogo`, tokens, motion 14, design system em `components/ui/README.md`) | commits `c5f4aa8`, `18a53ad` (2026-10) | **Implementado** |
+| Telas **Insights** (`/insights`) e **Orçamentos** (`/orcamentos`, V52) | `18a53ad` (2026-10) | **Implementado** |
+| Parcelamentos de cartão ("Compras parceladas" k/n) + formulário único de lançamento | `18a53ad` (2026-10) | **Implementado** |
+| Conciliação unificada (banco + cartão em `ConciliacaoWorkspace`, abas por permissão, lote e desfazer; rotas mantidas) | `18a53ad` (2026-10) | **Implementado** |
+| Modo de acessibilidade (WCAG 2.2 AA: perfis, alto contraste, fontes de leitura, daltonismo, movimento reduzido, `/acessibilidade`) | `18a53ad` (2026-10) | **Implementado** |
+| Navegação única (`lib/navigation.js`), transferências em Contas bancárias, um `PeriodoSelector` por tela | `18a53ad` (2026-10) | **Implementado** |
 
 ---
 
@@ -900,9 +962,9 @@ Após a migration V32, `tb_perfil_acesso` tem campo `empresa_id` (nullable):
 
 ### Permissões em sessão ativa — polling frontend
 
-O backend já invalida o cache Caffeine em mudanças individuais de permissão (explicitamente, antes de persistir) e tem TTL de 30s. O frontend **não faz refresh automático** de permissões — armazena em `sessionStorage` desde o login.
+O backend já invalida o cache Caffeine em mudanças individuais de permissão (explicitamente, antes de persistir) e tem TTL de 30s. O frontend guarda as permissões no `loginState` (localStorage) desde o login.
 
-**Solução implementada:** `useAuth.js` faz polling de `GET /api/auth/me/permissoes` a cada 30s e atualiza o `sessionStorage` via `setLoginState()`, disparando `auth-change` para re-render. O endpoint retorna as permissões calculadas pelo `TenantContext` (já corrigidas pelo TenantFilter a cada request).
+**Solução implementada:** o `AuthProvider` (`context/AuthContext.jsx`) faz um único polling de `GET /api/auth/me/permissoes` a cada 30s (pausa com a aba oculta, retoma ao voltar) e atualiza o `loginState` via `setLoginState()` (cópia imutável, só a empresa ativa), disparando `auth-change` para re-render. O endpoint retorna as permissões calculadas pelo `TenantContext` (já corrigidas pelo TenantFilter a cada request).
 
 ### Hibernate 6 — campo `timestamp` como palavra reservada HQL
 
@@ -961,7 +1023,7 @@ return repo.findAllByEmpresaId(eid, pageable);
 
 ### Roteamento inteligente pós-login — getFirstAccessibleRoute
 
-`PermissaoRoute` e `AdminRoute` redirecionam para `<NavigateToFirstAccessible />` em vez de hardcodar `/dashboard`. Isso evita loop infinito quando o usuário não tem `DASHBOARD_VISUALIZAR`.
+`PermissaoRoute` e `ContaEmpresaRoute` redirecionam para `<NavigateToFirstAccessible />` em vez de hardcodar `/dashboard`. Isso evita loop infinito quando o usuário não tem `DASHBOARD_VISUALIZAR`.
 
 `getFirstAccessibleRoute(temPermissao)` está em `src/lib/routeUtils.js` — use ao precisar calcular a rota inicial após login ou ao redirecionar por falta de permissão.
 
@@ -1384,7 +1446,7 @@ Antes de abrir PR que adiciona ou modifica uma integração externa:
 ## 25. Como Rodar Localmente
 
 ```bash
-# Pré-requisitos: Java 21, Node 20, PostgreSQL 15+, arquivo .env configurado
+# Pré-requisitos: Java 21, Node 22 (o Dockerfile do front usa node:22), PostgreSQL 15+, arquivo .env configurado
 
 # Backend
 cd core4erp
@@ -1393,8 +1455,9 @@ cd core4erp
 # Frontend
 cd front-end
 npm install
-npm run dev
+npm run dev          # vite --port=5173 (proxy /api → 8080)
 # Acesse: http://localhost:5173
+# Antes de subir: npx eslint src (0 erros) e npm run build
 
 # Stack completa com Docker
 docker-compose up --build
