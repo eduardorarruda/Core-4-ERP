@@ -1,0 +1,20 @@
+# Core 4 ERP — só as páginas públicas podem ser indexadas.
+# A área logada fica bloqueada.
+User-agent: *
+Allow: /$
+Allow: /login
+Allow: /register
+Allow: /privacidade
+Allow: /termos
+Allow: /assets/
+Allow: /og-image.png
+Allow: /favicon.svg
+Allow: /apple-touch-icon.png
+Allow: /pwa-192.png
+Allow: /pwa-512.png
+Allow: /manifest.webmanifest
+Allow: /llms.txt
+Allow: /.well-known/security.txt
+Disallow: /
+
+Sitemap: https://front.core4erp.codes/sitemap.xml

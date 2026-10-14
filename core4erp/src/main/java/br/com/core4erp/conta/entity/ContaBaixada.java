@@ -22,7 +22,9 @@ public class ContaBaixada extends TenantEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne(optional = false)
+    // LAZY (antes EAGER implícito do @OneToOne): toda listagem de baixas carregava a conta linha a
+    // linha. Quem precisa da conta usa a query com JOIN FETCH do ContaBaixadaRepository.
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "conta_id", nullable = false, unique = true)
     private Conta conta;
 

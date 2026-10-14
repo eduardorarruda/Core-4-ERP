@@ -3,12 +3,14 @@ package br.com.core4erp.config;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManagerFactory;
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.configuration.FluentConfiguration;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
@@ -103,17 +105,31 @@ public class PrimaryJpaConfig {
     @Primary
     @Bean("primaryFlyway")
     @DependsOn("dataSource")
-    Flyway primaryFlyway(@Qualifier("dataSource") DataSource dataSource) {
-        Flyway flyway = Flyway.configure()
-                .dataSource(dataSource)
-                .locations("classpath:db/migration")
-                .baselineOnMigrate(true)
-                .baselineVersion("1")
-                .outOfOrder(true)
-                .ignoreMigrationPatterns("*:missing")
-                .load();
-        flyway.migrate();
+    Flyway primaryFlyway(@Qualifier("dataSource") DataSource dataSource, Environment env) {
+        Flyway flyway = configurarFlyway(dataSource, env).load();
+        if (env.getProperty("spring.flyway.enabled", Boolean.class, true)) {
+            flyway.migrate();
+        }
         return flyway;
+    }
+
+    /**
+     * Monta a configuração do Flyway a partir das propriedades {@code spring.flyway.*}.
+     * O FlywayAutoConfiguration está excluído (datasource próprio), então sem esta leitura explícita
+     * as propriedades por perfil seriam ignoradas — em especial o modo ESTRITO de produção
+     * (application-prod.properties: out-of-order=false, ignore-migration-patterns=*:future).
+     * Os defaults abaixo espelham application.properties (perfil dev, tolerante).
+     */
+    static FluentConfiguration configurarFlyway(DataSource dataSource, Environment env) {
+        return Flyway.configure()
+                .dataSource(dataSource)
+                .locations(env.getProperty("spring.flyway.locations", String[].class,
+                        new String[]{"classpath:db/migration"}))
+                .baselineOnMigrate(env.getProperty("spring.flyway.baseline-on-migrate", Boolean.class, true))
+                .baselineVersion(env.getProperty("spring.flyway.baseline-version", "1"))
+                .outOfOrder(env.getProperty("spring.flyway.out-of-order", Boolean.class, true))
+                .ignoreMigrationPatterns(env.getProperty("spring.flyway.ignore-migration-patterns", String[].class,
+                        new String[]{"*:missing"}));
     }
 
     @Primary

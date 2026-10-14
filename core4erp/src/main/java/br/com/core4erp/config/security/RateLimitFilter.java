@@ -7,7 +7,6 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -17,42 +16,88 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Rate limit por IP (Bucket4j em memória).
+ *
+ * <ul>
+ *   <li>login/registro: 10/min por IP;</li>
+ *   <li>rotas sensíveis de conta (esqueci/redefinir senha, convite, trocar senha, excluir conta,
+ *       criar empresa):
+ *       5 a cada 15 min por IP <b>e por rota</b> — freia força bruta de token/senha e abuso de envio
+ *       de e-mail;</li>
+ *   <li>chat IA: 30/min por usuário (ou IP); upload OFX: 10/h por IP.</li>
+ * </ul>
+ *
+ * <p>O IP vem do {@link ClientIpResolver} (nunca do X-Forwarded-For mais à esquerda).
+ */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    private static final int AUTH_CAPACIDADE = 10;
+    private static final int SENSIVEL_CAPACIDADE = 5;
+    private static final Duration SENSIVEL_JANELA = Duration.ofMinutes(15);
+    private static final int CHAT_CAPACIDADE = 30;
+    private static final int UPLOAD_CAPACIDADE = 10;
+    private static final long MAX_ENTRADAS = 5_000;
+
+    private enum Grupo { AUTH, SENSIVEL, CHAT, UPLOAD }
+
     private final Cache<String, Bucket> buckets;
+    private final Cache<String, Bucket> sensiveisBuckets;
     private final Cache<String, Bucket> chatBuckets;
     private final Cache<String, Bucket> uploadBuckets;
     private final ObjectMapper objectMapper;
     private final JwtService jwtService;
+    private final ClientIpResolver clientIpResolver;
 
-    public RateLimitFilter(ObjectMapper objectMapper, JwtService jwtService) {
+    public RateLimitFilter(ObjectMapper objectMapper, JwtService jwtService, ClientIpResolver clientIpResolver) {
         this.objectMapper = objectMapper;
         this.jwtService = jwtService;
-        this.buckets = Caffeine.newBuilder()
-                .expireAfterAccess(10, TimeUnit.MINUTES)
-                .maximumSize(5_000)
-                .build();
-        this.chatBuckets = Caffeine.newBuilder()
-                .expireAfterAccess(10, TimeUnit.MINUTES)
-                .maximumSize(5_000)
-                .build();
-        this.uploadBuckets = Caffeine.newBuilder()
-                .expireAfterAccess(2, TimeUnit.HOURS)
-                .maximumSize(5_000)
+        this.clientIpResolver = clientIpResolver;
+        this.buckets = novoCache(Duration.ofMinutes(10));
+        this.sensiveisBuckets = novoCache(Duration.ofMinutes(30));
+        this.chatBuckets = novoCache(Duration.ofMinutes(10));
+        this.uploadBuckets = novoCache(Duration.ofHours(2));
+    }
+
+    private static Cache<String, Bucket> novoCache(Duration expiraAposAcesso) {
+        return Caffeine.newBuilder()
+                .expireAfterAccess(expiraAposAcesso.toMinutes(), TimeUnit.MINUTES)
+                .maximumSize(MAX_ENTRADAS)
                 .build();
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
-        return !path.equals("/api/auth/login")
-                && !path.equals("/api/auth/registrar")
-                && !isChatAiCall(request)
-                && !path.equals("/api/conciliacao/upload");
+        return classificar(request) == null;
+    }
+
+    /** Grupo de rate limit da requisição, ou {@code null} se a rota não é limitada. */
+    private Grupo classificar(HttpServletRequest request) {
+        String path = RespostaErroJson.caminho(request);
+        String metodo = request.getMethod();
+        if (path.equals("/api/auth/login") || path.equals("/api/auth/registrar")) return Grupo.AUTH;
+        if (rotaSensivel(path, metodo) != null) return Grupo.SENSIVEL;
+        if (isChatAiCall(request)) return Grupo.CHAT;
+        if (path.equals("/api/conciliacao/upload")) return Grupo.UPLOAD;
+        return null;
+    }
+
+    /** Nome lógico da rota sensível (usado na chave do bucket) ou {@code null}. */
+    static String rotaSensivel(String path, String metodo) {
+        if (path.equals("/api/auth/esqueci-senha")) return "esqueci-senha";
+        if (path.equals("/api/auth/redefinir-senha")) return "redefinir-senha";
+        if (path.equals("/api/auth/aceitar-convite")) return "aceitar-convite";
+        if (path.startsWith("/api/auth/convite/")) return "convite";
+        if (path.equals("/api/auth/senha")) return "senha";
+        if (path.equals("/api/auth/me") && "DELETE".equalsIgnoreCase(metodo)) return "excluir-conta";
+        if (path.equals("/api/empresas") && "POST".equalsIgnoreCase(metodo)) return "criar-empresa";
+        return null;
     }
 
     /**
@@ -61,7 +106,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
      */
     private boolean isChatAiCall(HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) return false;
-        String path = request.getServletPath();
+        String path = RespostaErroJson.caminho(request);
         return path.equals("/api/chat") || path.equals("/api/chat/stream")
                 || path.equals("/api/chat/anexo") || path.equals("/api/chat/rag/indexar");
     }
@@ -69,39 +114,63 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String ip = resolveClientIp(request);
-        String path = request.getServletPath();
-        boolean isChat = isChatAiCall(request);
-        boolean isUpload = path.equals("/api/conciliacao/upload");
-        Bucket bucket = isChat ? resolveChatBucket(resolveChatKey(request, ip))
-                : isUpload ? resolveUploadBucket(ip)
-                        : resolveBucket(ip);
+        String ip = clientIpResolver.resolver(request);
+        Grupo grupo = classificar(request);
+        if (grupo == null) {
+            chain.doFilter(request, response);
+            return;
+        }
+        Bucket bucket = switch (grupo) {
+            case AUTH -> buckets.get(ip, k -> bucket(AUTH_CAPACIDADE, Duration.ofMinutes(1)));
+            case SENSIVEL -> sensiveisBuckets.get(
+                    ip + "|" + rotaSensivel(RespostaErroJson.caminho(request), request.getMethod()),
+                    k -> bucket(SENSIVEL_CAPACIDADE, SENSIVEL_JANELA));
+            case CHAT -> chatBuckets.get(resolveChatKey(request, ip),
+                    k -> bucket(CHAT_CAPACIDADE, Duration.ofMinutes(1)));
+            case UPLOAD -> uploadBuckets.get(ip, k -> bucket(UPLOAD_CAPACIDADE, Duration.ofHours(1)));
+        };
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
-        } else {
-            String origin = request.getHeader("Origin");
-            if (origin != null) {
-                response.setHeader("Access-Control-Allow-Origin", origin);
-                response.setHeader("Access-Control-Allow-Credentials", "true");
-                response.setHeader("Vary", "Origin");
-            }
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            String msg = isChat ? "Limite de mensagens atingido. Aguarde 1 minuto."
-                    : isUpload ? "Limite de uploads atingido. Aguarde 1 hora."
-                            : "Muitas tentativas. Aguarde 1 minuto.";
-            objectMapper.writeValue(response.getWriter(), Map.of("erro", msg));
+            return;
         }
+        EventoSeguranca.warn(EventoSeguranca.RATE_LIMIT)
+                .addKeyValue("grupo", grupo.name())
+                .addKeyValue("path", RespostaErroJson.caminho(request))
+                .log("Limite de requisições excedido");
+        escrever429(response, mensagem(grupo));
     }
 
-    private Bucket resolveBucket(String ip) {
-        return buckets.get(ip, k -> Bucket.builder()
+    private static String mensagem(Grupo grupo) {
+        return switch (grupo) {
+            case CHAT -> "Limite de mensagens atingido. Aguarde 1 minuto.";
+            case UPLOAD -> "Limite de uploads atingido. Aguarde 1 hora.";
+            case SENSIVEL -> "Muitas tentativas. Aguarde 15 minutos e tente novamente.";
+            case AUTH -> "Muitas tentativas. Aguarde 1 minuto.";
+        };
+    }
+
+    private void escrever429(HttpServletResponse response, String msg) throws IOException {
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        // Mesmo formato do GlobalExceptionHandler (codigo/mensagem/timestamp); "erro" mantido por
+        // compatibilidade com clientes antigos. Cabeçalhos CORS já vêm do CorsFilter (allowlist).
+        Map<String, Object> corpo = new LinkedHashMap<>();
+        corpo.put("codigo", "MUITAS_TENTATIVAS");
+        corpo.put("mensagem", msg);
+        corpo.put("erro", msg);
+        corpo.put("timestamp", LocalDateTime.now().toString());
+        objectMapper.writeValue(response.getWriter(), corpo);
+    }
+
+    private static Bucket bucket(int capacidade, Duration janela) {
+        return Bucket.builder()
                 .addLimit(Bandwidth.builder()
-                        .capacity(10)
-                        .refillIntervally(10, Duration.ofMinutes(1))
+                        .capacity(capacidade)
+                        .refillIntervally(capacidade, janela)
                         .build())
-                .build());
+                .build();
     }
 
     /**
@@ -110,64 +179,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
      * {@code JwtFilter}, então o {@code SecurityContext} ainda não está populado.
      */
     private String resolveChatKey(HttpServletRequest request, String ip) {
-        try {
-            String token = extractToken(request);
-            if (token != null && jwtService.isTokenValid(token)) {
-                String email = jwtService.extractEmail(token);
-                if (email != null && !email.isBlank()) {
-                    return "user:" + email;
-                }
-            }
-        } catch (Exception ignored) {
-            // Token inválido/ausente — cai para o IP
-        }
-        return "ip:" + ip;
-    }
-
-    private String extractToken(HttpServletRequest request) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("access_token".equals(cookie.getName())) {
-                    return cookie.getValue();
-                }
-            }
-        }
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
-        }
-        return null;
-    }
-
-    private Bucket resolveChatBucket(String key) {
-        return chatBuckets.get(key, k -> Bucket.builder()
-                .addLimit(Bandwidth.builder()
-                        .capacity(30)
-                        .refillIntervally(30, Duration.ofMinutes(1))
-                        .build())
-                .build());
-    }
-
-    private Bucket resolveUploadBucket(String ip) {
-        return uploadBuckets.get(ip, k -> Bucket.builder()
-                .addLimit(Bandwidth.builder()
-                        .capacity(10)
-                        .refillIntervally(10, Duration.ofHours(1))
-                        .build())
-                .build());
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        // Trusted proxy header — use only when behind a known reverse proxy.
-        // Disabled by default to prevent IP spoofing in direct deployments.
-        // Enable by setting TRUSTED_PROXY=true and deploying behind a proxy.
-        String trustedProxy = System.getenv("TRUSTED_PROXY");
-        if ("true".equalsIgnoreCase(trustedProxy)) {
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                return forwarded.split(",")[0].trim();
-            }
-        }
-        return request.getRemoteAddr();
+        String token = JwtFilter.extrairCookie(request);
+        if (token == null) token = JwtFilter.extrairBearer(request);
+        String email = jwtService.extractEmail(token);
+        return (email != null && !email.isBlank()) ? "user:" + email : "ip:" + ip;
     }
 }

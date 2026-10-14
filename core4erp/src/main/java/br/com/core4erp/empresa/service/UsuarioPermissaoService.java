@@ -1,16 +1,16 @@
 package br.com.core4erp.empresa.service;
 
+import br.com.core4erp.config.rbac.EscaladaPrivilegioValidator;
 import br.com.core4erp.config.rbac.PermissaoCalculadora;
+import br.com.core4erp.config.rbac.Requer;
+import br.com.core4erp.config.security.EventoSeguranca;
+import br.com.core4erp.config.tenant.PermissaoCacheService;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.empresa.dto.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import br.com.core4erp.empresa.entity.*;
 import br.com.core4erp.empresa.repository.*;
-import br.com.core4erp.exception.AcessoNegadoException;
 import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
-import com.github.benmanes.caffeine.cache.Cache;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,16 +28,17 @@ import java.util.LinkedHashMap;
 @Transactional(readOnly = true)
 public class UsuarioPermissaoService {
 
-    private static final Logger log = LoggerFactory.getLogger(UsuarioPermissaoService.class);
-
     private final UsuarioEmpresaRepository usuarioEmpresaRepository;
     private final UsuarioEmpresaPermissaoRepository permissaoUsuarioRepository;
     private final PermissaoRepository permissaoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PermissaoCalculadora permissaoCalculadora;
     private final TenantContext tenantCtx;
-    private final Cache<String, Set<String>> permissaoCache;
+    private final PermissaoCacheService permissaoCacheService;
+    private final EscaladaPrivilegioValidator escaladaValidator;
+    private final PerfilAtribuicaoService perfilAtribuicaoService;
 
+    @Requer("USUARIO_VISUALIZAR")
     public PermissoesUsuarioResponseDto listar(Long usuarioId) {
         UsuarioEmpresa ue = buscarMembroNaEmpresa(usuarioId);
 
@@ -94,8 +95,11 @@ public class UsuarioPermissaoService {
         );
     }
 
+    @Requer("USUARIO_EDITAR")
     @Transactional
     public PermissaoUsuarioResponseDto concederOuRevogar(Long usuarioId, PermissaoUsuarioRequestDto dto) {
+        // Ninguém altera as próprias permissões diretas (auto-concessão) — mesma regra do perfil.
+        perfilAtribuicaoService.bloquearAutoAlteracao(usuarioId);
         validarNaoEhProprietario(usuarioId);
         validarEscaladaDePrivilegio(dto);
         UsuarioEmpresa ue = buscarMembroNaEmpresa(usuarioId);
@@ -120,6 +124,13 @@ public class UsuarioPermissaoService {
         // CR-B7: invalidar cache ANTES de persistir para evitar leitura com dados antigos
         invalidarCache(ue.getUsuario().getEmail());
         permissaoUsuarioRepository.save(registro);
+        EventoSeguranca.info(EventoSeguranca.PERMISSAO_ALTERADA)
+            .addKeyValue("usuarioId", tenantCtx.getUsuarioId())
+            .addKeyValue("empresaId", tenantCtx.getEmpresaId())
+            .addKeyValue("alvoUsuarioId", usuarioId)
+            .addKeyValue("permissao", permissao.getCodigo())
+            .addKeyValue("acao", revogada ? "revogada" : "concedida")
+            .log("Permissão direta alterada");
 
         String origem = revogada ? "DIRETA_REVOGADA" : "DIRETA_CONCEDIDA";
         return new PermissaoUsuarioResponseDto(
@@ -129,8 +140,10 @@ public class UsuarioPermissaoService {
         );
     }
 
+    @Requer("USUARIO_EDITAR")
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public PermissoesUsuarioResponseDto substituirTodas(Long usuarioId, PermissaoUsuarioBulkRequestDto dto) {
+        perfilAtribuicaoService.bloquearAutoAlteracao(usuarioId);
         validarNaoEhProprietario(usuarioId);
         UsuarioEmpresa ue = buscarMembroNaEmpresa(usuarioId);
 
@@ -162,14 +175,23 @@ public class UsuarioPermissaoService {
         return listar(usuarioId);
     }
 
+    @Requer("USUARIO_EDITAR")
     @Transactional
     public void removerPermissaoDireta(Long usuarioId, Long permissaoId) {
+        perfilAtribuicaoService.bloquearAutoAlteracao(usuarioId);
         validarNaoEhProprietario(usuarioId);
         UsuarioEmpresa ue = buscarMembroNaEmpresa(usuarioId);
+        invalidarCache(ue.getUsuario().getEmail());
         permissaoUsuarioRepository.deleteByUsuarioIdAndEmpresaIdAndPermissaoId(
             usuarioId, tenantCtx.getEmpresaId(), permissaoId
         );
-        invalidarCache(ue.getUsuario().getEmail());
+        EventoSeguranca.info(EventoSeguranca.PERMISSAO_ALTERADA)
+            .addKeyValue("usuarioId", tenantCtx.getUsuarioId())
+            .addKeyValue("empresaId", tenantCtx.getEmpresaId())
+            .addKeyValue("alvoUsuarioId", usuarioId)
+            .addKeyValue("permissaoId", permissaoId)
+            .addKeyValue("acao", "removida")
+            .log("Permissão direta removida");
     }
 
     // ---- privados ----
@@ -184,28 +206,23 @@ public class UsuarioPermissaoService {
         usuarioEmpresaRepository
             .findByUsuarioIdAndEmpresaIdAndAtivoTrue(usuarioId, tenantCtx.getEmpresaId())
             .ifPresent(ue -> {
-                if ("PROPRIETARIO".equals(ue.getPerfil().getNome())) {
+                if (EscaladaPrivilegioValidator.PERFIL_PROPRIETARIO.equals(ue.getPerfil().getNome())) {
                     throw new BusinessException("OPERACAO_INVALIDA",
                         "Permissões do proprietário não podem ser alteradas individualmente.");
                 }
             });
     }
 
+    // Regra compartilhada (EscaladaPrivilegioValidator): só concede o que o próprio usuário possui;
+    // PROPRIETARIO e Admin do Sistema podem conceder qualquer permissão do catálogo.
     private void validarEscaladaDePrivilegio(PermissaoUsuarioRequestDto dto) {
         if (Boolean.TRUE.equals(dto.revogada())) return;
         Permissao p = permissaoRepository.findById(dto.permissaoId())
             .orElseThrow(() -> new EntityNotFoundException("Permissão não encontrada"));
-        if (!tenantCtx.temPermissao(p.getCodigo())) {
-            // CR-B8: log interno específico, mensagem externa genérica
-            log.warn("Escalada de privilégio negada: usuarioId={} tentouConceder={}",
-                tenantCtx.getUsuarioId(), p.getCodigo());
-            throw new AcessoNegadoException("Permissão insuficiente para esta operação");
-        }
+        escaladaValidator.validarCodigos(List.of(p.getCodigo()));
     }
 
     private void invalidarCache(String email) {
-        // CR-B10: hash determinístico evita colisão quando email contém ':'
-        permissaoCache.invalidate(Integer.toHexString(
-            Objects.hash(email, tenantCtx.getEmpresaId())));
+        permissaoCacheService.invalidar(email, tenantCtx.getEmpresaId());
     }
 }

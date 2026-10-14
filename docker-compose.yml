@@ -1,37 +1,97 @@
+# Core 4 ERP — stack de produção (ver DEPLOY.md).
+#
+# Segmentação de rede (cada serviço só enxerga o que precisa):
+#   edge       → cloudflared, frontend                      (entrada pública via túnel)
+#   app        → frontend, backend, n8n, qdrant              (nginx→backend, backend↔n8n, RAG)
+#   data       → backend, db, n8n                            (interna: sem saída para a internet)
+#   monitoring → prometheus, alertmanager, grafana, loki, promtail, backend (Actuator :8081)
+#
+# Variáveis com `:?` são OBRIGATÓRIAS: o `docker compose` recusa subir sem elas (ver .env.example).
+
+# Logs no driver json-file com rotação (evita encher o disco) e com nome/serviço gravados em
+# "attrs" de cada linha — é isso que o promtail usa como label, sem precisar do docker.sock.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+    tag: "{{.Name}}"
+    labels: "com.docker.compose.service"
+
+# Hardening comum: impede escalada de privilégio via setuid/setgid dentro do container.
+x-hardening: &hardening
+  security_opt:
+    - "no-new-privileges:true"
+
 services:
   db:
     image: postgres:16-alpine
     container_name: core4erp-db
+    <<: *hardening
+    # Sem cap_drop: o entrypoint do Postgres precisa de chown/setuid para cair para o usuário postgres.
+    mem_limit: 1g
+    logging: *logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-core4erp}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME:?defina DB_USERNAME no .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      # Role/banco dedicados do n8n — criados por scripts/postgres/init-n8n.sh SÓ na primeira
+      # subida (volume vazio). Em volume existente, ver DEPLOY.md › "n8n — role dedicado".
+      N8N_DB_USER: ${N8N_DB_USER:?defina N8N_DB_USER no .env}
+      N8N_DB_PASSWORD: ${N8N_DB_PASSWORD:?defina N8N_DB_PASSWORD no .env}
+      N8N_DB_NAME: ${N8N_DB_NAME:-n8n}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres:/docker-entrypoint-initdb.d:ro
     networks:
-      - app-network
+      - data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${POSTGRES_DB:-core4erp}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
 
   backend:
     build: ./core4erp
+    <<: *hardening
+    cap_drop: [ALL]
     mem_limit: 1500m
+    logging: *logging
+    # Só a API (8080) em 127.0.0.1 (diagnóstico local). O Actuator fica na porta de gestão 8081,
+    # que NÃO é publicada: só o Prometheus a alcança, pela rede `monitoring`.
     ports:
       - "127.0.0.1:8080:8080"
     environment:
+      SPRING_PROFILES_ACTIVE: prod
+      APP_ENV: ${APP_ENV:-production}
+      # Logs JSON (ECS) no stdout → promtail → Loki. O perfil prod já força json; explícito aqui.
+      LOG_FORMAT: json
+      # O backend fica atrás de cloudflared → nginx: o IP do cliente vem do CF-Connecting-IP
+      # (depois X-Real-IP), que o nginx SOBRESCREVE com o IP resolvido pelo realip (só confia no
+      # CF-Connecting-IP vindo do cloudflared). Só é seguro porque o 8080 não é público.
+      TRUSTED_PROXY: "true"
       DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/core4erp}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-3}
-      SECRET_KEY: ${SECRET_KEY}
+      DB_USERNAME: ${DB_USERNAME:?defina DB_USERNAME no .env}
+      DB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY no .env (openssl rand -base64 64)}
       TOKEN_EXPIRATION: ${TOKEN_EXPIRATION:-604800000}
+      # JWT assimétrico (Ed25519) — OPCIONAL. Com as duas chaves PEM definidas, o token passa a
+      # ser assinado com a privada; sem elas, segue HS256 com SECRET_KEY. Ver DEPLOY.md.
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:-}
+      # Criptografia em repouso de CPF/CNPJ (AES-256) + índice cego (HMAC) para busca/unicidade.
+      # PERDER a DATA_ENCRYPTION_KEY = dados criptografados ilegíveis. Guardar fora do servidor.
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?defina DATA_ENCRYPTION_KEY no .env (openssl rand -base64 32)}
+      DATA_HMAC_KEY: ${DATA_HMAC_KEY:?defina DATA_HMAC_KEY no .env (openssl rand -base64 32)}
+      # Cifra na subida os CPF/CNPJ legados em texto puro (idempotente). false = pular.
+      CRYPTO_MIGRAR_NA_SUBIDA: ${CRYPTO_MIGRAR_NA_SUBIDA:-true}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      # RAG — Qdrant protegido por API key (a mesma configurada no serviço qdrant abaixo).
+      QDRANT_API_KEY: ${QDRANT_API_KEY:?defina QDRANT_API_KEY no .env}
       # Ingestão RAG via n8n (pré-processamento do anexo). Aponta para o serviço n8n interno;
       # se o n8n estiver fora, o backend faz fallback e indexa o conteúdo original (best-effort).
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/rag-ingest}
@@ -40,18 +100,21 @@ services:
       # Orquestrador do chat: interno (default) | shadow (só admin) | n8n (todos). Delega ao WF-AUREA.
       CHAT_ORQUESTRADOR: ${CHAT_ORQUESTRADOR:-interno}
       N8N_AUREA_WEBHOOK_URL: ${N8N_AUREA_WEBHOOK_URL:-http://n8n:5678/webhook/aurea}
-      # Segredo assinado no header X-Webhook-Secret das chamadas ao n8n (vazio = não envia).
-      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      # Segredo enviado no header X-Webhook-Secret de TODA chamada ao n8n. OBRIGATÓRIO: os
+      # webhooks do n8n exigem o header (Header Auth) e respondem 403 sem ele.
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:?defina N8N_WEBHOOK_SECRET no .env}
       # Timeout de leitura do webhook do n8n (s). 95 acomoda o ramo LOTE multi-agente (medido ~91s p/
       # ~6 itens) e fica < ~100s (idle do Cloudflare free) e < 98s do nginx. Lotes grandes de parceiros
       # novos (enriquecimento BrasilAPI) podem passar disso — ver limite de itens no prompt do Extrator.
       N8N_READ_TIMEOUT_SECONDS: ${N8N_READ_TIMEOUT_SECONDS:-95}
+      # false (padrão): não envia e-mail e o health do Actuator ignora o SMTP. Em prod o link de
+      # redefinição/convite NÃO vai para o log — ligue o envio (MAIL_*) para recuperar senha.
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME}
-      MAIL_PASSWORD: ${MAIL_PASSWORD}
-      MAIL_FROM: ${MAIL_FROM}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       # ── Traces → Painel EBPÓS (OpenTelemetry) ────────────────────────────────
       # O -javaagent (no Dockerfile) exporta traces via OTLP/HTTP. Só métricas/logs
       # ficam desligados aqui (o painel já coleta métricas do servidor pelo nmon-agent).
@@ -70,48 +133,64 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      qdrant:
+        condition: service_healthy
     networks:
-      - app-network
+      - app
+      - data
+      - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      # Porta de gestão (Actuator) — 8081, interna.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 90s
 
   frontend:
     build: ./front-end
     container_name: core4erp-frontend
+    <<: *hardening
+    # nginx-unprivileged (usuário 101, porta 8080): não precisa de nenhuma capability.
+    cap_drop: [ALL]
+    mem_limit: 128m
+    logging: *logging
     depends_on:
       backend:
         condition: service_healthy
     networks:
-      - app-network
+      - edge
+      - app
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.15.0
     container_name: prometheus
+    <<: *hardening
+    cap_drop: [ALL]
+    mem_limit: 512m
+    logging: *logging
     volumes:
-      - ./core4erp/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./core4erp/monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      - ./core4erp/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./core4erp/monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     expose:
       - "9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
     depends_on:
       backend:
         condition: service_healthy
     networks:
-      - app-network
+      - monitoring
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
@@ -119,43 +198,95 @@ services:
       timeout: 5s
       retries: 3
 
+  # Alertmanager — recebe os alertas do Prometheus (alert_rules.yml) e envia por e-mail e/ou
+  # webhook. Destinos vêm do .env (ALERT_*); a config é gerada no start pelo entrypoint.sh.
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    container_name: alertmanager
+    <<: *hardening
+    cap_drop: [ALL]
+    mem_limit: 64m
+    logging: *logging
+    entrypoint: ["/bin/sh", "/etc/alertmanager/core4/entrypoint.sh"]
+    environment:
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_SMTP_SMARTHOST: ${ALERT_SMTP_SMARTHOST:-smtp.gmail.com:587}
+      ALERT_SMTP_FROM: ${ALERT_SMTP_FROM:-${MAIL_FROM:-}}
+      ALERT_SMTP_USER: ${ALERT_SMTP_USER:-${MAIL_USERNAME:-}}
+      ALERT_SMTP_PASSWORD: ${ALERT_SMTP_PASSWORD:-${MAIL_PASSWORD:-}}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    volumes:
+      - ./core4erp/monitoring/alertmanager:/etc/alertmanager/core4:ro
+      - alertmanager_data:/alertmanager
+    expose:
+      - "9093"
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9093/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.6.11
     container_name: loki
+    <<: *hardening
+    cap_drop: [ALL]
+    mem_limit: 512m
+    logging: *logging
+    # Sem healthcheck: a imagem do Loki é distroless (sem shell/wget). O /ready é verificado
+    # pelo Grafana (datasource) e pode ser checado à mão: ver DEPLOY.md › "Verificar".
     expose:
       - "3100"
     volumes:
-      - ./core4erp/monitoring/loki-config.yml:/etc/loki/local-config.yaml
+      - ./core4erp/monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki_data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
-      - app-network
+      - monitoring
     restart: unless-stopped
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.6.11
     container_name: promtail
+    <<: *hardening
+    # Roda como root (dono dos arquivos de log do Docker), mas sem nenhuma capability e com o
+    # diretório montado SOMENTE LEITURA. Sem docker.sock (seria root no host).
+    cap_drop: [ALL]
+    mem_limit: 128m
+    logging: *logging
     volumes:
-      - ./core4erp/monitoring/promtail-config.yml:/etc/promtail/config.yml
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ./core4erp/monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail_positions:/var/lib/promtail
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       - loki
     networks:
-      - app-network
+      - monitoring
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.0.11
     container_name: grafana
+    <<: *hardening
+    cap_drop: [ALL]
+    mem_limit: 384m
+    logging: *logging
+    # Só em 127.0.0.1: acesso via túnel SSH (ssh -L 3001:127.0.0.1:3001 servidor). Ver DEPLOY.md.
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./core4erp/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./core4erp/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?defina GRAFANA_PASSWORD no .env}
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - GF_SERVER_ROOT_URL=${GRAFANA_URL:-http://localhost:3001}
       - GF_SERVER_SERVE_FROM_SUB_PATH=false
     depends_on:
@@ -164,7 +295,7 @@ services:
       loki:
         condition: service_started
     networks:
-      - app-network
+      - monitoring
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
@@ -172,83 +303,158 @@ services:
       timeout: 5s
       retries: 3
 
+  # Cloudflare Tunnel — ÚNICO túnel da stack (o cloudflared do host via systemd foi aposentado).
+  # As rotas (public hostnames) ficam no painel da Cloudflare. Só alcança o frontend (rede edge):
+  # a rota pública deve apontar para http://frontend:8080. O n8n NÃO é alcançável pelo túnel
+  # (ver DEPLOY.md › "Cloudflare Tunnel").
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.0
     container_name: cloudflared
-    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    <<: *hardening
+    cap_drop: [ALL]
+    mem_limit: 128m
+    logging: *logging
+    command: tunnel --no-autoupdate run
+    environment:
+      # Token via env (não aparece na linha de comando do processo / `ps`).
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?defina TUNNEL_TOKEN no .env}
     depends_on:
       - frontend
     networks:
-      - app-network
+      edge:
+        # IP FIXO: o nginx (front-end/nginx.conf › set_real_ip_from) só confia no CF-Connecting-IP
+        # vindo deste endereço. Mudou aqui → mude lá também.
+        ipv4_address: 172.31.10.10
     restart: unless-stopped
 
-  # Qdrant — banco vetorial do RAG (embeddings de documentos/descrições). Isolado, na mesma
-  # rede (backend e n8n usam internamente http://qdrant:6333). Exposto só em 127.0.0.1 (admin via túnel).
+  # Qdrant — banco vetorial do RAG (embeddings de documentos/descrições). Backend e n8n usam
+  # internamente http://qdrant:6333 (REST) / qdrant:6334 (gRPC), autenticados por API key.
+  # Exposto só em 127.0.0.1 (admin via túnel SSH).
   qdrant:
     # Versão fixada (reprodutibilidade — evita drift de :latest). O cliente Spring AI (gRPC 1.13)
     # emite um WARN de versão contra este servidor, porém as operações usadas (create/upsert/search)
     # são compatíveis. Ao atualizar, casar com a versão do qdrant-client do Spring AI.
     image: qdrant/qdrant:v1.18.2
     container_name: qdrant
+    <<: *hardening
+    cap_drop: [ALL]
+    mem_limit: 512m
+    logging: *logging
     ports:
       - "127.0.0.1:6333:6333"
+    environment:
+      # Exige o header `api-key` em toda chamada REST/gRPC (exceto /healthz, /livez, /readyz).
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?defina QDRANT_API_KEY no .env}
+      QDRANT__TELEMETRY_DISABLED: "true"
     volumes:
       - qdrant_data:/qdrant/storage
     networks:
-      - app-network
+      - app
     restart: unless-stopped
+    healthcheck:
+      # A imagem não tem curl/wget: HTTP mínimo via /dev/tcp do bash.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && printf \"GET /readyz HTTP/1.0\\r\\n\\r\\n\" >&3 && head -n1 <&3 | grep -q \" 200 \"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # n8n self-hosted — orquestra o processamento pesado/assíncrono da IA (arquivos/lote).
-  # Mesma rede do backend (interno: backend -> http://n8n:5678 ; n8n -> http://backend:8080).
-  # Exposto só em 127.0.0.1 (acesso ao editor via túnel SSH; n8n é poderoso e não deve ficar
-  # público sem TLS). N8N_SECURE_COOKIE=false permite acesso por HTTP no túnel/localhost.
+  # Interno: backend -> http://n8n:5678 (rede app); n8n -> http://backend:8080 (app),
+  # qdrant (app) e Postgres próprio (data). Exposto só em 127.0.0.1: o EDITOR é acessado por
+  # túnel SSH e NUNCA deve ficar público (ver DEPLOY.md › "Cloudflare Tunnel").
   n8n:
     image: n8nio/n8n:2.28.3
     container_name: n8n
+    <<: *hardening
     mem_limit: 1g
+    logging: *logging
     ports:
       - "127.0.0.1:5678:5678"
     environment:
-      # Público via Cloudflare Tunnel: valores reais ficam no .env do servidor (gitignored).
+      # Valores reais ficam no .env do servidor (gitignored).
       # Defaults abaixo = uso local (localhost) — não quebra o `docker compose up` de dev.
       - N8N_HOST=${N8N_HOST:-localhost}
       - N8N_PORT=5678
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      # Atrás do cloudflared (1 proxy): N8N_PROXY_HOPS=1 faz o n8n confiar no X-Forwarded-Proto
-      # do túnel, para o cookie seguro (N8N_SECURE_COOKIE=true) funcionar sem falso "URL inseguro".
-      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
+      # Cookie de sessão do editor só via HTTPS (default seguro). Navegadores tratam
+      # http://localhost como contexto seguro, então o acesso por túnel SSH continua funcionando.
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-true}
       - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-0}
       - WEBHOOK_URL=${N8N_PUBLIC_URL:-http://localhost:5678/}
       - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL:-http://localhost:5678/}
       - GENERIC_TIMEZONE=America/Sao_Paulo
       - TZ=America/Sao_Paulo
       - N8N_DIAGNOSTICS_ENABLED=false
-      # Persistência: SQLite por padrão (dev local — não quebra o `docker compose up`).
-      # Em produção o .env seta N8N_DB_TYPE=postgresdb → usa o Postgres do compose
-      # (database 'n8n', mesmo servidor/credenciais do backend) para execuções persistentes.
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      # Chave que criptografa as CREDENCIAIS salvas no n8n (OpenAI, Postgres, Header Auth...).
+      # OBRIGATÓRIA e deve ser guardada FORA do servidor: sem ela, um backup do n8n é inútil.
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?defina N8N_ENCRYPTION_KEY no .env}
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      # Execuções guardam o payload do webhook (inclui o JWT do usuário e dados financeiros):
+      # não salva execuções de sucesso nem manuais, não salva progresso e expurga o que sobrar
+      # (erros) após 7 dias (168h) — LGPD/minimização.
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168
+      - EXECUTIONS_DATA_SAVE_ON_SUCCESS=none
+      - EXECUTIONS_DATA_SAVE_ON_PROGRESS=false
+      - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=false
+      # Persistência: SQLite por padrão (dev local). Em produção o .env seta N8N_DB_TYPE=postgresdb
+      # → usa o Postgres do compose com ROLE DEDICADO (N8N_DB_USER), dono só do banco 'n8n'.
       - DB_TYPE=${N8N_DB_TYPE:-sqlite}
       - DB_POSTGRESDB_HOST=${N8N_DB_HOST:-db}
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME:-n8n}
-      - DB_POSTGRESDB_USER=${DB_USERNAME}
-      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
-      # Segredo compartilhado backend↔n8n: os workflows validam o header X-Webhook-Secret
-      # contra este valor (via $env). Vazio = webhooks abertos (dev). Setado no .env em produção.
-      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET:-}
+      - DB_POSTGRESDB_USER=${N8N_DB_USER:?defina N8N_DB_USER no .env}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:?defina N8N_DB_PASSWORD no .env}
+      # Segredo compartilhado backend↔n8n: os webhooks usam Header Auth (X-Webhook-Secret) com
+      # este valor. OBRIGATÓRIO — webhook sem o header correto responde 403.
+      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET:?defina N8N_WEBHOOK_SECRET no .env}
     volumes:
       - n8n_data:/home/node/.n8n
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
     networks:
-      - app-network
+      - app
+      - data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
 volumes:
   postgres_data:
   prometheus_data:
+  alertmanager_data:
   grafana_data:
   loki_data:
+  promtail_positions:
   n8n_data:
   qdrant_data:
 
 networks:
-  app-network:
+  # Entrada pública: só cloudflared e frontend. Sub-rede fixa para o cloudflared ter IP fixo
+  # (172.31.10.10) — é o único peer cujo CF-Connecting-IP o nginx aceita (anti-spoofing de IP).
+  edge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.10.0/24
+  # Aplicação: nginx→backend, backend↔n8n, backend/n8n→qdrant. Precisa de saída (OpenAI etc.).
+  app:
+    driver: bridge
+  # Dados: Postgres. `internal` = sem rota para a internet (nem entrada nem saída externa).
+  data:
+    driver: bridge
+    internal: true
+  # Observabilidade. Não é internal porque o Grafana publica 127.0.0.1:3001 e o
+  # Alertmanager precisa sair para SMTP/webhook.
+  monitoring:
     driver: bridge

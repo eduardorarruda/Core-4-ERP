@@ -4,10 +4,11 @@ import BentoCard from '../ui/BentoCard';
 import { brl } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 import { chartTheme, readCssVar } from './chartTheme';
+import GraficoAcessivel from '../ui/GraficoAcessivel';
 
 export default function FluxoCaixaChart({ cashFlowData, carregando, isDark, totalEntradas6m, totalSaidas6m, resultado6m, mediaEntradas }) {
   const { gridColor, axisColor, tooltipStyle } = chartTheme(isDark);
-  const colorEntradas = readCssVar('--color-primary', isDark ? '#6EFFC0' : '#059669');
+  const colorEntradas = readCssVar('--color-chart-1', isDark ? '#6EFFC0' : '#047857');
   const colorSaidas = readCssVar('--color-error', isDark ? '#FFB4AB' : '#DC2626');
 
   return (
@@ -22,7 +23,15 @@ export default function FluxoCaixaChart({ cashFlowData, carregando, isDark, tota
         </div>
       }
     >
-      <div className="w-full mt-4">
+      <GraficoAcessivel
+        className="w-full mt-4"
+        resumo={`Gráfico de área do fluxo de caixa dos últimos 6 meses: entradas somam R$ ${brl(totalEntradas6m)}, saídas somam R$ ${brl(totalSaidas6m)} e o resultado é R$ ${brl(resultado6m)}.`}
+        tabela={{
+          titulo: 'Fluxo de caixa por mês',
+          colunas: ['Mês', 'Entradas', 'Saídas'],
+          linhas: cashFlowData.map((m) => [m.name, `R$ ${brl(m.entradas)}`, `R$ ${brl(m.saidas)}`]),
+        }}
+      >
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={cashFlowData}>
             <defs>
@@ -45,36 +54,36 @@ export default function FluxoCaixaChart({ cashFlowData, carregando, isDark, tota
             <Area type="monotone" dataKey="saidas" stroke={colorSaidas} fillOpacity={1} fill="url(#colorSaidas)" strokeWidth={2} />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
+      </GraficoAcessivel>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-5 border-t border-text-primary/5">
         <div className="bg-surface-low rounded-xl p-4 space-y-1">
           <div className="flex items-center gap-1.5">
             <TrendingUp className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Entradas</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Entradas</span>
           </div>
           <p className="text-base font-bold text-primary">R$ {brl(totalEntradas6m)}</p>
-          <p className="text-xs text-text-primary/40">acumulado 6 meses</p>
+          <p className="text-xs text-text-primary/60">acumulado 6 meses</p>
         </div>
         <div className="bg-surface-low rounded-xl p-4 space-y-1">
           <div className="flex items-center gap-1.5">
             <TrendingDown className="w-3.5 h-3.5 text-error" />
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Saídas</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Saídas</span>
           </div>
           <p className="text-base font-bold text-error">R$ {brl(totalSaidas6m)}</p>
-          <p className="text-xs text-text-primary/40">acumulado 6 meses</p>
+          <p className="text-xs text-text-primary/60">acumulado 6 meses</p>
         </div>
         <div className={cn('bg-surface-low rounded-xl p-4 space-y-1', resultado6m < 0 && 'border border-error/20')}>
           <div className="flex items-center gap-1.5">
             {resultado6m >= 0
               ? <TrendingUp className="w-3.5 h-3.5 text-secondary" />
               : <TrendingDown className="w-3.5 h-3.5 text-error" />}
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Resultado</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Resultado</span>
           </div>
           <p className={cn('text-base font-bold', resultado6m >= 0 ? 'text-secondary' : 'text-error')}>
             {resultado6m >= 0 ? '+' : ''}R$ {brl(resultado6m)}
           </p>
-          <p className="text-xs text-text-primary/40">saldo do período</p>
+          <p className="text-xs text-text-primary/60">saldo do período</p>
         </div>
       </div>
     </BentoCard>

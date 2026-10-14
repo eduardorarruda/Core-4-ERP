@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.config;
 
+import br.com.core4erp.chat.service.ConfirmacaoNecessariaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.execution.ToolExecutionException;
@@ -24,6 +25,12 @@ public class ChatToolErrorConfig {
         return (ToolExecutionException ex) -> {
             String tool = ex.getToolDefinition() != null ? ex.getToolDefinition().name() : "desconhecida";
             Throwable causa = ex.getCause() != null ? ex.getCause() : ex;
+            // Não é falha: portão de escrita em turno com anexo (GateEscritaAnexoAspect) ou de ação
+            // crítica não confirmada (GateAcaoCriticaAspect) — devolve a instrução de confirmação ao
+            // modelo, sem stack trace no log.
+            if (causa instanceof ConfirmacaoNecessariaException confirmacao) {
+                return confirmacao.getMessage();
+            }
             log.error("[CHAT-TOOL-ERRO] tool={} causa={}: {}",
                     tool, causa.getClass().getName(), causa.getMessage(), causa);
             // Anti-loop: sem esta instrução o modelo repetia a MESMA chamada dezenas de vezes

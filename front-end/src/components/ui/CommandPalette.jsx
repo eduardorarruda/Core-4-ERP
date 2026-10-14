@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useId, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, LayoutDashboard, Users, Tag, Landmark, FileText,
   CreditCard, TrendingUp, Repeat, CalendarDays, BarChart3,
-  Gavel, Settings, Plus, X, Clock, HelpCircle, LifeBuoy,
+  Settings, Plus, X, Clock, HelpCircle, LifeBuoy,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { busca } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import Modal from './Modal';
 
 // Ícone por tipo de registro retornado pela busca global do backend.
 const TIPO_ICON = { PARCEIRO: Users, CONTA: FileText, LANCAMENTO_CARTAO: CreditCard };
@@ -63,6 +64,7 @@ export default function CommandPalette({ onClose }) {
   const [buscando, setBuscando] = useState(false);
   const inputRef = useRef(null);
   const listRef = useRef(null);
+  const listaId = useId();
   const recent = getRecent();
 
   // Só mostra páginas/ações que o usuário pode acessar (itens sem permissão são sempre visíveis).
@@ -70,17 +72,10 @@ export default function CommandPalette({ onClose }) {
   const pages = PAGES.filter(podeVer);
   const actions = ACTIONS.filter(podeVer);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-    const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
   // Busca de dados reais (contas, parceiros, lançamentos) no backend, com debounce.
   useEffect(() => {
     const termo = query.trim();
-    if (termo.length < 2) { setResultados([]); setBuscando(false); return; }
+    if (termo.length < 2) { setResultados([]); setBuscando(false); return undefined; }
     setBuscando(true);
     const t = setTimeout(async () => {
       try { setResultados(await busca.global(termo)); }
@@ -117,10 +112,11 @@ export default function CommandPalette({ onClose }) {
     : [
         { label: 'Recentes', items: pages.filter((p) => recent.includes(p.id)) },
         { label: 'Páginas', items: pages.filter((p) => !recent.includes(p.id)) },
-        { label: 'Ações Rápidas', items: actions },
+        { label: 'Ações rápidas', items: actions },
       ].filter((s) => s.items.length);
 
   const flatItems = sections.flatMap((s) => s.items);
+  const opcaoId = (idx) => `${listaId}-opcao-${idx}`;
 
   const handleSelect = useCallback((item) => {
     if (!item.transient) saveRecent(item.id); // não guardar registros de dados como "recentes"
@@ -141,9 +137,10 @@ export default function CommandPalette({ onClose }) {
     }
   };
 
-  useEffect(() => {
+  const alterarBusca = (valor) => {
+    setQuery(valor);
     setActive(0);
-  }, [query]);
+  };
 
   useEffect(() => {
     const el = listRef.current?.querySelector('[data-active="true"]');
@@ -151,92 +148,99 @@ export default function CommandPalette({ onClose }) {
   }, [active]);
 
   let flatIdx = 0;
+  const statusTexto = buscando
+    ? 'Buscando...'
+    : `${flatItems.length} resultado${flatItems.length === 1 ? '' : 's'}`;
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-start justify-center pt-[10vh] px-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-fade-in" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-surface-low border border-text-primary/10 rounded-2xl shadow-elevated overflow-hidden animate-scale-in">
-        {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-text-primary/10">
-          <Search className="w-5 h-5 text-text-primary/40 shrink-0" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Buscar contas, parceiros, lançamentos, páginas..."
-            aria-label="Busca global"
-            className="flex-1 bg-transparent text-text-primary placeholder:text-text-primary/30 outline-none text-sm font-body"
-          />
-          {query && (
-            <button onClick={() => setQuery('')} aria-label="Limpar busca" className="text-text-primary/40 hover:text-text-primary transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          <kbd className="text-[10px] font-bold bg-surface-highest px-1.5 py-0.5 rounded border border-text-primary/10 text-text-primary/40 shrink-0">
-            ESC
-          </kbd>
-        </div>
-
-        {/* Results */}
-        <div ref={listRef} className="overflow-y-auto max-h-[60vh] py-2">
-          {flatItems.length === 0 && (
-            <p className="text-center text-sm text-text-primary/40 py-12">
-              {buscando ? 'Buscando...' : 'Nenhum resultado encontrado'}
-            </p>
-          )}
-          {sections.map((section) => (
-            <div key={section.label}>
-              <p className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-widest text-text-primary/30">
-                {section.label}
-              </p>
-              {section.items.map((item) => {
-                const idx = flatIdx++;
-                const isActive = idx === active;
-                const Icon = item.icon;
-                const isRecent = recent.includes(item.id);
-                return (
-                  <button
-                    key={item.id}
-                    data-active={isActive}
-                    onClick={() => handleSelect(item)}
-                    className={cn(
-                      'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors',
-                      isActive ? 'bg-surface-medium' : 'hover:bg-surface-medium'
-                    )}
-                  >
-                    <div className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                      isActive ? 'bg-primary/15' : 'bg-surface-highest'
-                    )}>
-                      <Icon className={cn('w-4 h-4', isActive ? 'text-primary' : 'text-text-primary/50')} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-text-primary truncate">{item.label}</p>
-                      <p className="text-[11px] text-text-primary/40 truncate">{item.desc}</p>
-                    </div>
-                    {isRecent && !query && (
-                      <Clock className="w-3.5 h-3.5 text-text-primary/20 shrink-0" />
-                    )}
-                    {isActive && (
-                      <kbd className="text-[10px] bg-surface-highest px-1.5 py-0.5 rounded border border-text-primary/10 text-text-primary/40 shrink-0">
-                        ↵
-                      </kbd>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-text-primary/10 flex items-center gap-4 text-[10px] text-text-primary/30">
-          <span className="flex items-center gap-1"><kbd className="bg-surface-highest px-1 py-0.5 rounded border border-text-primary/10">↑↓</kbd> navegar</span>
-          <span className="flex items-center gap-1"><kbd className="bg-surface-highest px-1 py-0.5 rounded border border-text-primary/10">↵</kbd> selecionar</span>
-          <span className="flex items-center gap-1"><kbd className="bg-surface-highest px-1 py-0.5 rounded border border-text-primary/10">ESC</kbd> fechar</span>
-        </div>
+    <Modal open onClose={onClose} title="Buscar no sistema" size="md" initialFocusRef={inputRef} className="sm:max-h-[80dvh]">
+      {/* Campo de busca (combobox) */}
+      <div className="flex items-center gap-3 px-3 rounded-xl border border-text-primary/15 bg-surface focus-within:ring-2 focus-within:ring-primary">
+        <Search className="w-5 h-5 text-text-primary/60 shrink-0" aria-hidden="true" />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => alterarBusca(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Contas, parceiros, lançamentos, páginas..."
+          aria-label="Buscar contas, parceiros, lançamentos e páginas"
+          role="combobox"
+          aria-expanded={flatItems.length > 0}
+          aria-controls={listaId}
+          aria-autocomplete="list"
+          aria-activedescendant={flatItems[active] ? opcaoId(active) : undefined}
+          className="flex-1 min-h-11 bg-transparent text-text-primary placeholder:text-text-primary/50 outline-none text-sm font-body"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => { alterarBusca(''); inputRef.current?.focus(); }}
+            aria-label="Limpar busca"
+            className="min-w-11 min-h-11 -mr-2 grid place-items-center rounded-lg text-text-primary/60 hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+        )}
       </div>
-    </div>
+      <p className="sr-only" role="status" aria-live="polite">{query ? statusTexto : ''}</p>
+
+      {/* Results */}
+      <div ref={listRef} id={listaId} role="listbox" aria-label="Resultados da busca" className="overflow-y-auto max-h-[55dvh] py-2 -mx-2">
+        {flatItems.length === 0 && (
+          <p className="text-center text-sm text-text-primary/70 py-12">
+            {buscando ? 'Buscando...' : 'Nenhum resultado encontrado'}
+          </p>
+        )}
+        {sections.map((section) => (
+          <div key={section.label} role="group" aria-label={section.label}>
+            <p className="px-3 pt-3 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/60" aria-hidden="true">
+              {section.label}
+            </p>
+            {section.items.map((item) => {
+              const idx = flatIdx++;
+              const isActive = idx === active;
+              const Icon = item.icon;
+              const isRecent = recent.includes(item.id);
+              return (
+                <div
+                  key={item.id}
+                  id={opcaoId(idx)}
+                  role="option"
+                  aria-selected={isActive}
+                  data-active={isActive}
+                  onClick={() => handleSelect(item)}
+                  onMouseMove={() => { if (!isActive) setActive(idx); }}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 min-h-11 py-2 text-left transition-colors rounded-xl cursor-pointer',
+                    isActive ? 'bg-surface-medium' : 'hover:bg-surface-medium'
+                  )}
+                >
+                  <div className={cn(
+                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                    isActive ? 'bg-primary/15' : 'bg-surface-highest'
+                  )}>
+                    <Icon className={cn('w-4 h-4', isActive ? 'text-primary' : 'text-text-primary/70')} aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text-primary truncate">{item.label}</p>
+                    <p className="text-xs text-text-primary/70 truncate">{item.desc}</p>
+                  </div>
+                  {isRecent && !query && (
+                    <Clock className="w-3.5 h-3.5 text-text-primary/50 shrink-0" aria-label="Recente" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* Atalhos (só faz sentido com teclado físico) */}
+      <div className="hidden sm:flex pt-3 border-t border-text-primary/10 items-center gap-4 text-xs text-text-primary/60" aria-hidden="true">
+        <span className="flex items-center gap-1"><kbd className="bg-surface-highest px-1 py-0.5 rounded border border-text-primary/10">↑↓</kbd> navegar</span>
+        <span className="flex items-center gap-1"><kbd className="bg-surface-highest px-1 py-0.5 rounded border border-text-primary/10">↵</kbd> abrir</span>
+        <span className="flex items-center gap-1"><kbd className="bg-surface-highest px-1 py-0.5 rounded border border-text-primary/10">Esc</kbd> fechar</span>
+      </div>
+    </Modal>
   );
 }

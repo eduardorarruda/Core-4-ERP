@@ -24,7 +24,7 @@ export default function ConciliacaoHistorico() {
       .then(setLista)
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const columns = [
     {
@@ -38,7 +38,7 @@ export default function ConciliacaoHistorico() {
       render: (v, row) => (
         <div>
           <p className="font-medium text-text-primary">{v}</p>
-          {row.contaCorrenteNumero && <p className="text-xs text-text-primary/40">{row.contaCorrenteNumero}</p>}
+          {row.contaCorrenteNumero && <p className="text-xs text-text-primary/60">{row.contaCorrenteNumero}</p>}
         </div>
       ),
     },
@@ -53,7 +53,7 @@ export default function ConciliacaoHistorico() {
       render: (v, row) => (
         <div className="text-sm">
           <span className="font-bold text-text-primary">{v}</span>
-          <span className="text-text-primary/40"> total · </span>
+          <span className="text-text-primary/60"> total · </span>
           <span className="text-primary">{row.totalConciliados} conciliadas</span>
           {row.totalNaoIdentificados > 0 && (
             <span className="text-error"> · {row.totalNaoIdentificados} não id.</span>
@@ -100,6 +100,7 @@ export default function ConciliacaoHistorico() {
       />
 
       <DataTable
+        caption="Histórico de conciliações bancárias"
         columns={columns}
         data={lista}
         loading={loading}

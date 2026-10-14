@@ -1,9 +1,12 @@
 package br.com.core4erp.auth.dto;
 
+import br.com.core4erp.auth.validation.SenhaForte;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record RedefinirSenhaRequestDto(
-        @NotBlank String token,
-        @NotBlank @Size(min = 8, message = "A senha deve ter no mínimo 8 caracteres") String novaSenha
+        @NotBlank @Size(max = 128, message = "Link de redefinição inválido") String token,
+        @NotBlank(message = "Informe a nova senha")
+        @SenhaForte
+        String novaSenha
 ) {}

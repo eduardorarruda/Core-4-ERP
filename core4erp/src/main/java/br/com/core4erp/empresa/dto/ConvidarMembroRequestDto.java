@@ -1,10 +1,10 @@
 package br.com.core4erp.empresa.dto;
 
-import jakarta.validation.constraints.Email;
+import br.com.core4erp.auth.validation.EmailEstrito;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record ConvidarMembroRequestDto(
-    @NotBlank @Email String email,
+    @NotBlank @EmailEstrito String email,
     @NotNull Long perfilId
 ) {}

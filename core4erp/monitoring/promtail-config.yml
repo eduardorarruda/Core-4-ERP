@@ -1,40 +1,92 @@
+# Promtail SEM acesso ao docker.sock (montar o socket = root no host para quem comprometer o
+# container). Lê os arquivos do driver json-file em /var/lib/docker/containers (montado :ro).
+#
+# Como o arquivo de log só traz o ID do container, o nome/serviço vem do próprio log: o
+# docker-compose.yml configura o driver com `tag: "{{.Name}}"` e `labels:
+# com.docker.compose.service`, que o Docker grava em "attrs" de cada linha.
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
+  log_level: warn
 
+# Posições em volume nomeado (não em /tmp): sobrevive a recriação do container e evita
+# reenviar/duplicar logs antigos no Loki após um restart.
 positions:
-  filename: /tmp/positions.yaml
+  filename: /var/lib/promtail/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: docker
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-        filters:
-          - name: status
-            values: ["running"]
-    relabel_configs:
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)'
-        target_label: 'container'
-      - source_labels: ['__meta_docker_container_log_stream']
-        target_label: 'logstream'
-      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
-        target_label: 'service'
+  - job_name: containers
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: containers
+          __path__: /var/lib/docker/containers/*/*-json.log
     pipeline_stages:
+      # 1) Envelope do json-file: {"log": "...", "stream": "stdout", "attrs": {...}, "time": "..."}
       - json:
           expressions:
             output: log
             stream: stream
-      - regex:
-          # Extrai level do formato logback: "2024-01-01 10:00:00.000 [thread] ERROR logger [reqId=x] - msg"
-          expression: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \[[^\]]+\] (?P<level>\w+)'
-          source: output
+            time: time
+            container: attrs.tag
+            service: 'attrs."com.docker.compose.service"'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      # Labels de BAIXA cardinalidade apenas: container, service e stream.
+      # (Nunca usar traceId/usuarioId/empresaId como label — explode o índice do Loki.)
       - labels:
-          level:
+          container:
+          service:
           stream:
+      # Containers sem a tag (subidos fora do compose) ficam sem label "service": descarta para
+      # não misturar logs de terceiros.
+      - match:
+          selector: '{service=""}'
+          action: drop
+          drop_counter_reason: sem_servico_compose
+      # 2) Backend: log JSON (ECS) no stdout. Extrai o nível como LABEL e mantém logger/
+      #    traceId/usuarioId/empresaId como "structured metadata" (pesquisáveis sem virar label).
+      - match:
+          selector: '{service="backend"}'
+          stages:
+            - json:
+                source: output
+                expressions:
+                  # ECS do Spring Boot: aceita chave pontuada ("log.level") e aninhada (log.level).
+                  level: '"log.level" || log.level'
+                  logger: '"log.logger" || log.logger'
+                  traceId: '"trace.id" || trace.id || traceId || trace_id'
+                  usuarioId: usuarioId
+                  empresaId: empresaId
+            - template:
+                source: level
+                template: '{{ ToLower .Value }}'
+            - labels:
+                level:
+            - structured_metadata:
+                logger:
+                traceId:
+                usuarioId:
+                empresaId:
+      # 3) Demais serviços: tenta achar o nível em logs de texto ("level=info", " ERROR ").
+      - match:
+          selector: '{service!="backend"}'
+          stages:
+            - regex:
+                source: output
+                expression: '(?i)(?:level=|\b)(?P<level>debug|info|warn|warning|error|fatal|panic)\b'
+            - template:
+                source: level
+                template: '{{ ToLower .Value }}'
+            - labels:
+                level:
+      # O promtail adiciona "filename" (caminho com o ID do container, que muda a cada
+      # recriação) — descartado para não criar séries novas a cada deploy.
+      - labeldrop:
+          - filename
       - output:
           source: output

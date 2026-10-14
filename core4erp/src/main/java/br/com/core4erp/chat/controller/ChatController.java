@@ -14,7 +14,8 @@ import br.com.core4erp.chat.service.RagService;
 
 import java.util.List;
 import br.com.core4erp.chat.tools.relatorio.RelatorioExcelService;
-import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.rbac.Requer;
+import br.com.core4erp.config.tenant.TenantContext;
 import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,20 +40,20 @@ public class ChatController {
     private final ChatAnexoService chatAnexoService;
     private final RagService ragService;
     private final RelatorioExcelService relatorioService;
-    private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public ChatController(ChatService chatService,
                           ChatConversaService conversaService,
                           ChatAnexoService chatAnexoService,
                           RagService ragService,
                           RelatorioExcelService relatorioService,
-                          SecurityContextUtils securityCtx) {
+                          TenantContext tenantCtx) {
         this.chatService = chatService;
         this.conversaService = conversaService;
         this.chatAnexoService = chatAnexoService;
         this.ragService = ragService;
         this.relatorioService = relatorioService;
-        this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Operation(summary = "Enviar mensagem ao assistente de IA")
@@ -153,11 +154,12 @@ public class ChatController {
         }
     }
 
-    @Operation(summary = "Download de relatório gerado pelo chat")
+    @Operation(summary = "Download de relatório gerado pelo chat (somente quem o gerou)")
     @GetMapping("/relatorios/{fileName}")
+    @Requer("CONTA_VISUALIZAR")
     public ResponseEntity<Resource> downloadRelatorio(@PathVariable String fileName) {
-        String ownerEmail = securityCtx.getEmail();
-        Resource file = relatorioService.getRelatorio(ownerEmail, fileName);
+        // Dono = usuário + empresa ativos (TenantContext); outro usuário/empresa recebe 404
+        Resource file = relatorioService.getRelatorio(tenantCtx.getUsuarioId(), tenantCtx.getEmpresaId(), fileName);
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,

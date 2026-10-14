@@ -24,7 +24,7 @@ export default function PeriodoSelector({ value, onChange }) {
   return (
     <div className="flex flex-wrap gap-2 items-end">
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-text-primary/50 font-semibold uppercase tracking-widest">De</label>
+        <label className="text-xs text-text-primary/70 font-semibold uppercase tracking-widest">De</label>
         <div className="flex gap-1">
           <select className={inputCls + ' py-1.5 text-sm'} value={value.mesInicio ?? ''} onChange={set('mesInicio')}>
             <option value="">Mês</option>
@@ -38,7 +38,7 @@ export default function PeriodoSelector({ value, onChange }) {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-text-primary/50 font-semibold uppercase tracking-widest">Até</label>
+        <label className="text-xs text-text-primary/70 font-semibold uppercase tracking-widest">Até</label>
         <div className="flex gap-1">
           <select className={inputCls + ' py-1.5 text-sm'} value={value.mesFim ?? ''} onChange={set('mesFim')}>
             <option value="">Mês</option>

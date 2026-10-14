@@ -4,11 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -34,15 +33,15 @@ public class N8nChatOrquestradorService {
     private static final Logger log = LoggerFactory.getLogger(N8nChatOrquestradorService.class);
 
     private final String webhookUrl;
-    private final String webhookSecret;
+    private final N8nWebhookClient n8n;
     private final RestClient client;
 
     public N8nChatOrquestradorService(
             @Value("${chat.n8n.aurea-webhook-url:http://n8n:5678/webhook/aurea}") String webhookUrl,
-            @Value("${chat.n8n.webhook-secret:}") String webhookSecret,
+            N8nWebhookClient n8n,
             @Value("${chat.n8n.read-timeout-seconds:60}") int readTimeoutSeconds) {
         this.webhookUrl = webhookUrl;
-        this.webhookSecret = webhookSecret;
+        this.n8n = n8n;
         // Timeout explícito (CLAUDE.md §21): conexão curta; leitura configurável — o roteador do n8n
         // encadeia agente + tools + memória Postgres antes de responder (Respond to Webhook). O ramo
         // LOTE (multi-agente: extrator→verificador→revisor→executor→redator) precisa de mais folga,
@@ -50,10 +49,7 @@ public class N8nChatOrquestradorService {
         // MAIOR que o orçamento interno do pipeline no n8n: se o backend desistir antes de o n8n
         // terminar, o fallback interno REEXECUTA a mensagem — e num LOTE de escrita isso duplicaria
         // cadastros. Ver Fase A do plano multi-agente.
-        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
-        f.setConnectTimeout(5_000);
-        f.setReadTimeout(Math.max(1, readTimeoutSeconds) * 1_000);
-        this.client = RestClient.builder().requestFactory(f).build();
+        this.client = n8n.novoCliente(Duration.ofSeconds(5), Duration.ofSeconds(Math.max(1, readTimeoutSeconds)));
     }
 
     /**
@@ -68,6 +64,10 @@ public class N8nChatOrquestradorService {
     public Optional<String> orquestrar(Long conversaId, Long usuarioId, Long empresaId, String canal,
                                        String mensagem, boolean pensamentoEstendido, String jwt) {
         String requestId = MDC.get("requestId");
+        if (!n8n.podeChamar()) {
+            // Fail closed (prod sem N8N_WEBHOOK_SECRET): usa o pipeline interno.
+            return Optional.empty();
+        }
         try {
             Map<String, Object> corpo = new LinkedHashMap<>();
             corpo.put("conversaId", conversaId);
@@ -78,14 +78,13 @@ public class N8nChatOrquestradorService {
             corpo.put("pensamentoEstendido", pensamentoEstendido);
             corpo.put("jwt", jwt);
 
-            RestClient.RequestBodySpec spec = client.post().uri(webhookUrl)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + jwt);
-            if (webhookSecret != null && !webhookSecret.isBlank()) {
-                spec = spec.header("X-Webhook-Secret", webhookSecret);
-            }
-
-            RespostaWebhook body = spec.body(corpo)
+            RespostaWebhook body = n8n.post(client, webhookUrl)
+                    .header("Authorization", "Bearer " + jwt)
+                    .headers(h -> {
+                        // Propaga a correlação (CLAUDE.md §21) quando disponível no MDC.
+                        if (requestId != null) h.set("X-Request-Id", requestId);
+                    })
+                    .body(corpo)
                     .retrieve()
                     .body(RespostaWebhook.class);
 

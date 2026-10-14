@@ -9,7 +9,8 @@ import java.util.Optional;
 
 public interface ConciliacaoCartaoRepository extends JpaRepository<ConciliacaoCartao, Long> {
 
-    List<ConciliacaoCartao> findAllByEmpresaIdOrderByDataConciliacaoDesc(Long empresaId);
+    /** As 200 conciliações de cartão mais recentes (teto: a tela lista sem paginação). */
+    List<ConciliacaoCartao> findTop200ByEmpresaIdOrderByDataConciliacaoDesc(Long empresaId);
 
     Optional<ConciliacaoCartao> findByIdAndEmpresaId(Long id, Long empresaId);
 

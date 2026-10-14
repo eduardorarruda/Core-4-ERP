@@ -1,6 +1,7 @@
 package br.com.core4erp.cartaoCredito.repository;
 
 import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
+import br.com.core4erp.config.crypto.IndiceCego;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,5 +24,11 @@ public interface CartaoCreditoRepository extends JpaRepository<CartaoCredito, Lo
     @Query("SELECT c.nome, c.limite FROM CartaoCredito c WHERE c.empresaId = :eid")
     List<Object[]> limitesPorCartao(@Param("eid") Long eid);
 
-    Optional<CartaoCredito> findByAcctIdOfxAndEmpresaId(String acctIdOfx, Long empresaId);
+    /** O ACCTID é cifrado em repouso — a busca exata usa o índice cego ({@code acct_id_ofx_hash}). */
+    Optional<CartaoCredito> findByAcctIdOfxHashAndEmpresaId(String acctIdOfxHash, Long empresaId);
+
+    default Optional<CartaoCredito> buscarPorAcctIdOfx(String acctIdOfx, Long empresaId) {
+        String hash = IndiceCego.acctIdCartao(acctIdOfx);
+        return hash == null ? Optional.empty() : findByAcctIdOfxHashAndEmpresaId(hash, empresaId);
+    }
 }

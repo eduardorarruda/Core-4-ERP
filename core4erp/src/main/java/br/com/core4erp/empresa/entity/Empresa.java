@@ -1,8 +1,11 @@
 package br.com.core4erp.empresa.entity;
 
 import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.crypto.CampoCriptografadoConverter;
+import br.com.core4erp.config.crypto.IndiceCego;
 import br.com.core4erp.plano.entity.Plano;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,8 +26,15 @@ public class Empresa extends Auditable {
     @Column(nullable = false, length = 150)
     private String nome;
 
-    @Column(unique = true, length = 18)
+    /** CNPJ cifrado em repouso (AES-256-GCM). Unicidade/busca pelo índice cego {@link #cnpjHash}. */
+    @Convert(converter = CampoCriptografadoConverter.class)
+    @Column(name = "cnpj", length = 255)
     private String cnpj;
+
+    /** Índice cego (HMAC-SHA256) do CNPJ normalizado — UNIQUE parcial no banco (V47). */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "cnpj_hash", length = 64, unique = true)
+    private String cnpjHash;
 
     @Column(length = 150)
     private String emailContato;
@@ -47,4 +57,10 @@ public class Empresa extends Auditable {
 
     @Column(nullable = false)
     private Boolean ativa = true;
+
+    /** Mantém o índice cego sempre sincronizado com o CNPJ. */
+    public void setCnpj(String cnpj) {
+        this.cnpj = cnpj;
+        this.cnpjHash = IndiceCego.documento(cnpj);
+    }
 }

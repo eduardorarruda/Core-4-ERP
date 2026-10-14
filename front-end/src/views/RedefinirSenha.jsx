@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { auth } from '../lib/api';
 import { FloatingPasswordInput } from '../components/ui/FormField';
-import PasswordRules, { senhaValida } from '../components/ui/PasswordRules';
+import PasswordRules from '../components/ui/PasswordRules';
+import { senhaValida } from '../lib/senha';
 import Button from '../components/ui/Button';
-import { BrandMark } from '../components/login/HeroPane';
+import BrandMark from '../components/ui/BrandMark';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 export default function RedefinirSenha() {
+  usePageMeta({ title: 'Redefinir senha', noindex: true });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
@@ -71,7 +74,7 @@ export default function RedefinirSenha() {
           <h2 className="font-display text-2xl font-bold text-text-primary mb-2.5">
             Senha redefinida!
           </h2>
-          <p className="text-sm text-text-primary/50 leading-relaxed">
+          <p className="text-sm text-text-primary/70 leading-relaxed">
             Sua senha foi alterada com sucesso.<br />Redirecionando para o login…
           </p>
         </div>
@@ -99,7 +102,7 @@ export default function RedefinirSenha() {
         <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">
           Nova senha
         </h1>
-        <p className="text-sm text-text-primary/50 mb-7 leading-relaxed">
+        <p className="text-sm text-text-primary/70 mb-7 leading-relaxed">
           Escolha uma senha forte para proteger sua conta.
         </p>
 
@@ -151,7 +154,7 @@ export default function RedefinirSenha() {
           <button
             type="button"
             onClick={() => navigate('/login')}
-            className="text-xs text-text-primary/40 hover:text-text-primary/70 transition-colors py-2"
+            className="text-xs text-text-primary/60 hover:text-text-primary/70 transition-colors py-2"
           >
             Voltar ao login
           </button>

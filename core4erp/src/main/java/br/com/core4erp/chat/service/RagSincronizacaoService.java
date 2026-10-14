@@ -32,6 +32,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Vetoriza RESUMOS financeiros mensais agregados por empresa e os grava na mesma coleção Qdrant
@@ -84,18 +85,44 @@ public class RagSincronizacaoService {
         this.self = self;
     }
 
-    /** Roda de madrugada; itera empresas ativas (mesmo padrão do SincronizacaoService). */
+    /**
+     * Roda de madrugada; itera empresas ativas (mesmo padrão do SincronizacaoService).
+     *
+     * <p><b>Consentimento (LGPD):</b> o envio de resumos aos embeddings da OpenAI tem base legal de
+     * consentimento. Só empresas com ao menos um membro ativo que aceitou os termos são
+     * sincronizadas; das demais, os vetores já indexados são APAGADOS do Qdrant.
+     */
     @Scheduled(cron = "0 30 3 * * *", zone = "America/Sao_Paulo")
     public void sincronizarTodas() {
         List<Long> empresas = empresaRepository.findIdsAtivas();
-        log.info("[RAG-Sync] iniciando sincronização de {} empresa(s)", empresas.size());
+        Set<Long> comConsentimento = ragSyncRepository.findEmpresaIdsComConsentimento();
+        log.info("[RAG-Sync] iniciando sincronização de {} empresa(s) — {} com consentimento",
+                empresas.size(), empresas.stream().filter(comConsentimento::contains).count());
         for (Long empresaId : empresas) {
             try {
-                sincronizarEmpresa(empresaId);
+                if (comConsentimento.contains(empresaId)) {
+                    sincronizarComConsentimento(empresaId);
+                } else {
+                    removerVetoresSemConsentimento(empresaId);
+                }
             } catch (Exception e) {
                 log.error("[RAG-Sync] falha empresaId={} — segue para a próxima", empresaId, e);
             }
         }
+    }
+
+    /**
+     * Apaga do Qdrant todos os vetores da empresa (filtro por metadado {@code empresaId}) e o estado
+     * de sincronização. Idempotente — chamado a cada execução enquanto não houver consentimento.
+     */
+    void removerVetoresSemConsentimento(Long empresaId) {
+        vectorStore.delete("empresaId == '" + empresaId + "'");
+        int estados = ragSyncRepository.deleteByEmpresaId(empresaId);
+        log.atInfo()
+                .addKeyValue("evento", "rag.vetores_removidos_sem_consentimento")
+                .addKeyValue("empresaId", empresaId)
+                .addKeyValue("estadosRemovidos", estados)
+                .log("[RAG-Sync] empresa sem consentimento para IA — vetores removidos do Qdrant e sincronização ignorada");
     }
 
     /**
@@ -111,8 +138,19 @@ public class RagSincronizacaoService {
     /**
      * Sincroniza os resumos mensais de uma empresa. Na 1ª execução (nenhum RESUMO_MENSAL ainda)
      * faz backfill dos últimos {@value #MESES_BACKFILL} meses; depois, só o mês anterior.
+     * Sem consentimento (nenhum membro ativo com termos aceitos) não envia nada à OpenAI: apaga os
+     * vetores da empresa e retorna 0.
      */
     public int sincronizarEmpresa(Long empresaId) {
+        if (!ragSyncRepository.empresaTemConsentimento(empresaId)) {
+            removerVetoresSemConsentimento(empresaId);
+            return 0;
+        }
+        return sincronizarComConsentimento(empresaId);
+    }
+
+    /** Sincronização propriamente dita — o chamador já verificou o consentimento. */
+    private int sincronizarComConsentimento(Long empresaId) {
         boolean primeiraVez = !ragSyncRepository.existsByEmpresaIdAndTipoResumo(empresaId, TIPO_RESUMO_MENSAL);
         YearMonth mesAnterior = YearMonth.now().minusMonths(1);
 

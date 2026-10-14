@@ -1,4 +1,6 @@
 apiVersion: 1
+# Datasources provisionados como código: editable:false impede alterar URL/credenciais pela UI
+# (mudanças passam por este arquivo + `docker compose restart grafana`).
 
 datasources:
   - name: Prometheus
@@ -7,13 +9,13 @@ datasources:
     access: proxy
     url: http://prometheus:9090
     isDefault: true
-    editable: true
+    editable: false
 
   - name: Loki
     type: loki
     access: proxy
     url: http://loki:3100
     isDefault: false
-    editable: true
+    editable: false
     jsonData:
       maxLines: 1000

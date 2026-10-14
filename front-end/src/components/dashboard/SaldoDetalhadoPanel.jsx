@@ -30,7 +30,7 @@ function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
 function Divider({ label }) {
   return (
     <div className="flex items-center gap-3 mt-5 mb-3">
-      <span className="text-xs font-bold uppercase tracking-widest text-text-primary/40">{label}</span>
+      <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">{label}</span>
       <div className="flex-1 h-px bg-text-primary/5" />
     </div>
   );
@@ -69,7 +69,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
           <p className="text-sm font-bold text-text-primary">Não foi possível carregar a posição financeira</p>
           <p className="text-xs text-text-primary/60 mt-1">Tente atualizar em instantes.</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={carregar} leftIcon={RefreshCw}>
+        <Button variant="secondary" size="sm" onClick={carregar} leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}>
           Tentar novamente
         </Button>
       </div>
@@ -88,14 +88,14 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-base font-bold text-text-primary tracking-tight font-display">Posição Financeira</h2>
-          <p className="text-xs text-text-primary/40 uppercase tracking-widest mt-0.5 font-body">Saldo e projeções</p>
+          <p className="text-xs text-text-primary/60 uppercase tracking-widest mt-0.5 font-body">Saldo e projeções</p>
         </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={carregar}
           aria-label="Atualizar saldo"
-          className="text-text-primary/50 hover:text-text-primary"
+          className="text-text-primary/70 hover:text-text-primary"
         >
           <RefreshCw className="w-4 h-4" />
         </Button>
@@ -106,7 +106,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">Saldo em Conta Hoje</p>
           <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(dados.saldoContasCorrentes)}</p>
-          <p className="text-xs text-text-primary/40 mt-0.5">Soma das contas correntes</p>
+          <p className="text-xs text-text-primary/60 mt-0.5">Soma das contas correntes</p>
         </div>
         <Wallet className="w-9 h-9 text-primary opacity-40" />
       </div>
@@ -148,7 +148,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
       <div className="space-y-2">
         <div className={cn('rounded-xl p-3.5 border', saldoPrevistoPositivo ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20')}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Saldo Previsto</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Saldo Previsto</span>
             <span className={cn('text-lg font-bold font-display', saldoPrevistoPositivo ? 'text-primary' : 'text-error')}>
               R$ {brl(dados.saldoPrevisto)}
             </span>
@@ -156,7 +156,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
         </div>
         <div className={cn('rounded-xl p-3.5 border', saldoComCartaoPositivo ? 'bg-surface border-text-primary/5' : 'bg-error/10 border-error/30')}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Com Cartão</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70">Com Cartão</span>
             <span className={cn('text-lg font-bold font-display', saldoComCartaoPositivo ? 'text-text-primary' : 'text-error')}>
               R$ {brl(dados.saldoPrevistoComCartao)}
             </span>
@@ -167,7 +167,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
       {/* Patrimônio */}
       <Divider label="Investimentos" />
       <div className="bg-surface border border-text-primary/5 rounded-xl px-4 py-3 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-widest text-text-primary/40">Patrimônio</span>
+        <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60">Patrimônio</span>
         <span className="text-base font-bold text-text-primary font-display">R$ {brl(dados.patrimonioInvestimentos)}</span>
       </div>
     </div>

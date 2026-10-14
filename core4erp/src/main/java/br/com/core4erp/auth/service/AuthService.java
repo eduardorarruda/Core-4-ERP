@@ -4,10 +4,11 @@ import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
 import br.com.core4erp.auth.dto.TrocarSenhaRequestDto;
-import br.com.core4erp.config.tenant.TenantContext;
-import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.config.rbac.PermissaoCalculadora;
+import br.com.core4erp.config.security.EventoSeguranca;
 import br.com.core4erp.config.security.JwtService;
+import br.com.core4erp.config.security.SessaoUsuarioService;
+import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.empresa.dto.EmpresaResumoDto;
 import br.com.core4erp.empresa.entity.Empresa;
 import br.com.core4erp.empresa.entity.PerfilAcesso;
@@ -21,26 +22,30 @@ import br.com.core4erp.usuario.entity.Usuario;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.LockedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
 
-    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    /**
+     * Rede de segurança: falhas seguidas (de QUALQUER IP) que bloqueiam a conta no banco. Alto de
+     * propósito — o bloqueio do dia a dia é por conta + IP ({@link TentativasLoginService}), para
+     * que um atacante em outro IP não tranque o dono legítimo fora com poucas tentativas.
+     */
+    static final int MAX_FALHAS_CONTA = 20;
     private static final int LOCKOUT_MINUTES = 15;
-
-    // S.14: hash bcrypt fixo usado para nivelar o tempo de resposta quando o e-mail não existe,
-    // evitando enumeração de usuários por timing. Não corresponde a nenhuma senha real.
-    private static final String DUMMY_HASH =
-            "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+    /** Mesma resposta para senha errada, conta inexistente e conta/IP bloqueados (sem enumeração). */
+    private static final String CREDENCIAIS_INVALIDAS = "Credenciais inválidas";
+    static final String ROLE_USUARIO = "ROLE_USER";
 
     public record LoginResult(String token, MeResponseDto usuario, List<EmpresaResumoDto> empresas, Boolean senhaProvisoria, Boolean adminSistema) {}
 
@@ -52,7 +57,13 @@ public class AuthService {
     private final PerfilAcessoRepository perfilAcessoRepository;
     private final EmpresaRepository empresaRepository;
     private final PermissaoCalculadora permissaoCalculadora;
-    private final TenantContext tenantContext;
+    private final SessaoUsuarioService sessaoUsuarioService;
+    private final TentativasLoginService tentativasLogin;
+
+    // S.14: hash bcrypt "dummy" para nivelar o tempo de resposta quando o e-mail não existe
+    // (evita enumeração de usuários por timing). Gerado no boot com o MESMO custo do encoder
+    // (12) — um hash fixo de custo 10 responderia mais rápido e denunciaria contas inexistentes.
+    private final String dummyHash;
 
     public AuthService(UsuarioRepository usuarioRepository,
                        PasswordEncoder passwordEncoder,
@@ -62,7 +73,8 @@ public class AuthService {
                        PerfilAcessoRepository perfilAcessoRepository,
                        EmpresaRepository empresaRepository,
                        PermissaoCalculadora permissaoCalculadora,
-                       TenantContext tenantContext) {
+                       SessaoUsuarioService sessaoUsuarioService,
+                       TentativasLoginService tentativasLogin) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -71,11 +83,13 @@ public class AuthService {
         this.perfilAcessoRepository = perfilAcessoRepository;
         this.empresaRepository = empresaRepository;
         this.permissaoCalculadora = permissaoCalculadora;
-        this.tenantContext = tenantContext;
+        this.sessaoUsuarioService = sessaoUsuarioService;
+        this.tentativasLogin = tentativasLogin;
+        this.dummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     @Transactional
-    public MeResponseDto registrar(RegistrarRequestDto request) {
+    public MeResponseDto registrar(RegistrarRequestDto request, String ip) {
         if (usuarioRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("Email já cadastrado");
         }
@@ -89,8 +103,13 @@ public class AuthService {
         usuario.setEmail(request.email());
         usuario.setSenhaHash(passwordEncoder.encode(request.senha()));
         usuario.setTelefone(request.telefone());
-        usuario.setRole(tipoConta == Usuario.TipoConta.EMPRESA ? "ROLE_ADMIN" : "ROLE_USER");
+        // Auto-cadastro NUNCA recebe papel administrativo: o poder do dono da conta vem do perfil
+        // PROPRIETARIO na própria empresa (RBAC por empresa), não de um papel global.
+        usuario.setRole(ROLE_USUARIO);
         usuario.setTipoConta(tipoConta);
+        // LGPD art. 8º — registro do consentimento (validado no DTO: aceiteTermos == true)
+        usuario.setTermosAceitosEm(LocalDateTime.now());
+        usuario.setTermosVersao(request.versaoTermos().trim());
 
         usuario = usuarioRepository.save(usuario);
 
@@ -102,45 +121,94 @@ public class AuthService {
 
         criarEmpresaParaUsuario(usuario, nomeEmpresa);
 
+        EventoSeguranca.info(EventoSeguranca.REGISTRO)
+            .addKeyValue("usuarioId", usuario.getId())
+            .addKeyValue("emailHash", EventoSeguranca.hashEmail(usuario.getEmail()))
+            .addKeyValue("tipoConta", tipoConta.name())
+            .addKeyValue("termosVersao", usuario.getTermosVersao())
+            .log("Nova conta registrada");
         return toMeResponse(usuario);
     }
 
-    @Transactional
-    public LoginResult login(LoginRequestDto request) {
+    /**
+     * Login. Toda recusa responde o MESMO 401 genérico — senha errada, e-mail inexistente, conta
+     * bloqueada no banco ou (e-mail + IP) em backoff —, então a resposta não revela se a conta existe.
+     * O bloqueio é registrado como evento de segurança.
+     */
+    @Transactional(noRollbackFor = BadCredentialsException.class)
+    public LoginResult login(LoginRequestDto request, String ip) {
+        if (tentativasLogin.estaBloqueado(request.email(), ip)) {
+            EventoSeguranca.warn(EventoSeguranca.LOGIN_BLOQUEADO)
+                .addKeyValue("emailHash", EventoSeguranca.hashEmail(request.email()))
+                .addKeyValue("escopo", "conta_ip")
+                .log("Tentativa de login durante bloqueio temporário (e-mail + IP)");
+            throw new BadCredentialsException(CREDENCIAIS_INVALIDAS);
+        }
+
         Usuario usuario = usuarioRepository.findByEmail(request.email()).orElse(null);
 
         // S.14: e-mail inexistente — executa um bcrypt "dummy" para nivelar o tempo de resposta
         // e não permitir enumeração de contas por diferença de tempo.
         if (usuario == null) {
-            passwordEncoder.matches(request.senha(), DUMMY_HASH);
-            throw new BadCredentialsException("Credenciais inválidas");
+            passwordEncoder.matches(request.senha(), dummyHash);
+            registrarFalha(request.email(), null, ip, "usuario_inexistente");
+            throw new BadCredentialsException(CREDENCIAIS_INVALIDAS);
         }
+
+        // O bcrypt roda SEMPRE (inclusive em conta bloqueada) para o tempo não denunciar o bloqueio.
+        boolean senhaConfere = passwordEncoder.matches(request.senha(), usuario.getSenhaHash());
 
         if (usuario.getLockedUntil() != null && usuario.getLockedUntil().isAfter(LocalDateTime.now())) {
-            throw new LockedException("Conta bloqueada temporariamente. Tente novamente em " + LOCKOUT_MINUTES + " minutos.");
+            EventoSeguranca.warn(EventoSeguranca.LOGIN_BLOQUEADO)
+                .addKeyValue("usuarioId", usuario.getId())
+                .addKeyValue("emailHash", EventoSeguranca.hashEmail(request.email()))
+                .addKeyValue("escopo", "conta")
+                .log("Tentativa de login em conta bloqueada temporariamente");
+            throw new BadCredentialsException(CREDENCIAIS_INVALIDAS);
         }
 
-        if (!passwordEncoder.matches(request.senha(), usuario.getSenhaHash())) {
+        if (!senhaConfere) {
             int attempts = usuario.getLoginAttempts() + 1;
-            if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            if (attempts >= MAX_FALHAS_CONTA) {
                 usuario.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));
                 usuario.setLoginAttempts(0);
+                EventoSeguranca.warn(EventoSeguranca.CONTA_BLOQUEADA)
+                    .addKeyValue("usuarioId", usuario.getId())
+                    .addKeyValue("emailHash", EventoSeguranca.hashEmail(request.email()))
+                    .addKeyValue("minutos", LOCKOUT_MINUTES)
+                    .log("Conta bloqueada após muitas tentativas de login sem sucesso (rede de segurança)");
             } else {
                 usuario.setLoginAttempts(attempts);
             }
             usuarioRepository.save(usuario);
-            throw new BadCredentialsException("Credenciais inválidas");
+            registrarFalha(request.email(), usuario.getId(), ip, "senha_incorreta");
+            throw new BadCredentialsException(CREDENCIAIS_INVALIDAS);
         }
 
+        tentativasLogin.limpar(request.email(), ip);
         usuario.setLoginAttempts(0);
         usuario.setLockedUntil(null);
         usuarioRepository.save(usuario);
 
-        String token = jwtService.generateToken(usuario.getEmail());
+        String token = jwtService.generateToken(usuario.getEmail(), usuario.getTokenVersion());
         List<EmpresaResumoDto> empresas = carregarEmpresasDoUsuario(usuario.getEmail());
+        EventoSeguranca.info(EventoSeguranca.LOGIN_SUCESSO)
+            .addKeyValue("usuarioId", usuario.getId())
+            .log("Login realizado");
         return new LoginResult(token, toMeResponse(usuario), empresas,
             Boolean.TRUE.equals(usuario.getSenhaProvisoria()),
             Boolean.TRUE.equals(usuario.getAdminSistema()));
+    }
+
+    /** Conta a falha no backoff por (e-mail + IP) e registra o evento de segurança. */
+    private void registrarFalha(String email, Long usuarioId, String ip, String motivo) {
+        Duration bloqueio = tentativasLogin.registrarFalha(email, ip);
+        EventoSeguranca.warn(EventoSeguranca.LOGIN_FALHA)
+            .addKeyValue("emailHash", EventoSeguranca.hashEmail(email))
+            .addKeyValue("usuarioId", usuarioId)
+            .addKeyValue("motivo", motivo)
+            .addKeyValue("bloqueioSegundos", bloqueio == null ? null : bloqueio.toSeconds())
+            .log("Falha de login");
     }
 
     public MeResponseDto me(String email) {
@@ -164,18 +232,44 @@ public class AuthService {
         return new EmpresaResumoDto(empresaId, ue.getEmpresa().getNome(), ue.getPerfil().getNome(), efetivas);
     }
 
+    /**
+     * Troca a senha confirmando a atual. Revoga todos os tokens (outras sessões caem) e devolve
+     * um token novo para a sessão atual continuar. Também libera a conta com senha provisória.
+     */
     @Transactional
-    public void trocarSenha(TrocarSenhaRequestDto dto) {
-        Usuario usuario = usuarioRepository.findById(tenantContext.getUsuarioId())
+    public String trocarSenha(String email, TrocarSenhaRequestDto dto) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
             .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
 
         if (!passwordEncoder.matches(dto.senhaAtual(), usuario.getSenhaHash())) {
+            EventoSeguranca.warn(EventoSeguranca.SENHA_ALTERADA)
+                .addKeyValue("usuarioId", usuario.getId())
+                .addKeyValue("resultado", "senha_atual_incorreta")
+                .log("Troca de senha recusada");
             throw new BusinessException("SENHA_INCORRETA", "Senha atual incorreta");
         }
 
         usuario.setSenhaHash(passwordEncoder.encode(dto.novaSenha()));
         usuario.setSenhaProvisoria(false);
+        sessaoUsuarioService.revogarTokens(usuario);
         usuarioRepository.save(usuario);
+        EventoSeguranca.info(EventoSeguranca.SENHA_ALTERADA)
+            .addKeyValue("usuarioId", usuario.getId())
+            .addKeyValue("resultado", "sucesso")
+            .log("Senha alterada; demais sessões revogadas");
+        return jwtService.generateToken(usuario.getEmail(), usuario.getTokenVersion());
+    }
+
+    /** "Sair de todos os dispositivos": incrementa a versão de token do usuário. */
+    @Transactional
+    public void logoutTodos(String email) {
+        Usuario usuario = usuarioRepository.findByEmail(email)
+            .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        sessaoUsuarioService.revogarTokens(usuario);
+        usuarioRepository.save(usuario);
+        EventoSeguranca.info(EventoSeguranca.LOGOUT_TODOS)
+            .addKeyValue("usuarioId", usuario.getId())
+            .log("Logout de todos os dispositivos");
     }
 
     // ---- privados ----
@@ -201,7 +295,7 @@ public class AuthService {
         empresa.setEmailContato(usuario.getEmail());
         empresa = empresaRepository.save(empresa);
 
-        PerfilAcesso proprietario = perfilAcessoRepository.findByNome("PROPRIETARIO")
+        PerfilAcesso proprietario = perfilAcessoRepository.findByNomeAndEmpresaIdIsNull("PROPRIETARIO")
             .orElseThrow(() -> new IllegalStateException("Perfil PROPRIETARIO não encontrado"));
 
         UsuarioEmpresa ue = new UsuarioEmpresa();

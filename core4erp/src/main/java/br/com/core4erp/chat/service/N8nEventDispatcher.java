@@ -3,11 +3,10 @@ package br.com.core4erp.chat.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -30,7 +29,7 @@ public class N8nEventDispatcher {
     private static final Logger log = LoggerFactory.getLogger(N8nEventDispatcher.class);
 
     private final String webhookUrl;
-    private final String webhookSecret;
+    private final N8nWebhookClient n8n;
     private final RestClient client;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "n8n-eventos");
@@ -40,18 +39,15 @@ public class N8nEventDispatcher {
 
     public N8nEventDispatcher(
             @Value("${chat.n8n.eventos-webhook-url:}") String webhookUrl,
-            @Value("${chat.n8n.webhook-secret:}") String webhookSecret) {
+            N8nWebhookClient n8n) {
         this.webhookUrl = webhookUrl;
-        this.webhookSecret = webhookSecret;
-        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
-        f.setConnectTimeout(3_000);
-        f.setReadTimeout(8_000);
-        this.client = RestClient.builder().requestFactory(f).build();
+        this.n8n = n8n;
+        this.client = n8n.novoCliente(Duration.ofSeconds(3), Duration.ofSeconds(8));
     }
 
     /** Enfileira o envio do evento ao n8n (não bloqueia a ação do usuário). */
     public void publicar(String acao, String detalhe, boolean origemIa, Long usuarioId, Long empresaId) {
-        if (webhookUrl == null || webhookUrl.isBlank()) return;
+        if (webhookUrl == null || webhookUrl.isBlank() || !n8n.podeChamar()) return;
         Map<String, Object> evento = new LinkedHashMap<>();
         evento.put("acao", acao);
         evento.put("detalhe", detalhe);
@@ -66,13 +62,8 @@ public class N8nEventDispatcher {
 
     private void enviar(Map<String, Object> evento, String acao) {
         try {
-            RestClient.RequestBodySpec spec = client.post().uri(webhookUrl)
-                    .contentType(MediaType.APPLICATION_JSON);
-            // Assina o webhook quando o segredo está configurado; sem segredo, mantém o comportamento atual.
-            if (webhookSecret != null && !webhookSecret.isBlank()) {
-                spec = spec.header("X-Webhook-Secret", webhookSecret);
-            }
-            spec.body(evento)
+            n8n.post(client, webhookUrl)
+                    .body(evento)
                     .retrieve()
                     .toBodilessEntity();
             log.info("[N8N-EVENTO] enviado acao={}", acao);

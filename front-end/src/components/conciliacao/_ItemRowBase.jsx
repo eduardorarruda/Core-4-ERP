@@ -29,10 +29,10 @@ import { useToast } from '../../hooks/useToast';
  */
 
 const TONE_ICON = {
-  primary: 'text-text-primary/40 hover:text-primary hover:bg-primary/10',
-  secondary: 'text-text-primary/40 hover:text-secondary hover:bg-secondary/10',
-  warning: 'text-text-primary/40 hover:text-amber-400 hover:bg-amber-400/10',
-  neutral: 'text-text-primary/40 hover:text-text-primary/70 hover:bg-surface-medium',
+  primary: 'text-text-primary/60 hover:text-primary hover:bg-primary/10',
+  secondary: 'text-text-primary/60 hover:text-secondary hover:bg-secondary/10',
+  warning: 'text-text-primary/60 hover:text-amber-400 hover:bg-amber-400/10',
+  neutral: 'text-text-primary/60 hover:text-text-primary/70 hover:bg-surface-medium',
 };
 
 const TONE_TEXT = {
@@ -53,7 +53,7 @@ function statusColor(statusItem, score) {
   if (statusItem === 'SUGERIDO') return score >= 70 ? 'text-primary' : 'text-amber-400';
   if (statusItem === 'VINCULADO_MANUALMENTE') return 'text-secondary';
   if (statusItem === 'BAIXADO') return 'text-primary';
-  if (statusItem === 'IGNORADO') return 'text-text-primary/30';
+  if (statusItem === 'IGNORADO') return 'text-text-primary/60';
   return 'text-error';
 }
 
@@ -146,7 +146,7 @@ export default function ItemRowBase({
           {descricaoOfx(item) || '—'}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          {item.ofxTipo && <span className="text-xs text-text-primary/40">{item.ofxTipo}</span>}
+          {item.ofxTipo && <span className="text-xs text-text-primary/60">{item.ofxTipo}</span>}
           {badgeExtra?.(item)}
         </div>
       </div>
@@ -179,7 +179,7 @@ export default function ItemRowBase({
         </div>
       );
     }
-    if (ignorado) return <span className="text-sm text-text-primary/30">Ignorado</span>;
+    if (ignorado) return <span className="text-sm text-text-primary/60">Ignorado</span>;
     return <span className="text-sm text-error">Não identificado</span>;
   }
 

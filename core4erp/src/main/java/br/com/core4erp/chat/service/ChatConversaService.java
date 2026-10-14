@@ -36,7 +36,7 @@ public class ChatConversaService {
 
     @Transactional(readOnly = true)
     public List<ChatConversaResponseDto> listar(ChatMensagem.Canal canal) {
-        return repository.findByUsuarioIdAndCanalOrderByAtualizadoEmDescIdDesc(usuarioId(), canal)
+        return repository.findTop200ByUsuarioIdAndCanalOrderByAtualizadoEmDescIdDesc(usuarioId(), canal)
                 .stream().map(ChatConversaResponseDto::from).toList();
     }
 

@@ -14,9 +14,14 @@ import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.parceiro.repository.ParceiroRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Set;
 
 @Service
 public class ParceiroService {
@@ -42,12 +47,31 @@ public class ParceiroService {
         this.dtoValidator = dtoValidator;
     }
 
+    @Requer("PARCEIRO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public Page<ParceiroResponseDto> listar(Pageable pageable) {
-        return parceiroRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), pageable)
+        return parceiroRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), ordenacaoPermitida(pageable))
                 .map(ParceiroResponseDto::from);
     }
 
+    /**
+     * Campos aceitos em {@code sort}. CPF/CNPJ (e seu índice cego) ficam de fora: são cifrados em
+     * repouso — ordenar pelo texto cifrado/HMAC não tem significado e só gastaria índice.
+     */
+    static final Set<String> CAMPOS_ORDENAVEIS = Set.of("id", "razaoSocial", "nomeFantasia", "tipo", "municipio", "uf");
+
+    /** Descarta ordenações fora da whitelist; sem nenhuma válida, ordena por razão social. */
+    static Pageable ordenacaoPermitida(Pageable pageable) {
+        List<Sort.Order> ordens = pageable.getSort().stream()
+                .filter(o -> CAMPOS_ORDENAVEIS.contains(o.getProperty()))
+                .toList();
+        Sort sort = ordens.isEmpty() ? Sort.by("razaoSocial") : Sort.by(ordens);
+        return pageable.isPaged()
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort)
+                : Pageable.unpaged(sort);
+    }
+
+    @Requer("PARCEIRO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public ParceiroResponseDto buscarPorId(Long id) {
         return ParceiroResponseDto.from(findOwned(id));
@@ -65,7 +89,7 @@ public class ParceiroService {
         }
         validarCpfCnpj(docNormalizado);
         Long empresaId = tenantCtx.getEmpresaId();
-        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaId(docNormalizado, empresaId)) {
+        if (docNormalizado != null && parceiroRepository.existeDocumento(docNormalizado, empresaId)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
         Parceiro parceiro = new Parceiro();
@@ -98,7 +122,7 @@ public class ParceiroService {
         }
         validarCpfCnpj(docNormalizado);
         Long empresaId = tenantCtx.getEmpresaId();
-        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaIdAndIdNot(docNormalizado, empresaId, id)) {
+        if (docNormalizado != null && parceiroRepository.existeDocumentoEmOutro(docNormalizado, empresaId, id)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
         preencherCampos(parceiro, dto, docNormalizado);

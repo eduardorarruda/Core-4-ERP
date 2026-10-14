@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 import {
   AssistantRuntimeProvider,
   ThreadPrimitive,
@@ -10,8 +9,9 @@ import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { MessageCircle, X, Trash2, Send, Download } from "lucide-react";
 import { useChatRuntime } from "../../hooks/useChatRuntime";
 import { DownloadToolUI } from "./RelatorioToolUI";
-import { cn } from "../../lib/utils";
 import { chat } from "../../lib/api";
+import { safeUrl, isExternalUrl } from "../../lib/safeUrl";
+import AvisoIa from "./AvisoIa";
 import { useConfirm } from "../../hooks/useConfirm";
 import { useToast } from "../../hooks/useToast";
 
@@ -27,7 +27,7 @@ const SUGGESTIONS = [
 const RELATORIO_PATH = /\/api\/chat\/relatorios\/[^\s)"']+\.xlsx/;
 
 const markdownComponents = {
-  a: ({ href = "", children, ...props }) => {
+  a: ({ href = "", children }) => {
     const match = href.match(RELATORIO_PATH);
     if (match) {
       // Sempre usa o caminho relativo à origem atual — nunca o domínio do href original.
@@ -36,16 +36,26 @@ const markdownComponents = {
         <a
           href={relative}
           download
-          className="inline-flex items-center gap-2 mt-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors text-sm font-semibold shadow-md no-underline"
+          className="inline-flex items-center gap-2 mt-2 px-4 py-2.5 min-h-11 bg-primary text-on-primary rounded-xl hover:opacity-90 transition-opacity text-sm font-semibold no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
-          <Download className="w-4 h-4" />
-          Baixar Relatório (.xlsx)
+          <Download className="w-4 h-4" aria-hidden="true" />
+          Baixar relatório (.xlsx)
         </a>
       );
     }
+    // Link vindo da IA: só http(s), mailto e caminhos relativos. Qualquer outro esquema
+    // (javascript:, data: …) vira texto simples.
+    const seguro = safeUrl(href);
+    if (!seguro) return <span>{children}</span>;
+    const externo = isExternalUrl(seguro);
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline" {...props}>
+      <a
+        href={seguro}
+        {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+        className="text-secondary underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+      >
         {children}
+        {externo && <span className="sr-only"> (abre em nova aba)</span>}
       </a>
     );
   },
@@ -57,11 +67,11 @@ function MarkdownText(props) {
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 py-1">
+    <div className="flex items-center gap-1 py-1" role="status" aria-label="A Áurea está escrevendo">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="w-1.5 h-1.5 rounded-full bg-text-primary/30 animate-typing"
+          className="w-1.5 h-1.5 rounded-full bg-text-primary/50 animate-typing"
           style={{ animationDelay: `${i * 0.15}s` }}
         />
       ))}
@@ -83,23 +93,25 @@ function ChatContent({ onClose, onLimpar }) {
           </div>
           <div>
             <h3 className="text-sm font-bold text-text-primary font-display">Áurea</h3>
-            <p className="text-[10px] text-text-primary/40">Assistente financeira</p>
+            <p className="text-xs text-text-primary/60">Assistente financeira</p>
           </div>
         </div>
         <div className="flex gap-1">
           <button
+            type="button"
             onClick={onLimpar}
             aria-label="Limpar conversa"
-            className="p-1.5 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium transition-colors"
+            className="min-w-11 min-h-11 grid place-items-center rounded-lg text-text-primary/60 hover:text-text-primary hover:bg-surface-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Fechar assistente"
-            className="p-1.5 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium transition-colors"
+            className="min-w-11 min-h-11 grid place-items-center rounded-lg text-text-primary/60 hover:text-text-primary hover:bg-surface-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -107,7 +119,15 @@ function ChatContent({ onClose, onLimpar }) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto no-scrollbar">
         <ThreadPrimitive.Root>
-          <ThreadPrimitive.Viewport className="flex flex-col gap-3 p-4">
+          <div className="px-4 pt-3">
+            <AvisoIa />
+          </div>
+          <ThreadPrimitive.Viewport
+            role="log"
+            aria-live="polite"
+            aria-label="Mensagens da conversa com a Áurea"
+            className="flex flex-col gap-3 p-4"
+          >
             <ThreadPrimitive.Messages
               components={{
                 UserMessage: () => (
@@ -143,7 +163,7 @@ function ChatContent({ onClose, onLimpar }) {
                   prompt={s}
                   method="replace"
                   autoSend
-                  className="text-[11px] px-3 py-1.5 rounded-full border border-text-primary/10 text-text-primary/50 hover:border-primary/30 hover:text-primary transition-colors"
+                  className="text-xs min-h-11 px-3 py-1.5 rounded-full border border-text-primary/15 text-text-primary/70 hover:border-primary/30 hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   {s}
                 </ThreadPrimitive.Suggestion>
@@ -156,13 +176,14 @@ function ChatContent({ onClose, onLimpar }) {
             <ComposerPrimitive.Root className="flex gap-2 items-end">
               <ComposerPrimitive.Input
                 placeholder="Pergunte sobre suas finanças..."
-                className="flex-1 bg-surface border border-text-primary/10 rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus:ring-1 focus:ring-primary/30 placeholder:text-text-primary/30 font-body resize-none min-h-[42px] max-h-28"
+                aria-label="Mensagem para a Áurea"
+                className="flex-1 bg-surface border border-text-primary/10 rounded-xl px-4 py-2.5 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary/60 placeholder:text-text-primary/50 font-body resize-none min-h-11 max-h-28"
               />
               <ComposerPrimitive.Send
                 aria-label="Enviar mensagem"
-                className="bg-primary text-on-primary p-2.5 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0"
+                className="bg-primary text-on-primary min-w-11 min-h-11 grid place-items-center rounded-xl hover:opacity-90 transition-opacity disabled:opacity-30 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface-low"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4" aria-hidden="true" />
               </ComposerPrimitive.Send>
             </ComposerPrimitive.Root>
           </div>
@@ -211,7 +232,7 @@ function PainelAurea({ onClose }) {
 
   if (inicial === null) {
     return (
-      <div className="h-full flex items-center justify-center text-sm text-text-primary/50">
+      <div className="h-full flex items-center justify-center text-sm text-text-primary/70">
         Carregando conversa…
       </div>
     );
@@ -236,45 +257,7 @@ function PainelAureaRuntime({ initialMessages, onClose, onLimpar }) {
   );
 }
 
-export default function ChatSidebar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const { pathname } = useLocation();
-
-  // Na tela do Assistente o usuário já está conversando com a IA em tela cheia —
-  // o balão flutuante seria redundante, então não o exibimos ali.
-  if (pathname === "/assistente") return null;
-
-  return (
-    <>
-      {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          aria-label="Abrir a Áurea, assistente financeira"
-          title="Áurea"
-          className="fixed right-6 z-50 w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-primary-glow"
-          style={{ boxShadow: 'var(--shadow-primary)', bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
-      )}
-
-      {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] lg:hidden"
-            onClick={() => setIsOpen(false)}
-          />
-          <div
-            className={cn(
-              "fixed right-0 top-0 bottom-0 z-[70] w-full sm:w-[420px]",
-              "bg-surface-low border-l border-text-primary/5 shadow-2xl",
-              "animate-slide-in-right"
-            )}
-          >
-            <PainelAurea onClose={() => setIsOpen(false)} />
-          </div>
-        </>
-      )}
-    </>
-  );
+/** Conteúdo do painel da Áurea (carregado sob demanda pelo ChatLauncher). */
+export default function ChatSidebar({ onClose }) {
+  return <PainelAurea onClose={onClose} />;
 }

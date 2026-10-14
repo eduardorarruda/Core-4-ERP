@@ -38,7 +38,7 @@ export default function VincularLancamentoModal({ item, cartaoId, salvando = fal
       title={(
         <span className="block">
           Vincular lançamento
-          <span className="block text-xs font-normal text-text-primary/50 mt-0.5">
+          <span className="block text-xs font-normal text-text-primary/70 mt-0.5">
             OFX: {item.ofxMemo} — R$ {brl(valorOfxAbs)}
           </span>
         </span>
@@ -52,20 +52,20 @@ export default function VincularLancamentoModal({ item, cartaoId, salvando = fal
           placeholder="Buscar por descrição ou valor..."
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
-          className="w-full bg-surface-medium border border-text-primary/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-primary/30 focus:outline-none focus:border-primary/40"
+          className="w-full bg-surface-medium border border-text-primary/10 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary placeholder:text-text-primary/50 focus:outline-none focus:border-primary/40"
         />
       </div>
 
       <div className="max-h-[50dvh] md:max-h-72 overflow-y-auto no-scrollbar -mx-1 px-1">
         {carregando ? (
-          <p className="text-center text-sm text-text-primary/40 py-8">Carregando...</p>
+          <p className="text-center text-sm text-text-primary/60 py-8">Carregando...</p>
         ) : erro ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <AlertTriangle className="w-6 h-6 text-error" />
             <p className="text-sm text-error px-4">{erro}</p>
           </div>
         ) : filtrados.length === 0 ? (
-          <p className="text-center text-sm text-text-primary/40 py-8">Nenhum lançamento encontrado</p>
+          <p className="text-center text-sm text-text-primary/60 py-8">Nenhum lançamento encontrado</p>
         ) : (
           filtrados.map((l) => {
             const diff = Math.abs(parseFloat(l.valor) - valorOfxAbs);
@@ -83,13 +83,13 @@ export default function VincularLancamentoModal({ item, cartaoId, salvando = fal
               >
                 <div className="min-w-0">
                   <p className="font-medium text-text-primary text-sm truncate">{l.descricao}</p>
-                  <p className="text-xs text-text-primary/50">
+                  <p className="text-xs text-text-primary/70">
                     {formatDate(l.dataCompra)}
                     {l.totalParcelas > 1 && ` · Parcela ${l.numeroParcela}/${l.totalParcelas}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {proxima && <span className="text-[10px] text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">≈ valor</span>}
+                  {proxima && <span className="text-xs text-primary font-bold bg-primary/10 px-2 py-0.5 rounded-full">≈ valor</span>}
                   <span className="text-sm font-bold text-text-primary">R$ {brl(l.valor)}</span>
                 </div>
               </button>

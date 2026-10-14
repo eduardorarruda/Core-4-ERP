@@ -2,6 +2,7 @@ package br.com.core4erp.empresa.service;
 
 import br.com.core4erp.auth.service.EmailService;
 import br.com.core4erp.config.rbac.Requer;
+import br.com.core4erp.config.security.EventoSeguranca;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.empresa.dto.AceitarConviteRequestDto;
 import br.com.core4erp.empresa.dto.ConvidarOperadorRequestDto;
@@ -12,8 +13,9 @@ import br.com.core4erp.empresa.entity.PerfilAcesso;
 import br.com.core4erp.empresa.entity.UsuarioEmpresa;
 import br.com.core4erp.empresa.repository.ConviteRepository;
 import br.com.core4erp.empresa.repository.EmpresaRepository;
-import br.com.core4erp.empresa.repository.PerfilAcessoRepository;
 import br.com.core4erp.empresa.repository.UsuarioEmpresaRepository;
+import br.com.core4erp.enums.TipoNotificacao;
+import br.com.core4erp.notificacao.service.NotificacaoService;
 import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.usuario.entity.Usuario;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
@@ -41,7 +43,7 @@ public class ConviteService {
 
     private final ConviteRepository conviteRepository;
     private final UsuarioEmpresaRepository usuarioEmpresaRepository;
-    private final PerfilAcessoRepository perfilAcessoRepository;
+    private final PerfilAtribuicaoService perfilAtribuicaoService;
     private final EmpresaRepository empresaRepository;
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -49,6 +51,7 @@ public class ConviteService {
     private final TokenGenerator tokenGenerator;
     private final TenantContext tenantCtx;
     private final EmailService emailService;
+    private final NotificacaoService notificacaoService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -59,8 +62,8 @@ public class ConviteService {
         Long empresaId = tenantCtx.getEmpresaId();
         planoLimitValidator.validar(empresaId);
 
-        PerfilAcesso perfil = perfilAcessoRepository.findById(dto.perfilId())
-            .orElseThrow(() -> new EntityNotFoundException("Perfil não encontrado"));
+        // Perfil do sistema ou da própria empresa; nunca PROPRIETARIO; sem escalada de privilégio
+        PerfilAcesso perfil = perfilAtribuicaoService.resolverParaAtribuir(dto.perfilId());
 
         Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(dto.email());
         if (usuarioExistente.isPresent()) {
@@ -85,8 +88,12 @@ public class ConviteService {
 
         Convite salvo = conviteRepository.save(convite);
 
-        log.info("Convite criado — empresaId={} emailHash={} perfilId={} expiraEm={}",
-            empresaId, hashEmail(dto.email()), dto.perfilId(), salvo.getExpiraEm());
+        EventoSeguranca.info(EventoSeguranca.CONVITE_ENVIADO)
+            .addKeyValue("usuarioId", tenantCtx.getUsuarioId())
+            .addKeyValue("empresaId", empresaId)
+            .addKeyValue("emailHash", hashEmail(dto.email()))
+            .addKeyValue("perfilId", dto.perfilId())
+            .log("Convite criado");
 
         emailService.enviarConvite(salvo.getEmailConvidado(), salvo.getToken(),
             frontendUrl, empresa.getNome());
@@ -119,6 +126,8 @@ public class ConviteService {
         usuario.setTipoConta(Usuario.TipoConta.EMPRESA);
         usuario.setSenhaProvisoria(false);
         usuario.setRole("ROLE_USER");
+        usuario.setTermosAceitosEm(LocalDateTime.now());
+        usuario.setTermosVersao(dto.versaoTermos().trim());
         usuarioRepository.save(usuario);
 
         criarVinculo(usuario, convite.getEmpresa(), convite.getPerfil(), convite.getConvidadoPor());
@@ -126,10 +135,13 @@ public class ConviteService {
         convite.setAceito(true);
         conviteRepository.save(convite);
 
-        log.info("Convite aceito — emailHash={} empresaId={} perfilId={}",
-            hashEmail(convite.getEmailConvidado()),
-            convite.getEmpresa().getId(),
-            convite.getPerfil().getId());
+        EventoSeguranca.info(EventoSeguranca.CONVITE_ACEITO)
+            .addKeyValue("usuarioId", usuario.getId())
+            .addKeyValue("empresaId", convite.getEmpresa().getId())
+            .addKeyValue("emailHash", hashEmail(convite.getEmailConvidado()))
+            .addKeyValue("perfilId", convite.getPerfil().getId())
+            .addKeyValue("termosVersao", usuario.getTermosVersao())
+            .log("Convite aceito — conta criada");
     }
 
     @Transactional
@@ -180,6 +192,16 @@ public class ConviteService {
         Empresa empresa = empresaRepository.getReferenceById(empresaId);
         Usuario convidadoPor = usuarioRepository.getReferenceById(tenantCtx.getUsuarioId());
         criarVinculo(usuario, empresa, perfil, convidadoPor);
+        // Usuário existente entra na empresa sem aceitar nada — fica registrado na trilha de segurança
+        // e ele é avisado por notificação in-app (mesma transação: some junto se o vínculo falhar).
+        notificacaoService.criar(usuario.getId(), empresaId, TipoNotificacao.MEMBRO_ADICIONADO,
+            "Você foi adicionado à empresa " + empresa.getNome() + " por " + convidadoPor.getNome() + ".");
+        EventoSeguranca.warn(EventoSeguranca.MEMBRO_ADICIONADO_DIRETAMENTE)
+            .addKeyValue("usuarioId", tenantCtx.getUsuarioId())
+            .addKeyValue("empresaId", empresaId)
+            .addKeyValue("alvoUsuarioId", usuario.getId())
+            .addKeyValue("perfil", perfil.getNome())
+            .log("Usuário existente adicionado diretamente à empresa");
         return new ConviteResponseDto(null, usuario.getEmail(), perfil.getNome(),
             null, true, tenantCtx.getEmail());
     }
@@ -204,7 +226,7 @@ public class ConviteService {
     }
 
     // CR-B15: nunca logar email em plaintext — LGPD
-    private String hashEmail(String email) {
-        return email == null ? "null" : Integer.toHexString(email.hashCode());
+    private static String hashEmail(String email) {
+        return EventoSeguranca.hashEmail(email);
     }
 }

@@ -1,6 +1,6 @@
 package br.com.core4erp.config.security;
 
-import br.com.core4erp.utils.RequestUtils;
+import br.com.core4erp.config.security.SessaoUsuarioService.SessaoUsuario;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -8,111 +8,119 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
 
+/**
+ * Autentica a requisição a partir do JWT (cookie httpOnly {@code access_token} ou
+ * {@code Authorization: Bearer}).
+ *
+ * <p>Além de assinatura/expiração ({@link JwtService}), confere a <b>versão do token</b> (claim
+ * {@code tv}) com a versão atual do usuário: troca de senha, "sair de todos os dispositivos" e
+ * exclusão de conta incrementam a versão e invalidam imediatamente os tokens antigos.
+ *
+ * <p>Publica a {@link SessaoUsuario} no atributo {@link SessaoUsuarioService#ATRIBUTO_REQUEST}
+ * para os filtros seguintes (TenantFilter, SenhaProvisoriaFilter) e coloca {@code usuarioId} no MDC
+ * (requestId/ip são responsabilidade do {@code RequestContextFilter}).
+ */
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;
+    public static final String COOKIE_TOKEN = "access_token";
+    static final String MDC_USUARIO_ID = "usuarioId";
+    private static final String BEARER = "Bearer ";
 
-    public JwtFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    private final JwtService jwtService;
+    private final SessaoUsuarioService sessaoUsuarioService;
+
+    public JwtFilter(JwtService jwtService, SessaoUsuarioService sessaoUsuarioService) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
+        this.sessaoUsuarioService = sessaoUsuarioService;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
+        boolean mdcDefinido = false;
         try {
-            populateMdc(request);
-
-            // Resolve o token pela fonte de maior prioridade que seja VÁLIDA:
-            // 1º cookie httpOnly (método primário), 2º header Authorization: Bearer (fallback).
-            String token = resolveToken(request);
-            if (token == null) {
-                chain.doFilter(request, response);
-                return;
-            }
-
-            String email = jwtService.extractEmail(token);
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                try {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities()
-                    );
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    MDC.put("userId", email);
-                } catch (org.springframework.security.core.userdetails.UsernameNotFoundException ignored) {
-                    // Stale JWT — user no longer exists; proceed unauthenticated
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                Optional<SessaoUsuario> sessao = autenticar(request);
+                if (sessao.isPresent()) {
+                    MDC.put(MDC_USUARIO_ID, String.valueOf(sessao.get().id()));
+                    mdcDefinido = true;
                 }
             }
-
             chain.doFilter(request, response);
         } finally {
-            MDC.clear();
+            if (mdcDefinido) {
+                MDC.remove(MDC_USUARIO_ID);
+            }
         }
     }
 
-    private void populateMdc(HttpServletRequest request) {
-        if (MDC.get("requestId") == null) {
-            MDC.put("requestId", RequestUtils.resolveRequestId(request));
+    private Optional<SessaoUsuario> autenticar(HttpServletRequest request) {
+        JwtService.DadosToken dados = resolverToken(request);
+        if (dados == null) return Optional.empty();
+
+        Optional<SessaoUsuario> sessao = sessaoUsuarioService.buscar(dados.email());
+        if (sessao.isEmpty()) {
+            // Token de usuário que não existe mais (ex.: e-mail anonimizado) — segue sem autenticação
+            return Optional.empty();
         }
-        MDC.put("ipAddress", RequestUtils.resolveClientIp(request));
-        MDC.put("httpMethod", request.getMethod());
-        MDC.put("endpoint", request.getRequestURI());
+        SessaoUsuario s = sessao.get();
+        if (s.tokenVersion() != dados.tokenVersion()) {
+            EventoSeguranca.info(EventoSeguranca.TOKEN_REVOGADO)
+                    .addKeyValue("usuarioId", s.id())
+                    .addKeyValue("jti", dados.jti())
+                    .log("Token revogado apresentado — requisição segue sem autenticação");
+            return Optional.empty();
+        }
+
+        User principal = new User(s.email(), "", List.of(new SimpleGrantedAuthority(s.role())));
+        UsernamePasswordAuthenticationToken auth =
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        request.setAttribute(SessaoUsuarioService.ATRIBUTO_REQUEST, s);
+        return sessao;
     }
 
     /**
-     * Seleciona o token JWT da fonte de maior prioridade que passe pela validação
-     * do {@link JwtService} (assinatura + expiração).
-     *
-     * <p>Prioridade: (1) cookie httpOnly {@code access_token} — método primário e
-     * imune a XSS; (2) header {@code Authorization: Bearer <token>} — fallback para
-     * clientes sem cookie (ex.: n8n chamando a API REST). O header só é considerado
-     * quando não há cookie válido, de modo que o cookie sempre tem prioridade e o
-     * Bearer não cria bypass: ambos passam pela MESMA validação.</p>
+     * Seleciona o token da fonte de maior prioridade que passe pela validação do {@link JwtService}
+     * (assinatura + algoritmo + expiração): (1) cookie httpOnly — método primário e imune a XSS;
+     * (2) {@code Authorization: Bearer} — fallback para clientes sem cookie (ex.: n8n). Ambos passam
+     * pela MESMA validação, então o Bearer não cria bypass.
      */
-    private String resolveToken(HttpServletRequest request) {
-        String cookieToken = extractCookieToken(request);
-        if (cookieToken != null && jwtService.isTokenValid(cookieToken)) {
-            return cookieToken;
-        }
-
-        String headerToken = extractBearerToken(request);
-        if (headerToken != null && jwtService.isTokenValid(headerToken)) {
-            return headerToken;
-        }
-
-        return null;
+    private JwtService.DadosToken resolverToken(HttpServletRequest request) {
+        JwtService.DadosToken doCookie = jwtService.validar(extrairCookie(request));
+        if (doCookie != null) return doCookie;
+        return jwtService.validar(extrairBearer(request));
     }
 
-    private String extractCookieToken(HttpServletRequest request) {
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("access_token".equals(cookie.getName())) {
-                    String value = cookie.getValue();
-                    return (value == null || value.isBlank()) ? null : value;
-                }
+    static String extrairCookie(HttpServletRequest request) {
+        if (request.getCookies() == null) return null;
+        for (Cookie cookie : request.getCookies()) {
+            if (COOKIE_TOKEN.equals(cookie.getName())) {
+                String value = cookie.getValue();
+                return (value == null || value.isBlank()) ? null : value;
             }
         }
         return null;
     }
 
-    private String extractBearerToken(HttpServletRequest request) {
+    static String extrairBearer(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String value = authHeader.substring(7).trim();
+        if (authHeader != null && authHeader.startsWith(BEARER)) {
+            String value = authHeader.substring(BEARER.length()).trim();
             return value.isEmpty() ? null : value;
         }
         return null;

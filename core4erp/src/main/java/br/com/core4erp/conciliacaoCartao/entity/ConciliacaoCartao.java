@@ -3,6 +3,7 @@ package br.com.core4erp.conciliacaoCartao.entity;
 import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
 import br.com.core4erp.conciliacaoCartao.enums.StatusConciliacaoCartao;
 import br.com.core4erp.config.auditing.TenantEntity;
+import br.com.core4erp.config.crypto.CampoCriptografadoConverter;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -34,7 +35,9 @@ public class ConciliacaoCartao extends TenantEntity {
     @Column(nullable = false, length = 30)
     private StatusConciliacaoCartao status = StatusConciliacaoCartao.PENDENTE;
 
-    @Column(length = 100)
+    /** ACCTID do OFX importado — cifrado em repouso (não é pesquisado; o casamento usa o cartão). */
+    @Convert(converter = CampoCriptografadoConverter.class)
+    @Column(name = "acct_id_ofx", length = 255)
     private String acctIdOfx;
 
     private LocalDate dataInicioOfx;

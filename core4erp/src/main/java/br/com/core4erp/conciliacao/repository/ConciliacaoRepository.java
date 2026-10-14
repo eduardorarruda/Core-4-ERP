@@ -9,7 +9,8 @@ import java.util.Optional;
 
 public interface ConciliacaoRepository extends JpaRepository<Conciliacao, Long> {
 
-    List<Conciliacao> findAllByEmpresaIdOrderByDataConciliacaoDesc(Long empresaId);
+    /** As 200 conciliações mais recentes (teto: a tela lista sem paginação e espera um array). */
+    List<Conciliacao> findTop200ByEmpresaIdOrderByDataConciliacaoDesc(Long empresaId);
 
     Optional<Conciliacao> findByIdAndEmpresaId(Long id, Long empresaId);
 

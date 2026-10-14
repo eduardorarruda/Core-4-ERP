@@ -67,8 +67,8 @@ export default function FormularioNovaContaInline({ item, onConfirm, onCancel })
       <form onSubmit={handleSubmit} className="mt-2 p-4 bg-surface-medium border border-primary/20 rounded-xl space-y-4 animate-scale-in">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-bold uppercase tracking-widest text-primary">Novo lançamento</span>
-          <button type="button" onClick={onCancel} className="p-1 rounded-lg text-text-primary/40 hover:text-error hover:bg-error/10 transition-colors">
-            <X className="w-3.5 h-3.5" />
+          <button type="button" onClick={onCancel} aria-label="Fechar formulário" className="min-w-11 min-h-11 grid place-items-center rounded-lg text-text-primary/60 hover:text-error hover:bg-error/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -98,10 +98,11 @@ export default function FormularioNovaContaInline({ item, onConfirm, onCancel })
               <button
                 type="button"
                 title="Nova categoria"
+                aria-label="Criar nova categoria"
                 onClick={() => setCriacaoRapida('categoria')}
-                className="p-2 rounded-lg text-text-primary/40 hover:text-primary hover:bg-primary/10 border border-text-primary/10 transition-colors shrink-0"
+                className="min-w-11 min-h-11 grid place-items-center rounded-lg text-text-primary/60 hover:text-primary hover:bg-primary/10 border border-text-primary/15 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </FormField>
@@ -115,10 +116,11 @@ export default function FormularioNovaContaInline({ item, onConfirm, onCancel })
               <button
                 type="button"
                 title="Novo parceiro"
+                aria-label="Criar novo parceiro"
                 onClick={() => setCriacaoRapida('parceiro')}
-                className="p-2 rounded-lg text-text-primary/40 hover:text-primary hover:bg-primary/10 border border-text-primary/10 transition-colors shrink-0"
+                className="min-w-11 min-h-11 grid place-items-center rounded-lg text-text-primary/60 hover:text-primary hover:bg-primary/10 border border-text-primary/15 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           </FormField>

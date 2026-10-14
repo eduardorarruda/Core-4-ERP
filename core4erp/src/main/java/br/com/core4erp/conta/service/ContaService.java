@@ -3,6 +3,7 @@ package br.com.core4erp.conta.service;
 import br.com.core4erp.cartaoCredito.service.FaturaCartaoService;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
@@ -87,6 +88,8 @@ public class ContaService {
                 .map(ContaResponseDto::from);
     }
 
+    // Defense-in-depth: também chamado pelas tools do chat (LancamentoTools.consultarContas).
+    @Requer("CONTA_VISUALIZAR")
     @Transactional(readOnly = true)
     public Page<ContaResponseDto> listarComFiltros(
             TipoConta tipo, StatusConta status, String numeroDocumento,
@@ -109,12 +112,14 @@ public class ContaService {
         return contaRepository.findAll(spec, pageable).map(ContaResponseDto::from);
     }
 
+    @Requer("CONTA_VISUALIZAR")
     @Transactional(readOnly = true)
     public ContaResponseDto buscarPorId(Long id) {
         return ContaResponseDto.from(findOwned(id));
     }
 
     /** Total pago por conta corrente (saídas), do maior para o menor — para a IA. */
+    @Requer("CONTA_VISUALIZAR")
     @Transactional(readOnly = true)
     public List<GastoContaCorrenteDto> gastoPorContaCorrente() {
         return baixadaRepository.gastoPorContaCorrente(tenantCtx.getEmpresaId()).stream()

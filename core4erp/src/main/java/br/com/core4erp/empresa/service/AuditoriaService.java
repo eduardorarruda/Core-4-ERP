@@ -41,7 +41,8 @@ public class AuditoriaService {
         a.setAcao(acao);
         a.setValorAnterior(toJsonSanitizado(valorAnterior));
         a.setValorNovo(toJsonSanitizado(valorNovo));
-        a.setIpAddress(MDC.get("ipAddress"));
+        // "ip" é o MDC do RequestContextFilter (IP real via ClientIp rules); "ipAddress" é legado
+        a.setIpAddress(MDC.get("ip") != null ? MDC.get("ip") : MDC.get("ipAddress"));
         a.setRequestId(MDC.get("requestId"));
         // Autoria: marca as alterações executadas pela IA (Áurea) a pedido do usuário —
         // a tela de auditoria exibe "Ação executada pela IA a pedido do utilizador X".

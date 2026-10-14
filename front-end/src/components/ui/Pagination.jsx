@@ -19,7 +19,7 @@ export default function Pagination({ page, totalPages, totalElements, onChange }
   return (
     <div className="flex items-center justify-between gap-4 pt-1">
       <span
-        className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 font-mono"
+        className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono"
         aria-current="page"
       >
         Página {atual} de {totalPages}

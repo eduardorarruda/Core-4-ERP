@@ -24,7 +24,7 @@ export default function ConciliacaoCartaoHistorico() {
       .then(setLista)
       .catch((e) => toast.error(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
 
   const columns = [
     {
@@ -48,7 +48,7 @@ export default function ConciliacaoCartaoHistorico() {
       render: (v, row) => (
         <div className="text-sm">
           <span className="font-bold text-text-primary">{v}</span>
-          <span className="text-text-primary/40"> total · </span>
+          <span className="text-text-primary/60"> total · </span>
           <span className="text-primary">{row.totalConciliados} conciliadas</span>
           {row.totalNaoIdentificados > 0 && (
             <span className="text-error"> · {row.totalNaoIdentificados} não id.</span>
@@ -97,6 +97,7 @@ export default function ConciliacaoCartaoHistorico() {
       />
 
       <DataTable
+        caption="Histórico de conciliações de cartão"
         columns={columns}
         data={lista}
         loading={loading}

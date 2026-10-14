@@ -34,7 +34,8 @@ public class BrasilApiService {
                     .block();
             return Optional.ofNullable(data);
         } catch (Exception e) {
-            log.warn("BrasilAPI indisponível para CNPJ {}: {}", digits, e.getMessage());
+            // LGPD (CLAUDE.md §20): documento em log só com os 4 últimos dígitos.
+            log.warn("BrasilAPI indisponível para CNPJ final {}: {}", digits.substring(digits.length() - 4), e.getMessage());
             return Optional.empty();
         }
     }

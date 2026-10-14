@@ -1,54 +1,75 @@
 groups:
   - name: core4erp_alerts
     rules:
-      - alert: AltaLatenciaHTTP
-        expr: histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 2
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: "P95 de latência acima de 2s"
-          description: "A latência P95 está em {{ $value }}s nos últimos 5 minutos."
-
-      - alert: AltoCpuJVM
-        expr: process_cpu_usage > 0.8
+      # Backend fora do ar (ou Actuator inalcançável na porta 8081) por 2 minutos.
+      - alert: InstanciaFora
+        expr: up{job="core4erp"} == 0
         for: 2m
         labels:
           severity: critical
         annotations:
-          summary: "CPU do processo JVM acima de 80%"
-          description: "CPU em {{ $value | humanizePercentage }} por mais de 2 minutos."
+          summary: "Backend Core 4 ERP fora do ar"
+          description: "O Prometheus não consegue coletar {{ $labels.instance }} há mais de 2 minutos."
 
+      # P95 agregado de TODAS as rotas (sum by le) — sem o sum, o histogram_quantile seria
+      # calculado por série (uri/status/method) e o alerta dispararia por rota rara/isolada.
+      - alert: AltaLatenciaHTTP
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="core4erp"}[5m]))) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 de latência acima de 2s"
+          description: "A latência P95 está em {{ $value | humanizeDuration }} nos últimos 5 minutos."
+
+      - alert: AltoCpuJVM
+        expr: process_cpu_usage{job="core4erp"} > 0.8
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU do processo JVM acima de 80%"
+          description: "CPU em {{ $value | humanizePercentage }} por mais de 5 minutos."
+
+      # Soma todas as pools do heap (eden/survivor/old). jvm_memory_max_bytes = -1 em pools sem
+      # limite; o filtro > 0 evita divisão inválida.
       - alert: MemoriaHeapCritica
-        expr: jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.9
-        for: 1m
+        expr: sum by (instance) (jvm_memory_used_bytes{job="core4erp",area="heap"}) / sum by (instance) (jvm_memory_max_bytes{job="core4erp",area="heap"} > 0) > 0.9
+        for: 5m
         labels:
           severity: critical
         annotations:
           summary: "Heap JVM acima de 90%"
           description: "Heap em {{ $value | humanizePercentage }} de uso."
 
-      - alert: PoolConexoesEsgotado
-        expr: hikaricp_connections_pending > 5
-        for: 30s
+      # Pool Hikari saturado: requisições esperando conexão de forma sustentada.
+      - alert: PoolConexoesSaturado
+        expr: max by (instance, pool) (hikaricp_connections_pending{job="core4erp"}) > 0
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Mais de 5 requests aguardando conexão ao banco"
-          description: "{{ $value }} requests aguardando no pool HikariCP."
+          summary: "Pool de conexões (HikariCP) saturado"
+          description: "{{ $value }} requisições aguardando conexão no pool {{ $labels.pool }} há mais de 5 minutos."
 
+      # Taxa de erro como PROPORÇÃO: 5xx / total > 10% (antes era req/s absoluto, que não
+      # é "percentual" e dispara em pico de tráfego). O `> 0` no denominador evita NaN sem tráfego.
       - alert: TaxaErrosAlta
-        expr: rate(http_server_requests_seconds_count{status=~"5.."}[5m]) > 0.1
-        for: 1m
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="core4erp",status=~"5.."}[5m]))
+            /
+          (sum(rate(http_server_requests_seconds_count{job="core4erp"}[5m])) > 0)
+            > 0.10
+        for: 5m
         labels:
           severity: critical
         annotations:
           summary: "Taxa de erros 5xx acima de 10%"
-          description: "Taxa de erros: {{ $value }} req/s com status 5xx."
+          description: "{{ $value | humanizePercentage }} das requisições retornaram 5xx nos últimos 5 minutos."
 
       - alert: ChatIAComErros
-        expr: rate(chat_erros_total[5m]) > 0.05
-        for: 1m
+        expr: sum(rate(chat_erros_total{job="core4erp"}[5m])) > 0.05
+        for: 5m
         labels:
           severity: warning
         annotations:

@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { auth, setLoginState } from '../lib/api';
 import { getFirstAccessibleRoute } from '../lib/routeUtils';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
 import Button from '../components/ui/Button';
-import HeroPane, { BrandMark } from '../components/login/HeroPane';
+import HeroPane from '../components/login/HeroPane';
+import BrandMark from '../components/ui/BrandMark';
+import LinksLegais from '../components/legal/LinksLegais';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { usePrefersReducedMotion } from '../hooks/useMediaQuery';
 
 function greetingFor(h) {
   if (h < 5) return 'Boa madrugada';
@@ -14,7 +18,15 @@ function greetingFor(h) {
 }
 
 export default function Login() {
+  usePageMeta({
+    title: 'Entrar',
+    canonical: '/login',
+    description: 'Entre no Core 4 ERP para controlar contas a pagar e receber, cartões, conciliação bancária e relatórios da sua vida financeira ou da sua empresa.',
+  });
   const navigate = useNavigate();
+  const { state: estadoNavegacao } = useLocation();
+  const contaExcluida = Boolean(estadoNavegacao?.contaExcluida);
+  const reduzirMovimento = usePrefersReducedMotion();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
@@ -40,10 +52,16 @@ export default function Login() {
   // Limpa o timer de redirecionamento se o componente desmontar antes do navigate.
   useEffect(() => () => clearTimeout(navTimer.current), []);
 
+  // Parallax do fundo: desligado com "reduzir movimento" e limitado a 1 atualização por quadro
   useEffect(() => {
-    const onMove = (e) => {
+    if (reduzirMovimento) return undefined;
+    let quadro = 0;
+    let ultimo = null;
+    const aplicar = () => {
+      quadro = 0;
+      if (!ultimo) return;
       const w = window.innerWidth, h = window.innerHeight;
-      const x = e.clientX, y = e.clientY;
+      const { x, y } = ultimo;
       const dx = (x / w - 0.5) * 2, dy = (y / h - 0.5) * 2;
       if (spotRef.current) {
         spotRef.current.style.setProperty('--mx', `${x}px`);
@@ -53,9 +71,16 @@ export default function Login() {
       if (o2Ref.current) o2Ref.current.style.transform = `translate(${dx * -40}px, ${dy * -40}px)`;
       if (o3Ref.current) o3Ref.current.style.transform = `translate(${dx * 22}px, ${dy * 22}px)`;
     };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
+    const onMove = (e) => {
+      ultimo = { x: e.clientX, y: e.clientY };
+      if (!quadro) quadro = requestAnimationFrame(aplicar);
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      if (quadro) cancelAnimationFrame(quadro);
+    };
+  }, [reduzirMovimento]);
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -86,7 +111,7 @@ export default function Login() {
   const handleLogin = async (e) => {
     e?.preventDefault?.();
     setErro('');
-    if (!emailValid) { setErro('Informe um email válido.'); return; }
+    if (!emailValid) { setErro('Informe um e-mail válido.'); return; }
     setCarregando(true);
     try {
       const result = await auth.login(email, senha);
@@ -103,7 +128,7 @@ export default function Login() {
   };
 
   const errBanner = 'flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-error/10 border border-error/20 text-error text-[13px] mt-3';
-  const backBtn = 'flex items-center gap-1.5 text-xs text-text-primary/40 hover:text-text-primary/70 transition-colors mb-7';
+  const backBtn = 'flex items-center gap-1.5 text-xs text-text-primary/70 hover:text-text-primary transition-colors mb-7 min-h-11 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
   const iconBadge = 'flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 border border-primary/20 mb-5';
 
   return (
@@ -135,23 +160,28 @@ export default function Login() {
         <div className="w-full max-w-[380px] mx-auto">
           {view === 'login' && (
             <>
+              {contaExcluida && (
+                <p role="status" className="mb-5 rounded-xl border border-text-primary/15 bg-surface-low px-3.5 py-2.5 text-sm text-text-primary/80">
+                  Sua conta foi excluída e seus dados pessoais foram anonimizados.
+                </p>
+              )}
               <div className="anim-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-text-primary/5 border border-text-primary/10 text-xs text-text-primary/60 mb-5">
                 <span className="live-dot" />
                 {greetingFor(now.getHours())} — pronto para entrar
               </div>
 
               <h1 className="anim-in d1 font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
-                Acesse seu <em className="text-primary italic">workspace</em>
+                Acesse sua <em className="text-primary italic">conta</em>
               </h1>
-              <p className="anim-in d2 text-sm text-text-primary/50 mb-7">
-                Entre com sua conta corporativa para continuar.
+              <p className="anim-in d2 text-sm text-text-primary/70 mb-7">
+                Entre com o e-mail e a senha cadastrados.
               </p>
 
               <form onSubmit={handleLogin}>
                 <div className="anim-in d3 mb-3">
                   <FloatingInput
                     id="email"
-                    label="Email corporativo"
+                    label="E-mail"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -176,7 +206,7 @@ export default function Login() {
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    className="text-xs text-primary font-medium py-2 hover:opacity-80 transition-opacity"
+                    className="text-xs text-primary font-medium min-h-11 px-1 hover:opacity-80 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     onClick={() => { setResetEmail(email); setResetErro(''); setView('forgot-email'); }}
                   >
                     Esqueci a senha
@@ -197,7 +227,7 @@ export default function Login() {
                 </div>
               </form>
 
-              <div className="anim-in d6 text-center mt-6 text-[13px] text-text-primary/40">
+              <div className="anim-in d6 text-center mt-6 text-[13px] text-text-primary/70">
                 Primeira vez no Core 4?{' '}
                 <Link to="/register" className="text-primary font-semibold hover:opacity-80 transition-opacity">Criar conta</Link>
               </div>
@@ -214,7 +244,7 @@ export default function Login() {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
               </div>
               <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">Recuperar acesso</h1>
-              <p className="text-sm text-text-primary/50 mb-7 leading-relaxed">
+              <p className="text-sm text-text-primary/70 mb-7 leading-relaxed">
                 Informe o e-mail cadastrado. Enviaremos um código de verificação.
               </p>
               <form onSubmit={handleEsqueciSenha}>
@@ -243,10 +273,10 @@ export default function Login() {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="text-primary"><rect x="2" y="4" width="20" height="16" rx="3" /><path d="m2 7 10 6 10-6" /></svg>
               </div>
               <h1 className="font-display text-[26px] font-bold tracking-tight text-text-primary mb-2">Verifique seu e-mail</h1>
-              <p className="text-sm text-text-primary/50 leading-relaxed mb-7">
+              <p className="text-sm text-text-primary/70 leading-relaxed mb-7">
                 Enviamos um link de recuperação para <strong className="text-text-primary">{resetEmail}</strong>.<br />
                 Clique no link do e-mail para criar sua nova senha.<br />
-                <span className="text-xs text-text-primary/30">O link expira em 60 minutos.</span>
+                <span className="text-xs text-text-primary/70">O link expira em 60 minutos.</span>
               </p>
               <Button type="button" variant="secondary" onClick={voltarParaLogin} className="w-full h-11 mt-1">
                 Voltar ao login
@@ -255,8 +285,9 @@ export default function Login() {
           )}
         </div>
 
-        <footer className="flex justify-between text-[10px] text-text-primary/25 font-mono uppercase tracking-widest">
-          <span>© 2026 Core 4 · LGPD</span>
+        <footer className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-primary/70">
+          <span>© 2026 Core 4 ERP</span>
+          <LinksLegais />
         </footer>
       </section>
 
@@ -275,7 +306,7 @@ export default function Login() {
             <div className="font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
               Bem-vindo de volta!
             </div>
-            <div className="text-text-primary/55 text-sm">
+            <div className="text-text-primary/70 text-sm" role="status">
               Redirecionando…
             </div>
           </div>

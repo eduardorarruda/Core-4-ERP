@@ -1,8 +1,12 @@
+# auth_enabled: false → modo single-tenant SEM autenticação. Aceitável SÓ porque o Loki é
+# interno: não publica porta no host e fica apenas na rede docker `monitoring` (promtail e
+# grafana). Nunca exponha a porta 3100 nem coloque o Loki em rede alcançável pelo túnel.
 auth_enabled: false
 
 server:
   http_listen_port: 3100
   grpc_listen_port: 9096
+  log_level: warn
 
 common:
   instance_addr: 127.0.0.1
@@ -33,6 +37,25 @@ schema_config:
         prefix: index_
         period: 24h
 
+# Compactor com retenção ligada: é ele que APAGA de fato os chunks/índices vencidos.
+# Sem isso, retention_period não tem efeito e os logs crescem para sempre no disco.
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 50
+  delete_request_store: filesystem
+
 limits_config:
+  # Retenção LGPD: logs de aplicação podem conter dados pessoais (e-mail, IP, ids de usuário/
+  # empresa). Guardamos 30 dias (720h) — tempo suficiente para investigação de incidentes e
+  # auditoria operacional — e descartamos depois (minimização/necessidade, art. 6º e art. 16
+  # da LGPD). Para mudar, ajuste aqui e documente o motivo no DEPLOY.md.
+  retention_period: 720h
   reject_old_samples: true
   reject_old_samples_max_age: 168h
+  # Proteções de cardinalidade/ingestão (instância pequena).
+  max_label_names_per_series: 10
+  ingestion_rate_mb: 4
+  ingestion_burst_size_mb: 8

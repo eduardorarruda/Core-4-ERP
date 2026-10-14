@@ -1,8 +1,10 @@
 # TOOLS → ENDPOINTS — Mapa das 48 @Tool para a API REST
 
 > Cada "tool" dos agentes n8n é um nó **HTTP Request Tool** apontando para
-> `http://backend:8080/api/...` (rede docker interna), com o header
-> `Authorization: Bearer {{ $json.jwt }}`. O backend valida como qualquer request
+> `http://backend:8080/api/...` (rede docker interna `app`), com os headers
+> `Authorization: Bearer {{ $('Webhook').item.json.body.jwt }}` e
+> `X-Empresa-Id: {{ $('Webhook').item.json.body.empresaId }}` (empresa já validada pelo nó
+> "Validar sessão (auth/me)" — ver `CONTRATOS.md`). O backend valida como qualquer request
 > (JwtFilter → TenantFilter → TenantContext → `@Requer`), preservando RBAC, `DtoValidator`,
 > multi-tenancy e auditoria — **sem reimplementar nada no n8n**.
 >
@@ -20,7 +22,9 @@
 - **⚠️ endpoint a confirmar** = não há endpoint REST espelho óbvio; decidir na Fase 3 (criar
   endpoint, usar loop, ou aproximar por outro).
 - Todos os GET de listagem já filtram por `empresaId` no backend (via TenantContext) — o isolamento
-  é automático desde que o JWT correto seja repassado.
+  é automático desde que o JWT correto seja repassado. O `X-Empresa-Id` fixa a empresa: o
+  `TenantFilter` recusa (403) se o usuário do JWT não pertence a ela.
+- Os webhooks que disparam esses workflows exigem `X-Webhook-Secret` (Header Auth) — sem exceção.
 
 ---
 
@@ -152,3 +156,30 @@ GET /api/relatorios/assinaturas              RELATORIO_ASSINATURAS_EXPORTAR   (x
    `NotificacaoController` só expõe `GET`, `PATCH /{id}/lida` e `POST /sincronizar`. **Não há POST de
    criação de notificação** — ver nota no `evento-workflow.json` e resolver na Fase 2.4 (criar
    endpoint de criação ou usar `POST /api/notificacoes/sincronizar`).
+
+---
+
+## Ferramentas destrutivas (exclusão/estorno)
+
+Hoje **existem** tools destrutivas ligadas a agentes no `aurea-multiagente-workflow.json`:
+
+| Tool | Agente | Endpoint | Permissão exigida no backend |
+|---|---|---|---|
+| `excluirConta` | EXECUTOR | `DELETE /api/contas/{id}` | `CONTA_DELETAR` |
+| `estornarConta` | EXECUTOR | `DELETE /api/contas/{id}/baixa` | `CONTA_ESTORNAR` |
+
+(O `aurea-workflow.json` — MVP de agente único — não tem tools de exclusão.)
+
+**Sendo honesto sobre as garantias:**
+
+- A regra "confirmar com o usuário antes de excluir/estornar" está **somente no prompt** (system
+  message do Executor: operações irreversíveis exigem confirmação explícita, a menos que a mensagem
+  já seja a confirmação; e na `toolDescription` das duas tools). É uma instrução ao modelo — um
+  prompt injection (ex.: texto malicioso dentro de um anexo) ou um erro do LLM **pode** pular essa
+  etapa. Não há nó determinístico de confirmação no fluxo.
+- O que é **garantido pelo backend**: a chamada só funciona se o usuário tiver a permissão
+  (`@Requer`), na empresa validada (`X-Empresa-Id` + `TenantFilter`), e fica auditada
+  (`EventoN8nAspect`/auditoria com `origemIa=true`).
+- Mitigação recomendada para usuários que não devem apagar dados via IA: não conceder
+  `CONTA_DELETAR`/`CONTA_ESTORNAR` ao perfil, ou remover as duas tools do Executor.
+

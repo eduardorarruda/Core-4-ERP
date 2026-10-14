@@ -114,16 +114,22 @@ public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecific
 
     // ── Conciliação: candidatas por valor próximo ─────────────────────────────
 
+    /**
+     * Conciliação em LOTE: todas as contas abertas cujo valor cai na faixa [valorMin, valorMax]
+     * (menor/maior valor do OFX ± tolerância), com o parceiro já carregado (o score usa o nome).
+     * Uma única query por importação — o casamento por transação é feito em memória.
+     */
     @Query("""
         SELECT c FROM Conta c
+        LEFT JOIN FETCH c.parceiro
         WHERE c.empresaId = :eid
           AND c.status IN :statuses
-          AND ABS(c.valorOriginal - :valor) <= :tolerancia
+          AND c.valorOriginal BETWEEN :valorMin AND :valorMax
         """)
-    List<Conta> findCandidatasParaConciliacao(@Param("eid") Long eid,
-                                              @Param("statuses") Collection<StatusConta> statuses,
-                                              @Param("valor") BigDecimal valor,
-                                              @Param("tolerancia") BigDecimal tolerancia);
+    List<Conta> findCandidatasParaConciliacaoNaFaixa(@Param("eid") Long eid,
+                                                     @Param("statuses") Collection<StatusConta> statuses,
+                                                     @Param("valorMin") BigDecimal valorMin,
+                                                     @Param("valorMax") BigDecimal valorMax);
 
     // ── Projection interfaces ─────────────────────────────────────────────────
 

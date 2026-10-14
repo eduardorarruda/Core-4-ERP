@@ -11,7 +11,11 @@ import java.util.Optional;
 
 public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> {
 
-    List<Notificacao> findByUsuarioIdAndLidaFalseOrderByDataCriacaoDesc(Long usuarioId);
+    /**
+     * Até 200 notificações NÃO LIDAS mais recentes (teto de segurança: a tela não pagina e espera
+     * um array — acima disso o usuário não consegue tratá-las mesmo).
+     */
+    List<Notificacao> findTop200ByUsuarioIdAndLidaFalseOrderByDataCriacaoDesc(Long usuarioId);
 
     Optional<Notificacao> findByIdAndUsuarioId(Long id, Long usuarioId);
 

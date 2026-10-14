@@ -18,6 +18,7 @@ import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoRequestDto;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.InvestimentoService;
+import br.com.core4erp.chat.service.AcaoCritica;
 import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
@@ -79,8 +80,9 @@ public class LancamentoTools {
         // 3.1: ContaService.criar é reusado internamente (fechamento de fatura/conciliação), por isso
         // a barreira de permissão fica aqui, na porta do chat, e não com @Requer no service.
         tenantCtx.exigirPermissao("CONTA_CRIAR");
-        log.info("[CHAT-AUDIT] user={} tool=registrarConta descricao={} valor={} tipo={}",
-                securityCtx.getUsuarioId(), descricao, valorOriginal, tipo);
+        // LGPD: descrição (texto livre do usuário) fica só na auditoria do banco, não no log.
+        log.info("[CHAT-AUDIT] user={} tool=registrarConta valor={} tipo={}",
+                securityCtx.getUsuarioId(), valorOriginal, tipo);
         auditoria.registrar("registrarConta",
                 "descricao=" + descricao + " valor=" + valorOriginal + " tipo=" + tipo);
         TipoConta tipoConta;
@@ -150,8 +152,8 @@ public class LancamentoTools {
             @ToolParam(description = "ID do parceiro (fornecedor/cliente) — OBRIGATÓRIO em lançamento de cartão. Use consultarParceiros para descobrir; se não existir, cadastre com registrarParceiro") Long parceiroId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
             @ToolParam(description = "Tipo do lançamento: SAIDA para gasto/compra (padrão), ENTRADA para crédito/estorno recebido no cartão. Se o usuário não indicar, use SAIDA.") String tipo) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={} parceiroId={} tipo={}",
-                securityCtx.getUsuarioId(), cartaoId, descricao, valor, parceiroId, tipo);
+        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} valor={} parceiroId={} tipo={}",
+                securityCtx.getUsuarioId(), cartaoId, valor, parceiroId, tipo);
         auditoria.registrar("registrarLancamentoCartao",
                 "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor + " parceiroId=" + parceiroId + " tipo=" + tipo);
 
@@ -207,8 +209,9 @@ public class LancamentoTools {
 
     @Tool(description = """
             Transfere valor entre duas contas correntes. Use consultarContasCorrentes para os IDs.
-            Data obrigatória. Chame só APÓS o usuário confirmar.
+            Data obrigatória. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Transferir valor entre contas correntes")
     public TransferenciaResponseDto transferirEntreContas(
             @ToolParam(description = "ID da conta corrente de origem") Long contaOrigemId,
             @ToolParam(description = "ID da conta corrente de destino") Long contaDestinoId,
@@ -224,8 +227,9 @@ public class LancamentoTools {
 
     @Tool(description = """
             Baixa uma conta (pagamento de conta a pagar ou recebimento de conta a receber),
-            movendo o saldo da conta corrente informada. Chame só APÓS o usuário confirmar.
+            movendo o saldo da conta corrente informada. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Dar baixa (pagar/receber) na conta, movimentando o saldo da conta corrente")
     public ContaResponseDto baixarConta(
             @ToolParam(description = "ID da conta a ser baixada") Long contaId,
             @ToolParam(description = "ID da conta corrente para débito/crédito") Long contaCorrenteId,
@@ -250,8 +254,9 @@ public class LancamentoTools {
 
     @Tool(description = """
             Registra transação em conta de investimento: APORTE (adiciona), RESGATE (retira) ou
-            RENDIMENTO (creditado). APORTE pode debitar de uma conta corrente. Confirme antes.
+            RENDIMENTO (creditado). APORTE pode debitar de uma conta corrente. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Registrar aporte/resgate/rendimento no investimento, movimentando saldo")
     public TransacaoInvestimentoResponseDto registrarTransacaoInvestimento(
             @ToolParam(description = "ID da conta de investimento") Long contaInvestimentoId,
             @ToolParam(description = "APORTE, RESGATE ou RENDIMENTO") String tipoTransacao,
@@ -329,8 +334,9 @@ public class LancamentoTools {
 
     @Tool(description = """
             Exclui uma conta a pagar/receber (pelo ID de consultarContas). BLOQUEADO se já estiver
-            baixada. Confirme antes de executar.
+            baixada. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir a conta a pagar/receber")
     public String excluirConta(@ToolParam(description = "ID da conta a excluir") Long contaId) {
         tenantCtx.exigirPermissao("CONTA_DELETAR");
         auditoria.registrar("excluirConta", "id=" + contaId);
@@ -340,8 +346,9 @@ public class LancamentoTools {
 
     @Tool(description = """
             Estorna a baixa de uma conta (desfaz o pagamento/recebimento, revertendo o saldo da conta
-            corrente). A conta volta para PENDENTE. Use o ID de consultarContas. Confirme antes.
+            corrente). A conta volta para PENDENTE. Use o ID de consultarContas. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Estornar a baixa da conta, revertendo o saldo da conta corrente")
     public ContaResponseDto estornarConta(@ToolParam(description = "ID da conta a estornar") Long contaId) {
         tenantCtx.exigirPermissao("CONTA_ESTORNAR");
         auditoria.registrar("estornarConta", "id=" + contaId);
@@ -351,12 +358,12 @@ public class LancamentoTools {
     private TipoConta parseTipo(String tipo) {
         if (tipo == null || tipo.isBlank()) return null;
         try { return TipoConta.valueOf(tipo.toUpperCase()); }
-        catch (IllegalArgumentException e) { return null; }
+        catch (IllegalArgumentException e) { return null; } // valor livre do modelo: inválido = sem filtro
     }
 
     private StatusConta parseStatus(String status) {
         if (status == null || status.isBlank()) return null;
         try { return StatusConta.valueOf(status.toUpperCase()); }
-        catch (IllegalArgumentException e) { return null; }
+        catch (IllegalArgumentException e) { return null; } // valor livre do modelo: inválido = sem filtro
     }
 }

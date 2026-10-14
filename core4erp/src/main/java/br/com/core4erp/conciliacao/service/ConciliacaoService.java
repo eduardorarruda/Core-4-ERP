@@ -76,7 +76,7 @@ public class ConciliacaoService {
     @Transactional(readOnly = true)
     public List<ConciliacaoResponseDto> listar() {
         return conciliacaoRepository
-                .findAllByEmpresaIdOrderByDataConciliacaoDesc(tenantCtx.getEmpresaId())
+                .findTop200ByEmpresaIdOrderByDataConciliacaoDesc(tenantCtx.getEmpresaId())
                 .stream()
                 .map(ConciliacaoResponseDto::fromSemItens)
                 .toList();
@@ -148,7 +148,7 @@ public class ConciliacaoService {
                     .orElseThrow(() -> new EntityNotFoundException("Conta corrente não encontrada"));
         } else {
             String numeroConta = ofxDados.getNumeroConta();
-            contaCorrente = contaCorrenteRepository.findByNumeroContaAndEmpresaId(numeroConta, empresaId)
+            contaCorrente = contaCorrenteRepository.buscarPorNumeroConta(numeroConta, empresaId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
                             "CONTA_NAO_ENCONTRADA:" + numeroConta));
@@ -170,14 +170,19 @@ public class ConciliacaoService {
         int totalNaoIdentificados = 0;
         List<StatusConta> statusesAbertos = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
 
+        // Performance (antes N+1: 2 queries por transação do OFX): ofxIds já registrados e TODAS as
+        // contas candidatas (faixa de valores do arquivo ± tolerância, com parceiro) são carregados
+        // uma única vez; o casamento por transação é feito em memória com o mesmo critério de antes.
+        Set<String> ofxIdsProcessados = new HashSet<>(itemRepository.findOfxIdsByConciliacaoId(conciliacao.getId()));
+        List<Conta> todasCandidatas = carregarCandidatas(empresaId, statusesAbertos, ofxDados.getTransacoes());
+
         for (OfxTransacaoDto ofxTrn : ofxDados.getTransacoes()) {
-            if (itemRepository.existsByConciliacaoIdAndOfxId(conciliacao.getId(), ofxTrn.getOfxId())) {
-                continue;
+            if (!ofxIdsProcessados.add(ofxTrn.getOfxId())) {
+                continue; // ofxId repetido no arquivo (ou já registrado) — mesmo comportamento anterior
             }
 
             BigDecimal valorAbs = ofxTrn.getValor().abs();
-            List<Conta> candidatas = contaRepository
-                    .findCandidatasParaConciliacao(empresaId, statusesAbertos, valorAbs, TOLERANCIA_VALOR);
+            List<Conta> candidatas = filtrarPorValor(todasCandidatas, valorAbs, TOLERANCIA_VALOR);
 
             ConciliacaoItem item = new ConciliacaoItem();
             item.setConciliacao(conciliacao);
@@ -220,6 +225,35 @@ public class ConciliacaoService {
         List<ConciliacaoItemResponseDto> itensDto = itemRepository.findAllByConciliacaoId(conciliacao.getId())
                 .stream().map(ConciliacaoItemResponseDto::from).toList();
         return ConciliacaoResponseDto.from(conciliacao, itensDto);
+    }
+
+    /** Uma única query: contas abertas na faixa [menor valor − tolerância, maior valor + tolerância]. */
+    private List<Conta> carregarCandidatas(Long empresaId, List<StatusConta> statuses, List<OfxTransacaoDto> transacoes) {
+        BigDecimal min = null;
+        BigDecimal max = null;
+        for (OfxTransacaoDto t : transacoes) {
+            if (t.getValor() == null) continue;
+            BigDecimal v = t.getValor().abs();
+            min = min == null || v.compareTo(min) < 0 ? v : min;
+            max = max == null || v.compareTo(max) > 0 ? v : max;
+        }
+        if (min == null) {
+            return List.of();
+        }
+        return contaRepository.findCandidatasParaConciliacaoNaFaixa(empresaId, statuses,
+                min.subtract(TOLERANCIA_VALOR), max.add(TOLERANCIA_VALOR));
+    }
+
+    /** Mesmo critério da antiga query por transação: |valorOriginal − valor| ≤ tolerância. */
+    static List<Conta> filtrarPorValor(List<Conta> candidatas, BigDecimal valorAbs, BigDecimal tolerancia) {
+        List<Conta> filtradas = new ArrayList<>();
+        for (Conta c : candidatas) {
+            if (c.getValorOriginal() != null
+                    && c.getValorOriginal().subtract(valorAbs).abs().compareTo(tolerancia) <= 0) {
+                filtradas.add(c);
+            }
+        }
+        return filtradas;
     }
 
     @Transactional

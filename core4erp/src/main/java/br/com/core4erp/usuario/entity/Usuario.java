@@ -59,6 +59,22 @@ public class Usuario extends Auditable {
     @Column(name = "senha_provisoria", nullable = false)
     private Boolean senhaProvisoria = false;
 
+    /**
+     * Versão dos tokens do usuário (claim {@code tv} do JWT). Incrementar invalida TODOS os
+     * tokens já emitidos: troca/redefinição de senha, "sair de todos os dispositivos" e
+     * exclusão de conta (V45).
+     */
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion = 0;
+
+    /** LGPD art. 8º — momento em que o titular aceitou Termos de Uso e Política de Privacidade (V45). */
+    @Column(name = "termos_aceitos_em")
+    private LocalDateTime termosAceitosEm;
+
+    /** Versão dos documentos legais aceitos no cadastro (V45). */
+    @Column(name = "termos_versao", length = 20)
+    private String termosVersao;
+
     public enum TipoConta {
         EMPRESA, PESSOA_FISICA
     }

@@ -1,5 +1,6 @@
 package br.com.core4erp.plano.controller;
 
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.plano.dto.PlanoRequestDto;
 import br.com.core4erp.plano.dto.PlanoResponseDto;
 import br.com.core4erp.plano.service.PlanoService;
@@ -21,6 +22,7 @@ import java.util.List;
 public class PlanoController {
 
     private final PlanoService planoService;
+    private final TenantContext tenantCtx;
 
     @Operation(summary = "Listar planos ativos — público")
     @GetMapping("/ativos")
@@ -31,12 +33,14 @@ public class PlanoController {
     @Operation(summary = "Listar todos os planos — Admin Sistema")
     @GetMapping
     public ResponseEntity<List<PlanoResponseDto>> listarTodos() {
+        exigirAdmin();
         return ResponseEntity.ok(planoService.listarTodos());
     }
 
     @Operation(summary = "Criar plano — Admin Sistema")
     @PostMapping
     public ResponseEntity<PlanoResponseDto> criar(@Valid @RequestBody PlanoRequestDto dto) {
+        exigirAdmin();
         PlanoResponseDto criado = planoService.criar(dto);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{id}").buildAndExpand(criado.id()).toUri();
@@ -48,12 +52,14 @@ public class PlanoController {
     public ResponseEntity<PlanoResponseDto> atualizar(
             @PathVariable Long id,
             @Valid @RequestBody PlanoRequestDto dto) {
+        exigirAdmin();
         return ResponseEntity.ok(planoService.atualizar(id, dto));
     }
 
     @Operation(summary = "Desativar plano — Admin Sistema")
     @PatchMapping("/{id}/desativar")
     public ResponseEntity<Void> desativar(@PathVariable Long id) {
+        exigirAdmin();
         planoService.desativar(id);
         return ResponseEntity.noContent().build();
     }
@@ -61,7 +67,16 @@ public class PlanoController {
     @Operation(summary = "Reativar plano — Admin Sistema")
     @PatchMapping("/{id}/reativar")
     public ResponseEntity<Void> reativar(@PathVariable Long id) {
+        exigirAdmin();
         planoService.reativar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Defense-in-depth (CLAUDE.md §4): gestão de planos é exclusiva do Admin do Sistema — checado
+     * no controller E no PlanoService.
+     */
+    private void exigirAdmin() {
+        tenantCtx.exigirAdminSistema();
     }
 }

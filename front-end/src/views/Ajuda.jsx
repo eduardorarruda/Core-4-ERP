@@ -43,7 +43,7 @@ function ConteudoSecao({ secao, temAcesso }) {
 
       {secao.comoUsar?.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary/50 mb-2">Como usar</h4>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary/70 mb-2">Como usar</h4>
           <ol className="list-decimal pl-5 space-y-1.5 text-sm text-text-primary/80 marker:text-primary marker:font-bold">
             {secao.comoUsar.map((passo, i) => <li key={i} className="leading-relaxed">{passo}</li>)}
           </ol>
@@ -63,7 +63,7 @@ function ConteudoSecao({ secao, temAcesso }) {
 
       {secao.faq?.length > 0 && (
         <div className="mt-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary/50 mb-2">Perguntas frequentes</h4>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary/70 mb-2">Perguntas frequentes</h4>
           <div className="space-y-2">
             {secao.faq.map((f, i) => (
               <details key={i} className="group rounded-xl bg-surface-medium overflow-hidden">
@@ -127,14 +127,14 @@ export default function Ajuda() {
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar na ajuda (ex.: baixar conta, cartão, convidar)..."
           aria-label="Buscar na Central de Ajuda"
-          className="w-full min-h-11 rounded-xl bg-surface-low border border-text-primary/10 pl-10 pr-10 text-sm text-text-primary placeholder:text-text-primary/40 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="w-full min-h-11 rounded-xl bg-surface-low border border-text-primary/10 pl-10 pr-10 text-sm text-text-primary placeholder:text-text-primary/50 outline-none focus-visible:ring-2 focus-visible:ring-primary"
         />
         {busca && (
           <button
             type="button"
             onClick={() => setBusca('')}
             aria-label="Limpar busca"
-            className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium"
+            className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-lg text-text-primary/60 hover:text-text-primary hover:bg-surface-medium"
           >
             <X className="w-4 h-4" aria-hidden="true" />
           </button>
@@ -142,7 +142,7 @@ export default function Ajuda() {
       </div>
       <p aria-live="polite" className="sr-only">{total} tópicos encontrados</p>
       {busca && (
-        <p className="text-sm text-text-primary/50 -mt-3">{total} {total === 1 ? 'tópico encontrado' : 'tópicos encontrados'}</p>
+        <p className="text-sm text-text-primary/70 -mt-3">{total} {total === 1 ? 'tópico encontrado' : 'tópicos encontrados'}</p>
       )}
 
       {total === 0 && (
@@ -157,7 +157,7 @@ export default function Ajuda() {
         <nav aria-label="Índice da ajuda" className="sticky top-20 space-y-4 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
           {gruposVisiveis.map((g) => (
             <div key={g.id}>
-              <p className="text-xs font-bold uppercase tracking-wider text-text-primary/40 mb-1.5">{g.titulo}</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-text-primary/60 mb-1.5">{g.titulo}</p>
               <ul className="space-y-0.5">
                 {g.secoes.map((s) => (
                   <li key={s.id}>
@@ -175,8 +175,8 @@ export default function Ajuda() {
           ))}
           {semAcesso.length > 0 && (
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-text-primary/40 mb-1.5">Outros recursos</p>
-              <a href="#outros-recursos" className="block rounded-lg px-2 py-1.5 text-sm text-text-primary/50 hover:bg-surface-medium">
+              <p className="text-xs font-bold uppercase tracking-wider text-text-primary/60 mb-1.5">Outros recursos</p>
+              <a href="#outros-recursos" className="block rounded-lg px-2 py-1.5 text-sm text-text-primary/70 hover:bg-surface-medium">
                 Telas sem acesso no seu perfil
               </a>
             </div>
@@ -231,7 +231,7 @@ export default function Ajuda() {
                       </span>
                       <span className="flex-1 min-w-0">
                         <span className="block text-sm font-bold text-text-primary">{s.titulo}</span>
-                        <span className="block text-xs text-text-primary/50 truncate">{s.resumo}</span>
+                        <span className="block text-xs text-text-primary/70 truncate">{s.resumo}</span>
                       </span>
                       <ChevronDown className={`w-5 h-5 shrink-0 text-text-primary/40 transition-transform ${aberto ? 'rotate-180' : ''}`} aria-hidden="true" />
                     </button>
@@ -267,7 +267,7 @@ function BlocoOutrosRecursos({ secoes, anchorId }) {
           </span>
           <span className="flex-1 min-w-0">
             <span className="block text-base font-bold text-text-primary">Outros recursos do sistema</span>
-            <span className="block text-xs text-text-primary/50">Telas que seu perfil ainda não acessa</span>
+            <span className="block text-xs text-text-primary/70">Telas que seu perfil ainda não acessa</span>
           </span>
           <ChevronDown className="w-5 h-5 shrink-0 text-text-primary/40 transition-transform group-open:rotate-180" aria-hidden="true" />
         </summary>

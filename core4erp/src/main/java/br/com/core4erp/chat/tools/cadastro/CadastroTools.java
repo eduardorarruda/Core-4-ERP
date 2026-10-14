@@ -61,8 +61,9 @@ public class CadastroTools {
             @ToolParam(description = "Nome fantasia. Opcional, pode ser null") String nomeFantasia,
             @ToolParam(description = "Telefone. Opcional, pode ser null") String telefone,
             @ToolParam(description = "E-mail. Opcional, pode ser null") String email) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarParceiro razaoSocial={} tipo={}",
-                securityCtx.getUsuarioId(), razaoSocial, tipo);
+        // LGPD: razão social pode ser nome de pessoa física — fica só na auditoria do banco.
+        log.info("[CHAT-AUDIT] user={} tool=registrarParceiro tipo={}",
+                securityCtx.getUsuarioId(), tipo);
         auditoria.registrar("registrarParceiro", "razaoSocial=" + razaoSocial + " tipo=" + tipo);
 
         // Idempotência: se já existe parceiro com o mesmo nome, reaproveita em vez de duplicar.
@@ -135,8 +136,8 @@ public class CadastroTools {
             @ToolParam(description = "Descrição da categoria. Ex: 'Alimentação', 'Salário'") String descricao,
             @ToolParam(description = "Nome do ícone. Opcional, pode ser null") String icone,
             @ToolParam(description = "Nome da categoria principal, para criar uma subcategoria. Opcional, null para categoria raiz") String categoriaPaiDescricao) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarCategoria descricao={} pai={}",
-                securityCtx.getUsuarioId(), descricao, categoriaPaiDescricao);
+        log.info("[CHAT-AUDIT] user={} tool=registrarCategoria subcategoria={}",
+                securityCtx.getUsuarioId(), categoriaPaiDescricao != null);
         auditoria.registrar("registrarCategoria", "descricao=" + descricao
                 + (categoriaPaiDescricao != null ? " pai=" + categoriaPaiDescricao : ""));
 

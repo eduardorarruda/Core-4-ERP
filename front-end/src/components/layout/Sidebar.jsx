@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
+import { BrandTile } from '../ui/BrandMark';
 
 const NAV_GROUPS = [
   {
@@ -63,33 +64,20 @@ function labelVisibility(expandido) {
     : 'opacity-0 group-hover/sidebar:opacity-100 group-focus-within/sidebar:opacity-100';
 }
 
-/* BrandMark com SVG 4-grid idêntico ao Login */
-function BrandMark({ expandido }) {
+/* Marca no topo do rail — mesmo desenho do login (componente compartilhado) */
+function SidebarBrand({ expandido }) {
   return (
     <NavLink
       to="/dashboard"
-      className="px-4 mb-4 flex items-center gap-3 cursor-pointer w-full"
+      aria-label="Core 4 ERP — ir para o Dashboard"
+      className="px-4 mb-4 flex items-center gap-3 cursor-pointer w-full min-h-11 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      <div style={{
-        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-        background: 'linear-gradient(135deg,rgba(110,255,192,.16),rgba(110,255,192,.04))',
-        border: '1px solid rgba(110,255,192,.22)',
-        display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 20%,rgba(110,255,192,.4),transparent 60%)', opacity: .8 }} />
-        <svg width="16" height="16" viewBox="0 0 22 22" fill="none" style={{ position: 'relative', zIndex: 1 }}>
-          <rect x="1" y="1" width="9" height="9" rx="1.5" fill="#6EFFC0"/>
-          <rect x="12" y="1" width="9" height="9" rx="1.5" stroke="#6EFFC0" strokeWidth="1.6"/>
-          <rect x="1" y="12" width="9" height="9" rx="1.5" stroke="#6EFFC0" strokeWidth="1.6"/>
-          <rect x="12" y="12" width="9" height="9" rx="1.5" fill="#6EFFC0" opacity=".4"/>
-        </svg>
-      </div>
+      <BrandTile size={32} iconSize={16} />
       <div className={cn('transition-opacity duration-200 whitespace-nowrap min-w-0', labelVisibility(expandido))}>
-        <div className="text-sm font-bold text-text-primary font-display leading-tight flex items-center gap-2">
+        <div className="text-sm font-bold text-text-primary font-display leading-tight">
           Core <span className="text-primary">4</span> ERP
-          <span className="live-dot" style={{ width: 5, height: 5 }} />
         </div>
-        <div className="text-[9px] text-text-primary/30 font-mono tracking-widest uppercase">Enterprise</div>
+        <div className="text-xs text-text-primary/60">Gestão financeira</div>
       </div>
     </NavLink>
   );
@@ -116,11 +104,11 @@ function CartaoDropdown({ onNavigate, temPermissao, expandido }) {
         aria-expanded={open}
         className={cn(
           'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
-          isActive ? 'text-text-primary' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+          isActive ? 'text-text-primary' : 'text-text-primary/70 hover:text-text-primary hover:bg-surface-medium'
         )}
       >
         <CreditCard className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
-        <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono flex-1 text-left', labelVisibility(expandido))}>
+        <span className={cn('transition-opacity duration-200 text-xs font-bold uppercase tracking-wider whitespace-nowrap font-mono flex-1 text-left', labelVisibility(expandido))}>
           Cartões
         </span>
         <ChevronRight className={cn('w-3.5 h-3.5 transition-all duration-200 shrink-0', labelVisibility(expandido), open && 'rotate-90')} />
@@ -135,8 +123,8 @@ function CartaoDropdown({ onNavigate, temPermissao, expandido }) {
               onClick={onNavigate}
               title={sub.label}
               className={({ isActive: a }) => cn(
-                'w-full min-h-11 px-3 py-2 flex items-center gap-2 rounded-xl transition-all duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono',
-                a ? 'text-primary' : 'text-text-primary/40 hover:text-text-primary'
+                'w-full min-h-11 px-3 py-2 flex items-center gap-2 rounded-xl transition-all duration-200 text-xs font-bold uppercase tracking-wider whitespace-nowrap font-mono',
+                a ? 'text-primary' : 'text-text-primary/70 hover:text-text-primary'
               )}
             >
               {({ isActive: a }) => (
@@ -171,11 +159,11 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
 
   return (
     <aside className={cn(
-      'group/sidebar h-screen sticky top-0 transition-all duration-300 ease-in-out overflow-hidden bg-surface-low flex flex-col items-start py-6 gap-2 z-50 border-r border-text-primary/5 pb-safe',
+      'group/sidebar h-dvh sticky top-0 transition-all duration-300 ease-in-out overflow-hidden bg-surface-low flex flex-col items-start py-6 gap-2 z-50 border-r border-text-primary/5 pb-safe',
       expandido ? 'w-56' : 'w-16 hover:w-56 focus-within:w-56'
     )}>
       {/* Logo */}
-      <BrandMark expandido={expandido} />
+      <SidebarBrand expandido={expandido} />
 
       {/* Nav */}
       <nav className="flex flex-col gap-0.5 flex-1 w-full overflow-y-auto no-scrollbar px-2">
@@ -190,7 +178,7 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
           return (
             <React.Fragment key={group.label}>
               <div className={cn('px-2 pt-3 pb-1 transition-opacity duration-200', labelVisibility(expandido))}>
-                <span className="text-[9px] font-bold uppercase tracking-widest text-text-primary/30 font-mono">
+                <span className="text-xs font-bold uppercase tracking-wider text-text-primary/60 font-mono">
                   {group.label}
                 </span>
               </div>
@@ -207,13 +195,13 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
                         'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200 relative',
                         isActive
                           ? 'text-text-primary bg-gradient-to-r from-primary/15 to-transparent border-l-2 border-primary pl-[calc(0.75rem-2px)]'
-                          : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+                          : 'text-text-primary/70 hover:text-text-primary hover:bg-surface-medium'
                       )}
                     >
                       {({ isActive }) => (
                         <>
                           <item.icon className={cn('w-5 h-5 shrink-0 transition-colors', isActive && 'text-primary')} />
-                          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
+                          <span className={cn('transition-opacity duration-200 text-xs font-bold uppercase tracking-wider whitespace-nowrap font-mono', labelVisibility(expandido))}>
                             {item.label}
                           </span>
                         </>
@@ -239,11 +227,11 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
           title="Configurações"
           className={({ isActive }) => cn(
             'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
-            isActive ? 'text-text-primary bg-surface-medium' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+            isActive ? 'text-text-primary bg-surface-medium' : 'text-text-primary/70 hover:text-text-primary hover:bg-surface-medium'
           )}
         >
           <Settings className="w-5 h-5 shrink-0" />
-          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
+          <span className={cn('transition-opacity duration-200 text-xs font-bold uppercase tracking-wider whitespace-nowrap font-mono', labelVisibility(expandido))}>
             Configurações
           </span>
         </NavLink>
@@ -255,11 +243,11 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
           title="Ajuda"
           className={({ isActive }) => cn(
             'w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl transition-all duration-200',
-            isActive ? 'text-text-primary bg-surface-medium' : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+            isActive ? 'text-text-primary bg-surface-medium' : 'text-text-primary/70 hover:text-text-primary hover:bg-surface-medium'
           )}
         >
           <HelpCircle className="w-5 h-5 shrink-0" />
-          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
+          <span className={cn('transition-opacity duration-200 text-xs font-bold uppercase tracking-wider whitespace-nowrap font-mono', labelVisibility(expandido))}>
             Ajuda
           </span>
         </NavLink>
@@ -267,20 +255,20 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
         <button
           onClick={logout}
           title="Sair"
-          className="w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl text-text-primary/50 hover:text-error hover:bg-error/5 transition-all duration-200"
+          className="w-full min-h-11 px-3 py-2.5 flex items-center gap-3 rounded-xl text-text-primary/70 hover:text-error hover:bg-error/5 transition-all duration-200"
           aria-label="Sair do sistema"
         >
           <LogOut className="w-5 h-5 shrink-0" />
-          <span className={cn('transition-opacity duration-200 text-[11px] font-bold uppercase tracking-widest whitespace-nowrap font-mono', labelVisibility(expandido))}>
+          <span className={cn('transition-opacity duration-200 text-xs font-bold uppercase tracking-wider whitespace-nowrap font-mono', labelVisibility(expandido))}>
             Sair
           </span>
         </button>
 
         {/* Avatar do usuário */}
         <div className="px-3 py-2 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: 'linear-gradient(135deg,rgba(110,255,192,.3),rgba(110,255,192,.1))', border: '1px solid rgba(110,255,192,.2)' }}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden bg-primary/15 border border-primary/25">
             {usuario?.fotoPerfil ? (
-              <img src={usuario.fotoPerfil} alt="Perfil" className="w-full h-full object-cover" />
+              <img src={usuario.fotoPerfil} alt="" className="w-full h-full object-cover" />
             ) : (
               <span className="text-xs font-bold text-primary select-none font-display">
                 {getInitials(usuario?.nome)}
@@ -288,8 +276,8 @@ export default function Sidebar({ onClose, onNavigate, expandido = false }) {
             )}
           </div>
           <div className={cn('transition-opacity duration-200 min-w-0', labelVisibility(expandido))}>
-            <p className="text-[11px] font-bold text-text-primary truncate font-display">{usuario?.nome ?? 'Usuário'}</p>
-            <p className="text-[9px] text-text-primary/40 truncate font-mono">{usuario?.email ?? ''}</p>
+            <p className="text-xs font-bold text-text-primary truncate font-display">{usuario?.nome ?? 'Usuário'}</p>
+            <p className="text-xs text-text-primary/60 truncate font-mono">{usuario?.email ?? ''}</p>
           </div>
         </div>
       </div>

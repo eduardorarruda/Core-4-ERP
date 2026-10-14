@@ -7,19 +7,131 @@
         "httpMethod": "POST",
         "path": "aurea",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "11111111-1111-4111-8111-111111111111",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [160, 320],
-      "webhookId": "aurea-webhook"
+      "webhookId": "aurea-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_HEADER_AUTH",
+          "name": "N8N Webhook Secret (X-Webhook-Secret)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8080/api/auth/me",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $json.body.empresaId }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "a7e8c0de-0001-4a11-8a11-000000000001",
+      "name": "Validar sessão (auth/me)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 100],
+      "notesInFlow": true,
+      "notes": "Não confia em empresaId/usuarioId do corpo: o backend valida o JWT e, com X-Empresa-Id, devolve 403 se o usuário não pertence (ou está inativo) na empresa."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-status-200",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-usuario",
+              "leftValue": "={{ $json.body.id }}",
+              "rightValue": "={{ $('Webhook').item.json.body.usuarioId }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-empresa",
+              "leftValue": "={{ $('Webhook').item.json.body.empresaId }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "cond-conversa",
+              "leftValue": "={{ $('Webhook').item.json.body.conversaId }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a7e8c0de-0002-4a11-8a11-000000000002",
+      "name": "Sessão confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [520, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ ({ erro: 'Sessão inválida ou empresa não corresponde ao usuário.' }) }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "a7e8c0de-0003-4a11-8a11-000000000003",
+      "name": "Responder 403",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [720, -100]
     },
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $json.body.mensagem }}",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
         "options": {
           "systemMessage": "Você é a Áurea, assistente financeira do Core 4 ERP. Responda SEMPRE em português brasileiro, tom profissional e amigável, valores em R$ (1.234,56) e datas em dd/MM/yyyy. Hoje é {{ $now.format('dd/MM/yyyy') }}.\n\nRegras gerais:\n1. NUNCA invente números: todo valor financeiro citado deve vir de uma ferramenta chamada NESTA resposta — mesmo que pareça óbvio pelo histórico (o histórico pode estar defasado).\n2. NUNCA exponha termos técnicos ao usuário (IDs internos, nomes de tabelas, exceções, códigos de permissão). Se uma ferramenta retornar erro de permissão, explique que o usuário não tem acesso e oriente a falar com o administrador da empresa.\n3. Se uma consulta voltar vazia, diga claramente que não há registros no período — não preencha com suposições.\n4. Para saudações, agradecimentos ou perguntas sobre o que você sabe fazer (small talk), responda diretamente, com simpatia, SEM chamar nenhuma ferramenta.\n\nConsulta (leitura): use as ferramentas de consulta antes de citar qualquer número. Contas PENDENTE são previsão (fluxo de caixa); apenas BAIXADA compõe o saldo real — deixe a distinção clara quando relevante. Cartão de crédito tem lançamentos de SAÍDA (compras) e ENTRADA (estornos, pagamentos, cashback); o total da fatura é LÍQUIDO (saídas menos entradas) — nunca some entradas como gasto. Formate listas longas em tabelas Markdown compactas (até 15 linhas).\n\nExecução (escrita financeira): precisão antes de velocidade. NUNCA execute uma escrita com dados incompletos ou ambíguos — falta valor, data, conta ou parceiro? PERGUNTE. Dois cartões com nome parecido? LISTE e peça a escolha. Antes de gravar, resuma a operação (o quê, quanto, quando, onde) e confirme com o usuário. Operações irreversíveis ou de alto valor (exclusões, estornos, transferências, valores acima de R$ 5.000): confirme explicitamente antes de executar. Lançamento de cartão exige parceiro e categoria: compra/gasto → tipo SAIDA; estorno/pagamento/cashback → tipo ENTRADA; na dúvida, pergunte. Após executar, confirme de forma objetiva o que foi feito.\n\nCadastro: parceiro SEMPRE exige CPF ou CNPJ válido — se o usuário não informar, recuse e peça o documento. Ao receber um CNPJ, consulte-o na ferramenta de CNPJ e use a razão social e demais dados para preencher, confirmando com o usuário antes de salvar. Antes de criar, verifique se já existe cadastro igual (consulta por nome) para não duplicar. Itens usados em lançamentos não são excluídos, apenas desativados — explique isso ao usuário.\n\nAnálise: em comparações, explicite o critério (competência × caixa e o período comparado). Encerre análises com 1-2 insights acionáveis, não só números."
         }
@@ -52,7 +164,7 @@
     {
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $json.body.conversaId }}"
+        "sessionKey": "={{ $('Webhook').item.json.body.conversaId }}"
       },
       "id": "44444444-4444-4444-8444-444444444444",
       "name": "Postgres Chat Memory",
@@ -74,7 +186,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -93,15 +213,29 @@
         "specifyQuery": "keypair",
         "parametersQuery": {
           "values": [
-            { "name": "tipo", "value": "{tipo}" },
-            { "name": "status", "value": "{status}" }
+            {
+              "name": "tipo",
+              "value": "{tipo}"
+            },
+            {
+              "name": "status",
+              "value": "{status}"
+            }
           ]
         },
         "sendHeaders": true,
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -120,7 +254,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -139,7 +281,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -158,7 +308,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -177,7 +335,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -200,7 +366,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -223,7 +397,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -246,7 +428,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -269,7 +459,15 @@
         "specifyHeaders": "keypair",
         "parametersHeaders": {
           "values": [
-            { "name": "Authorization", "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
+            }
           ]
         },
         "options": {}
@@ -307,53 +505,204 @@
   ],
   "connections": {
     "Webhook": {
-      "main": [[{ "node": "AI Agent Áurea", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validar sessão (auth/me)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "OpenAI Chat Model": {
-      "ai_languageModel": [[{ "node": "AI Agent Áurea", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Postgres Chat Memory": {
-      "ai_memory": [[{ "node": "AI Agent Áurea", "type": "ai_memory", "index": 0 }]]
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarDashboard": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarContas": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarContasCorrentes": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarCartoes": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarCategorias": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarParceiros": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "registrarConta": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "baixarConta": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "registrarLancamentoCartao": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "registrarParceiro": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "consultarCnpj": {
-      "ai_tool": [[{ "node": "AI Agent Áurea", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "AI Agent Áurea": {
-      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar sessão (auth/me)": {
+      "main": [
+        [
+          {
+            "node": "Sessão confere?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sessão confere?": {
+      "main": [
+        [
+          {
+            "node": "AI Agent Áurea",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 403",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "meta": {
-    "notas": "WF-AUREA MVP — agente único: Webhook POST /aurea (sem auth, secret vem depois) -> AI Agent (gpt-4o-mini, temp 0.1, systemMessage pt-BR fundido consultor/executor/cadastrador/analista) com OpenAI Chat Model (ai_languageModel), Postgres Chat Memory (ai_memory, sessionKey=conversaId) e 11 HTTP Request Tools (ai_tool) apontando para http://backend:8080 com Authorization Bearer do jwt do payload -> Respond to Webhook {resposta,agente:AUREA,acoes:[]}. Credenciais reais referenciadas por id. Base tools curadas do TOOLS_ENDPOINTS.md."
+    "notas": "WF-AUREA MVP — agente único: Webhook POST /aurea (Header Auth X-Webhook-Secret) -> Validar sessão (GET /api/auth/me com Bearer jwt + X-Empresa-Id) -> IF Sessão confere? (senão Responder 403) -> AI Agent (gpt-4o-mini, temp 0.1, systemMessage pt-BR fundido consultor/executor/cadastrador/analista) com OpenAI Chat Model (ai_languageModel), Postgres Chat Memory (ai_memory, sessionKey=conversaId) e 11 HTTP Request Tools (ai_tool) apontando para http://backend:8080 com Authorization Bearer do jwt do payload -> Respond to Webhook {resposta,agente:AUREA,acoes:[]}. Credenciais reais referenciadas por id. Base tools curadas do TOOLS_ENDPOINTS.md."
   }
 }

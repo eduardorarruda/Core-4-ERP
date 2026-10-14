@@ -45,7 +45,7 @@ export default function Investimentos() {
     api.listar().then(setLista).catch((e) => toast.error(e.message));
     ccApi.listar().then(setCcs).catch(() => {});
     carregarTipos();
-  }, []);
+  }, [toast]);
 
   async function carregarTipos() {
     try { setTiposInv(await api.tipos.listar()); }
@@ -152,10 +152,10 @@ export default function Investimentos() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="live-dot" style={{ width: 5, height: 5 }} />
-            <p className="text-[10px] uppercase tracking-widest font-bold font-mono text-secondary">Patrimônio Investido — Todas as Contas</p>
+            <p className="text-xs uppercase tracking-widest font-bold font-mono text-secondary">Patrimônio Investido — Todas as Contas</p>
           </div>
           <p className="text-3xl font-bold text-secondary font-display">R$ {brl(totalSaldo)}</p>
-          <p className="text-[10px] text-text-primary/35 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} de investimento</p>
+          <p className="text-xs text-text-primary/60 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} de investimento</p>
         </div>
         <TrendingUp className="w-12 h-12 text-secondary opacity-20" />
       </div>
@@ -169,7 +169,7 @@ export default function Investimentos() {
         >
           <div className="flex items-center gap-2">
             <Settings2 className="w-4 h-4 text-primary" />
-            <span className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
+            <span className="text-sm font-bold uppercase tracking-widest text-text-primary/70">
               Gerenciar Tipos de Investimento
             </span>
             <Badge variant="neutral">{tiposInv.length}</Badge>
@@ -218,7 +218,7 @@ export default function Investimentos() {
 
             {/* Lista de tipos */}
             {tiposInv.length === 0 ? (
-              <p className="text-sm text-text-primary/40 text-center py-4">
+              <p className="text-sm text-text-primary/60 text-center py-4">
                 Nenhum tipo cadastrado. Crie o primeiro acima.
               </p>
             ) : (
@@ -240,10 +240,10 @@ export default function Investimentos() {
                       {t.nome}
                     </span>
                     <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" onClick={() => editarTipo(t)} aria-label={`Editar tipo ${t.nome}`} className="text-text-primary/40 hover:text-primary hover:bg-primary/10">
+                      <Button variant="ghost" size="icon" onClick={() => editarTipo(t)} aria-label={`Editar tipo ${t.nome}`} className="text-text-primary/60 hover:text-primary hover:bg-primary/10">
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deletarTipo(t.id)} aria-label={`Excluir tipo ${t.nome}`} className="text-text-primary/40 hover:text-error hover:bg-error/10">
+                      <Button variant="ghost" size="icon" onClick={() => deletarTipo(t.id)} aria-label={`Excluir tipo ${t.nome}`} className="text-text-primary/60 hover:text-error hover:bg-error/10">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
@@ -258,7 +258,7 @@ export default function Investimentos() {
       {!contaSel && (
         <>
           <form onSubmit={criar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Nova Conta de Investimento</h2>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">Nova Conta de Investimento</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className={labelCls}>Nome *</label>
@@ -287,12 +287,19 @@ export default function Investimentos() {
                 return (
                   <div
                     key={c.id}
-                    onClick={() => abrir(c)}
-                    className="bg-surface-medium border border-text-primary/5 rounded-2xl p-5 cursor-pointer hover:border-primary/30 hover:shadow-elevated transition-all space-y-3"
+                    className="relative bg-surface-medium border border-text-primary/5 rounded-2xl p-5 hover:border-primary/30 hover:shadow-elevated transition-all space-y-3 focus-within:ring-2 focus-within:ring-primary"
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="font-bold text-text-primary">{c.nome}</p>
+                        {/* Botão "esticado": o card inteiro abre a conta e funciona pelo teclado */}
+                        <button
+                          type="button"
+                          onClick={() => abrir(c)}
+                          className="font-bold text-text-primary text-left outline-none after:absolute after:inset-0 after:content-['']"
+                        >
+                          {c.nome}
+                          <span className="sr-only">: ver investimentos desta conta</span>
+                        </button>
                         {c.tipoNome && (
                           <Badge variant="info" className="mt-1">{c.tipoNome}</Badge>
                         )}
@@ -303,7 +310,7 @@ export default function Investimentos() {
                       <div className="h-1.5 w-full bg-surface-highest rounded-full overflow-hidden">
                         <div className="h-full bg-primary/60 rounded-full transition-all duration-700" style={{ width: `${pct.toFixed(1)}%` }} />
                       </div>
-                      <p className="text-[10px] text-text-primary/40 text-right">{pct.toFixed(1)}% do patrimônio</p>
+                      <p className="text-xs text-text-primary/60 text-right">{pct.toFixed(1)}% do patrimônio</p>
                     </div>
                   </div>
                 );
@@ -334,14 +341,14 @@ export default function Investimentos() {
               size="icon"
               onClick={() => setContaSel(null)}
               aria-label="Fechar conta"
-              className="text-text-primary/50 hover:text-text-primary hover:bg-surface-medium"
+              className="text-text-primary/70 hover:text-text-primary hover:bg-surface-medium"
             >
               <X className="w-5 h-5" />
             </Button>
           </div>
 
           <form onSubmit={registrar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Nova Transação</h3>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">Nova Transação</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <label className={labelCls}>Tipo *</label>
@@ -374,6 +381,7 @@ export default function Investimentos() {
           </form>
 
           <DataTable
+            caption="Investimentos"
             columns={TRANSACAO_COLUMNS}
             data={transacoes}
             loading={loadingTransacoes}

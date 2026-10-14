@@ -1,10 +1,8 @@
 /* Fontes self-hosted (@fontsource) — sem @import bloqueante do Google, funciona offline no PWA */
-@import '@fontsource/sora/300.css';
 @import '@fontsource/sora/400.css';
 @import '@fontsource/sora/500.css';
 @import '@fontsource/sora/600.css';
 @import '@fontsource/sora/700.css';
-@import '@fontsource/sora/800.css';
 @import '@fontsource-variable/dm-sans';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
@@ -31,6 +29,14 @@
   --color-warning: #FFD37A;
 
   --gradient-primary: linear-gradient(135deg, #6EFFC0, #2bdb96);
+
+  /* Séries de gráfico (tema escuro); o tema claro redefine abaixo */
+  --color-chart-1: #6EFFC0;
+  --color-chart-2: #ACC7FF;
+  --color-chart-3: #FFD37A;
+  --color-chart-4: #FFB4AB;
+  --color-chart-grid: rgba(250, 250, 250, 0.08);
+  --color-chart-axis: #A1A1AA;
 
   --color-text-primary: #FAFAFA;
 
@@ -70,13 +76,22 @@
     --color-surface-high: #D4D4D8;
     --color-surface-highest: #A1A1AA;
 
-    --color-primary: #059669;
+    /* #047857: contraste 5,1:1 sobre #F4F4F5 (o #059669 anterior ficava em 3,6:1 — reprovado para texto) */
+    --color-primary: #047857;
     --color-on-primary: #FFFFFF;
     --color-secondary: #2563EB;
     --color-error: #DC2626;
     --color-warning: #B45309;
 
-    --gradient-primary: linear-gradient(135deg, #059669, #047857);
+    --gradient-primary: linear-gradient(135deg, #047857, #065F46);
+
+    /* Séries de gráfico: contraste mínimo de 3:1 sobre fundo branco (WCAG 1.4.11) */
+    --color-chart-1: #047857;
+    --color-chart-2: #2563EB;
+    --color-chart-3: #B45309;
+    --color-chart-4: #DC2626;
+    --color-chart-grid: rgba(24, 24, 27, 0.12);
+    --color-chart-axis: #52525B;
 
     --color-text-primary: #18181B;
 
@@ -265,7 +280,7 @@
   width: 100%;
   padding: 22px 16px 10px;
   background: var(--color-surface-low);
-  border: 1px solid rgba(250,250,250,.1);
+  border: 1px solid color-mix(in srgb, var(--color-text-primary) 15%, transparent);
   border-radius: 14px;
   color: var(--color-text-primary);
   font-size: 14px;
@@ -282,8 +297,8 @@
   position: absolute;
   left: 16px;
   top: 8px;
-  font-size: 11px;
-  color: rgba(250,250,250,.4);
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
   font-family: var(--font-body);
   pointer-events: none;
   transition: color 200ms;
@@ -304,7 +319,7 @@
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: rgba(250,250,250,.4);
+  color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
   cursor: pointer;
   background: none;
   border: none;
@@ -322,7 +337,7 @@ html:not(.dark) .field-float textarea {
   color: #18181B;
 }
 html:not(.dark) .field-float label {
-  color: rgba(0,0,0,.45);
+  color: rgba(0,0,0,.65);
 }
 html:not(.dark) .field-float input:focus,
 html:not(.dark) .field-float textarea:focus {

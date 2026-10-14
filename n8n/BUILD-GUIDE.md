@@ -23,11 +23,11 @@
 
 | Item | Onde | Sem isso… |
 |---|---|---|
-| **Owner account do n8n** logado | https://n8n.core4erp.codes | não dá para cadastrar credencial nem salvar workflow |
+| **Owner account do n8n** logado | editor via túnel SSH: `ssh -L 5678:127.0.0.1:5678 servidor` → http://localhost:5678 (o editor não é público — ver DEPLOY.md) | não dá para cadastrar credencial nem salvar workflow |
 | **Credencial OpenAI** (`OpenAI Core4`) | Credentials → OpenAI | nenhum AI Agent / Embeddings roda |
-| **Credencial Qdrant** (`Qdrant Core4`, `http://qdrant:6333`, sem API key) | Credentials → Qdrant | WF-ANALISTA e WF-DOC não recuperam/inserem |
-| **Credencial Postgres** (`Postgres n8n`) | Credentials → Postgres | sem memória de conversa |
-| **Credencial Header Auth** (`N8N Webhook Secret`, header `X-Webhook-Secret` = `N8N_WEBHOOK_SECRET`) | Credentials → Header Auth | webhooks ficam abertos (A1/A5) |
+| **Credencial Qdrant** (`Qdrant Core4`, `http://qdrant:6333`, API key = `QDRANT_API_KEY` do `.env`) | Credentials → Qdrant | WF-ANALISTA não recupera (o WF-DOC não grava no Qdrant — quem indexa é o backend) |
+| **Credencial Postgres** (`Postgres n8n`: host `db`, banco `n8n`, usuário `N8N_DB_USER` — o role do n8n não acessa o banco do ERP) | Credentials → Postgres | sem memória de conversa |
+| **Credencial Header Auth** (`N8N Webhook Secret`, header `X-Webhook-Secret` = `N8N_WEBHOOK_SECRET`) | Credentials → Header Auth | o webhook não ativa (Header Auth é obrigatório em todos — 403 sem o header) |
 | **Credencial SMTP** (`SMTP Core4`) | Credentials → SMTP | WF-EVENTOS não envia e-mail |
 | **Backend aceita `Authorization: Bearer`** | validar A4 (passo 1.1 do plano) | nenhuma tool autentica |
 
@@ -320,7 +320,7 @@ Regras:
 | Recurso | Credencial nomeada | Bloqueia |
 |---|---|---|
 | Todos os AI Agent + Embeddings | `OpenAI Core4` | validação inteira (sem OpenAI nada roda) |
-| Retrieval/insert Qdrant | `Qdrant Core4` | WF-ANALISTA, WF-DOC |
+| Retrieval Qdrant | `Qdrant Core4` | WF-ANALISTA (o WF-DOC só pré-processa; o backend indexa) |
 | Memória de conversa | `Postgres n8n` | contexto multi-turno |
 | Webhooks de entrada | `N8N Webhook Secret` (Header Auth) | segurança A1/A5 |
 | E-mail | `SMTP Core4` | WF-EVENTOS ramo alto valor |
@@ -343,7 +343,7 @@ Rodar no shadow-mode (`CHAT_ORQUESTRADOR=n8n` só para o admin, Fase 3.8) e no c
 - [ ] 6. "Cadastra parceiro João" (sem CPF) → **recusa** e pede documento.
 - [ ] 7. "Transfere R$ 6.000 da conta A para B" → **pede confirmação** (alto valor) antes de executar.
 - [ ] 8. "Exclui a conta de luz" → **confirmação explícita**; Revisor valida.
-- [ ] 9. Anexo PDF de extrato → resposta imediata; indexado (WF-DOC); pergunta posterior usa o conteúdo.
+- [ ] 9. Anexo PDF de extrato → resposta imediata; pré-processado (WF-DOC) e indexado UMA vez pelo backend; pergunta posterior usa o conteúdo.
 - [ ] 10. "Compare meus gastos de maio e junho" → **ANALISTA**, números de tools, insight final.
 - [ ] 11. Usuário SEM permissão `CONTA_CRIAR` tenta registrar conta → mensagem amigável de acesso.
 - [ ] 12. **CRÍTICO** — usuário da empresa A jamais vê dado da empresa B (testar com 2 tokens/JWT).

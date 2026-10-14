@@ -22,4 +22,6 @@ public interface ConviteRepository extends JpaRepository<Convite, Long> {
     boolean existsByEmpresaIdAndEmailConvidadoAndAceitoFalse(Long empresaId, String email);
 
     List<Convite> findByAceitoFalseAndExpiraEmBefore(LocalDateTime momento);
+
+    boolean existsByPerfilIdAndAceitoFalse(Long perfilId);
 }

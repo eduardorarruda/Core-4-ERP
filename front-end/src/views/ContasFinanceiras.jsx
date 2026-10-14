@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown, Loader2, Pencil, ArrowRightLeft, History, Sparkles } from 'lucide-react';
 import { contas as api, categorias as catApi, parceiros as parApi, contasCorrentes as ccApi, assinaturas as assinaturasApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -25,8 +25,8 @@ const COLUMNS = [
   { key: 'descricao', label: 'Descrição', render: (v, row) => (
     <div>
       <p className="font-medium text-text-primary">{v}</p>
-      {row.totalParcelas > 1 && <span className="text-xs text-text-primary/40">{row.numeroParcela}/{row.totalParcelas}</span>}
-      {row.numeroDocumento && <p className="text-xs text-text-primary/40">{row.numeroDocumento}</p>}
+      {row.totalParcelas > 1 && <span className="text-xs text-text-primary/60">{row.numeroParcela}/{row.totalParcelas}</span>}
+      {row.numeroDocumento && <p className="text-xs text-text-primary/60">{row.numeroDocumento}</p>}
     </div>
   )},
   { key: 'valorOriginal', label: 'Valor', sortable: true, render: (v) => `R$ ${brl(v)}` },
@@ -82,7 +82,6 @@ export default function ContasFinanceiras() {
       setAssinaturasAtivas(a);
       setTransferencias(t);
     });
-    carregar(emptyFiltros);
   }, []);
 
   const carregar = useCallback(async (f = filtros, pageArg = 0) => {
@@ -108,7 +107,12 @@ export default function ContasFinanceiras() {
     } finally {
       setLoading(false);
     }
-  }, [filtros]);
+  }, [filtros, toast]);
+
+  // Carga inicial com filtros vazios. `carregar` muda a cada filtro digitado; o ref garante que
+  // a busca automática rode só na montagem (os filtros são aplicados pelo botão).
+  const carregarInicial = useRef(carregar);
+  useEffect(() => { carregarInicial.current(emptyFiltros); }, []);
 
   const irParaPagina = (novaPagina) => carregar(filtros, novaPagina);
   const setTipo = (tipo) => { const novo = { ...filtros, tipo }; setFiltros(novo); carregar(novo, 0); };
@@ -180,7 +184,7 @@ export default function ContasFinanceiras() {
         catch (e) { toast.error(e.message); }
       },
     });
-  }, [carregar]);
+  }, [carregar, toast]);
 
   const estornar = useCallback((id) => {
     setConfirmAction({
@@ -194,12 +198,12 @@ export default function ContasFinanceiras() {
         catch (e) { toast.error(e.message); }
       },
     });
-  }, [carregar]);
+  }, [carregar, toast]);
 
   const carregarTransferencias = useCallback(async () => {
     try { setTransferencias(await ccApi.transferencias.listar()); }
     catch (e) { toast.error(e.message); }
-  }, []);
+  }, [toast]);
 
   async function salvarTransferencia(e) {
     e.preventDefault();
@@ -264,7 +268,7 @@ export default function ContasFinanceiras() {
         }
       },
     });
-  }, [carregar, carregarTransferencias]);
+  }, [carregar, carregarTransferencias, toast]);
 
   async function baixar(e) {
     e.preventDefault();
@@ -343,7 +347,7 @@ export default function ContasFinanceiras() {
               onClick={() => { setBaixaId(row.id); setBaixaForm(emptyBaixa); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               aria-label="Baixar conta"
               title="Baixar"
-              className="text-text-primary/50 hover:text-primary"
+              className="text-text-primary/70 hover:text-primary"
             >
               <CheckCircle className="w-5 h-5" />
             </Button>
@@ -355,7 +359,7 @@ export default function ContasFinanceiras() {
             aria-label="Editar conta"
             title={row.conciliada ? 'Conta conciliada — edição bloqueada' : 'Editar'}
             disabled={row.conciliada}
-            className="text-text-primary/50 hover:text-secondary"
+            className="text-text-primary/70 hover:text-secondary"
           >
             <Pencil className="w-5 h-5" />
           </Button>
@@ -367,7 +371,7 @@ export default function ContasFinanceiras() {
               aria-label="Estornar quitação"
               title={row.conciliada ? 'Conta conciliada — estorno bloqueado' : 'Estornar'}
               disabled={row.conciliada}
-              className="text-text-primary/50 hover:text-warning"
+              className="text-text-primary/70 hover:text-warning"
             >
               <RotateCcw className="w-5 h-5" />
             </Button>
@@ -378,7 +382,7 @@ export default function ContasFinanceiras() {
             onClick={() => deletar(row.id)}
             aria-label="Excluir conta"
             title="Excluir"
-            className="text-text-primary/50 hover:text-error"
+            className="text-text-primary/70 hover:text-error"
           >
             <Trash2 className="w-5 h-5" />
           </Button>
@@ -408,10 +412,10 @@ export default function ContasFinanceiras() {
       label: 'Ações',
       render: (id, t) => (
         <div className="flex gap-1 md:justify-end">
-          <Button variant="ghost" size="icon" onClick={() => editarTransferencia(t)} aria-label="Editar transferência" title="Editar" className="text-text-primary/50 hover:text-primary">
+          <Button variant="ghost" size="icon" onClick={() => editarTransferencia(t)} aria-label="Editar transferência" title="Editar" className="text-text-primary/70 hover:text-primary">
             <Pencil className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => deletarTransferencia(t.id)} aria-label="Excluir transferência" title="Excluir" className="text-text-primary/50 hover:text-error">
+          <Button variant="ghost" size="icon" onClick={() => deletarTransferencia(t.id)} aria-label="Excluir transferência" title="Excluir" className="text-text-primary/70 hover:text-error">
             <Trash2 className="w-5 h-5" />
           </Button>
         </div>
@@ -453,7 +457,7 @@ export default function ContasFinanceiras() {
       {/* Formulário de transferência */}
       {showTransf && (
         <form onSubmit={salvarTransferencia} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">
             {editTransfId ? `Editar Transferência #${editTransfId}` : 'Transferência entre Contas'}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -492,7 +496,7 @@ export default function ContasFinanceiras() {
           o total real vem do backend (totalElements). */}
       {!loading && contas.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-widest font-mono text-text-primary/40">
+          <span className="text-xs font-bold uppercase tracking-widest font-mono text-text-primary/60">
             Nesta página:
           </span>
           {statusChips.map((s) => {
@@ -513,7 +517,7 @@ export default function ContasFinanceiras() {
               </button>
             );
           })}
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono text-text-primary/40 border border-text-primary/10">
+          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono text-text-primary/60 border border-text-primary/10">
             {totalElements} no total
           </span>
         </div>
@@ -526,10 +530,10 @@ export default function ContasFinanceiras() {
           onClick={() => setShowFiltros((v) => !v)}
           className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-high/40 transition-colors"
         >
-          <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono flex items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono flex items-center gap-2">
             <Filter className="w-3.5 h-3.5" /> Filtros avançados
           </span>
-          <ChevronDown className={cn('w-4 h-4 text-text-primary/40 transition-transform duration-200', showFiltros && 'rotate-180')} />
+          <ChevronDown className={cn('w-4 h-4 text-text-primary/60 transition-transform duration-200', showFiltros && 'rotate-180')} />
         </button>
 
         {showFiltros && (
@@ -543,7 +547,7 @@ export default function ContasFinanceiras() {
                     'px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono transition-all',
                     filtros.tipo === t
                       ? 'bg-gradient-primary text-on-primary'
-                      : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary'
+                      : 'border border-text-primary/10 text-text-primary/70 hover:text-text-primary'
                   )}
                 >
                   {t || 'Todos'}
@@ -594,7 +598,7 @@ export default function ContasFinanceiras() {
       {/* Form */}
       {showForm && (
         <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">Nova Conta</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">Nova Conta</h2>
           <form onSubmit={criar}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 [&>*]:min-w-0">
               {assinaturasAtivas.length > 0 && (
@@ -771,6 +775,7 @@ export default function ContasFinanceiras() {
 
       {/* Tabela */}
       <DataTable
+        caption="Lançamentos a pagar e a receber"
         columns={columns}
         data={contas}
         loading={loading}
@@ -789,17 +794,12 @@ export default function ContasFinanceiras() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-text-primary/40" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/40 font-mono">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono">
               Histórico de Transferências
             </h2>
           </div>
-          {/* Cards no mobile, tabela com rolagem horizontal no desktop */}
-          <div className="md:hidden">
-            <DataTable columns={transfColumns} data={transferencias} cardView keyExtractor={(t) => t.id} />
-          </div>
-          <div className="hidden md:block">
-            <DataTable columns={transfColumns} data={transferencias} keyExtractor={(t) => t.id} />
-          </div>
+          {/* O DataTable já alterna sozinho: tabela no desktop, cards no celular */}
+          <DataTable caption="Transferências entre contas" columns={transfColumns} data={transferencias} keyExtractor={(t) => t.id} />
         </div>
       )}
 

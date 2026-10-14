@@ -13,7 +13,7 @@ import { useConfirm } from '../hooks/useConfirm';
 
 const INPUT_CLS =
   'block w-full h-11 px-3.5 bg-surface border border-text-primary/10 rounded-xl text-sm text-text-primary ' +
-  'placeholder:text-text-primary/40 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition';
+  'placeholder:text-text-primary/50 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition';
 const LABEL_CLS = 'block text-xs font-medium text-text-primary/60 mb-1.5';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -397,7 +397,7 @@ export default function GestaoOperadores() {
                 'focus-visible:ring-2 focus-visible:ring-primary ' +
                 (ativo
                   ? 'bg-primary/10 text-primary'
-                  : 'bg-surface-medium text-text-primary/50 hover:text-text-primary hover:bg-surface-high')
+                  : 'bg-surface-medium text-text-primary/70 hover:text-text-primary hover:bg-surface-high')
               }
             >
               {a.label}
@@ -408,10 +408,10 @@ export default function GestaoOperadores() {
 
       {/* Tabela (desktop) + cards (mobile) — mesmo conteúdo, responsivo */}
       <div className="hidden md:block">
-        <DataTable columns={colunas} data={dados} loading={loading} emptyState={vazio} keyExtractor={(r) => r.usuarioId ?? r.id} />
+        <DataTable caption="Operadores da empresa" columns={colunas} data={dados} loading={loading} emptyState={vazio} keyExtractor={(r) => r.usuarioId ?? r.id} />
       </div>
       <div className="md:hidden">
-        <DataTable columns={colunas} data={dados} loading={loading} emptyState={vazio} cardView keyExtractor={(r) => r.usuarioId ?? r.id} />
+        <DataTable caption="Operadores da empresa" columns={colunas} data={dados} loading={loading} emptyState={vazio} cardView keyExtractor={(r) => r.usuarioId ?? r.id} />
       </div>
 
       {modalConvite && (

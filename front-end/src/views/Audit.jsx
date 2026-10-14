@@ -116,7 +116,7 @@ export default function Audit() {
     {
       key: 'timestamp',
       label: 'Data e hora',
-      render: (v) => <span className="text-[11px] font-mono text-text-primary/50 whitespace-nowrap">{fmtData(v)}</span>,
+      render: (v) => <span className="text-xs font-mono text-text-primary/70 whitespace-nowrap">{fmtData(v)}</span>,
     },
     {
       key: 'usuarioId',
@@ -128,7 +128,7 @@ export default function Audit() {
             <span
               role="img"
               aria-label={`Ação executada pela assistente de IA (Áurea) a pedido do ${usuarioLabel(v)}`}
-              className="inline-flex items-center rounded-full font-bold uppercase tracking-wider text-[10px] px-2 py-0.5 bg-secondary/15 text-secondary border border-secondary/20"
+              className="inline-flex items-center rounded-full font-bold uppercase tracking-wider text-xs px-2 py-0.5 bg-secondary/15 text-secondary border border-secondary/20"
             >
               <span aria-hidden="true">IA</span>
             </span>
@@ -144,7 +144,7 @@ export default function Audit() {
     {
       key: 'entidadeId',
       label: 'Registro',
-      render: (v) => <span className="text-[11px] font-mono text-text-primary/40">{v ?? '—'}</span>,
+      render: (v) => <span className="text-xs font-mono text-text-primary/60">{v ?? '—'}</span>,
     },
     {
       key: 'acao',
@@ -162,7 +162,7 @@ export default function Audit() {
     {
       key: 'ipAddress',
       label: 'IP',
-      render: (v) => <span className="text-[11px] font-mono text-text-primary/35">{v ?? '—'}</span>,
+      render: (v) => <span className="text-xs font-mono text-text-primary/60">{v ?? '—'}</span>,
     },
   ];
 
@@ -198,12 +198,12 @@ export default function Audit() {
             </div>
             <div className="flex items-center gap-2">
               {stat.live && <span className="live-dot" style={{ width: 5, height: 5 }} />}
-              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono">{stat.label}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono">{stat.label}</span>
             </div>
             <p className={`text-4xl font-bold font-display leading-none ${stat.color}`}>
               {loading ? '—' : stat.value}
             </p>
-            <span className="text-[10px] uppercase tracking-widest text-text-primary/30 font-mono">{stat.hint}</span>
+            <span className="text-xs uppercase tracking-widest text-text-primary/60 font-mono">{stat.hint}</span>
           </div>
         ))}
       </div>
@@ -218,7 +218,7 @@ export default function Audit() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filtrar nesta página por entidade, ação ou usuário..."
               aria-label="Filtrar registros exibidos nesta página"
-              className="w-full bg-surface-high border border-text-primary/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-text-primary/30"
+              className="w-full bg-surface-high border border-text-primary/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-text-primary/50"
             />
           </div>
           <Button
@@ -236,11 +236,11 @@ export default function Audit() {
         {showFiltros && (
           <div className="p-4 border-b border-text-primary/5 flex flex-wrap gap-4 items-end">
             <div>
-              <label className="block text-xs font-mono uppercase tracking-widest text-text-primary/40 mb-1">Ação</label>
-              <select
+              <label htmlFor="audit-acao" className="block text-xs font-mono uppercase tracking-wider text-text-primary/70 mb-1">Ação</label>
+              <select id="audit-acao"
                 value={filtroAcao}
                 onChange={(e) => aplicarFiltro(setFiltroAcao)(e.target.value)}
-                className="bg-surface-high border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="bg-surface-high border border-text-primary/15 rounded-xl px-3 py-2 min-h-11 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <option value="">Todas</option>
                 {['CRIAR', 'ATUALIZAR', 'DELETAR', 'LOGIN', 'LOGOUT', 'ACESSO_NEGADO', 'EXPORTAR'].map((a) => (
@@ -249,26 +249,26 @@ export default function Audit() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-mono uppercase tracking-widest text-text-primary/40 mb-1">Data início</label>
-              <input
+              <label htmlFor="audit-inicio" className="block text-xs font-mono uppercase tracking-wider text-text-primary/70 mb-1">Data início</label>
+              <input id="audit-inicio"
                 type="date"
                 value={dataInicio}
                 onChange={(e) => aplicarFiltro(setDataInicio)(e.target.value)}
-                className="bg-surface-high border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="bg-surface-high border border-text-primary/15 rounded-xl px-3 py-2 min-h-11 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </div>
             <div>
-              <label className="block text-xs font-mono uppercase tracking-widest text-text-primary/40 mb-1">Data fim</label>
-              <input
+              <label htmlFor="audit-fim" className="block text-xs font-mono uppercase tracking-wider text-text-primary/70 mb-1">Data fim</label>
+              <input id="audit-fim"
                 type="date"
                 value={dataFim}
                 onChange={(e) => aplicarFiltro(setDataFim)(e.target.value)}
-                className="bg-surface-high border border-text-primary/10 rounded-xl px-3 py-2 text-sm text-text-primary outline-none"
+                className="bg-surface-high border border-text-primary/15 rounded-xl px-3 py-2 min-h-11 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
               />
             </div>
             <button
               onClick={limparFiltros}
-              className="px-3 py-2 text-text-primary/40 text-xs font-mono uppercase tracking-widest hover:text-text-primary transition-colors"
+              className="px-3 min-h-11 rounded-xl text-text-primary/70 text-xs font-mono uppercase tracking-wider hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               Limpar
             </button>
@@ -278,13 +278,14 @@ export default function Audit() {
         {/* Tabela (desktop) + cards (mobile), paginação real server-side */}
         <div className="p-4 space-y-4">
           <DataTable
+            caption="Registros de auditoria"
             columns={columns}
             data={filtered}
             loading={loading}
             serverSort
             keyExtractor={(r) => r.id}
             emptyState={
-              <div className="py-12 text-center text-text-primary/40 text-sm">
+              <div className="py-12 text-center text-text-primary/60 text-sm">
                 Nenhum evento de auditoria encontrado para os filtros selecionados.
               </div>
             }

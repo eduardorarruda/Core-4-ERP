@@ -7,7 +7,8 @@
         "httpMethod": "POST",
         "path": "aurea",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "11111111-1111-4111-8111-111111111111",
       "name": "Webhook",
@@ -17,7 +18,127 @@
         -200,
         400
       ],
-      "webhookId": "aurea-webhook"
+      "webhookId": "aurea-webhook",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_HEADER_AUTH",
+          "name": "N8N Webhook Secret (X-Webhook-Secret)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8080/api/auth/me",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.body.jwt }}"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $json.body.empresaId }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "a7e8c0de-0001-4a11-8a11-000000000001",
+      "name": "Validar sessão (auth/me)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -20,
+        180
+      ],
+      "notesInFlow": true,
+      "notes": "Não confia em empresaId/usuarioId do corpo: o backend valida o JWT e, com X-Empresa-Id, devolve 403 se o usuário não pertence (ou está inativo) na empresa."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-status-200",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-usuario",
+              "leftValue": "={{ $json.body.id }}",
+              "rightValue": "={{ $('Webhook').item.json.body.usuarioId }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-empresa",
+              "leftValue": "={{ $('Webhook').item.json.body.empresaId }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "cond-conversa",
+              "leftValue": "={{ $('Webhook').item.json.body.conversaId }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a7e8c0de-0002-4a11-8a11-000000000002",
+      "name": "Sessão confere?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ ({ erro: 'Sessão inválida ou empresa não corresponde ao usuário.' }) }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "a7e8c0de-0003-4a11-8a11-000000000003",
+      "name": "Responder 403",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        360,
+        -20
+      ]
     },
     {
       "parameters": {
@@ -64,7 +185,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ $json.body.mensagem }}",
+        "text": "={{ $('Webhook').item.json.body.mensagem }}",
         "hasOutputParser": true,
         "options": {
           "systemMessage": "Você é o roteador interno da Áurea. Sua ÚNICA função é classificar a mensagem do usuário e escolher qual agente especializado deve atendê-la. Não responda ao usuário.\n\nAgentes disponíveis:\n- CONSULTOR: perguntas de leitura — saldos, extratos, contas a pagar/receber, faturas de cartão, investimentos, assinaturas, notificações. \"Quanto…\", \"Liste…\", \"Qual o saldo…\".\n- EXECUTOR: ações que alteram dados — registrar/baixar/estornar conta, lançar compra no cartão, transferir entre contas, fechar fatura, registrar aporte.\n- CADASTRADOR: criar/editar parceiros, categorias, contas correntes, cartões, assinaturas; consultas de CNPJ.\n- ANALISTA: análises comparativas e históricas (\"compare meus gastos\", \"como evoluiu\"), relatórios em Excel, perguntas sobre documentos/anexos enviados.\n- SMALLTALK: saudações, agradecimentos, perguntas sobre o que a Áurea sabe fazer.\n- LOTE: EXCLUSIVAMENTE para CADASTRAR/IMPORTAR EM MASSA vários itens (categorias e/ou parceiros) a partir de arquivo(s) anexado(s), quando o usuário PEDE EXPLICITAMENTE a ação de cadastrar. Só use LOTE se a mensagem contém um verbo de criação em massa: \"cadastre\", \"importe\", \"registre\", \"crie\", \"adicione\" seguido de categorias/parceiros dos arquivos. Ex. de LOTE: \"cadastre as categorias e parceiros desses arquivos\". NÃO é LOTE se a mensagem é uma PERGUNTA, COMPARAÇÃO ou CONCILIAÇÃO sobre o anexo — mesmo que tenha muitos dados. Ex. que NÃO é LOTE (vai para ANALISTA): \"quais dessas contas não foram lançadas no cartão?\", \"compare esse extrato com meus lançamentos\", \"concilie esse arquivo\", \"o que tem nesse arquivo?\". Na dúvida entre LOTE e ANALISTA, escolha ANALISTA (LOTE escreve dados; só use quando o pedido de cadastrar for inequívoco).\n\nRegras:\n1. Uma mensagem com leitura E escrita (\"paga a conta de luz e me diz quanto sobra\") vai para EXECUTOR — ele consulta o que precisar depois de agir.\n2. Extraia entidades óbvias (valores, datas, nomes de parceiro/categoria/cartão) em \"resumoIntencao\" para o próximo agente não re-perguntar.\n3. Em dúvida entre CONSULTOR e ANALISTA: pergunta pontual → CONSULTOR; comparação/tendência/documento → ANALISTA.\n4. Responda APENAS o JSON no formato combinado: {\"agente\":\"...\",\"resumoIntencao\":\"...\"}. O campo agente deve ser exatamente um de: CONSULTOR, EXECUTOR, CADASTRADOR, ANALISTA, SMALLTALK, LOTE."
@@ -396,6 +517,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -438,6 +564,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -463,6 +594,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -490,6 +626,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -515,6 +656,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -542,6 +688,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -567,6 +718,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -594,6 +750,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -619,6 +780,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -672,6 +838,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -714,6 +885,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -743,6 +919,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -774,6 +955,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -800,6 +986,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -831,6 +1022,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -857,6 +1053,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -888,6 +1089,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -917,6 +1123,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -948,6 +1159,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -978,6 +1194,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -1007,6 +1228,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -1053,6 +1279,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -1082,6 +1313,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -1113,6 +1349,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -1142,6 +1383,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -1185,6 +1431,11 @@
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
               "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
+              "valueProvider": "fieldValue"
             }
           ]
         }
@@ -1226,6 +1477,11 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Webhook').item.json.body.jwt }}",
+              "valueProvider": "fieldValue"
+            },
+            {
+              "name": "X-Empresa-Id",
+              "value": "={{ $('Webhook').item.json.body.empresaId }}",
               "valueProvider": "fieldValue"
             }
           ]
@@ -1789,7 +2045,7 @@
       "main": [
         [
           {
-            "node": "Roteador",
+            "node": "Validar sessão (auth/me)",
             "type": "main",
             "index": 0
           }
@@ -2072,12 +2328,41 @@
           }
         ]
       ]
+    },
+    "Validar sessão (auth/me)": {
+      "main": [
+        [
+          {
+            "node": "Sessão confere?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sessão confere?": {
+      "main": [
+        [
+          {
+            "node": "Roteador",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 403",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
     "executionOrder": "v1"
   },
   "meta": {
-    "notas": "WF-AUREA multi-agente co-localizado: Webhook POST /aurea -> Roteador (AI Agent, saida estruturada agente/resumoIntencao, sem tools) -> Switch por agente -> 5 sub-agentes (Consultor/Executor/Cadastrador/Analista/SmallTalk), cada um AI Agent gpt-4o-mini temp0.1 com prompt exato da Parte 4, memoria Postgres compartilhada (sessionKey=conversaId) e subconjunto de tools HTTP (Bearer do jwt do payload). Revisor (§4.4) incorporado como regra de auto-revisao no prompt do Executor (nao e no separado). Analista com retrieval Qdrant (colecao core4erp_rag) filtrado por empresaId. Convergem em 1 Respond to Webhook {resposta,agente,acoes}."
+    "notas": "WF-AUREA multi-agente co-localizado: Webhook POST /aurea (Header Auth X-Webhook-Secret) -> Validar sessão (GET /api/auth/me com Bearer jwt + X-Empresa-Id) -> IF Sessão confere? (senão Responder 403) -> Roteador (AI Agent, saida estruturada agente/resumoIntencao, sem tools) -> Switch por agente -> 5 sub-agentes (Consultor/Executor/Cadastrador/Analista/SmallTalk), cada um AI Agent gpt-4o-mini temp0.1 com prompt exato da Parte 4, memoria Postgres compartilhada (sessionKey=conversaId) e subconjunto de tools HTTP (Bearer do jwt do payload). Revisor (§4.4) incorporado como regra de auto-revisao no prompt do Executor (nao e no separado). Analista com retrieval Qdrant (colecao core4erp_rag) filtrado por empresaId. Convergem em 1 Respond to Webhook {resposta,agente,acoes}."
   }
 }

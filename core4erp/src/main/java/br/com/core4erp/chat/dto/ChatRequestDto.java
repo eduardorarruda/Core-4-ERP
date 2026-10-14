@@ -30,6 +30,7 @@ public record ChatRequestDto(
         try {
             return ChatMensagem.Canal.valueOf(canal.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
+            // Canal desconhecido enviado pelo cliente: cai no canal padrão (não é erro do usuário).
             return ChatMensagem.Canal.ASSISTENTE;
         }
     }
