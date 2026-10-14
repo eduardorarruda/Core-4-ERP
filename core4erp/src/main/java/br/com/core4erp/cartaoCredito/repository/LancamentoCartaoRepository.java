@@ -281,9 +281,26 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
     // ── Compras parceladas ativas (GET /api/cartoes/parcelamentos) ─────────────
 
     /**
-     * Todas as parcelas (SAIDA) dos parcelamentos que ainda têm parcela em fatura do mês
-     * {@code ymAtual} (ano×12+mês) em diante. Uma consulta só, com cartão e parceiro já
-     * resolvidos (sem N+1); o agrupamento por {@code grupoParcelamento} é feito no service.
+     * Grupos de parcelamento que ainda têm parcela em fatura do mês {@code ymAtual} (ano×12+mês) em
+     * diante, dos mais recentes (data da compra) para os mais antigos. Sempre chamado com
+     * {@link Pageable} — o teto de grupos fica no {@code ParcelamentoCartaoService}.
+     */
+    @Query("""
+        SELECT x.grupoParcelamento FROM LancamentoCartao x
+        WHERE x.empresaId = :eid
+          AND x.grupoParcelamento IS NOT NULL
+          AND x.totalParcelas > 1
+        GROUP BY x.grupoParcelamento
+        HAVING MAX(x.anoFatura * 12 + x.mesFatura) >= :ymAtual
+        ORDER BY MAX(x.dataCompra) DESC, x.grupoParcelamento
+        """)
+    List<String> gruposDeParcelamentosAtivos(@Param("eid") Long eid, @Param("ymAtual") int ymAtual,
+                                             Pageable pageable);
+
+    /**
+     * Todas as parcelas (SAIDA) dos grupos informados (vindos de {@link #gruposDeParcelamentosAtivos}).
+     * Uma consulta só, com cartão e parceiro já resolvidos (sem N+1); o agrupamento por
+     * {@code grupoParcelamento} é feito no service. Sempre com {@link Pageable} (teto de linhas).
      */
     @Query("""
         SELECT new br.com.core4erp.cartaoCredito.repository.ParcelaLinha(
@@ -296,13 +313,9 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
         WHERE l.empresaId = :eid
           AND l.tipo = br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao.SAIDA
           AND l.totalParcelas > 1
-          AND l.grupoParcelamento IN (
-                SELECT x.grupoParcelamento FROM LancamentoCartao x
-                WHERE x.empresaId = :eid
-                  AND x.grupoParcelamento IS NOT NULL
-                  AND x.totalParcelas > 1
-                  AND (x.anoFatura * 12 + x.mesFatura) >= :ymAtual)
+          AND l.grupoParcelamento IN :grupos
         ORDER BY l.grupoParcelamento, l.numeroParcela
         """)
-    List<ParcelaLinha> parcelasDeParcelamentosAtivos(@Param("eid") Long eid, @Param("ymAtual") int ymAtual);
+    List<ParcelaLinha> parcelasDosGrupos(@Param("eid") Long eid, @Param("grupos") List<String> grupos,
+                                         Pageable pageable);
 }

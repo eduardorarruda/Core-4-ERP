@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.tools.consulta;
 
+import br.com.core4erp.chat.tools.DadosNaoConfiaveisResultConverter;
 import br.com.core4erp.assinatura.dto.AssinaturaResponseDto;
 import br.com.core4erp.assinatura.service.AssinaturaService;
 import br.com.core4erp.cartaoCredito.dto.CartaoCreditoResponseDto;
@@ -56,12 +57,12 @@ public class ConsultaTools {
             Resumo financeiro do usuário: saldo, total a pagar/receber, investimentos,
             cartões, fluxo dos últimos meses, top despesas por categoria e contas
             vencendo/atrasadas. Use para saldo, "como estão minhas finanças", resumo.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public DashboardResumoDto consultarDashboard() {
         return DashboardResumoDto.from(dashboardService.getDashboard(null, null, null, null));
     }
 
-    @Tool(description = "Lista as contas correntes (id, número, agência, descrição, saldo).")
+    @Tool(description = "Lista as contas correntes (id, número, agência, descrição, saldo).", resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<ContaCorrenteResponseDto> consultarContasCorrentes() {
         return contaCorrenteService.listar();
     }
@@ -71,28 +72,28 @@ public class ConsultaTools {
             subcategoria — campo categoriaPaiDescricao). Use ANTES de registrar um lançamento para
             obter o categoriaId correto. Prefira a subcategoria mais específica quando existir.
             Nunca invente um categoriaId.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<CategoriaResponseDto> consultarCategorias() {
         return categoriaService.listar(PageRequest.of(0, 200, Sort.by("descricao"))).getContent()
                 .stream().filter(CategoriaResponseDto::ativo).toList();
     }
 
-    @Tool(description = "Lista os cartões de crédito (id, nome, limite total/usado/livre, fechamento, vencimento).")
+    @Tool(description = "Lista os cartões de crédito (id, nome, limite total/usado/livre, fechamento, vencimento).", resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<CartaoCreditoResponseDto> consultarCartoes() {
         return cartaoCreditoService.listar(PageRequest.of(0, 200)).getContent();
     }
 
-    @Tool(description = "Lista as carteiras de investimento (id, nome, tipo, saldo).")
+    @Tool(description = "Lista as carteiras de investimento (id, nome, tipo, saldo).", resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<ContaInvestimentoResponseDto> consultarInvestimentos() {
         return investimentoService.listar();
     }
 
-    @Tool(description = "Lista notificações não lidas (contas vencidas e faturas de cartão).")
+    @Tool(description = "Lista notificações não lidas (contas vencidas e faturas de cartão).", resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<NotificacaoResponseDto> consultarNotificacoes() {
         return notificacaoService.listarNaoLidas();
     }
 
-    @Tool(description = "Lista assinaturas/recorrências (valor mensal e dia de vencimento).")
+    @Tool(description = "Lista assinaturas/recorrências (valor mensal e dia de vencimento).", resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<AssinaturaResponseDto> consultarAssinaturas() {
         return assinaturaService.listar();
     }
@@ -101,7 +102,7 @@ public class ConsultaTools {
             Lista os parceiros (id, razão social, nome fantasia, CPF/CNPJ, tipo). Use SEMPRE
             para localizar um parceiro pelo nome e obter o parceiroId antes de vincular um
             lançamento. Reaproveite parceiro existente; nunca cadastre duplicado.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<ParceiroResponseDto> consultarParceiros() {
         return parceiroService.listar(PageRequest.of(0, 200, Sort.by("razaoSocial"))).getContent();
     }

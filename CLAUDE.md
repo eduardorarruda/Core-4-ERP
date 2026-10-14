@@ -1385,6 +1385,18 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
   dado. **Portão técnico** `GateEscritaAnexoAspect`: num turno com anexo (`TurnoAnexoHolder`), toda tool que não começa
   com `consultar`/`gerarRelatorio` lança `ConfirmacaoNecessariaException` — escrita só no turno seguinte, após o "sim"
   (o histórico guarda só um resumo do arquivo). Tool nova é escrita por padrão (fail-safe).
+- **Prompt injection via dados cadastrados (resultado de tools)**: nomes/descrições (categoria, conta, parceiro, cartão,
+  assinatura, frases de insight, dados da BrasilAPI) são texto livre de usuários. Toda tool `consultar*` que devolve DTO usa
+  `@Tool(..., resultConverter = DadosNaoConfiaveisResultConverter.class)` → JSON envolto em `<dados_do_sistema_nao_confiaveis>`
+  (tags reservadas neutralizadas por `ConteudoNaoConfiavel`). Tools que devolvem texto com orientação (`AnaliseFinanceiraTools`)
+  envolvem só o trecho de dados (`ConteudoNaoConfiavel.envolverDadosSistema()`). **Tool `consultar*` nova DEVE usar o
+  converter** — `DadosNaoConfiaveisToolsTest` falha caso contrário.
+- **Erro de tool (`ChatToolErrorConfig`)**: falta de permissão → orientação amigável sem código; exceção de domínio
+  (`BusinessException`, `EntityNotFoundException`, IAE/ISE dos services, ≤ 300 caracteres, sem marcas técnicas) → repassada
+  envelopada como dado; `DataIntegrityViolationException` → texto fixo amigável; qualquer outra → "erro interno inesperado"
+  (detalhe só no log `[CHAT-TOOL-ERRO]`). Instrução anti-loop sempre presente.
+- `ParcelamentoCartaoService.listarAtivos` limita a 200 parcelamentos ativos (mais recentes) e 12.000 parcelas. Parcelas por
+  compra: no máximo 72 no cartão (`LancamentoRequestDto`) e 360 em contas (`ContaCreateDto`).
 - Output do modelo não deve ser retornado diretamente ao usuário sem sanitização de XSS (frontend já usa React que escapa por padrão).
 - Custo por requisição: configurar `maxTokens` no `ChatClient` para evitar respostas excessivamente longas.
 - Logar apenas metadados (conversa, tamanho, latência) — **nunca** o conteúdo das mensagens ou anexos (dados financeiros pessoais).

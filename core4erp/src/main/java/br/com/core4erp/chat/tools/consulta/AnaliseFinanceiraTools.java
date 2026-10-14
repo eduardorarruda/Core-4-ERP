@@ -1,6 +1,7 @@
 package br.com.core4erp.chat.tools.consulta;
 
 import br.com.core4erp.cartaoCredito.service.ParcelamentoCartaoService;
+import br.com.core4erp.chat.service.ConteudoNaoConfiavel;
 import br.com.core4erp.exception.AcessoNegadoException;
 import br.com.core4erp.insights.service.InsightsService;
 import br.com.core4erp.orcamento.service.OrcamentoService;
@@ -18,7 +19,8 @@ import java.util.function.Supplier;
  * "consultar" — o {@code GateEscritaAnexoAspect} as trata como leitura (liberadas em turno com anexo)
  * e não há {@code @AcaoCritica}. Tenant e RBAC ficam nos services ({@code TenantContext} + {@code @Requer});
  * sem permissão, a tool devolve uma mensagem amigável em vez de um erro técnico.
- * O retorno é texto compacto (valores já em R$ pt-BR) para economizar tokens.
+ * O retorno é texto compacto (valores já em R$ pt-BR) para economizar tokens; o trecho de dados vai
+ * dentro de {@code <dados_do_sistema_nao_confiaveis>} (defesa contra prompt injection via nomes cadastrados).
  */
 @Component
 public class AnaliseFinanceiraTools {
@@ -88,7 +90,10 @@ public class AnaliseFinanceiraTools {
 
     private static String comPermissao(String assunto, Supplier<String> consulta) {
         try {
-            return consulta.get();
+            // Os dados (nomes de categoria, descrições, frases de insight) são texto livre cadastrado
+            // por usuários: vão envelopados como não confiáveis. As mensagens de orientação abaixo
+            // (sem permissão / mês inválido) ficam FORA do envelope — são instruções do sistema.
+            return ConteudoNaoConfiavel.envolverDadosSistema(consulta.get());
         } catch (AcessoNegadoException e) {
             // PermissaoAspect já registrou o evento de segurança; ao modelo vai só a mensagem amigável.
             return semPermissao(assunto);

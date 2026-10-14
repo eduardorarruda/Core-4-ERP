@@ -8,6 +8,8 @@ import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.tenant.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -18,7 +20,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,12 +91,15 @@ class ParcelamentoCartaoServiceTest {
         TenantContext ctx = new TenantContext();
         ctx.setEmpresaId(77L);
         try {
-            when(repo.parcelasDeParcelamentosAtivos(77L, 2026 * 12 + 10)).thenReturn(List.of());
+            when(repo.gruposDeParcelamentosAtivos(eq(77L), eq(2026 * 12 + 10), any(Pageable.class)))
+                    .thenReturn(List.of());
             ParcelamentoCartaoService service = new ParcelamentoCartaoService(repo, ctx,
                     Clock.fixed(LocalDate.of(2026, 10, 14).atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC));
 
             assertThat(service.listarAtivos()).isEmpty();
-            verify(repo).parcelasDeParcelamentosAtivos(77L, 2026 * 12 + 10);
+            verify(repo).gruposDeParcelamentosAtivos(eq(77L), eq(2026 * 12 + 10), any(Pageable.class));
+            // sem grupo ativo, nem consulta as parcelas
+            verify(repo, never()).parcelasDosGrupos(any(), any(), any());
         } finally {
             ctx.clear();
         }
@@ -98,5 +107,50 @@ class ParcelamentoCartaoServiceTest {
                 .isEqualTo("CARTAO_VISUALIZAR");
         assertThat(ParcelamentoCartaoController.class.getMethod("listar").getAnnotation(Requer.class).value())
                 .isEqualTo("CARTAO_VISUALIZAR");
+    }
+
+    @Test
+    void listarAtivos_aplicaTetoDeGruposEDeLinhas() {
+        LancamentoCartaoRepository repo = mock(LancamentoCartaoRepository.class);
+        TenantContext ctx = new TenantContext();
+        ctx.setEmpresaId(77L);
+        try {
+            when(repo.gruposDeParcelamentosAtivos(eq(77L), anyInt(), any(Pageable.class)))
+                    .thenReturn(List.of("g-note"));
+            when(repo.parcelasDosGrupos(eq(77L), eq(List.of("g-note")), any(Pageable.class))).thenReturn(notebook());
+            ParcelamentoCartaoService service = new ParcelamentoCartaoService(repo, ctx,
+                    Clock.fixed(LocalDate.of(2026, 10, 14).atTime(12, 0).toInstant(ZoneOffset.UTC), ZoneOffset.UTC));
+
+            assertThat(service.listarAtivos()).singleElement()
+                    .satisfies(p -> assertThat(p.descricao()).isEqualTo("Notebook"));
+
+            ArgumentCaptor<Pageable> grupos = ArgumentCaptor.forClass(Pageable.class);
+            verify(repo).gruposDeParcelamentosAtivos(eq(77L), eq(2026 * 12 + 10), grupos.capture());
+            assertThat(grupos.getValue().getPageSize()).isEqualTo(ParcelamentoCartaoService.MAX_PARCELAMENTOS);
+            ArgumentCaptor<Pageable> linhas = ArgumentCaptor.forClass(Pageable.class);
+            verify(repo).parcelasDosGrupos(eq(77L), eq(List.of("g-note")), linhas.capture());
+            assertThat(linhas.getValue().getPageSize()).isEqualTo(ParcelamentoCartaoService.MAX_LINHAS + 1);
+        } finally {
+            ctx.clear();
+        }
+    }
+
+    @Test
+    void semGrupoTruncado_descartaUltimoGrupoQuandoPassaDoTeto() {
+        List<ParcelaLinha> linhas = new ArrayList<>();
+        ParcelaLinha base = notebook().get(0);
+        for (int i = 0; i < ParcelamentoCartaoService.MAX_LINHAS - 1; i++) {
+            linhas.add(base);
+        }
+        ParcelaLinha outro = new ParcelaLinha("g-z", 1, 3, new BigDecimal("10.00"), 10, 2026,
+                "Fone", LocalDate.of(2026, 10, 1), 5L, "Visa Empresa", 10, "Loja Y");
+        linhas.add(outro);
+        linhas.add(outro); // MAX_LINHAS + 1: o grupo "g-z" pode ter vindo incompleto
+
+        List<ParcelaLinha> r = ParcelamentoCartaoService.semGrupoTruncado(linhas);
+
+        assertThat(r).hasSize(ParcelamentoCartaoService.MAX_LINHAS - 1)
+                .allSatisfy(l -> assertThat(l.grupoParcelamento()).isEqualTo("g-note"));
+        assertThat(ParcelamentoCartaoService.semGrupoTruncado(notebook())).hasSize(12);
     }
 }

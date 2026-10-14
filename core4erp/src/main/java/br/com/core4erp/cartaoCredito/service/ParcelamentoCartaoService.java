@@ -10,6 +10,7 @@ import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.utils.FaturaHelper;
 import br.com.core4erp.utils.MesReferencia;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,13 +46,44 @@ public class ParcelamentoCartaoService {
         this.clock = clock;
     }
 
+    /**
+     * Teto defensivo de parcelamentos ativos listados (os {@value} mais recentes pela data da compra) —
+     * a tela e a tool da Áurea não precisam de mais, e a consulta fica limitada mesmo numa empresa com
+     * volume anormal (mesmo espírito dos tetos de 200 das listagens das tools de consulta).
+     */
+    static final int MAX_PARCELAMENTOS = 200;
+
+    /**
+     * Teto de linhas (parcelas) lidas para esses grupos: 200 grupos × 60 parcelas. O número de
+     * parcelas não tem limite superior no cadastro; se o teto for atingido, o último grupo (que pode
+     * ter vindo incompleto) é descartado em vez de exibido com totais errados.
+     */
+    static final int MAX_LINHAS = MAX_PARCELAMENTOS * 60;
+
     @Requer("CARTAO_VISUALIZAR")
     @Transactional(readOnly = true)
     public List<ParcelamentoResponseDto> listarAtivos() {
         YearMonth atual = YearMonth.now(clock);
-        List<ParcelaLinha> linhas = lancamentoRepo.parcelasDeParcelamentosAtivos(
-                tenantCtx.getEmpresaId(), indice(atual));
-        return agrupar(linhas, atual);
+        Long empresaId = tenantCtx.getEmpresaId();
+        List<String> grupos = lancamentoRepo.gruposDeParcelamentosAtivos(
+                empresaId, indice(atual), PageRequest.of(0, MAX_PARCELAMENTOS));
+        if (grupos.isEmpty()) {
+            return List.of();
+        }
+        List<ParcelaLinha> linhas = lancamentoRepo.parcelasDosGrupos(
+                empresaId, grupos, PageRequest.of(0, MAX_LINHAS + 1));
+        return agrupar(semGrupoTruncado(linhas), atual);
+    }
+
+    /** Acima do teto de linhas, descarta o último grupo (ordenado por grupo — pode estar incompleto). */
+    static List<ParcelaLinha> semGrupoTruncado(List<ParcelaLinha> linhas) {
+        if (linhas.size() <= MAX_LINHAS) {
+            return linhas;
+        }
+        String ultimoGrupo = linhas.get(MAX_LINHAS).grupoParcelamento();
+        return linhas.subList(0, MAX_LINHAS).stream()
+                .filter(l -> !l.grupoParcelamento().equals(ultimoGrupo))
+                .toList();
     }
 
     /** Agrupa as parcelas por parcelamento; os que terminam antes são listados primeiro. */

@@ -1,6 +1,7 @@
 package br.com.core4erp.cartaoCredito.dto;
 
 import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -29,6 +30,7 @@ public record LancamentoRequestDto(
 
         /** Número de parcelas (>= 1). */
         @PositiveOrZero
+        @Max(value = 72, message = "O parcelamento pode ter no máximo 72 parcelas.")
         Integer quantidadeParcelas,
 
         /** true = divide o valor; false = repete em cada parcela. */

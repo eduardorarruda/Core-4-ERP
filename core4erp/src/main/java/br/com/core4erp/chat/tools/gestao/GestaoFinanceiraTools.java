@@ -1,5 +1,6 @@
 package br.com.core4erp.chat.tools.gestao;
 
+import br.com.core4erp.chat.tools.DadosNaoConfiaveisResultConverter;
 import br.com.core4erp.assinatura.dto.AssinaturaRequestDto;
 import br.com.core4erp.assinatura.dto.AssinaturaResponseDto;
 import br.com.core4erp.assinatura.service.AssinaturaService;
@@ -206,7 +207,7 @@ public class GestaoFinanceiraTools {
     @Tool(description = """
             Lista os lançamentos de um cartão (pelo nome do cartão). Retorna id, descrição, valor,
             data e fatura. Use para obter o ID do lançamento antes de editar/excluir.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<LancamentoResponseDto> consultarLancamentosCartao(
             @ToolParam(description = "Nome do cartão") String cartao,
             @ToolParam(description = "Mês da fatura (opcional)") Integer mes,
@@ -342,7 +343,7 @@ public class GestaoFinanceiraTools {
             Métricas de gastos no cartão de crédito, agrupadas por categoria no período (total gasto
             por categoria/mês). Se omitir o período, usa os últimos 3 meses. Útil para responder
             'quanto gastei no cartão' e 'onde gastei mais no cartão'.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<CartaoDashboardResumoDto> consultarGastosCartao(
             @ToolParam(description = "Mês de início (opcional)") Integer mesInicio,
             @ToolParam(description = "Ano de início (opcional)") Integer anoInicio,
@@ -354,7 +355,7 @@ public class GestaoFinanceiraTools {
     @Tool(description = """
             Total já pago (saídas) por CONTA CORRENTE, da que mais gastou para a que menos gastou.
             Use para responder 'qual conta corrente eu mais gasto / gastei'.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<GastoContaCorrenteDto> consultarGastosPorContaCorrente() {
         return contaService.gastoPorContaCorrente();
     }
@@ -438,7 +439,7 @@ public class GestaoFinanceiraTools {
     @Tool(description = """
             Lista os TIPOS de investimento cadastrados (ex.: Renda Fixa, Ações, Tesouro Direto).
             Use antes de cadastrar uma carteira, para reaproveitar um tipo existente.
-            """)
+            """, resultConverter = DadosNaoConfiaveisResultConverter.class)
     public List<TipoInvestimentoResponseDto> consultarTiposInvestimento() {
         return tipoInvestimentoService.listar();
     }
