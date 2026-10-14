@@ -1,39 +1,93 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Tag, Plus, Pencil, Trash2, Loader2,
+  Tag, Plus, Pencil, Trash2,
   ShoppingCart, Home, Car, Utensils, Heart, Zap, Wifi,
   GraduationCap, Plane, Music, Gift, Coffee, Dumbbell, Shirt,
   Briefcase, TrendingUp, DollarSign, Landmark, CreditCard, Wallet,
+  Sofa, Lightbulb, Flame, Wrench, Key,
+  Bus, Fuel, CarFront, TrainFront, Bike,
+  Pizza, ShoppingBasket, UtensilsCrossed,
+  Pill, Stethoscope, Activity,
+  Gamepad2, Tv, BookOpen, Camera,
+  Smartphone, Laptop, Monitor,
+  Building2, PiggyBank, Receipt, Banknote, Calculator,
+  Baby, Dog, Package,
 } from 'lucide-react';
 import { categorias as api } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
-import FormField, { inputCls, labelCls } from '../components/ui/FormField';
+import { inputCls, inputErrorCls, labelCls } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import EmptyState from '../components/ui/EmptyState';
+import Button from '../components/ui/Button';
+import IconDropdown from '../components/ui/IconDropdown';
 import { useToast } from '../hooks/useToast';
 import { cn } from '../lib/utils';
+import PermissaoGuard from '../components/ui/PermissaoGuard';
 
+// Tabela de lookup nome -> componente para RENDERIZAR o ícone salvo nas linhas da lista.
+// A SELEÇÃO do ícone é feita pelo componente compartilhado IconDropdown (grid + busca + agrupamento),
+// que mantém o mesmo catálogo — não recrie um seletor manual aqui.
 const ICONES = [
+  // Compras e consumo
   { nome: 'ShoppingCart', componente: ShoppingCart },
+  { nome: 'ShoppingBasket', componente: ShoppingBasket },
+  { nome: 'Receipt', componente: Receipt },
+  { nome: 'Package', componente: Package },
+  // Habitação e moradia
   { nome: 'Home', componente: Home },
+  { nome: 'Sofa', componente: Sofa },
+  { nome: 'Lightbulb', componente: Lightbulb },
+  { nome: 'Flame', componente: Flame },
+  { nome: 'Wrench', componente: Wrench },
+  { nome: 'Key', componente: Key },
+  // Transporte
   { nome: 'Car', componente: Car },
-  { nome: 'Utensils', componente: Utensils },
-  { nome: 'Heart', componente: Heart },
-  { nome: 'Zap', componente: Zap },
-  { nome: 'Wifi', componente: Wifi },
-  { nome: 'GraduationCap', componente: GraduationCap },
+  { nome: 'CarFront', componente: CarFront },
+  { nome: 'Bus', componente: Bus },
+  { nome: 'TrainFront', componente: TrainFront },
+  { nome: 'Bike', componente: Bike },
+  { nome: 'Fuel', componente: Fuel },
   { nome: 'Plane', componente: Plane },
-  { nome: 'Music', componente: Music },
-  { nome: 'Gift', componente: Gift },
+  // Alimentação
+  { nome: 'Utensils', componente: Utensils },
+  { nome: 'UtensilsCrossed', componente: UtensilsCrossed },
+  { nome: 'Pizza', componente: Pizza },
   { nome: 'Coffee', componente: Coffee },
+  // Saúde e bem-estar
+  { nome: 'Heart', componente: Heart },
+  { nome: 'Pill', componente: Pill },
+  { nome: 'Stethoscope', componente: Stethoscope },
+  { nome: 'Activity', componente: Activity },
   { nome: 'Dumbbell', componente: Dumbbell },
-  { nome: 'Shirt', componente: Shirt },
-  { nome: 'Briefcase', componente: Briefcase },
-  { nome: 'TrendingUp', componente: TrendingUp },
+  // Educação e lazer
+  { nome: 'GraduationCap', componente: GraduationCap },
+  { nome: 'BookOpen', componente: BookOpen },
+  { nome: 'Music', componente: Music },
+  { nome: 'Gamepad2', componente: Gamepad2 },
+  { nome: 'Tv', componente: Tv },
+  { nome: 'Camera', componente: Camera },
+  { nome: 'Gift', componente: Gift },
+  // Tecnologia
+  { nome: 'Smartphone', componente: Smartphone },
+  { nome: 'Laptop', componente: Laptop },
+  { nome: 'Monitor', componente: Monitor },
+  { nome: 'Wifi', componente: Wifi },
+  { nome: 'Zap', componente: Zap },
+  // Finanças
   { nome: 'DollarSign', componente: DollarSign },
-  { nome: 'Landmark', componente: Landmark },
-  { nome: 'CreditCard', componente: CreditCard },
   { nome: 'Wallet', componente: Wallet },
+  { nome: 'Banknote', componente: Banknote },
+  { nome: 'CreditCard', componente: CreditCard },
+  { nome: 'Landmark', componente: Landmark },
+  { nome: 'PiggyBank', componente: PiggyBank },
+  { nome: 'Building2', componente: Building2 },
+  { nome: 'Calculator', componente: Calculator },
+  { nome: 'TrendingUp', componente: TrendingUp },
+  // Trabalho e pessoal
+  { nome: 'Briefcase', componente: Briefcase },
+  { nome: 'Shirt', componente: Shirt },
+  { nome: 'Baby', componente: Baby },
+  { nome: 'Dog', componente: Dog },
 ];
 
 function IconeCategoria({ nome, className = 'w-5 h-5' }) {
@@ -43,7 +97,37 @@ function IconeCategoria({ nome, className = 'w-5 h-5' }) {
   return <Icone className={className} />;
 }
 
-const empty = { descricao: '', icone: '' };
+function CategoriaLinha({ c, sub = false, onEditar, onDeletar }) {
+  const entry = ICONES.find((ic) => ic.nome === c.icone);
+  const Icone = entry ? entry.componente : Tag;
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-[12px] transition-all hover:bg-white/[.03] cursor-default">
+      <div
+        className={cn('rounded-xl flex items-center justify-center shrink-0', sub ? 'w-8 h-8' : 'w-10 h-10')}
+        style={{ background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)' }}
+      >
+        <Icone className={cn('text-primary', sub ? 'w-4 h-4' : 'w-5 h-5')} />
+      </div>
+      <span className={cn('font-bold text-text-primary flex-1 truncate font-display', sub ? 'text-xs' : 'text-sm')}>
+        {c.descricao}
+      </span>
+      <div className="flex gap-1 shrink-0">
+        <PermissaoGuard permissao="CATEGORIA_EDITAR">
+          <button onClick={() => onEditar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </PermissaoGuard>
+        <PermissaoGuard permissao="CATEGORIA_DELETAR">
+          <button onClick={() => onDeletar(c)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </PermissaoGuard>
+      </div>
+    </div>
+  );
+}
+
+const empty = { descricao: '', icone: '', categoriaPaiId: '' };
 
 export default function Categorias() {
   const toast = useToast();
@@ -52,20 +136,39 @@ export default function Categorias() {
   const [editId, setEditId] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => { carregar(); }, []);
 
   async function carregar() {
+    setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
+    finally { setLoading(false); }
+  }
+
+  function validar() {
+    const errs = {};
+    if (!form.descricao.trim()) errs.descricao = 'Informe uma descrição';
+    else if (form.descricao.trim().length < 2) errs.descricao = 'Descrição muito curta';
+    return errs;
   }
 
   async function salvar(e) {
     e.preventDefault();
+    const errs = validar();
+    if (Object.keys(errs).length) { setErrors(errs); toast.error('Verifique os campos destacados.'); return; }
+    setErrors({});
     setSalvando(true);
     try {
-      if (editId) await api.atualizar(editId, form);
-      else await api.criar(form);
+      const dto = {
+        descricao: form.descricao,
+        icone: form.icone,
+        categoriaPaiId: form.categoriaPaiId ? Number(form.categoriaPaiId) : null,
+      };
+      if (editId) await api.atualizar(editId, dto);
+      else await api.criar(dto);
       setForm(empty);
       setEditId(null);
       toast.success(editId ? 'Categoria atualizada!' : 'Categoria criada!');
@@ -77,15 +180,20 @@ export default function Categorias() {
     }
   }
 
-  function deletar(id) {
+  function deletar(c) {
+    const filhas = lista.filter((x) => x.categoriaPaiId === c.id && x.ativo !== false);
+    const temFilhas = filhas.length > 0;
     setConfirmAction({
       title: 'Excluir categoria',
-      message: 'Tem certeza que deseja excluir esta categoria?',
+      message: temFilhas
+        ? `A categoria "${c.descricao}" possui ${filhas.length} subcategoria${filhas.length > 1 ? 's' : ''}. Ao excluí-la, ${filhas.length > 1 ? 'elas também serão desativadas' : 'ela também será desativada'} automaticamente.`
+        : `Tem certeza que deseja excluir a categoria "${c.descricao}"?`,
+      details: temFilhas ? filhas.map((f) => f.descricao) : undefined,
       confirmLabel: 'Excluir',
       onConfirm: async () => {
         setConfirmAction(null);
         try {
-          await api.deletar(id);
+          await api.deletar(c.id);
           await carregar();
           toast.success('Categoria excluída!');
         } catch (e) {
@@ -95,9 +203,24 @@ export default function Categorias() {
     });
   }
 
-  function editar(c) { setForm({ descricao: c.descricao, icone: c.icone || '' }); setEditId(c.id); }
+  function editar(c) {
+    setForm({ descricao: c.descricao, icone: c.icone || '', categoriaPaiId: c.categoriaPaiId ? String(c.categoriaPaiId) : '' });
+    setEditId(c.id);
+    setErrors({});
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   const PreviewIcon = ICONES.find((i) => i.nome === form.icone)?.componente ?? null;
+
+  // Só categorias ativas na tela; deletar inativa (soft delete) e some daqui.
+  const ativas = lista.filter((c) => c.ativo !== false);
+  // Raízes disponíveis como "categoria principal" (exclui subcategorias e a própria em edição).
+  const raizesDisponiveis = ativas.filter((c) => !c.categoriaPaiId && c.id !== editId);
+  const raizes = ativas.filter((c) => !c.categoriaPaiId);
+  const subsPorPai = ativas.reduce((acc, c) => {
+    if (c.categoriaPaiId) (acc[c.categoriaPaiId] ||= []).push(c);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -105,8 +228,7 @@ export default function Categorias() {
 
       <form
         onSubmit={salvar}
-        className="rounded-[18px] p-6 space-y-5 anim-in"
-        style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}
+        className="rounded-[18px] p-6 space-y-5 anim-in bg-surface-medium border border-text-primary/5 shadow-elevated"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
@@ -120,89 +242,89 @@ export default function Categorias() {
           )}
         </div>
 
-        <div className="space-y-1 max-w-sm">
-          <label className={labelCls}>Descrição *</label>
-          <input
-            className={inputCls}
-            value={form.descricao}
-            onChange={(e) => setForm((f) => ({ ...f, descricao: e.target.value }))}
-            required
-            placeholder="Ex: Alimentação"
-          />
-        </div>
+        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+          <div className="space-y-1">
+            <label className={labelCls}>Descrição *</label>
+            <input
+              className={errors.descricao ? inputErrorCls : inputCls}
+              value={form.descricao}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({ ...f, descricao: v }));
+                if (errors.descricao) setErrors((prev) => ({ ...prev, descricao: undefined }));
+              }}
+              placeholder="Ex: Alimentação"
+              aria-invalid={!!errors.descricao}
+            />
+            {errors.descricao && <p className="text-error text-xs mt-1">{errors.descricao}</p>}
+          </div>
 
-        <div className="space-y-3">
-          <label className={labelCls}>Ícone</label>
-          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
-            {ICONES.map(({ nome, componente: Icone }) => (
-              <button
-                key={nome}
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, icone: nome }))}
-                title={nome}
-                aria-label={nome}
-                className={cn(
-                  'p-3 rounded-xl border transition-all hover:scale-105',
-                  form.icone === nome
-                    ? 'bg-primary/20 border-primary text-primary'
-                    : 'bg-surface border-text-primary/5 text-text-primary/50 hover:border-text-primary/20 hover:text-text-primary/80'
-                )}
-              >
-                <Icone className="w-5 h-5 mx-auto" />
-              </button>
-            ))}
+          <div className="space-y-1">
+            <label className={labelCls}>Categoria principal</label>
+            <select
+              className={inputCls}
+              value={form.categoriaPaiId}
+              onChange={(e) => setForm((f) => ({ ...f, categoriaPaiId: e.target.value }))}
+            >
+              <option value="">Nenhuma (categoria principal)</option>
+              {raizesDisponiveis.map((c) => (
+                <option key={c.id} value={c.id}>{c.descricao}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-text-primary/40">Deixe em branco para criar uma categoria principal, ou escolha uma para criar uma subcategoria.</p>
           </div>
         </div>
 
+        <div className="space-y-2 max-w-2xl">
+          <label className={labelCls}>Ícone</label>
+          <div className="sm:max-w-xs">
+            <IconDropdown value={form.icone} onChange={(nome) => setForm((f) => ({ ...f, icone: nome }))} />
+          </div>
+          <p className="text-[11px] text-text-primary/40">Use a busca para encontrar o ícone que melhor representa a categoria.</p>
+        </div>
+
         <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={salvando}
-            className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-          >
-            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+          <Button type="submit" loading={salvando} leftIcon={<Plus className="w-4 h-4" />}>
             {salvando ? 'Gravando...' : editId ? 'Salvar' : 'Criar'}
-          </button>
+          </Button>
           {editId && (
-            <button
+            <Button
               type="button"
-              onClick={() => { setForm(empty); setEditId(null); }}
-              className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors"
+              variant="ghost"
+              onClick={() => { setForm(empty); setEditId(null); setErrors({}); }}
+              className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary"
             >
               Cancelar
-            </button>
+            </Button>
           )}
         </div>
       </form>
 
-      {lista.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-[14px] bg-surface-medium border border-text-primary/5 animate-pulse" />
+          ))}
+        </div>
+      ) : ativas.length === 0 ? (
         <EmptyState icon={Tag} title="Nenhuma categoria" description="Crie categorias para organizar seus lançamentos financeiros." />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {lista.map((c, i) => {
-            const entry = ICONES.find((ic) => ic.nome === c.icone);
-            const Icone = entry ? entry.componente : Tag;
+        <div className="space-y-3">
+          {raizes.map((c, i) => {
+            const filhas = subsPorPai[c.id] || [];
             return (
               <div
                 key={c.id}
-                className={`anim-in d${Math.min(i + 1, 6)} flex items-center gap-3 p-4 rounded-[14px] transition-all hover:scale-[1.02] cursor-default`}
-                style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}
+                className={`anim-in d${Math.min(i + 1, 6)} rounded-[14px] p-2 bg-surface-medium border border-text-primary/5`}
               >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)' }}
-                >
-                  <Icone className="w-5 h-5 text-primary" />
-                </div>
-                <span className="font-bold text-text-primary flex-1 text-sm truncate font-display">{c.descricao}</span>
-                <div className="flex gap-1 shrink-0">
-                  <button onClick={() => editar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button onClick={() => deletar(c.id)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                <CategoriaLinha c={c} onEditar={editar} onDeletar={deletar} />
+                {filhas.length > 0 && (
+                  <div className="mt-1 ml-3 pl-3 sm:ml-6 sm:pl-4 border-l border-text-primary/10 space-y-1">
+                    {filhas.map((sub) => (
+                      <CategoriaLinha key={sub.id} c={sub} sub onEditar={editar} onDeletar={deletar} />
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

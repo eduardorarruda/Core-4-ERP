@@ -1,5 +1,6 @@
 package br.com.core4erp.investimento.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.investimento.dto.*;
 import br.com.core4erp.investimento.service.InvestimentoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,24 +25,28 @@ public class InvestimentoController {
 
     @Operation(summary = "Listar carteiras de investimento do usuário")
     @GetMapping
+    @Requer("INVESTIMENTO_VISUALIZAR")
     public ResponseEntity<List<ContaInvestimentoResponseDto>> listar() {
         return ResponseEntity.ok(service.listar());
     }
 
     @Operation(summary = "Buscar carteira por ID")
     @GetMapping("/{id}")
+    @Requer("INVESTIMENTO_VISUALIZAR")
     public ResponseEntity<ContaInvestimentoResponseDto> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
     @Operation(summary = "Criar nova carteira de investimento")
     @PostMapping
+    @Requer("INVESTIMENTO_CRIAR")
     public ResponseEntity<ContaInvestimentoResponseDto> criar(@Valid @RequestBody ContaInvestimentoRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.criar(dto));
     }
 
     @Operation(summary = "Atualizar carteira de investimento")
     @PutMapping("/{id}")
+    @Requer("INVESTIMENTO_EDITAR")
     public ResponseEntity<ContaInvestimentoResponseDto> atualizar(@PathVariable Long id,
                                                                     @Valid @RequestBody ContaInvestimentoRequestDto dto) {
         return ResponseEntity.ok(service.atualizar(id, dto));
@@ -49,6 +54,7 @@ public class InvestimentoController {
 
     @Operation(summary = "Remover carteira de investimento")
     @DeleteMapping("/{id}")
+    @Requer("INVESTIMENTO_DELETAR")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
@@ -56,12 +62,14 @@ public class InvestimentoController {
 
     @Operation(summary = "Listar transações de uma carteira")
     @GetMapping("/{id}/transacoes")
+    @Requer("INVESTIMENTO_VISUALIZAR")
     public ResponseEntity<List<TransacaoInvestimentoResponseDto>> listarTransacoes(@PathVariable Long id) {
         return ResponseEntity.ok(service.listarTransacoes(id));
     }
 
     @Operation(summary = "Registrar aporte ou resgate na carteira")
     @PostMapping("/{id}/transacoes")
+    @Requer("INVESTIMENTO_CRIAR")
     public ResponseEntity<TransacaoInvestimentoResponseDto> registrarTransacao(
             @PathVariable Long id,
             @Valid @RequestBody TransacaoInvestimentoRequestDto dto) {

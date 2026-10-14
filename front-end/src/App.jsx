@@ -1,17 +1,22 @@
-import React, { lazy, Suspense, useState, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense, useState, useCallback, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
+import PwaStatus from './components/layout/PwaStatus';
+import InstalarPwaBanner from './components/layout/InstalarPwaBanner';
 import ChatSidebar from './components/chat/ChatSidebar';
+import BottomNav from './components/layout/BottomNav';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
 import { ToastContainer } from './components/ui/Toast';
 import { getUsuario } from './lib/api';
+import { useAuth } from './hooks/useAuth';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
+import { getFirstAccessibleRoute } from './lib/routeUtils';
 
-const Dashboard         = lazy(() => import('./views/Dashboard'));
+const DashboardHome     = lazy(() => import('./views/DashboardHome'));
 const Login             = lazy(() => import('./views/Login'));
 const Register          = lazy(() => import('./views/Register'));
 const RedefinirSenha    = lazy(() => import('./views/RedefinirSenha'));
@@ -19,19 +24,27 @@ const RedefinirSenha    = lazy(() => import('./views/RedefinirSenha'));
 const Conciliacao         = lazy(() => import('./views/Conciliacao'));
 const ConciliacaoHistorico = lazy(() => import('./views/ConciliacaoHistorico'));
 const ConciliacaoRelatorio = lazy(() => import('./views/ConciliacaoRelatorio'));
+const ConciliacaoCartao         = lazy(() => import('./views/ConciliacaoCartao'));
+const ConciliacaoCartaoHistorico = lazy(() => import('./views/ConciliacaoCartaoHistorico'));
+const ConciliacaoCartaoRelatorio = lazy(() => import('./views/ConciliacaoCartaoRelatorio'));
+const CartaoDashboard   = lazy(() => import('./views/CartaoDashboard'));
 const Assinaturas     = lazy(() => import('./views/Assinaturas'));
 const Calendario      = lazy(() => import('./views/Calendario'));
 const Categorias      = lazy(() => import('./views/Categorias'));
 const Reports         = lazy(() => import('./views/Reports'));
+const Assistente      = lazy(() => import('./views/Assistente'));
 const Audit           = lazy(() => import('./views/Audit'));
 const Parceiros       = lazy(() => import('./views/Parceiros'));
 const ContasCorrentes = lazy(() => import('./views/ContasCorrentes'));
 const ContasFinanceiras = lazy(() => import('./views/ContasFinanceiras'));
 const Cartoes         = lazy(() => import('./views/Cartoes'));
 const Investimentos   = lazy(() => import('./views/Investimentos'));
-const Notificacoes    = lazy(() => import('./views/Notificacoes'));
 const Configuracoes   = lazy(() => import('./views/Configuracoes'));
 const CommandPalette  = lazy(() => import('./components/ui/CommandPalette'));
+const AceitarConvite     = lazy(() => import('./views/AceitarConvite'));
+const GestaoOperadores   = lazy(() => import('./views/GestaoOperadores'));
+const GestaoPerfis       = lazy(() => import('./views/GestaoPerfis'));
+const Ajuda              = lazy(() => import('./views/Ajuda'));
 
 function PageSkeleton() {
   return (
@@ -46,23 +59,68 @@ function PageSkeleton() {
 }
 
 function isAuthenticated() {
-  return Boolean(sessionStorage.getItem('usuario'));
+  // localStorage: sessão compartilhada entre abas (o JWT continua só no cookie HttpOnly).
+  // Fallback ao sessionStorage cobre sessões abertas antes da migração.
+  return Boolean(localStorage.getItem('usuario') || sessionStorage.getItem('usuario'));
 }
 
-function AdminRoute({ children }) {
-  const usuario = getUsuario();
-  if (!usuario || usuario.role !== 'ROLE_ADMIN') {
-    return <Navigate to="/dashboard" replace />;
+function NavigateToFirstAccessible() {
+  const { temPermissao } = useAuth();
+  return <Navigate to={getFirstAccessibleRoute(temPermissao)} replace />;
+}
+
+function PermissaoRoute({ permissao, children }) {
+  const { temPermissao } = useAuth();
+  if (!temPermissao(permissao)) {
+    return <NavigateToFirstAccessible />;
   }
   return children;
+}
+
+function ContaEmpresaRoute({ children }) {
+  const { tipoConta } = useAuth();
+  if (tipoConta === 'PESSOA_FISICA') {
+    return <NavigateToFirstAccessible />;
+  }
+  return children;
+}
+
+function SenhaProvisoriaModal({ onConfirm }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center' }}>
+      <div style={{ background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 400, width: '90%', textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,193,7,.1)', border: '1px solid rgba(255,193,7,.2)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD37A" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 8 }}>Troque sua Senha</h2>
+        <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.6, marginBottom: 24 }}>
+          Você está usando uma senha provisória. É obrigatório definir sua própria senha antes de continuar.
+        </p>
+        <button onClick={onConfirm} style={{ width: '100%', padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Sora', sans-serif" }}>
+          Definir Minha Senha
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ProtectedLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [showSenhaModal, setShowSenhaModal] = useState(false);
+  const { senhaProvisoria } = useAuth();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // Rotas "tela cheia": ocupam toda a área (sem padding/max-width) — ex.: a tela da Áurea, que
+  // precisa dos 2 painéis do tamanho da janela, estilo ChatGPT.
+  const fullBleed = pathname === '/assistente';
 
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
+
+  useEffect(() => {
+    if (senhaProvisoria) setShowSenhaModal(true);
+  }, [senhaProvisoria]);
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
@@ -83,7 +141,16 @@ function ProtectedLayout({ children }) {
         'fixed inset-y-0 left-0 transform lg:relative lg:translate-x-0 transition duration-200 ease-in-out z-50',
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
-        <Sidebar onClose={() => setIsSidebarOpen(false)} />
+        {/*
+          expandido = drawer aberto no mobile → rótulos sempre visíveis (w-56).
+          No desktop isSidebarOpen é sempre false → mantém o rail w-16 com hover/foco.
+          onNavigate fecha o drawer ao clicar num item de menu.
+        */}
+        <Sidebar
+          expandido={isSidebarOpen}
+          onNavigate={() => setIsSidebarOpen(false)}
+          onClose={() => setIsSidebarOpen(false)}
+        />
       </div>
 
       {/* Main */}
@@ -92,16 +159,30 @@ function ProtectedLayout({ children }) {
           onMenuClick={() => setIsSidebarOpen(true)}
           onCommandPaletteOpen={openCmd}
         />
-        <main id="main-content" className="flex-1 p-4 lg:p-8 overflow-y-auto no-scrollbar animate-fade-in">
-          <div className="max-w-7xl mx-auto">
+        <PwaStatus />
+        <main id="main-content" className={cn(
+          'flex-1 min-h-0 animate-fade-in',
+          fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 pb-24 lg:pb-8 overflow-y-auto no-scrollbar'
+        )}>
+          {fullBleed ? (
             <Suspense fallback={<PageSkeleton />}>
               {children}
             </Suspense>
-          </div>
+          ) : (
+            <div className="max-w-7xl mx-auto">
+              <Suspense fallback={<PageSkeleton />}>
+                {children}
+              </Suspense>
+            </div>
+          )}
         </main>
       </div>
 
       <ChatSidebar />
+
+      {/* Navegação inferior — apenas mobile (lg:hidden). Abre o mesmo drawer do Sidebar. */}
+      <BottomNav onAbrirMenu={() => setIsSidebarOpen(true)} />
+
       <ToastContainer />
 
       {/* Command Palette */}
@@ -109,6 +190,12 @@ function ProtectedLayout({ children }) {
         <Suspense fallback={null}>
           <CommandPalette onClose={closeCmd} />
         </Suspense>
+      )}
+
+      {showSenhaModal && (
+        <SenhaProvisoriaModal
+          onConfirm={() => { setShowSenhaModal(false); navigate('/configuracoes'); }}
+        />
       )}
     </div>
   );
@@ -130,33 +217,46 @@ export default function App() {
           <ErrorBoundary>
           <Suspense fallback={<PageSkeleton />}>
           <Routes>
-            <Route path="/login"           element={<Login />} />
-            <Route path="/register"        element={<Register />} />
-            <Route path="/redefinir-senha" element={<RedefinirSenha />} />
+            <Route path="/login"              element={<Login />} />
+            <Route path="/register"           element={<Register />} />
+            <Route path="/redefinir-senha"    element={<RedefinirSenha />} />
+            <Route path="/aceitar-convite"    element={<AceitarConvite />} />
 
-            <Route path="/dashboard"        element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
-            <Route path="/conciliacao"              element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
-            <Route path="/conciliacao/historico"   element={<ProtectedLayout><ConciliacaoHistorico /></ProtectedLayout>} />
-            <Route path="/conciliacao/:id"          element={<ProtectedLayout><Conciliacao /></ProtectedLayout>} />
-            <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><ConciliacaoRelatorio /></ProtectedLayout>} />
-            <Route path="/assinaturas"      element={<ProtectedLayout><Assinaturas /></ProtectedLayout>} />
-            <Route path="/calendario"       element={<ProtectedLayout><Calendario /></ProtectedLayout>} />
+            <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><DashboardHome /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao"              element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao/historico"   element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><ConciliacaoHistorico /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao/:id"          element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><ConciliacaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/assinaturas"      element={<ProtectedLayout><PermissaoRoute permissao="ASSINATURA_VISUALIZAR"><Assinaturas /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/calendario"       element={<ProtectedLayout><PermissaoRoute permissao="CALENDARIO_VISUALIZAR"><Calendario /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
-            <Route path="/audit"            element={<ProtectedLayout><AdminRoute><Audit /></AdminRoute></ProtectedLayout>} />
-            <Route path="/parceiros"        element={<ProtectedLayout><Parceiros /></ProtectedLayout>} />
-            <Route path="/categorias"       element={<ProtectedLayout><Categorias /></ProtectedLayout>} />
-            <Route path="/contas-correntes" element={<ProtectedLayout><ContasCorrentes /></ProtectedLayout>} />
-            <Route path="/contas"           element={<ProtectedLayout><ContasFinanceiras /></ProtectedLayout>} />
-            <Route path="/cartoes"          element={<ProtectedLayout><Cartoes /></ProtectedLayout>} />
-            <Route path="/investimentos"    element={<ProtectedLayout><Investimentos /></ProtectedLayout>} />
-            <Route path="/notificacoes"     element={<ProtectedLayout><Notificacoes /></ProtectedLayout>} />
+            <Route path="/assistente"       element={<ProtectedLayout><Assistente /></ProtectedLayout>} />
+            <Route path="/audit"            element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
+            <Route path="/parceiros"        element={<ProtectedLayout><PermissaoRoute permissao="PARCEIRO_VISUALIZAR"><Parceiros /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/categorias"       element={<ProtectedLayout><PermissaoRoute permissao="CATEGORIA_VISUALIZAR"><Categorias /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/contas-correntes" element={<ProtectedLayout><PermissaoRoute permissao="CONTA_CORRENTE_VISUALIZAR"><ContasCorrentes /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/contas"           element={<ProtectedLayout><PermissaoRoute permissao="CONTA_VISUALIZAR"><ContasFinanceiras /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes"                              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_LANCAR"><Cartoes /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/dashboard"                    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_VISUALIZAR"><CartaoDashboard /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao"                  element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/historico"        element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoHistorico /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/:id"              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
+            <Route path="/investimentos"    element={<ProtectedLayout><PermissaoRoute permissao="INVESTIMENTO_VISUALIZAR"><Investimentos /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
+            <Route path="/ajuda"            element={<ProtectedLayout><Ajuda /></ProtectedLayout>} />
+            <Route path="/help"             element={<Navigate to="/ajuda" replace />} />
+            <Route path="/empresa/operadores" element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="USUARIO_VISUALIZAR"><GestaoOperadores /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
+            <Route path="/empresa/perfis"     element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="CONFIGURACAO_EDITAR"><GestaoPerfis /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
 
-            <Route path="/"  element={<Navigate to="/dashboard" replace />} />
-            <Route path="*"  element={<Navigate to="/dashboard" replace />} />
+            <Route path="/"  element={<NavigateToFirstAccessible />} />
+            <Route path="*"  element={<NavigateToFirstAccessible />} />
           </Routes>
           </Suspense>
           </ErrorBoundary>
+
+          {/* Convite de instalação do PWA — global (aparece inclusive na tela de login). */}
+          <InstalarPwaBanner />
         </ConfirmProvider>
       </ToastProvider>
     </BrowserRouter>

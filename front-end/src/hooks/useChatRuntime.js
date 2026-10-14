@@ -19,7 +19,8 @@ const core4ChatAdapter = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ mensagem: textContent }),
+        // canal BALAO: a conversa do balão flutuante é separada da conversa da tela /assistente.
+        body: JSON.stringify({ mensagem: textContent, canal: "BALAO" }),
         signal: abortSignal,
       });
 
@@ -87,6 +88,9 @@ const core4ChatAdapter = {
   },
 };
 
-export function useChatRuntime() {
-  return useLocalRuntime(core4ChatAdapter);
+// initialMessages semeia a conversa (formato @assistant-ui: {role, content:[{type:'text',text}]}).
+// Só é lido na primeira renderização — por isso o componente que usa este hook deve montar
+// APÓS carregar o histórico (ver ChatSidebar → PainelAurea).
+export function useChatRuntime(initialMessages = []) {
+  return useLocalRuntime(core4ChatAdapter, { initialMessages });
 }

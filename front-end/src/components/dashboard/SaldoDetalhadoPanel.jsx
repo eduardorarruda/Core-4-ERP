@@ -1,9 +1,10 @@
 import React, { memo, useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, CreditCard, ArrowUpRight, ArrowDownRight, RefreshCw, AlertTriangle } from 'lucide-react';
 import { dashboard } from '../../lib/api';
 import { brl } from '../../lib/formatters';
 import { cn } from '../../lib/utils';
 import SkeletonCard from '../ui/SkeletonCard';
+import Button from '../ui/Button';
 
 function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
   const colorMap = {
@@ -18,10 +19,10 @@ function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
     <div className={cn('rounded-xl p-3.5 border flex flex-col gap-1', colorMap[tipo] ?? colorMap.neutro)}>
       <div className="flex items-center gap-1.5">
         {Icone && <Icone className="w-3.5 h-3.5 opacity-60" />}
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-70 font-body">{label}</span>
+        <span className="text-xs font-bold uppercase tracking-widest opacity-70 font-body">{label}</span>
       </div>
       <span className="text-base font-bold font-display">{prefixo} R$ {brl(valor)}</span>
-      {descricao && <span className="text-[10px] opacity-50">{descricao}</span>}
+      {descricao && <span className="text-xs opacity-50">{descricao}</span>}
     </div>
   );
 }
@@ -29,7 +30,7 @@ function ValorCard({ label, valor, tipo = 'neutro', descricao, icone: Icone }) {
 function Divider({ label }) {
   return (
     <div className="flex items-center gap-3 mt-5 mb-3">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40">{label}</span>
+      <span className="text-xs font-bold uppercase tracking-widest text-text-primary/40">{label}</span>
       <div className="flex-1 h-px bg-text-primary/5" />
     </div>
   );
@@ -59,8 +60,18 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
 
   if (erro) {
     return (
-      <div className="bg-surface-medium rounded-2xl p-6 border border-error/20 text-error text-sm">
-        Erro ao carregar saldo: {erro}
+      <div
+        role="alert"
+        className="bg-error/10 rounded-2xl p-6 border border-error/20 flex flex-col items-center gap-3 text-center h-full justify-center"
+      >
+        <AlertTriangle className="w-7 h-7 text-error" />
+        <div>
+          <p className="text-sm font-bold text-text-primary">Não foi possível carregar a posição financeira</p>
+          <p className="text-xs text-text-primary/60 mt-1">Tente atualizar em instantes.</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={carregar} leftIcon={RefreshCw}>
+          Tentar novamente
+        </Button>
       </div>
     );
   }
@@ -77,23 +88,25 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-base font-bold text-text-primary tracking-tight font-display">Posição Financeira</h2>
-          <p className="text-[10px] text-text-primary/40 uppercase tracking-widest mt-0.5 font-body">Saldo e projeções</p>
+          <p className="text-xs text-text-primary/40 uppercase tracking-widest mt-0.5 font-body">Saldo e projeções</p>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={carregar}
           aria-label="Atualizar saldo"
-          className="p-2 rounded-xl text-text-primary/50 hover:text-text-primary hover:bg-surface-highest transition-colors"
+          className="text-text-primary/50 hover:text-text-primary"
         >
           <RefreshCw className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
 
       {/* Saldo Principal */}
       <div className="bg-primary/10 border border-primary/20 rounded-2xl p-4 flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">Saldo em Conta Hoje</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1">Saldo em Conta Hoje</p>
           <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(dados.saldoContasCorrentes)}</p>
-          <p className="text-[10px] text-text-primary/40 mt-0.5">Soma das contas correntes</p>
+          <p className="text-xs text-text-primary/40 mt-0.5">Soma das contas correntes</p>
         </div>
         <Wallet className="w-9 h-9 text-primary opacity-40" />
       </div>
@@ -135,7 +148,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
       <div className="space-y-2">
         <div className={cn('rounded-xl p-3.5 border', saldoPrevistoPositivo ? 'bg-primary/5 border-primary/20' : 'bg-error/5 border-error/20')}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50">Saldo Previsto</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Saldo Previsto</span>
             <span className={cn('text-lg font-bold font-display', saldoPrevistoPositivo ? 'text-primary' : 'text-error')}>
               R$ {brl(dados.saldoPrevisto)}
             </span>
@@ -143,7 +156,7 @@ const SaldoDetalhadoPanel = memo(function SaldoDetalhadoPanel() {
         </div>
         <div className={cn('rounded-xl p-3.5 border', saldoComCartaoPositivo ? 'bg-surface border-text-primary/5' : 'bg-error/10 border-error/30')}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-text-primary/50">Com Cartão</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50">Com Cartão</span>
             <span className={cn('text-lg font-bold font-display', saldoComCartaoPositivo ? 'text-text-primary' : 'text-error')}>
               R$ {brl(dados.saldoPrevistoComCartao)}
             </span>

@@ -20,6 +20,9 @@ public class ChatMensagem {
 
     public enum Role { USER, ASSISTANT }
 
+    /** Superfície da conversa: tela do Assistente ou balão flutuante — cada uma tem contexto próprio. */
+    public enum Canal { ASSISTENTE, BALAO }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,9 +30,17 @@ public class ChatMensagem {
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
 
+    /** Conversa (thread) a que a mensagem pertence. */
+    @Column(name = "conversa_id", nullable = false)
+    private Long conversaId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Role role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private Canal canal = Canal.ASSISTENTE;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String conteudo;
@@ -37,8 +48,10 @@ public class ChatMensagem {
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 
-    public ChatMensagem(Long usuarioId, Role role, String conteudo) {
+    public ChatMensagem(Long usuarioId, Long conversaId, Canal canal, Role role, String conteudo) {
         this.usuarioId = usuarioId;
+        this.conversaId = conversaId;
+        this.canal = canal != null ? canal : Canal.ASSISTENTE;
         this.role = role;
         this.conteudo = conteudo;
         this.criadoEm = LocalDateTime.now();

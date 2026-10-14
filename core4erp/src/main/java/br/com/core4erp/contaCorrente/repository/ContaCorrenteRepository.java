@@ -10,12 +10,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ContaCorrenteRepository extends JpaRepository<ContaCorrente, Long> {
-    List<ContaCorrente> findAllByUsuarioId(Long usuarioId);
-    Optional<ContaCorrente> findByIdAndUsuarioId(Long id, Long usuarioId);
-    boolean existsByNumeroContaAndUsuarioId(String numeroConta, Long usuarioId);
+    List<ContaCorrente> findAllByEmpresaId(Long empresaId);
+    Optional<ContaCorrente> findByIdAndEmpresaId(Long id, Long empresaId);
+    boolean existsByNumeroContaAndEmpresaId(String numeroConta, Long empresaId);
 
-    Optional<ContaCorrente> findByNumeroContaAndUsuarioId(String numeroConta, Long usuarioId);
+    Optional<ContaCorrente> findByNumeroContaAndEmpresaId(String numeroConta, Long empresaId);
 
-    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM ContaCorrente c WHERE c.usuario.id = :uid")
-    BigDecimal sumSaldoByUsuarioId(@Param("uid") Long uid);
+    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM ContaCorrente c WHERE c.empresaId = :eid")
+    BigDecimal sumSaldoByEmpresaId(@Param("eid") Long eid);
 }

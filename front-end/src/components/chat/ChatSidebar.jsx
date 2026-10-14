@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AssistantRuntimeProvider,
   ThreadPrimitive,
@@ -11,6 +12,8 @@ import { useChatRuntime } from "../../hooks/useChatRuntime";
 import { DownloadToolUI } from "./RelatorioToolUI";
 import { cn } from "../../lib/utils";
 import { chat } from "../../lib/api";
+import { useConfirm } from "../../hooks/useConfirm";
+import { useToast } from "../../hooks/useToast";
 
 const SUGGESTIONS = [
   "Ver saldo atual",
@@ -54,7 +57,7 @@ function MarkdownText(props) {
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 px-4 py-3">
+    <div className="flex items-center gap-1 py-1">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -66,20 +69,7 @@ function TypingDots() {
   );
 }
 
-function ChatContent({ onClose }) {
-  const viewportRef = useRef(null);
-
-  async function limparHistorico() {
-    try {
-      await chat.limparHistorico();
-    } catch {}
-  }
-
-  const scrollToBottom = () => {
-    const el = viewportRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-
+function ChatContent({ onClose, onLimpar }) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -92,13 +82,13 @@ function ChatContent({ onClose }) {
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-primary rounded-full border-2 border-surface-low animate-pulse-dot" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-text-primary font-display">C4 Assistant</h3>
-            <p className="text-[10px] text-text-primary/40">Assistente financeiro</p>
+            <h3 className="text-sm font-bold text-text-primary font-display">Áurea</h3>
+            <p className="text-[10px] text-text-primary/40">Assistente financeira</p>
           </div>
         </div>
         <div className="flex gap-1">
           <button
-            onClick={limparHistorico}
+            onClick={onLimpar}
             aria-label="Limpar conversa"
             className="p-1.5 rounded-lg text-text-primary/40 hover:text-text-primary hover:bg-surface-medium transition-colors"
           >
@@ -115,7 +105,7 @@ function ChatContent({ onClose }) {
       </div>
 
       {/* Messages */}
-      <div ref={viewportRef} className="flex-1 overflow-y-auto no-scrollbar">
+      <div className="flex-1 overflow-y-auto no-scrollbar">
         <ThreadPrimitive.Root>
           <ThreadPrimitive.Viewport className="flex flex-col gap-3 p-4">
             <ThreadPrimitive.Messages
@@ -130,7 +120,13 @@ function ChatContent({ onClose }) {
                 AssistantMessage: () => (
                   <MessagePrimitive.Root className="flex justify-start">
                     <div className="bg-surface-medium text-text-primary/80 rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] text-sm leading-relaxed">
-                      <MessagePrimitive.Content components={{ Text: MarkdownText }} />
+                      {/* Sem conteúdo ainda = aguardando o 1º token → indicador de digitação. */}
+                      <MessagePrimitive.If hasContent={false}>
+                        <TypingDots />
+                      </MessagePrimitive.If>
+                      <MessagePrimitive.If hasContent>
+                        <MessagePrimitive.Content components={{ Text: MarkdownText }} />
+                      </MessagePrimitive.If>
                     </div>
                   </MessagePrimitive.Root>
                 ),
@@ -156,7 +152,7 @@ function ChatContent({ onClose }) {
           </div>
 
           {/* Input */}
-          <div className="border-t border-text-primary/5 p-3">
+          <div className="border-t border-text-primary/5 px-3 pt-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
             <ComposerPrimitive.Root className="flex gap-2 items-end">
               <ComposerPrimitive.Input
                 placeholder="Pergunte sobre suas finanças..."
@@ -176,19 +172,87 @@ function ChatContent({ onClose }) {
   );
 }
 
+// Painel do balão. Monta só quando aberto: carrega a conversa do canal BALAO (separada da conversa
+// da tela /assistente — contextos isolados no backend) e só então cria o runtime com
+// initialMessages, para o balão exibir exatamente o que a IA "lembra" nesta superfície.
+function PainelAurea({ onClose }) {
+  const [inicial, setInicial] = useState(null); // null = carregando
+  const [resetKey, setResetKey] = useState(0);  // muda → remonta o runtime (limpa a UI)
+  const confirm = useConfirm();
+  const toast = useToast();
+
+  useEffect(() => {
+    chat.historico('BALAO')
+      .then((h) => setInicial(Array.isArray(h)
+        ? h.map((m) => ({ role: m.role, content: [{ type: "text", text: m.texto }] }))
+        : []))
+      .catch(() => setInicial([]));
+  }, []);
+
+  async function limpar() {
+    const ok = await confirm({
+      title: 'Limpar conversa',
+      message: 'Isto vai apagar as mensagens desta conversa com a Áurea. Deseja continuar?',
+      confirmLabel: 'Limpar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await chat.limparHistorico('BALAO');
+      // Reseta o runtime local remontando com histórico vazio.
+      setInicial([]);
+      setResetKey((k) => k + 1);
+      toast.success('Conversa apagada.');
+    } catch {
+      toast.error('Não foi possível limpar a conversa. Tente novamente.');
+    }
+  }
+
+  if (inicial === null) {
+    return (
+      <div className="h-full flex items-center justify-center text-sm text-text-primary/50">
+        Carregando conversa…
+      </div>
+    );
+  }
+  return (
+    <PainelAureaRuntime
+      key={resetKey}
+      initialMessages={inicial}
+      onClose={onClose}
+      onLimpar={limpar}
+    />
+  );
+}
+
+function PainelAureaRuntime({ initialMessages, onClose, onLimpar }) {
+  const runtime = useChatRuntime(initialMessages);
+  return (
+    <AssistantRuntimeProvider runtime={runtime}>
+      <DownloadToolUI />
+      <ChatContent onClose={onClose} onLimpar={onLimpar} />
+    </AssistantRuntimeProvider>
+  );
+}
+
 export default function ChatSidebar() {
   const [isOpen, setIsOpen] = useState(false);
-  const runtime = useChatRuntime();
+  const { pathname } = useLocation();
+
+  // Na tela do Assistente o usuário já está conversando com a IA em tela cheia —
+  // o balão flutuante seria redundante, então não o exibimos ali.
+  if (pathname === "/assistente") return null;
 
   return (
     <>
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          aria-label="Abrir assistente financeiro"
-          title="Assistente C4"
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-primary-glow"
-          style={{ boxShadow: 'var(--shadow-primary)' }}
+          aria-label="Abrir a Áurea, assistente financeira"
+          title="Áurea"
+          className="fixed right-6 z-50 w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-primary-glow"
+          style={{ boxShadow: 'var(--shadow-primary)', bottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}
         >
           <MessageCircle className="w-6 h-6" />
         </button>
@@ -207,10 +271,7 @@ export default function ChatSidebar() {
               "animate-slide-in-right"
             )}
           >
-            <AssistantRuntimeProvider runtime={runtime}>
-              <DownloadToolUI />
-              <ChatContent onClose={() => setIsOpen(false)} />
-            </AssistantRuntimeProvider>
+            <PainelAurea onClose={() => setIsOpen(false)} />
           </div>
         </>
       )}

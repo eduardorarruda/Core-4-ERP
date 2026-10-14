@@ -5,12 +5,17 @@ import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.repository.ContaRepository;
+import br.com.core4erp.empresa.repository.EmpresaRepository;
+import br.com.core4erp.empresa.repository.UsuarioEmpresaRepository;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoNotificacao;
 import br.com.core4erp.notificacao.entity.Notificacao;
 import br.com.core4erp.notificacao.repository.NotificacaoRepository;
 import br.com.core4erp.usuario.entity.Usuario;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,22 +28,33 @@ import java.util.List;
 @Service
 public class SincronizacaoService {
 
+    private static final Logger log = LoggerFactory.getLogger(SincronizacaoService.class);
+
     private final UsuarioRepository usuarioRepository;
     private final ContaRepository contaRepository;
     private final CartaoCreditoRepository cartaoRepository;
     private final CartaoCreditoService cartaoCreditoService;
     private final NotificacaoRepository notificacaoRepository;
+    private final EmpresaRepository empresaRepository;
+    private final UsuarioEmpresaRepository usuarioEmpresaRepository;
+    private final SincronizacaoService self; // S.7: proxy para transação por empresa
 
     public SincronizacaoService(UsuarioRepository usuarioRepository,
                                 ContaRepository contaRepository,
                                 CartaoCreditoRepository cartaoRepository,
                                 CartaoCreditoService cartaoCreditoService,
-                                NotificacaoRepository notificacaoRepository) {
+                                NotificacaoRepository notificacaoRepository,
+                                EmpresaRepository empresaRepository,
+                                UsuarioEmpresaRepository usuarioEmpresaRepository,
+                                @Lazy SincronizacaoService self) {
         this.usuarioRepository = usuarioRepository;
         this.contaRepository = contaRepository;
         this.cartaoRepository = cartaoRepository;
         this.cartaoCreditoService = cartaoCreditoService;
         this.notificacaoRepository = notificacaoRepository;
+        this.empresaRepository = empresaRepository;
+        this.usuarioEmpresaRepository = usuarioEmpresaRepository;
+        this.self = self;
     }
 
     /**
@@ -47,72 +63,93 @@ public class SincronizacaoService {
      * Idempotente: não duplica notificações.
      */
     @Transactional
-    public void sincronizar(Long usuarioId) {
-        cartaoCreditoService.gerarLancamentosAssinaturas(usuarioId);
-        sincronizarContasVencidas(usuarioId);
-        sincronizarFaturasCartao(usuarioId);
+    public void sincronizar(Long empresaId) {
+        cartaoCreditoService.gerarLancamentosAssinaturas(empresaId);
+        sincronizarContasVencidas(empresaId);
+        sincronizarFaturasCartao(empresaId);
     }
 
-    /** Sincroniza todos os usuários (chamada administrativa). */
-    @Transactional
+    /**
+     * Sincroniza todas as empresas — roda diariamente às 00:10 (logo após a virada do dia, quando
+     * contas passam a estar vencidas). BUG CORRIGIDO: este método não tinha {@code @Scheduled} e a
+     * Regra 1 (PENDENTE → ATRASADO) nunca rodava automaticamente — em produção havia 22 contas
+     * vencidas há meses ainda marcadas PENDENTE.
+     * S.7: sem @Transactional aqui; cada empresa é sincronizada em sua própria transação
+     * (via {@code self}, para que o proxy aplique o @Transactional de {@code sincronizar}),
+     * isolando falhas — uma empresa com erro não derruba as demais.
+     */
+    @Scheduled(cron = "0 10 0 * * *")
     public void sincronizarTodos() {
-        usuarioRepository.findAllIds().forEach(this::sincronizar);
+        log.info("[SINCRONIZACAO] iniciando sincronização diária (status ATRASADO + notificações)");
+        empresaRepository.findIdsAtivas().forEach(self::sincronizar);
     }
 
-    /** Gera lançamentos de assinaturas para todos os usuários às 7h diariamente. */
+    /** Gera lançamentos de assinaturas para todas as empresas às 7h diariamente. */
     @Scheduled(cron = "0 0 7 * * *")
     public void gerarAssinaturasScheduled() {
-        usuarioRepository.findAllIds().forEach(cartaoCreditoService::gerarLancamentosAssinaturas);
+        empresaRepository.findIdsAtivas().forEach(cartaoCreditoService::gerarLancamentosAssinaturas);
     }
 
     // ── Regra 1 ──────────────────────────────────────────────────────────────
 
-    private void sincronizarContasVencidas(Long uid) {
+    private void sincronizarContasVencidas(Long empresaId) {
         List<Conta> vencidas = contaRepository
-                .findByUsuarioIdAndStatusAndDataVencimentoBefore(uid, StatusConta.PENDENTE, LocalDate.now());
+                .findByEmpresaIdAndStatusAndDataVencimentoBefore(empresaId, StatusConta.PENDENTE, LocalDate.now());
 
         vencidas.forEach(c -> c.setStatus(StatusConta.ATRASADO));
         contaRepository.saveAll(vencidas);
 
+        if (vencidas.isEmpty()) return;
+        // S.8: notifica TODOS os membros ativos da empresa (não só o criador da conta)
+        List<Long> membros = membrosAtivos(empresaId);
         for (Conta conta : vencidas) {
-            boolean jaNotificado = notificacaoRepository
-                    .existsByUsuarioIdAndTipoAndReferenciaId(uid, TipoNotificacao.VENCIMENTO, conta.getId());
-            if (!jaNotificado) {
-                criarNotificacao(uid,
-                        "Conta vencida: " + conta.getDescricao() + " (vencimento: " + conta.getDataVencimento() + ")",
-                        TipoNotificacao.VENCIMENTO, conta.getId());
+            String msg = "Conta vencida: " + conta.getDescricao()
+                    + " (vencimento: " + conta.getDataVencimento() + ")";
+            for (Long uid : membros) {
+                boolean jaNotificado = notificacaoRepository
+                        .existsByUsuarioIdAndTipoAndReferenciaId(uid, TipoNotificacao.VENCIMENTO, conta.getId());
+                if (!jaNotificado) {
+                    criarNotificacao(uid, empresaId, msg, TipoNotificacao.VENCIMENTO, conta.getId());
+                }
             }
         }
     }
 
+    private List<Long> membrosAtivos(Long empresaId) {
+        return usuarioEmpresaRepository.findByEmpresaIdAndAtivoTrue(empresaId)
+                .stream().map(ue -> ue.getUsuario().getId()).distinct().toList();
+    }
+
     // ── Regra 2 ──────────────────────────────────────────────────────────────
 
-    private void sincronizarFaturasCartao(Long uid) {
+    private void sincronizarFaturasCartao(Long empresaId) {
         int diaHoje = LocalDate.now().getDayOfMonth();
-        List<CartaoCredito> cartoes = cartaoRepository.findAllByUsuarioId(uid);
+        List<CartaoCredito> cartoes = cartaoRepository.findAllByEmpresaId(empresaId);
 
+        List<Long> membros = membrosAtivos(empresaId);
         for (CartaoCredito cartao : cartoes) {
             if (!cartao.getDiaFechamento().equals(diaHoje)) continue;
 
             YearMonth mesAtual = YearMonth.now();
             LocalDateTime inicioDoDia = LocalDate.now().atStartOfDay();
             LocalDateTime fimDoDia = LocalDate.now().atTime(23, 59, 59);
+            String msg = "Fatura do cartão " + cartao.getNome() + " fecha hoje (" +
+                    String.format("%02d/%d", mesAtual.getMonthValue(), mesAtual.getYear()) + ")";
 
-            boolean jaNotificado = notificacaoRepository
-                    .existsFaturaNotificacao(uid, cartao.getId(), inicioDoDia, fimDoDia);
-
-            if (!jaNotificado) {
-                criarNotificacao(uid,
-                        "Fatura do cartão " + cartao.getNome() + " fecha hoje (" +
-                        String.format("%02d/%d", mesAtual.getMonthValue(), mesAtual.getYear()) + ")",
-                        TipoNotificacao.FATURA, cartao.getId());
+            // S.8: notifica todos os membros ativos da empresa
+            for (Long uid : membros) {
+                boolean jaNotificado = notificacaoRepository
+                        .existsFaturaNotificacao(uid, cartao.getId(), inicioDoDia, fimDoDia);
+                if (!jaNotificado) {
+                    criarNotificacao(uid, empresaId, msg, TipoNotificacao.FATURA, cartao.getId());
+                }
             }
         }
     }
 
     // ── Helper ───────────────────────────────────────────────────────────────
 
-    private void criarNotificacao(Long uid, String mensagem, TipoNotificacao tipo, Long referenciaId) {
+    private void criarNotificacao(Long uid, Long empresaId, String mensagem, TipoNotificacao tipo, Long referenciaId) {
         Usuario usuario = usuarioRepository.getReferenceById(uid);
         Notificacao n = new Notificacao();
         n.setMensagem(mensagem);
@@ -120,6 +157,9 @@ public class SincronizacaoService {
         n.setReferenciaId(referenciaId);
         n.setUsuario(usuario);
         n.setLida(false);
+        // empresa_id é NOT NULL; como rodamos fora do request scope (scheduler),
+        // não há TenantContext disponível — definimos explicitamente a partir da entidade origem.
+        if (empresaId != null) n.setEmpresaId(empresaId);
         notificacaoRepository.save(n);
     }
 }

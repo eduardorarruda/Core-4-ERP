@@ -1,7 +1,7 @@
 package br.com.core4erp.conta.entity;
 
 import br.com.core4erp.categoria.entity.Categoria;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.parceiro.entity.Parceiro;
@@ -19,7 +19,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_conta")
-public class Conta extends Auditable {
+public class Conta extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -61,6 +61,14 @@ public class Conta extends Auditable {
 
     @Column(nullable = false)
     private Integer totalParcelas = 1;
+
+    /** Marca que a categoria foi sugerida pela IA (a pedido do usuário). */
+    @Column(name = "classificada_por_ia", nullable = false)
+    private Boolean classificadaPorIa = false;
+
+    /** Confiança (0..1) reportada pela IA na classificação; null se não classificado por IA. */
+    @Column(name = "confianca_ia", precision = 5, scale = 4)
+    private BigDecimal confiancaIa;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "categoria_id", nullable = false)

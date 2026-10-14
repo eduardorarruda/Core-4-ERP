@@ -1,6 +1,6 @@
 package br.com.core4erp.contaCorrente.entity;
 
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -15,11 +15,16 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_conta_corrente")
-public class ContaCorrente extends Auditable {
+public class ContaCorrente extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // S.12: lock otimista — evita lost update do saldo em baixas/transferências/conciliações concorrentes
+    @Version
+    @Column(nullable = false)
+    private Long version;
 
     private String numeroConta;
 

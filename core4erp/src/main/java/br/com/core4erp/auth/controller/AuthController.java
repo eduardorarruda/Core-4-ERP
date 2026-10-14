@@ -6,11 +6,15 @@ import br.com.core4erp.auth.dto.EsqueciSenhaResponseDto;
 import br.com.core4erp.auth.dto.LoginRequestDto;
 import br.com.core4erp.auth.dto.LoginResponseDto;
 import br.com.core4erp.auth.dto.MeResponseDto;
+import br.com.core4erp.auth.dto.PermissoesAtuaisResponseDto;
 import br.com.core4erp.auth.dto.RedefinirSenhaRequestDto;
 import br.com.core4erp.auth.dto.RegistrarRequestDto;
+import br.com.core4erp.auth.dto.TrocarSenhaRequestDto;
 import br.com.core4erp.auth.service.AuthService;
 import br.com.core4erp.auth.service.PasswordResetService;
 import br.com.core4erp.auth.service.ProfileService;
+import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.empresa.dto.EmpresaResumoDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,16 +38,22 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final ProfileService profileService;
+    private final TenantContext tenantCtx;
 
     @Value("${jwt.expiration}")
     private long tokenExpiration;
 
+    @Value("${security.cookie.same-site:None}")
+    private String cookieSameSite;
+
     public AuthController(AuthService authService,
                           PasswordResetService passwordResetService,
-                          ProfileService profileService) {
+                          ProfileService profileService,
+                          TenantContext tenantCtx) {
         this.authService = authService;
         this.passwordResetService = passwordResetService;
         this.profileService = profileService;
+        this.tenantCtx = tenantCtx;
     }
 
     @Operation(summary = "Registrar novo usuário")
@@ -57,7 +67,17 @@ public class AuthController {
     public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto request, HttpServletResponse response) {
         AuthService.LoginResult result = authService.login(request);
         response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie(result.token(), tokenExpiration / 1000));
-        return ResponseEntity.ok(new LoginResponseDto(result.usuario()));
+        Long empresaAtualId = result.empresas().isEmpty() ? null : result.empresas().get(0).id();
+        return ResponseEntity.ok(new LoginResponseDto(
+            result.usuario(), result.empresas(), empresaAtualId, result.senhaProvisoria(), result.adminSistema()));
+    }
+
+    @Operation(summary = "Trocar empresa ativa sem novo login")
+    @PostMapping("/trocar-empresa")
+    public ResponseEntity<EmpresaResumoDto> trocarEmpresa(
+            @RequestParam Long empresaId,
+            Authentication authentication) {
+        return ResponseEntity.ok(authService.trocarEmpresa(authentication.getName(), empresaId));
     }
 
     @Operation(summary = "Encerrar sessão e remover cookie JWT")
@@ -71,6 +91,15 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<MeResponseDto> me(Authentication authentication) {
         return ResponseEntity.ok(authService.me(authentication.getName()));
+    }
+
+    @Operation(summary = "Retorna as permissões efetivas do usuário na empresa atual")
+    @GetMapping("/me/permissoes")
+    public ResponseEntity<PermissoesAtuaisResponseDto> minhasPermissoes() {
+        return ResponseEntity.ok(new PermissoesAtuaisResponseDto(
+                tenantCtx.getPermissoes(),
+                tenantCtx.getPerfilNome()
+        ));
     }
 
     @Operation(summary = "Solicitar recuperação de senha — gera token e envia por e-mail")
@@ -94,6 +123,13 @@ public class AuthController {
         return ResponseEntity.ok(profileService.atualizarPerfil(authentication.getName(), dto));
     }
 
+    @Operation(summary = "Trocar senha do usuário autenticado")
+    @PatchMapping("/senha")
+    public ResponseEntity<Void> trocarSenha(@Valid @RequestBody TrocarSenhaRequestDto dto) {
+        authService.trocarSenha(dto);
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "Atualizar foto de perfil via multipart")
     @PostMapping("/foto")
     public ResponseEntity<MeResponseDto> uploadFoto(
@@ -108,11 +144,11 @@ public class AuthController {
         return ResponseEntity.ok(profileService.atualizarFotoPerfil(authentication.getName(), foto.getBytes(), contentType));
     }
 
-    private static String jwtCookie(String value, long maxAgeSeconds) {
+    private String jwtCookie(String value, long maxAgeSeconds) {
         return ResponseCookie.from("access_token", value)
                 .httpOnly(true)
                 .secure(true)
-                .sameSite("None")
+                .sameSite(cookieSameSite)
                 .path("/")
                 .maxAge(maxAgeSeconds)
                 .build()

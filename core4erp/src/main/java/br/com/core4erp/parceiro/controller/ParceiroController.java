@@ -1,5 +1,6 @@
 package br.com.core4erp.parceiro.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.service.BrasilApiService;
@@ -29,6 +30,7 @@ public class ParceiroController {
 
     @Operation(summary = "Consultar dados de CNPJ via BrasilAPI")
     @GetMapping("/cnpj/{cnpj}")
+    @Requer("PARCEIRO_VISUALIZAR")
     public ResponseEntity<BrasilApiService.CnpjData> buscarCnpj(@PathVariable String cnpj) {
         return brasilApiService.buscarCnpj(cnpj)
                 .map(ResponseEntity::ok)
@@ -37,6 +39,7 @@ public class ParceiroController {
 
     @Operation(summary = "Listar parceiros do usuário (paginado)")
     @GetMapping
+    @Requer("PARCEIRO_VISUALIZAR")
     public ResponseEntity<Page<ParceiroResponseDto>> listar(
             @PageableDefault(size = 200, sort = "razaoSocial") Pageable pageable) {
         return ResponseEntity.ok(parceiroService.listar(pageable));
@@ -44,18 +47,21 @@ public class ParceiroController {
 
     @Operation(summary = "Buscar parceiro por ID")
     @GetMapping("/{id}")
+    @Requer("PARCEIRO_VISUALIZAR")
     public ResponseEntity<ParceiroResponseDto> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(parceiroService.buscarPorId(id));
     }
 
     @Operation(summary = "Cadastrar novo parceiro")
     @PostMapping
+    @Requer("PARCEIRO_CRIAR")
     public ResponseEntity<ParceiroResponseDto> criar(@Valid @RequestBody ParceiroRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(parceiroService.criar(dto));
     }
 
     @Operation(summary = "Atualizar parceiro")
     @PutMapping("/{id}")
+    @Requer("PARCEIRO_EDITAR")
     public ResponseEntity<ParceiroResponseDto> atualizar(@PathVariable Long id,
                                                           @Valid @RequestBody ParceiroRequestDto dto) {
         return ResponseEntity.ok(parceiroService.atualizar(id, dto));
@@ -63,6 +69,7 @@ public class ParceiroController {
 
     @Operation(summary = "Remover parceiro")
     @DeleteMapping("/{id}")
+    @Requer("PARCEIRO_DELETAR")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         parceiroService.deletar(id);
         return ResponseEntity.noContent().build();

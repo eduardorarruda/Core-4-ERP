@@ -18,26 +18,39 @@ import java.util.Optional;
 
 public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecificationExecutor<Conta> {
 
-    Page<Conta> findAllByUsuarioId(Long usuarioId, Pageable pageable);
+    Page<Conta> findAllByEmpresaId(Long empresaId, Pageable pageable);
 
-    Page<Conta> findAllByUsuarioIdAndTipo(Long usuarioId, TipoConta tipo, Pageable pageable);
+    Page<Conta> findAllByEmpresaIdAndTipo(Long empresaId, TipoConta tipo, Pageable pageable);
 
-    Page<Conta> findAllByUsuarioIdAndStatus(Long usuarioId, StatusConta status, Pageable pageable);
+    Page<Conta> findAllByEmpresaIdAndStatus(Long empresaId, StatusConta status, Pageable pageable);
 
-    Optional<Conta> findByIdAndUsuarioId(Long id, Long usuarioId);
+    Optional<Conta> findByIdAndEmpresaId(Long id, Long empresaId);
+
+    /** Busca global: contas cuja descrição contém o termo. */
+    @Query("""
+            SELECT c FROM Conta c
+            WHERE c.empresaId = :eid
+              AND LOWER(c.descricao) LIKE LOWER(CONCAT('%', :q, '%'))
+            """)
+    List<Conta> buscarPorDescricao(@Param("eid") Long eid, @Param("q") String q, Pageable pageable);
+
+    /** Há alguma conta usando esta categoria/parceiro? Usado para bloquear exclusão (integridade referencial). */
+    boolean existsByCategoria_IdAndEmpresaId(Long categoriaId, Long empresaId);
+
+    boolean existsByParceiro_IdAndEmpresaId(Long parceiroId, Long empresaId);
 
     /** Para sincronização de status ATRASADO. */
-    List<Conta> findByUsuarioIdAndStatusAndDataVencimentoBefore(
-            Long usuarioId, StatusConta status, LocalDate data);
+    List<Conta> findByEmpresaIdAndStatusAndDataVencimentoBefore(
+            Long empresaId, StatusConta status, LocalDate data);
 
-    List<Conta> findByUsuarioIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(
-            Long usuarioId, Collection<StatusConta> statuses, LocalDate inicio, LocalDate fim);
+    List<Conta> findByEmpresaIdAndStatusInAndDataVencimentoBetweenOrderByDataVencimento(
+            Long empresaId, Collection<StatusConta> statuses, LocalDate inicio, LocalDate fim);
 
     // ── Dashboard queries ─────────────────────────────────────────────────────
 
     @Query("SELECT COALESCE(SUM(c.valorOriginal), 0) FROM Conta c " +
-           "WHERE c.usuario.id = :uid AND c.tipo = :tipo AND c.status IN :statuses")
-    BigDecimal sumByTipoAndStatus(@Param("uid") Long uid,
+           "WHERE c.empresaId = :eid AND c.tipo = :tipo AND c.status IN :statuses")
+    BigDecimal sumByTipoAndStatus(@Param("eid") Long eid,
                                   @Param("tipo") TipoConta tipo,
                                   @Param("statuses") Collection<StatusConta> statuses);
 
@@ -47,31 +60,36 @@ public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecific
                COALESCE(SUM(CASE WHEN c.status = :statusPago     THEN c.valorOriginal ELSE 0 END), 0) AS totalPago,
                COALESCE(SUM(CASE WHEN c.status = :statusRecebido THEN c.valorOriginal ELSE 0 END), 0) AS totalRecebido
         FROM Conta c
-        WHERE c.usuario.id = :uid
+        WHERE c.empresaId = :eid
           AND c.dataVencimento BETWEEN :inicio AND :fim
           AND c.status IN :statuses
         GROUP BY EXTRACT(YEAR FROM c.dataVencimento), EXTRACT(MONTH FROM c.dataVencimento)
         ORDER BY EXTRACT(YEAR FROM c.dataVencimento) ASC, EXTRACT(MONTH FROM c.dataVencimento) ASC
         """)
-    List<FluxoMensalProjection> fluxoMensal(@Param("uid") Long uid,
+    List<FluxoMensalProjection> fluxoMensal(@Param("eid") Long eid,
                                              @Param("inicio") LocalDate inicio,
                                              @Param("fim") LocalDate fim,
                                              @Param("statusPago") StatusConta statusPago,
                                              @Param("statusRecebido") StatusConta statusRecebido,
                                              @Param("statuses") Collection<StatusConta> statuses);
 
+    // Roll-up de subcategorias: agrupa pela categoria-pai (COALESCE) para o gasto de uma
+    // subcategoria somar no total da categoria principal. LEFT JOIN no pai preserva as
+    // categorias raiz (um join implícito em categoriaPai excluiria toda categoria sem pai).
     @Query("""
-        SELECT c.categoria.descricao AS categoria, SUM(c.valorOriginal) AS total
+        SELECT COALESCE(pai.descricao, cat.descricao) AS categoria, SUM(c.valorOriginal) AS total
         FROM Conta c
-        WHERE c.usuario.id = :uid
+        JOIN c.categoria cat
+        LEFT JOIN cat.categoriaPai pai
+        WHERE c.empresaId = :eid
           AND c.tipo = :tipo
           AND c.status IN :statuses
           AND EXTRACT(MONTH FROM c.dataVencimento) = :mes
           AND EXTRACT(YEAR  FROM c.dataVencimento) = :ano
-        GROUP BY c.categoria.descricao
+        GROUP BY COALESCE(pai.descricao, cat.descricao)
         ORDER BY SUM(c.valorOriginal) DESC
         """)
-    List<DespesaCategoriaProjection> despesasPorCategoria(@Param("uid") Long uid,
+    List<DespesaCategoriaProjection> despesasPorCategoria(@Param("eid") Long eid,
                                                            @Param("tipo") TipoConta tipo,
                                                            @Param("statuses") Collection<StatusConta> statuses,
                                                            @Param("mes") int mes,
@@ -79,30 +97,30 @@ public interface ContaRepository extends JpaRepository<Conta, Long>, JpaSpecific
                                                            Pageable pageable);
 
     @Query("SELECT COUNT(c) FROM Conta c " +
-           "WHERE c.usuario.id = :uid AND c.status IN :statuses AND c.dataVencimento = :data")
-    Long countByStatusAndData(@Param("uid") Long uid,
+           "WHERE c.empresaId = :eid AND c.status IN :statuses AND c.dataVencimento = :data")
+    Long countByStatusAndData(@Param("eid") Long eid,
                                @Param("statuses") Collection<StatusConta> statuses,
                                @Param("data") LocalDate data);
 
     @Query("SELECT COUNT(c) FROM Conta c " +
-           "WHERE c.usuario.id = :uid AND c.status IN :statuses AND c.dataVencimento < :data")
-    Long countByStatusAndDataBefore(@Param("uid") Long uid,
+           "WHERE c.empresaId = :eid AND c.status IN :statuses AND c.dataVencimento < :data")
+    Long countByStatusAndDataBefore(@Param("eid") Long eid,
                                     @Param("statuses") Collection<StatusConta> statuses,
                                     @Param("data") LocalDate data);
 
     // ── Relatório: contas por período ────────────────────────────────────────
 
-    List<Conta> findAllByUsuarioIdAndDataVencimentoBetween(Long usuarioId, LocalDate inicio, LocalDate fim);
+    List<Conta> findAllByEmpresaIdAndDataVencimentoBetween(Long empresaId, LocalDate inicio, LocalDate fim);
 
     // ── Conciliação: candidatas por valor próximo ─────────────────────────────
 
     @Query("""
         SELECT c FROM Conta c
-        WHERE c.usuario.id = :uid
+        WHERE c.empresaId = :eid
           AND c.status IN :statuses
           AND ABS(c.valorOriginal - :valor) <= :tolerancia
         """)
-    List<Conta> findCandidatasParaConciliacao(@Param("uid") Long uid,
+    List<Conta> findCandidatasParaConciliacao(@Param("eid") Long eid,
                                               @Param("statuses") Collection<StatusConta> statuses,
                                               @Param("valor") BigDecimal valor,
                                               @Param("tolerancia") BigDecimal tolerancia);

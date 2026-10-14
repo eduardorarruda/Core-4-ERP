@@ -1,5 +1,6 @@
 package br.com.core4erp.investimento.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.investimento.dto.TipoInvestimentoRequestDto;
 import br.com.core4erp.investimento.dto.TipoInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.TipoInvestimentoService;
@@ -25,18 +26,21 @@ public class TipoInvestimentoController {
 
     @Operation(summary = "Listar tipos de investimento do usuário")
     @GetMapping
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     public ResponseEntity<List<TipoInvestimentoResponseDto>> listar() {
         return ResponseEntity.ok(service.listar());
     }
 
     @Operation(summary = "Criar novo tipo de investimento")
     @PostMapping
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     public ResponseEntity<TipoInvestimentoResponseDto> criar(@Valid @RequestBody TipoInvestimentoRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.criar(dto));
     }
 
     @Operation(summary = "Atualizar tipo de investimento")
     @PutMapping("/{id}")
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     public ResponseEntity<TipoInvestimentoResponseDto> atualizar(@PathVariable Long id,
                                                                   @Valid @RequestBody TipoInvestimentoRequestDto dto) {
         return ResponseEntity.ok(service.atualizar(id, dto));
@@ -44,6 +48,7 @@ public class TipoInvestimentoController {
 
     @Operation(summary = "Remover tipo de investimento")
     @DeleteMapping("/{id}")
+    @Requer("INVESTIMENTO_TIPO_GERENCIAR")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();

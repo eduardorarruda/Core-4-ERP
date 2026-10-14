@@ -2,7 +2,7 @@ package br.com.core4erp.assinatura.entity;
 
 import br.com.core4erp.cartaoCredito.entity.CartaoCredito;
 import br.com.core4erp.categoria.entity.Categoria;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -15,7 +15,7 @@ import lombok.Setter;
 @Setter
 @Entity
 @Table(name = "tb_assinatura")
-public class Assinatura extends Auditable {
+public class Assinatura extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

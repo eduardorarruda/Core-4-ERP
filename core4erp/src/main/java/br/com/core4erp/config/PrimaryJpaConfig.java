@@ -28,11 +28,14 @@ import java.util.Properties;
                 "br.com.core4erp.categoria",
                 "br.com.core4erp.chat",
                 "br.com.core4erp.conciliacao",
+                "br.com.core4erp.conciliacaoCartao",
                 "br.com.core4erp.conta",
                 "br.com.core4erp.contaCorrente",
+                "br.com.core4erp.empresa",
                 "br.com.core4erp.investimento",
                 "br.com.core4erp.notificacao",
                 "br.com.core4erp.parceiro",
+                "br.com.core4erp.plano",
                 "br.com.core4erp.usuario"
         },
         entityManagerFactoryRef = "entityManagerFactory",
@@ -49,11 +52,14 @@ public class PrimaryJpaConfig {
             "br.com.core4erp.categoria",
             "br.com.core4erp.chat",
             "br.com.core4erp.conciliacao",
+            "br.com.core4erp.conciliacaoCartao",
             "br.com.core4erp.conta",
             "br.com.core4erp.contaCorrente",
+            "br.com.core4erp.empresa",
             "br.com.core4erp.investimento",
             "br.com.core4erp.notificacao",
             "br.com.core4erp.parceiro",
+            "br.com.core4erp.plano",
             "br.com.core4erp.usuario"
     };
 

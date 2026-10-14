@@ -8,10 +8,11 @@ const FORMATS = [
   { key: 'xlsx',   label: 'Excel',   icon: Download,   className: 'bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20' },
 ];
 
-export default function FormatButtons({ loading = {}, onSelect }) {
+export default function FormatButtons({ loading = {}, onSelect, canExport = true }) {
+  const formatos = canExport ? FORMATS : FORMATS.filter(f => f.key !== 'xlsx');
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {FORMATS.map(({ key, label, icon: Icon, className }) => {
+    <div className={cn('grid gap-2', canExport ? 'grid-cols-3' : 'grid-cols-2')}>
+      {formatos.map(({ key, label, icon: Icon, className }) => {
         const isLoading = loading[key];
         return (
           <button
@@ -19,7 +20,7 @@ export default function FormatButtons({ loading = {}, onSelect }) {
             onClick={() => onSelect(key)}
             disabled={isLoading || Object.values(loading).some(Boolean)}
             className={cn(
-              'flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50',
+              'flex flex-col items-center justify-center gap-1 min-h-[44px] py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50',
               className
             )}
           >

@@ -28,13 +28,13 @@ function Sparkline({ data }) {
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: 36, marginTop: 8 }}>
       <defs>
         <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6EFFC0" stopOpacity=".4" />
-          <stop offset="100%" stopColor="#6EFFC0" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--color-primary)" stopOpacity=".4" />
+          <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={area} fill="url(#sg)" />
-      <path d={line} fill="none" stroke="#6EFFC0" strokeWidth="1.5" />
-      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.5" fill="#6EFFC0" />
+      <path d={line} fill="none" stroke="var(--color-primary)" strokeWidth="1.5" />
+      <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="2.5" fill="var(--color-primary)" />
     </svg>
   );
 }
@@ -58,46 +58,47 @@ function CashflowChart({ entradas, saidas }) {
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: 80 }}>
       <defs>
         <linearGradient id="eg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6EFFC0" stopOpacity=".3" />
-          <stop offset="100%" stopColor="#6EFFC0" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--color-primary)" stopOpacity=".3" />
+          <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
         </linearGradient>
         <pattern id="gp" width="60" height="30" patternUnits="userSpaceOnUse">
-          <path d="M 60 0 L 0 0 0 30" fill="none" stroke="rgba(250,250,250,.04)" strokeWidth="1" />
+          <path d="M 60 0 L 0 0 0 30" fill="none" stroke="color-mix(in srgb, var(--color-text-primary) 4%, transparent)" strokeWidth="1" />
         </pattern>
       </defs>
       <rect width={w} height={h} fill="url(#gp)" />
       <path d={aE} fill="url(#eg)" />
-      <path d={pE} fill="none" stroke="#6EFFC0" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d={buildPath(saidas)} fill="none" stroke="#ACC7FF" strokeWidth="1.4" strokeDasharray="3 3" opacity=".7" />
+      <path d={pE} fill="none" stroke="var(--color-primary)" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d={buildPath(saidas)} fill="none" stroke="var(--color-secondary)" strokeWidth="1.4" strokeDasharray="3 3" opacity=".7" />
     </svg>
   );
 }
 
-function BrandMark() {
+export function BrandMark() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg,rgba(110,255,192,.16),rgba(110,255,192,.04))', border: '1px solid rgba(110,255,192,.22)', display: 'grid', placeItems: 'center', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 20%,rgba(110,255,192,.4),transparent 60%)', opacity: .8 }} />
-        <svg width="20" height="20" viewBox="0 0 22 22" fill="none" style={{ position: 'relative', zIndex: 1 }}>
-          <rect x="1" y="1" width="9" height="9" rx="2" fill="#6EFFC0" />
-          <rect x="12" y="1" width="9" height="9" rx="2" stroke="#6EFFC0" strokeWidth="1.6" />
-          <rect x="1" y="12" width="9" height="9" rx="2" stroke="#6EFFC0" strokeWidth="1.6" />
-          <rect x="12" y="12" width="9" height="9" rx="2" fill="#6EFFC0" opacity=".4" />
+    <div className="flex items-center gap-3">
+      <div className="relative w-10 h-10 rounded-[10px] grid place-items-center overflow-hidden shrink-0 bg-primary/10 border border-primary/20">
+        <div
+          className="absolute inset-0 opacity-80"
+          style={{ background: 'radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--color-primary) 40%, transparent), transparent 60%)' }}
+        />
+        <svg width="20" height="20" viewBox="0 0 22 22" fill="none" className="relative z-[1]">
+          <rect x="1" y="1" width="9" height="9" rx="2" fill="var(--color-primary)" />
+          <rect x="12" y="1" width="9" height="9" rx="2" stroke="var(--color-primary)" strokeWidth="1.6" />
+          <rect x="1" y="12" width="9" height="9" rx="2" stroke="var(--color-primary)" strokeWidth="1.6" />
+          <rect x="12" y="12" width="9" height="9" rx="2" fill="var(--color-primary)" opacity=".4" />
         </svg>
       </div>
       <div>
-        <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, letterSpacing: '-0.02em', fontSize: 16, color: '#fafafa' }}>
-          Core <span style={{ color: '#6EFFC0' }}>4</span> ERP
+        <div className="font-display font-bold tracking-tight text-base text-text-primary">
+          Core <span className="text-primary">4</span> ERP
         </div>
-        <div style={{ fontFamily: 'monospace', fontSize: 9, color: 'rgba(250,250,250,.3)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
+        <div className="font-mono text-[9px] text-text-primary/30 tracking-widest uppercase">
           Enterprise Finance
         </div>
       </div>
     </div>
   );
 }
-
-export { BrandMark };
 
 export default function HeroPane() {
   const cardRef = useRef(null);
@@ -145,6 +146,9 @@ export default function HeroPane() {
     ['IPCA', '…', 'neutral', ''], ['EUR/BRL', '…', 'up', ''],
   ]);
 
+  // Cotações reais (AwesomeAPI/BCB). Só faz polling quando a pane está de fato
+  // visível (lg+). No mobile ela é renderizada mas oculta via `hidden lg:flex`,
+  // então evitamos requisições de rede desnecessárias enquanto estiver oculta.
   useEffect(() => {
     const fmt = (n, dec = 2) => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
     const dir = (pct) => parseFloat(pct) >= 0 ? 'up' : 'down';
@@ -187,97 +191,103 @@ export default function HeroPane() {
       } catch (_) {}
     }
 
-    fetchAll();
-    const id = setInterval(fetchAll, 30_000);
-    return () => clearInterval(id);
+    const mq = window.matchMedia('(min-width: 1024px)');
+    let intervalId = null;
+    const start = () => {
+      if (intervalId) return;
+      fetchAll();
+      intervalId = setInterval(fetchAll, 30_000);
+    };
+    const stop = () => { if (intervalId) { clearInterval(intervalId); intervalId = null; } };
+    const onChange = (e) => { e.matches ? start() : stop(); };
+
+    if (mq.matches) start();
+    mq.addEventListener('change', onChange);
+    return () => { stop(); mq.removeEventListener('change', onChange); };
   }, []);
 
   const allTicker = [...tickerItems, ...tickerItems];
 
-  const cardStyle = {
-    width: '100%',
-    maxWidth: 480,
-    background: 'linear-gradient(160deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,.015) 100%)',
-    border: '1px solid rgba(255,255,255,.1)',
-    borderRadius: 24,
-    padding: '18px 20px 14px',
-    backdropFilter: 'blur(12px)',
-    boxShadow: '0 40px 80px -40px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06)',
-    transition: 'transform .05s linear',
-    willChange: 'transform',
-    boxSizing: 'border-box',
-  };
-
   return (
-    <aside style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px 20px 16px 12px', overflow: 'hidden' }}>
-      <div ref={cardRef} style={cardStyle}>
-        <div className="anim-in" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+    <aside className="flex-1 min-w-0 flex items-center justify-center overflow-hidden pl-3 pr-5 py-4">
+      <div
+        ref={cardRef}
+        className="w-full max-w-[480px] rounded-3xl pt-[18px] px-5 pb-3.5 box-border backdrop-blur-md border border-text-primary/10 will-change-transform [transition:transform_.05s_linear]"
+        style={{
+          background: 'linear-gradient(160deg, color-mix(in srgb, var(--color-text-primary) 4%, transparent) 0%, color-mix(in srgb, var(--color-text-primary) 1.5%, transparent) 100%)',
+          boxShadow: 'var(--shadow-elevated)',
+        }}
+      >
+        <div className="anim-in flex items-center gap-2 mb-2">
           <span className="live-dot" />
-          <span style={{ fontFamily: 'monospace', fontSize: 10, letterSpacing: '.14em', color: 'rgba(250,250,250,.5)', textTransform: 'uppercase' }}>
+          <span className="font-mono text-[10px] tracking-widest text-text-primary/50 uppercase">
             CORE 4 · INTELLIGENCE LAYER
           </span>
         </div>
 
-        <div className="anim-in d1" style={{ fontFamily: 'monospace', fontSize: 11, color: 'rgba(250,250,250,.35)', letterSpacing: '.08em', marginBottom: 10 }}>
+        <div className="anim-in d1 font-mono text-[11px] text-text-primary/35 tracking-wider mb-2.5">
           {date} · {time}
         </div>
 
-        <h2 className="anim-in d2" style={{ fontFamily: "'Sora', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.2, color: '#fafafa', marginBottom: 6 }}>
-          A arquiteta da sua<br /><em style={{ color: '#6EFFC0', fontStyle: 'italic' }}>liberdade financeira.</em>
+        <h2 className="anim-in d2 font-display text-[22px] font-bold tracking-tight leading-tight text-text-primary mb-1.5">
+          A arquiteta da sua<br /><em className="text-primary italic">liberdade financeira.</em>
         </h2>
 
-        <p className="anim-in d3" style={{ fontSize: 12, color: 'rgba(250,250,250,.5)', lineHeight: 1.6, marginBottom: 12, maxWidth: 380 }}>
+        <p className="anim-in d3 text-xs text-text-primary/50 leading-relaxed mb-3 max-w-[380px]">
           Conciliação automática, fluxo de caixa em tempo real e relatórios que falam. Tudo em um único lugar.
         </p>
 
-        <div className="anim-in d4" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          <div style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.08)', borderRadius: 14, padding: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 9, color: 'rgba(250,250,250,.4)', fontFamily: 'monospace', letterSpacing: '.1em', textTransform: 'uppercase' }}>Receita do mês</span>
-              <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 4, background: 'rgba(110,255,192,.12)', color: '#6EFFC0', fontFamily: 'monospace' }}>▲ 24.8%</span>
+        <div className="anim-in d4 grid grid-cols-2 gap-2 mb-2.5">
+          <div className="bg-text-primary/[.025] border border-text-primary/[.08] rounded-2xl p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-[9px] text-text-primary/40 font-mono tracking-wider uppercase">Receita do mês</span>
+              <span className="text-[9px] font-semibold px-1.5 py-px rounded bg-primary/[.12] text-primary font-mono">▲ 24.8%</span>
             </div>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: '-0.025em', color: '#fafafa', marginBottom: 2 }}>
+            <div className="font-display text-lg font-bold tracking-tight text-text-primary mb-0.5">
               <AnimatedNumber prefix="R$ " to={482931} duration={1800} />
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(250,250,250,.4)' }}>Meta atingida em 14 dias</div>
+            <div className="text-[10px] text-text-primary/40">Meta atingida em 14 dias</div>
           </div>
-          <div style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.08)', borderRadius: 14, padding: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 9, color: 'rgba(250,250,250,.4)', fontFamily: 'monospace', letterSpacing: '.1em', textTransform: 'uppercase' }}>Saldo consolidado</span>
-              <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 4, background: 'rgba(110,255,192,.12)', color: '#6EFFC0', fontFamily: 'monospace' }}>▲ 8.2%</span>
+          <div className="bg-text-primary/[.025] border border-text-primary/[.08] rounded-2xl p-3">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-[9px] text-text-primary/40 font-mono tracking-wider uppercase">Saldo consolidado</span>
+              <span className="text-[9px] font-semibold px-1.5 py-px rounded bg-primary/[.12] text-primary font-mono">▲ 8.2%</span>
             </div>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: '-0.025em', color: '#fafafa', marginBottom: 2 }}>
+            <div className="font-display text-[17px] font-bold tracking-tight text-text-primary mb-0.5">
               <AnimatedNumber prefix="R$ " to={1284055} duration={2000} />
             </div>
             <Sparkline data={spark} />
           </div>
         </div>
 
-        <div className="anim-in d5" style={{ background: 'rgba(255,255,255,.02)', border: '1px solid rgba(250,250,250,.06)', borderRadius: 14, padding: '10px 12px', marginBottom: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <div className="anim-in d5 bg-text-primary/[.02] border border-text-primary/[.06] rounded-2xl px-3 py-2.5 mb-2">
+          <div className="flex justify-between items-center mb-1.5">
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(250,250,250,.7)' }}>Fluxo de caixa · últimos 12 meses</div>
-              <div style={{ fontSize: 10, color: 'rgba(250,250,250,.3)', marginTop: 2, fontFamily: 'monospace' }}>Atualizado há 3 minutos</div>
+              <div className="text-xs font-semibold text-text-primary/70">Fluxo de caixa · últimos 12 meses</div>
+              <div className="text-[10px] text-text-primary/30 mt-0.5 font-mono">Atualizado há 3 minutos</div>
             </div>
-            <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'rgba(250,250,250,.5)', fontFamily: 'monospace' }}>
-              <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#6EFFC0', marginRight: 4 }} />Entradas</span>
-              <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#ACC7FF', marginRight: 4 }} />Saídas</span>
+            <div className="flex gap-3 text-[10px] text-text-primary/50 font-mono">
+              <span><span className="inline-block w-2 h-2 rounded-full bg-primary mr-1" />Entradas</span>
+              <span><span className="inline-block w-2 h-2 rounded-full bg-secondary mr-1" />Saídas</span>
             </div>
           </div>
           <CashflowChart entradas={entradas} saidas={saidas} />
         </div>
 
-        <div className="anim-in d6" style={{ borderRadius: 10, background: 'rgba(0,0,0,.25)', border: '1px solid rgba(250,250,250,.08)', overflow: 'hidden', height: 32, display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ flexShrink: 0, padding: '0 10px', fontFamily: 'monospace', fontSize: 9, letterSpacing: '.14em', textTransform: 'uppercase', color: '#6EFFC0', borderRight: '1px solid rgba(250,250,250,.08)', height: '100%', display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(110,255,192,.04)' }}>
+        <div
+          className="anim-in d6 rounded-[10px] border border-text-primary/[.08] overflow-hidden h-8 flex items-center mb-2.5"
+          style={{ background: 'color-mix(in srgb, var(--color-surface) 25%, transparent)' }}
+        >
+          <div className="shrink-0 px-2.5 font-mono text-[9px] tracking-widest uppercase text-primary border-r border-text-primary/[.08] h-full flex items-center gap-1.5 bg-primary/[.04]">
             <span className="live-dot" style={{ width: 4, height: 4 }} />
             LIVE
           </div>
-          <div style={{ flex: 1, overflow: 'hidden', WebkitMaskImage: 'linear-gradient(to right,transparent,#000 4%,#000 96%,transparent)' }}>
-            <div className="ticker-scroll" style={{ display: 'flex', gap: 24, alignItems: 'center', height: 32, whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: 10, paddingLeft: 16 }}>
+          <div className="flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_4%,#000_96%,transparent)]">
+            <div className="ticker-scroll flex gap-6 items-center h-8 whitespace-nowrap font-mono text-[10px] pl-4">
               {allTicker.map(([sym, val, dir, pct], i) => (
-                <span key={i} style={{ color: 'rgba(250,250,250,.55)' }}>
-                  <b style={{ color: 'rgba(250,250,250,.8)' }}>{sym}</b> {val}{' '}
-                  <span style={{ color: dir === 'up' ? '#6EFFC0' : '#FFB4AB' }}>
+                <span key={i} className="text-text-primary/55">
+                  <b className="text-text-primary/80">{sym}</b> {val}{' '}
+                  <span className={dir === 'up' ? 'text-primary' : 'text-error'}>
                     {dir === 'up' ? '▲' : '▼'} {pct}
                   </span>
                 </span>
@@ -286,13 +296,13 @@ export default function HeroPane() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, fontSize: 10, color: 'rgba(250,250,250,.35)', fontFamily: 'monospace' }}>
-            <span style={{ color: '#6EFFC0' }}>🛡️</span> SOC 2
-            <span style={{ color: '#6EFFC0' }}>🔒</span> LGPD
-            <span style={{ color: '#6EFFC0' }}>⏱️</span> 99.98%
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-end gap-3 text-[10px] text-text-primary/35 font-mono">
+            <span className="text-primary">🛡️</span> SOC 2
+            <span className="text-primary">🔒</span> LGPD
+            <span className="text-primary">⏱️</span> 99.98%
           </div>
-          <p style={{ fontSize: 9, color: 'rgba(250,250,250,.2)', fontFamily: 'monospace', letterSpacing: '.06em', textAlign: 'right', lineHeight: 1.5 }}>
+          <p className="text-[9px] text-text-primary/20 font-mono tracking-wide text-right leading-normal">
             * Valores e métricas exibidos são ilustrativos e não representam dados reais.
           </p>
         </div>

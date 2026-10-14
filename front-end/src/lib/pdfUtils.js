@@ -83,3 +83,58 @@ export function gerarPDF(titulo, periodo, dados) {
   const nomeArquivo = `${titulo.replace(/ /g, '_')}_${periodo.inicio}_${periodo.fim}.pdf`;
   doc.save(nomeArquivo);
 }
+
+/**
+ * Gera o PDF de um relatório de conciliação (bancária ou de cartão).
+ *
+ * Centraliza o cabeçalho, a tabela e o rodapé que antes estavam duplicados
+ * byte-a-byte em ConciliacaoRelatorio.jsx e ConciliacaoCartaoRelatorio.jsx.
+ * A montagem das linhas (que depende dos rótulos de status de cada fluxo)
+ * permanece em cada view — aqui recebemos apenas o resultado pronto.
+ *
+ * @param {Object}   opts
+ * @param {string}   opts.titulo       Título do cabeçalho (ex.: "Relatório de Conciliação #12").
+ * @param {string}  [opts.subtitulo]   Texto alinhado à direita (conta/cartão).
+ * @param {string[]} opts.cabecalho    Cabeçalho da tabela.
+ * @param {Array[]}  opts.linhas       Linhas já formatadas da tabela.
+ * @param {string}   opts.nomeArquivo  Nome do arquivo salvo (.pdf).
+ */
+export function exportarRelatorioConciliacaoPdf({ titulo, subtitulo, cabecalho, linhas, nomeArquivo }) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  // ── Cabeçalho ──────────────────────────────────────────────────────────────
+  doc.setFillColor(...PRIMARY);
+  doc.rect(0, 0, 297, 20, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...ON_PRIMARY);
+  doc.text(titulo, 10, 13);
+  if (subtitulo) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(subtitulo, 200, 13);
+  }
+
+  // ── Tabela ─────────────────────────────────────────────────────────────────
+  autoTable(doc, {
+    head: [cabecalho],
+    body: linhas,
+    startY: 25,
+    styles: { fontSize: 8, cellPadding: 3, textColor: [60, 60, 60] },
+    headStyles: { fillColor: PRIMARY, textColor: ON_PRIMARY, fontStyle: 'bold', fontSize: 8 },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+  });
+
+  // ── Rodapé ─────────────────────────────────────────────────────────────────
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Core 4 ERP — Gerado em ${new Date().toLocaleString('pt-BR')}`, 10, 205);
+    doc.text(`Página ${i} de ${pages}`, 260, 205);
+  }
+
+  doc.save(nomeArquivo);
+}

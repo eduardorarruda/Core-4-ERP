@@ -1,5 +1,6 @@
 package br.com.core4erp.relatorio.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
@@ -36,6 +37,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON do Fluxo de Caixa")
     @GetMapping("/fluxo-caixa/dados")
+    @Requer("RELATORIO_FLUXO_CAIXA_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> fluxoCaixaDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -47,6 +49,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX do Fluxo de Caixa")
     @GetMapping("/fluxo-caixa")
+    @Requer("RELATORIO_FLUXO_CAIXA_EXPORTAR")
     public ResponseEntity<Resource> fluxoCaixaExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -63,6 +66,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON das Contas Abertas")
     @GetMapping("/contas-abertas/dados")
+    @Requer("RELATORIO_CONTAS_ABERTAS_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> contasAbertasDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -75,6 +79,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX das Contas Abertas")
     @GetMapping("/contas-abertas")
+    @Requer("RELATORIO_CONTAS_ABERTAS_EXPORTAR")
     public ResponseEntity<Resource> contasAbertasExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -92,6 +97,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON do Extrato")
     @GetMapping("/extrato/dados")
+    @Requer("RELATORIO_EXTRATO_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> extratoDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -103,6 +109,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX do Extrato")
     @GetMapping("/extrato")
+    @Requer("RELATORIO_EXTRATO_EXPORTAR")
     public ResponseEntity<Resource> extratoExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -119,6 +126,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON da DRE")
     @GetMapping("/dre/dados")
+    @Requer("RELATORIO_DRE_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> dreDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -128,6 +136,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX da DRE")
     @GetMapping("/dre")
+    @Requer("RELATORIO_DRE_EXPORTAR")
     public ResponseEntity<Resource> dreExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -142,6 +151,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON de Investimentos")
     @GetMapping("/investimentos/dados")
+    @Requer("RELATORIO_INVESTIMENTOS_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> investimentosDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -152,6 +162,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX de Investimentos")
     @GetMapping("/investimentos")
+    @Requer("RELATORIO_INVESTIMENTOS_EXPORTAR")
     public ResponseEntity<Resource> investimentosExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -167,6 +178,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON de Cartões de Crédito")
     @GetMapping("/cartoes/dados")
+    @Requer("RELATORIO_CARTOES_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> cartoesDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -177,6 +189,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX de Cartões de Crédito")
     @GetMapping("/cartoes")
+    @Requer("RELATORIO_CARTOES_EXPORTAR")
     public ResponseEntity<Resource> cartoesExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -192,6 +205,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON da Posição Financeira Completa")
     @GetMapping("/posicao-financeira/dados")
+    @Requer("RELATORIO_POSICAO_FINANCEIRA_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> posicaoFinanceiraDados(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
@@ -200,6 +214,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX da Posição Financeira Completa")
     @GetMapping("/posicao-financeira")
+    @Requer("RELATORIO_POSICAO_FINANCEIRA_EXPORTAR")
     public ResponseEntity<Resource> posicaoFinanceiraExcel(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
@@ -213,6 +228,7 @@ public class RelatorioController {
 
     @Operation(summary = "Dados JSON de Assinaturas Recorrentes")
     @GetMapping("/assinaturas/dados")
+    @Requer("RELATORIO_ASSINATURAS_VISUALIZAR")
     public ResponseEntity<RelatorioResponseDto> assinaturasDados(
             @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
         return ResponseEntity.ok(relatorioService.getDadosAssinaturas(ativas));
@@ -220,6 +236,7 @@ public class RelatorioController {
 
     @Operation(summary = "Download XLSX de Assinaturas Recorrentes")
     @GetMapping("/assinaturas")
+    @Requer("RELATORIO_ASSINATURAS_EXPORTAR")
     public ResponseEntity<Resource> assinaturasExcel(
             @RequestParam(required = false, defaultValue = "true") Boolean ativas) {
         RelatorioResponseDto dados = relatorioService.getDadosAssinaturas(ativas);

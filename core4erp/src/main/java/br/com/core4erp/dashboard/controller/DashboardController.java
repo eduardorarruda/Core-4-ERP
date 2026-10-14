@@ -1,5 +1,6 @@
 package br.com.core4erp.dashboard.controller;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.dashboard.dto.DashboardResponseDto;
 import br.com.core4erp.dashboard.dto.SaldoDetalhadoResponseDto;
 import br.com.core4erp.dashboard.service.DashboardService;
@@ -8,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Dashboard", description = "Agregação financeira consolidada do usuário")
@@ -23,12 +25,18 @@ public class DashboardController {
 
     @Operation(summary = "Retorna saldos, totais, fluxo mensal e despesas por categoria")
     @GetMapping
-    public ResponseEntity<DashboardResponseDto> getDashboard() {
-        return ResponseEntity.ok(service.getDashboard());
+    @Requer("DASHBOARD_VISUALIZAR")
+    public ResponseEntity<DashboardResponseDto> getDashboard(
+            @RequestParam(required = false) Integer mesInicio,
+            @RequestParam(required = false) Integer anoInicio,
+            @RequestParam(required = false) Integer mesFim,
+            @RequestParam(required = false) Integer anoFim) {
+        return ResponseEntity.ok(service.getDashboard(mesInicio, anoInicio, mesFim, anoFim));
     }
 
     @Operation(summary = "Retorna saldo detalhado com composição, projeções e cartão")
     @GetMapping("/saldo-detalhado")
+    @Requer("DASHBOARD_CARTAO_VISUALIZAR")
     public ResponseEntity<SaldoDetalhadoResponseDto> getSaldoDetalhado() {
         return ResponseEntity.ok(service.getSaldoDetalhado());
     }

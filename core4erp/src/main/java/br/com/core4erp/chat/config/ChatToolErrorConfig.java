@@ -26,7 +26,11 @@ public class ChatToolErrorConfig {
             Throwable causa = ex.getCause() != null ? ex.getCause() : ex;
             log.error("[CHAT-TOOL-ERRO] tool={} causa={}: {}",
                     tool, causa.getClass().getName(), causa.getMessage(), causa);
-            return "A ferramenta '" + tool + "' falhou: " + causa.getMessage();
+            // Anti-loop: sem esta instrução o modelo repetia a MESMA chamada dezenas de vezes
+            // (visto em produção: ~25 chamadas/s de atualizarParceiro após um erro de validação).
+            return "A ferramenta '" + tool + "' falhou: " + causa.getMessage()
+                    + " — NÃO chame esta ferramenta novamente com os mesmos dados. Explique o problema"
+                    + " ao usuário em linguagem simples e pergunte como ele deseja proceder.";
         };
     }
 }

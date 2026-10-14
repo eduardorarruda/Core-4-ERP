@@ -32,12 +32,41 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      # Ingestão RAG via n8n (pré-processamento do anexo). Aponta para o serviço n8n interno;
+      # se o n8n estiver fora, o backend faz fallback e indexa o conteúdo original (best-effort).
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/rag-ingest}
+      # Eventos de domínio (cada ação da IA) → workflow 'evento' no n8n (fora do caminho crítico).
+      N8N_EVENTOS_WEBHOOK_URL: ${N8N_EVENTOS_WEBHOOK_URL:-http://n8n:5678/webhook/evento}
+      # Orquestrador do chat: interno (default) | shadow (só admin) | n8n (todos). Delega ao WF-AUREA.
+      CHAT_ORQUESTRADOR: ${CHAT_ORQUESTRADOR:-interno}
+      N8N_AUREA_WEBHOOK_URL: ${N8N_AUREA_WEBHOOK_URL:-http://n8n:5678/webhook/aurea}
+      # Segredo assinado no header X-Webhook-Secret das chamadas ao n8n (vazio = não envia).
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      # Timeout de leitura do webhook do n8n (s). 95 acomoda o ramo LOTE multi-agente (medido ~91s p/
+      # ~6 itens) e fica < ~100s (idle do Cloudflare free) e < 98s do nginx. Lotes grandes de parceiros
+      # novos (enriquecimento BrasilAPI) podem passar disso — ver limite de itens no prompt do Extrator.
+      N8N_READ_TIMEOUT_SECONDS: ${N8N_READ_TIMEOUT_SECONDS:-95}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_FROM: ${MAIL_FROM}
+      # ── Traces → Painel EBPÓS (OpenTelemetry) ────────────────────────────────
+      # O -javaagent (no Dockerfile) exporta traces via OTLP/HTTP. Só métricas/logs
+      # ficam desligados aqui (o painel já coleta métricas do servidor pelo nmon-agent).
+      # Setar NMON_INGEST_KEY no .env ativa o envio; sem ela, deixe OTEL_SDK_DISABLED=true.
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-core4erp}
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${NMON_OTLP_ENDPOINT:-https://monitoramento.ebpos.digital}
+      # Nome do header de ingestão parametrizável: o Painel EBPÓS novo usa X-Painel-Key;
+      # o nmon clássico usava X-NMon-Key (setar OTEL_INGEST_HEADER=X-NMon-Key p/ voltar).
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_INGEST_HEADER:-X-Painel-Key}=${NMON_INGEST_KEY:-}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=production}
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -153,11 +182,72 @@ services:
       - app-network
     restart: unless-stopped
 
+  # Qdrant — banco vetorial do RAG (embeddings de documentos/descrições). Isolado, na mesma
+  # rede (backend e n8n usam internamente http://qdrant:6333). Exposto só em 127.0.0.1 (admin via túnel).
+  qdrant:
+    # Versão fixada (reprodutibilidade — evita drift de :latest). O cliente Spring AI (gRPC 1.13)
+    # emite um WARN de versão contra este servidor, porém as operações usadas (create/upsert/search)
+    # são compatíveis. Ao atualizar, casar com a versão do qdrant-client do Spring AI.
+    image: qdrant/qdrant:v1.18.2
+    container_name: qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # n8n self-hosted — orquestra o processamento pesado/assíncrono da IA (arquivos/lote).
+  # Mesma rede do backend (interno: backend -> http://n8n:5678 ; n8n -> http://backend:8080).
+  # Exposto só em 127.0.0.1 (acesso ao editor via túnel SSH; n8n é poderoso e não deve ficar
+  # público sem TLS). N8N_SECURE_COOKIE=false permite acesso por HTTP no túnel/localhost.
+  n8n:
+    image: n8nio/n8n:2.28.3
+    container_name: n8n
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      # Público via Cloudflare Tunnel: valores reais ficam no .env do servidor (gitignored).
+      # Defaults abaixo = uso local (localhost) — não quebra o `docker compose up` de dev.
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      # Atrás do cloudflared (1 proxy): N8N_PROXY_HOPS=1 faz o n8n confiar no X-Forwarded-Proto
+      # do túnel, para o cookie seguro (N8N_SECURE_COOKIE=true) funcionar sem falso "URL inseguro".
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS:-0}
+      - WEBHOOK_URL=${N8N_PUBLIC_URL:-http://localhost:5678/}
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=America/Sao_Paulo
+      - TZ=America/Sao_Paulo
+      - N8N_DIAGNOSTICS_ENABLED=false
+      # Persistência: SQLite por padrão (dev local — não quebra o `docker compose up`).
+      # Em produção o .env seta N8N_DB_TYPE=postgresdb → usa o Postgres do compose
+      # (database 'n8n', mesmo servidor/credenciais do backend) para execuções persistentes.
+      - DB_TYPE=${N8N_DB_TYPE:-sqlite}
+      - DB_POSTGRESDB_HOST=${N8N_DB_HOST:-db}
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME:-n8n}
+      - DB_POSTGRESDB_USER=${DB_USERNAME}
+      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
+      # Segredo compartilhado backend↔n8n: os workflows validam o header X-Webhook-Secret
+      # contra este valor (via $env). Vazio = webhooks abertos (dev). Setado no .env em produção.
+      - N8N_WEBHOOK_SECRET=${N8N_WEBHOOK_SECRET:-}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - app-network
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   prometheus_data:
   grafana_data:
   loki_data:
+  n8n_data:
+  qdrant_data:
 
 networks:
   app-network:

@@ -6,12 +6,15 @@ import PeriodoFilter from './PeriodoFilter';
 import FormatButtons from './FormatButtons';
 import ReportModal from './ReportModal';
 import ReportFilters from './ReportFilters';
+import { useToast } from '../../hooks/useToast';
 
 export default function ReportCard({
   title, description, icon: Icon,
   onGetData, onDownloadXlsx, onError,
   filterConfig = [],
+  canExport = true,
 }) {
+  const toast = useToast();
   const [loading, setLoading] = useState({ online: false, pdf: false, xlsx: false });
   const [periodo, setPeriodo] = useState({
     inicio: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
@@ -36,6 +39,12 @@ export default function ReportCard({
   }
 
   async function handleSelect(fmt) {
+    // Validação amigável de período antes de qualquer chamada à API.
+    if (periodo.inicio && periodo.fim && periodo.inicio > periodo.fim) {
+      onError('A data inicial não pode ser maior que a data final. Ajuste o período.');
+      return;
+    }
+
     const params = activeParams();
 
     if (fmt === 'online') {
@@ -55,6 +64,7 @@ export default function ReportCard({
       try {
         const dados = await onGetData(periodo.inicio, periodo.fim, params);
         gerarPDF(title, periodo, dados);
+        toast.success('Relatório em PDF gerado com sucesso.');
       } catch (e) {
         onError(e.message || 'Erro ao gerar PDF');
       } finally {
@@ -74,6 +84,7 @@ export default function ReportCard({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        toast.success('Planilha em Excel gerada com sucesso.');
       } catch (e) {
         onError(e.message || 'Erro ao gerar Excel');
       } finally {
@@ -108,20 +119,20 @@ export default function ReportCard({
             onChange={handleFilterChange}
             open={filtersOpen}
             onToggle={() => setFiltersOpen(v => !v)}
+            onError={onError}
           />
 
-          <FormatButtons loading={loading} onSelect={handleSelect} />
+          <FormatButtons loading={loading} onSelect={handleSelect} canExport={canExport} />
         </div>
       </BentoCard>
 
-      {modalData && (
-        <ReportModal
-          titulo={title}
-          periodo={periodo}
-          dados={modalData}
-          onClose={() => setModalData(null)}
-        />
-      )}
+      <ReportModal
+        open={!!modalData}
+        titulo={title}
+        periodo={periodo}
+        dados={modalData}
+        onClose={() => setModalData(null)}
+      />
     </>
   );
 }

@@ -29,6 +29,8 @@ public class ChatAuditoriaService {
         this.securityCtx = securityCtx;
     }
 
+    // Nota: a publicação de eventos ao n8n foi movida para EventoN8nAspect, que intercepta a camada
+    // de service e cobre TODAS as ações (tela + IA) num ponto único, sem duplicar.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrar(String ferramenta, String detalhe) {
         try {

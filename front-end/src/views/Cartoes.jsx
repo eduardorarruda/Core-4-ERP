@@ -1,8 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import Button from '../components/ui/Button';
 import FormField, { inputCls } from '../components/ui/FormField';
+import CategoriaOptions from '../components/ui/CategoriaOptions';
 import PageHeader from '../components/ui/PageHeader';
 import Badge from '../components/ui/Badge';
 import DataTable from '../components/ui/DataTable';
@@ -10,7 +13,8 @@ import EmptyState from '../components/ui/EmptyState';
 import { brl } from '../lib/formatters';
 import { useToast } from '../hooks/useToast';
 
-const emptyLancForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: true };
+const emptyLancForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: true, tipo: 'SAIDA' };
+const emptyEditForm = { descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '', tipo: 'SAIDA' };
 
 const GRADIENTS = [
   'from-violet-600 to-indigo-700',
@@ -33,30 +37,92 @@ export default function Cartoes() {
   const [form, setForm] = useState({ nome: '', limite: '', diaFechamento: '', diaVencimento: '', contaCorrenteId: '' });
   const [cartaoSel, setCartaoSel] = useState(null);
   const [lancamentos, setLancamentos] = useState([]);
+  const [todosLancamentos, setTodosLancamentos] = useState([]);
   const [lancForm, setLancForm] = useState(emptyLancForm);
   const [editLancId, setEditLancId] = useState(null);
-  const [editForm, setEditForm] = useState({ descricao: '', valor: '', dataCompra: '', categoriaId: '', parceiroId: '' });
-  const [fechForm, setFechForm] = useState({ mes: '', ano: '' });
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [editErrors, setEditErrors] = useState({});
   const [salvando, setSalvando] = useState(false);
   const [salvandoLanc, setSalvandoLanc] = useState(false);
   const [salvandoEdit, setSalvandoEdit] = useState(false);
   const [salvandoFatura, setSalvandoFatura] = useState(false);
+  const [carregandoLancamentos, setCarregandoLancamentos] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
   const [filterMes, setFilterMes] = useState('');
   const [filterAno, setFilterAno] = useState('');
+  const [busca, setBusca] = useState('');
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     Promise.all([api.listar(), ccApi.listar(), catApi.listar(), parApi.listar()])
-      .then(([l, cs, ca, ps]) => { setLista(l); setCcs(cs); setCats(ca); setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS')); })
+      .then(([l, cs, ca, ps]) => {
+        setLista(l); setCcs(cs); setCats(ca); setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'));
+        // Restaura o cartão selecionado a partir da URL (?cartao=<id>) — preserva o
+        // contexto ao atualizar a página, usar voltar/avançar ou abrir um deep-link.
+        const cartaoId = searchParams.get('cartao');
+        if (cartaoId) {
+          const c = l.find((x) => String(x.id) === cartaoId);
+          if (c) abrirCartao(c);
+        }
+      })
       .catch((e) => toast.error(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function recarregarLancamentos() {
+  async function recarregarLancamentos(params = {}) {
     if (!cartaoSel) return;
-    const l = await api.lancamentos.listar(cartaoSel.id);
+    const l = await api.lancamentos.listar(cartaoSel.id, params);
     setLancamentos(l);
+  }
+
+  // Recarrega a lista COMPLETA (sem filtro) — usada após criar/editar/excluir/fechar, pois é dela
+  // que sai o cálculo das faturas em aberto.
+  async function recarregarTudo() {
+    if (!cartaoSel) return;
+    setCarregandoLancamentos(true);
+    try {
+      const l = await api.lancamentos.listar(cartaoSel.id);
+      setLancamentos(l);
+      setTodosLancamentos(l);
+    } finally {
+      setCarregandoLancamentos(false);
+    }
+  }
+
+  async function importarPlanilha() {
+    if (!importFile || !cartaoSel) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await api.lancamentos.importar(cartaoSel.id, importFile);
+      setImportResult(res);
+      if (res.lancamentosCriados > 0) {
+        toast.success(`${res.lancamentosCriados} lançamento(s) importado(s)`);
+        // Atualiza lançamentos, limite do cartão e os dropdowns (categorias/parceiros novos).
+        await recarregarTudo();
+        const [l, ca, ps] = await Promise.all([api.listar(), catApi.listar(), parApi.listar()]);
+        setLista(l);
+        setCats(ca);
+        setPars(ps.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'));
+        setCartaoSel((prev) => l.find((x) => x.id === prev?.id) || prev);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Não foi possível importar a planilha.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function abrirImport() {
+    setImportFile(null);
+    setImportResult(null);
+    setShowImport(true);
   }
 
   function validateCartaoForm() {
@@ -124,7 +190,26 @@ export default function Cartoes() {
     setCartaoSel(c);
     setEditLancId(null);
     setErrors({});
-    setLancamentos(await api.lancamentos.listar(c.id));
+    // Persiste o cartão aberto na URL (idempotente ao restaurar via deep-link).
+    setSearchParams({ cartao: String(c.id) });
+    setCarregandoLancamentos(true);
+    setLancamentos([]);
+    setTodosLancamentos([]);
+    try {
+      const l = await api.lancamentos.listar(c.id);
+      setLancamentos(l);
+      setTodosLancamentos(l);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setCarregandoLancamentos(false);
+    }
+  }
+
+  function fecharCartao() {
+    setCartaoSel(null);
+    setEditLancId(null);
+    setSearchParams({});
   }
 
   async function criarLancamento(e) {
@@ -134,8 +219,8 @@ export default function Cartoes() {
     setErrors({});
     setSalvandoLanc(true);
     try {
-      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor });
-      await recarregarLancamentos();
+      await api.lancamentos.criar(cartaoSel.id, { ...lancForm, valor: parseFloat(lancForm.valor), categoriaId: Number(lancForm.categoriaId), parceiroId: Number(lancForm.parceiroId), quantidadeParcelas: Number(lancForm.quantidadeParcelas), dividirValor: lancForm.dividirValor, tipo: lancForm.tipo });
+      await recarregarTudo();
       setLancForm(emptyLancForm);
       toast.success('Lançamento criado!');
     } catch (e) {
@@ -145,18 +230,32 @@ export default function Cartoes() {
     }
   }
 
+  function validateEditForm() {
+    const errs = {};
+    if (!editForm.descricao.trim()) errs.descricao = 'Descrição é obrigatória';
+    if (!editForm.valor || parseFloat(editForm.valor) <= 0) errs.valor = 'Valor deve ser maior que zero';
+    if (!editForm.dataCompra) errs.dataCompra = 'Data é obrigatória';
+    if (!editForm.categoriaId) errs.categoriaId = 'Selecione uma categoria';
+    if (!editForm.parceiroId) errs.parceiroId = 'Selecione um parceiro';
+    return errs;
+  }
+
   function iniciarEdicao(l) {
     setEditLancId(l.id);
-    setEditForm({ descricao: l.descricao, valor: String(l.valor), dataCompra: l.dataCompra, categoriaId: String(l.categoriaId), parceiroId: l.parceiroId ? String(l.parceiroId) : '' });
+    setEditErrors({});
+    setEditForm({ descricao: l.descricao, valor: String(l.valor), dataCompra: l.dataCompra, categoriaId: String(l.categoriaId), parceiroId: l.parceiroId ? String(l.parceiroId) : '', tipo: l.tipo || 'SAIDA' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function salvarEdicao(e) {
     e.preventDefault();
+    const errs = validateEditForm();
+    if (Object.keys(errs).length) { setEditErrors(errs); return; }
+    setEditErrors({});
     setSalvandoEdit(true);
     try {
-      await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), categoriaId: Number(editForm.categoriaId), parceiroId: Number(editForm.parceiroId) });
-      await recarregarLancamentos();
+      await api.lancamentos.atualizar(cartaoSel.id, editLancId, { ...editForm, valor: parseFloat(editForm.valor), categoriaId: Number(editForm.categoriaId), parceiroId: Number(editForm.parceiroId), tipo: editForm.tipo });
+      await recarregarTudo();
       setEditLancId(null);
       toast.success('Lançamento atualizado!');
     } catch (e) {
@@ -175,7 +274,7 @@ export default function Cartoes() {
         setConfirmAction(null);
         try {
           await api.lancamentos.deletar(cartaoSel.id, id);
-          await recarregarLancamentos();
+          await recarregarTudo();
           toast.success('Lançamento excluído!');
         } catch (e) {
           toast.error(e.message);
@@ -184,19 +283,30 @@ export default function Cartoes() {
     });
   }
 
-  async function fecharFatura(e) {
-    e.preventDefault();
-    setSalvandoFatura(true);
-    try {
-      await api.fecharFatura(cartaoSel.id, { mes: Number(fechForm.mes), ano: Number(fechForm.ano) });
-      await recarregarLancamentos();
-      toast.success('Fatura fechada! Conta a pagar gerada.');
-      setFechForm({ mes: '', ano: '' });
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvandoFatura(false);
-    }
+  function fecharFatura(mes, ano) {
+    setConfirmAction({
+      title: 'Fechar fatura',
+      message: `Fechar a fatura de ${String(mes).padStart(2, '0')}/${ano}? Isso gera uma conta a pagar e bloqueia novos lançamentos nesta fatura.`,
+      confirmLabel: 'Fechar fatura',
+      onConfirm: async () => {
+        setConfirmAction(null);
+        setSalvandoFatura(true);
+        try {
+          await api.fecharFatura(cartaoSel.id, { mes: Number(mes), ano: Number(ano) });
+          await recarregarTudo();
+          // Atualiza limite usado/livre exibido no cabeçalho e na lista de cartões.
+          const novaLista = await api.listar();
+          setLista(novaLista);
+          const atualizado = novaLista.find((c) => c.id === cartaoSel.id);
+          if (atualizado) setCartaoSel(atualizado);
+          toast.success('Fatura fechada! Conta a pagar gerada.');
+        } catch (e) {
+          toast.error(e.message);
+        } finally {
+          setSalvandoFatura(false);
+        }
+      },
+    });
   }
 
   const lancsFiltrados = lancamentos.filter((l) => {
@@ -204,6 +314,23 @@ export default function Cartoes() {
     if (filterAno && String(l.anoFatura) !== filterAno) return false;
     return true;
   });
+
+  // Faturas em aberto (não fechadas), agrupadas por mês/ano, com o total LÍQUIDO de cada uma
+  // (soma das SAÍDAS menos as ENTRADAS). Ordenadas da mais antiga para a mais recente — a primeira
+  // é a "atual", a próxima a ser fechada.
+  const faturasAbertas = useMemo(() => {
+    const mapa = new Map();
+    for (const l of todosLancamentos) {
+      if (l.faturaFechada) continue;
+      const chave = `${l.anoFatura}-${l.mesFatura}`;
+      const atual = mapa.get(chave) || { mes: l.mesFatura, ano: l.anoFatura, total: 0, qtd: 0 };
+      const v = Number(l.valor) || 0;
+      atual.total += l.tipo === 'ENTRADA' ? -v : v;
+      atual.qtd += 1;
+      mapa.set(chave, atual);
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  }, [todosLancamentos]);
 
   const columns = [
     {
@@ -225,32 +352,40 @@ export default function Cartoes() {
         </div>
       ),
     },
-    { key: 'valor', label: 'Valor', render: (v) => <span className="font-medium text-text-primary">R$ {brl(v)}</span> },
+    { key: 'valor', label: 'Valor', render: (v, row) => (
+      <span className={`font-mono font-bold ${row.tipo === 'ENTRADA' ? 'text-primary' : 'text-error'}`}>
+        {row.tipo === 'ENTRADA' ? '+' : '-'} R$ {brl(v)}
+      </span>
+    )},
     { key: 'mesFatura', label: 'Fatura', render: (v, row) => `${String(v).padStart(2, '0')}/${row.anoFatura}` },
     { key: 'numeroParcela', label: 'Parcela', render: (v, row) => `${v}/${row.totalParcelas}` },
     {
       key: 'id',
       label: 'Ações',
       render: (id, row) => (
-        <div className="flex gap-2">
-          <button
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => iniciarEdicao(row)}
             disabled={row.faturaFechada}
             aria-label="Editar lançamento"
             title={row.faturaFechada ? 'Fatura fechada' : 'Editar'}
-            className="p-1.5 text-text-primary/40 hover:text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="text-text-primary/40 hover:text-primary hover:bg-primary/10"
           >
             <Pencil className="w-4 h-4" />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => deletarLancamento(id)}
             disabled={row.faturaFechada}
             aria-label="Excluir lançamento"
             title={row.faturaFechada ? 'Fatura fechada' : 'Excluir'}
-            className="p-1.5 text-text-primary/40 hover:text-error rounded-lg hover:bg-error/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            className="text-text-primary/40 hover:text-error hover:bg-error/10"
           >
             <Trash2 className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       ),
     },
@@ -281,19 +416,19 @@ export default function Cartoes() {
           <form onSubmit={criarCartao}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <FormField label="Nome" required error={errors.nome}>
-                <input className={inputCls} value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} required />
+                <input className={inputCls} value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} />
               </FormField>
               <FormField label="Limite (R$)" required error={errors.limite}>
-                <input type="number" step="0.01" className={inputCls} value={form.limite} onChange={(e) => setForm((f) => ({ ...f, limite: e.target.value }))} required />
+                <input type="number" step="0.01" className={inputCls} value={form.limite} onChange={(e) => setForm((f) => ({ ...f, limite: e.target.value }))} />
               </FormField>
               <FormField label="Dia Fechamento" required error={errors.diaFechamento}>
-                <input type="number" min="1" max="31" className={inputCls} value={form.diaFechamento} onChange={(e) => setForm((f) => ({ ...f, diaFechamento: e.target.value }))} required />
+                <input type="number" min="1" max="31" className={inputCls} value={form.diaFechamento} onChange={(e) => setForm((f) => ({ ...f, diaFechamento: e.target.value }))} />
               </FormField>
               <FormField label="Dia Vencimento" required error={errors.diaVencimento}>
-                <input type="number" min="1" max="31" className={inputCls} value={form.diaVencimento} onChange={(e) => setForm((f) => ({ ...f, diaVencimento: e.target.value }))} required />
+                <input type="number" min="1" max="31" className={inputCls} value={form.diaVencimento} onChange={(e) => setForm((f) => ({ ...f, diaVencimento: e.target.value }))} />
               </FormField>
               <FormField label="Conta Corrente" required error={errors.contaCorrenteId}>
-                <select className={`${inputCls} appearance-none`} value={form.contaCorrenteId} onChange={(e) => setForm((f) => ({ ...f, contaCorrenteId: e.target.value }))} required>
+                <select className={`${inputCls} appearance-none`} value={form.contaCorrenteId} onChange={(e) => setForm((f) => ({ ...f, contaCorrenteId: e.target.value }))}>
                   <option value="">Selecione</option>
                   {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
                 </select>
@@ -371,48 +506,75 @@ export default function Cartoes() {
       {/* Detalhe do cartão selecionado */}
       {cartaoSel && (
         <div className="space-y-6 animate-fade-in">
-          <div className="rounded-[18px] p-5 flex items-center justify-between" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
-            <div>
+          <div className="rounded-[18px] p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-3 justify-between" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="live-dot" style={{ width: 5, height: 5 }} />
-                <h2 className="text-lg font-bold text-text-primary font-display">{cartaoSel.nome}</h2>
+                <h2 className="text-lg font-bold text-text-primary font-display truncate">{cartaoSel.nome}</h2>
               </div>
-              <p className="text-[10px] text-text-primary/40 font-mono uppercase tracking-widest mt-1">
-                Limite <span className="text-text-primary/70">R$ {brl(cartaoSel.limite)}</span> · Usado <span className="text-error/80">R$ {brl(cartaoSel.limiteUsado)}</span> · Livre <span className="text-primary/80">R$ {brl(cartaoSel.limiteLivre)}</span>
+              <p className="text-xs text-text-primary/40 font-mono uppercase tracking-widest mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
+                <span>Limite <span className="text-text-primary/70">R$ {brl(cartaoSel.limite)}</span></span>
+                <span className="text-text-primary/20 hidden sm:inline">·</span>
+                <span>Usado <span className="text-error/80">R$ {brl(cartaoSel.limiteUsado)}</span></span>
+                <span className="text-text-primary/20 hidden sm:inline">·</span>
+                <span>Livre <span className="text-primary/80">R$ {brl(cartaoSel.limiteLivre)}</span></span>
               </p>
             </div>
-            <button
-              onClick={() => { setCartaoSel(null); setEditLancId(null); }}
-              aria-label="Fechar cartão"
-              className="p-2 text-text-primary/40 hover:text-text-primary rounded-lg transition-colors"
-              style={{ background: 'rgba(255,255,255,.04)' }}
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <Button
+                variant="ghost"
+                onClick={abrirImport}
+                leftIcon={<Upload className="w-3.5 h-3.5" />}
+                className="border border-primary/25 text-primary/90 hover:text-primary hover:bg-primary/10"
+              >
+                Importar planilha
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={fecharCartao}
+                aria-label="Fechar cartão"
+                className="text-text-primary/40 hover:text-text-primary bg-surface-high/40"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Formulário de edição inline */}
           {editLancId && (
-            <div className="rounded-[18px] p-6 space-y-4 animate-scale-in" style={{ background: 'rgba(110,255,192,.04)', border: '1px solid rgba(110,255,192,.2)', backdropFilter: 'blur(8px)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: '#6EFFC0' }}>Editar Lançamento</h3>
+            <div className="rounded-[18px] p-6 space-y-4 animate-scale-in bg-primary/5 border border-primary/20" style={{ backdropFilter: 'blur(8px)' }}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-primary">Editar Lançamento</h3>
+                <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold self-start sm:self-auto">
+                  <button type="button" onClick={() => setEditForm((f) => ({ ...f, tipo: 'SAIDA' }))}
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    Saída
+                  </button>
+                  <button type="button" onClick={() => setEditForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    Entrada
+                  </button>
+                </div>
+              </div>
               <form onSubmit={salvarEdicao}>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                  <FormField label="Descrição">
-                    <input className={inputCls} value={editForm.descricao} onChange={(e) => setEditForm((f) => ({ ...f, descricao: e.target.value }))} required />
+                  <FormField label="Descrição" required error={editErrors.descricao}>
+                    <input className={inputCls} value={editForm.descricao} onChange={(e) => setEditForm((f) => ({ ...f, descricao: e.target.value }))} />
                   </FormField>
-                  <FormField label="Valor (R$)">
-                    <input type="number" step="0.01" className={inputCls} value={editForm.valor} onChange={(e) => setEditForm((f) => ({ ...f, valor: e.target.value }))} required />
+                  <FormField label="Valor (R$)" required error={editErrors.valor}>
+                    <input type="number" step="0.01" className={inputCls} value={editForm.valor} onChange={(e) => setEditForm((f) => ({ ...f, valor: e.target.value }))} />
                   </FormField>
-                  <FormField label="Data Compra">
-                    <input type="date" className={inputCls} value={editForm.dataCompra} onChange={(e) => setEditForm((f) => ({ ...f, dataCompra: e.target.value }))} required />
+                  <FormField label="Data Compra" required error={editErrors.dataCompra}>
+                    <input type="date" className={inputCls} value={editForm.dataCompra} onChange={(e) => setEditForm((f) => ({ ...f, dataCompra: e.target.value }))} />
                   </FormField>
-                  <FormField label="Categoria">
-                    <select className={`${inputCls} appearance-none`} value={editForm.categoriaId} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
+                  <FormField label="Categoria" required error={editErrors.categoriaId}>
+                    <select className={`${inputCls} appearance-none`} value={editForm.categoriaId} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))}>
                       <option value="">Selecione</option>
-                      {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                      <CategoriaOptions cats={cats} />
                     </select>
                   </FormField>
-                  <FormField label="Parceiro / Fornecedor" required>
+                  <FormField label="Parceiro / Fornecedor" required error={editErrors.parceiroId}>
                     <select className={`${inputCls} appearance-none`} value={editForm.parceiroId} onChange={(e) => setEditForm((f) => ({ ...f, parceiroId: e.target.value }))}>
                       <option value="">— Selecionar —</option>
                       {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
@@ -420,13 +582,12 @@ export default function Cartoes() {
                   </FormField>
                 </div>
                 <div className="flex gap-3">
-                  <button type="submit" disabled={salvandoEdit} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                    {salvandoEdit && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <Button type="submit" loading={salvandoEdit}>
                     {salvandoEdit ? 'Salvando...' : 'Salvar'}
-                  </button>
-                  <button type="button" onClick={() => setEditLancId(null)} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setEditLancId(null)} className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
                     Cancelar
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -435,18 +596,30 @@ export default function Cartoes() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Novo lançamento */}
             <form onSubmit={criarLancamento} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Lançamento</h3>
-              <FormField label="Descrição" error={errors.descricao}>
-                <input className={inputCls} value={lancForm.descricao} onChange={(e) => setLancForm((f) => ({ ...f, descricao: e.target.value }))} required />
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Lançamento</h3>
+                <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold">
+                  <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'SAIDA' }))}
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    Saída
+                  </button>
+                  <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    Entrada
+                  </button>
+                </div>
+              </div>
+              <FormField label="Descrição" required error={errors.descricao}>
+                <input className={inputCls} value={lancForm.descricao} onChange={(e) => setLancForm((f) => ({ ...f, descricao: e.target.value }))} />
               </FormField>
-              <FormField label="Valor (R$)" error={errors.valor}>
-                <input type="number" step="0.01" className={inputCls} value={lancForm.valor} onChange={(e) => setLancForm((f) => ({ ...f, valor: e.target.value }))} required />
+              <FormField label="Valor (R$)" required error={errors.valor}>
+                <input type="number" step="0.01" className={inputCls} value={lancForm.valor} onChange={(e) => setLancForm((f) => ({ ...f, valor: e.target.value }))} />
               </FormField>
-              <FormField label="Data Compra" error={errors.dataCompra}>
-                <input type="date" className={inputCls} value={lancForm.dataCompra} onChange={(e) => setLancForm((f) => ({ ...f, dataCompra: e.target.value }))} required />
+              <FormField label="Data Compra" required error={errors.dataCompra}>
+                <input type="date" className={inputCls} value={lancForm.dataCompra} onChange={(e) => setLancForm((f) => ({ ...f, dataCompra: e.target.value }))} />
               </FormField>
-              <FormField label="Nº Parcelas" error={errors.quantidadeParcelas}>
-                <input type="number" min="1" className={inputCls} value={lancForm.quantidadeParcelas} onChange={(e) => setLancForm((f) => ({ ...f, quantidadeParcelas: e.target.value }))} required />
+              <FormField label="Nº Parcelas" required error={errors.quantidadeParcelas}>
+                <input type="number" min="1" className={inputCls} value={lancForm.quantidadeParcelas} onChange={(e) => setLancForm((f) => ({ ...f, quantidadeParcelas: e.target.value }))} />
               </FormField>
               {Number(lancForm.quantidadeParcelas) > 1 && (
                 <label className="flex items-center gap-2 text-sm text-text-primary/70 cursor-pointer">
@@ -455,9 +628,9 @@ export default function Cartoes() {
                 </label>
               )}
               <FormField label="Categoria" required error={errors.categoriaId}>
-                <select className={`${inputCls} appearance-none`} value={lancForm.categoriaId} onChange={(e) => setLancForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
+                <select className={`${inputCls} appearance-none`} value={lancForm.categoriaId} onChange={(e) => setLancForm((f) => ({ ...f, categoriaId: e.target.value }))}>
                   <option value="">Selecione</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                  <CategoriaOptions cats={cats} />
                 </select>
               </FormField>
               <FormField label="Parceiro / Fornecedor" required error={errors.parceiroId}>
@@ -466,26 +639,43 @@ export default function Cartoes() {
                   {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
                 </select>
               </FormField>
-              <button type="submit" disabled={salvandoLanc} className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2">
-                {salvandoLanc ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              <Button type="submit" loading={salvandoLanc} leftIcon={<Plus className="w-3.5 h-3.5" />}>
                 {salvandoLanc ? 'Lançando...' : 'Lançar'}
-              </button>
+              </Button>
             </form>
 
-            {/* Fechar fatura */}
-            <form onSubmit={fecharFatura} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,211,122,.04)', border: '1px solid rgba(255,211,122,.2)', backdropFilter: 'blur(8px)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-widest font-mono" style={{ color: '#FFD37A' }}>Fechar Fatura</h3>
-              <FormField label="Mês (1-12)">
-                <input type="number" min="1" max="12" className={inputCls} value={fechForm.mes} onChange={(e) => setFechForm((f) => ({ ...f, mes: e.target.value }))} required />
-              </FormField>
-              <FormField label="Ano">
-                <input type="number" className={inputCls} value={fechForm.ano} onChange={(e) => setFechForm((f) => ({ ...f, ano: e.target.value }))} required />
-              </FormField>
-              <button type="submit" disabled={salvandoFatura} className="font-bold px-4 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 text-sm flex items-center gap-2" style={{ background: 'rgba(255,211,122,.2)', color: '#FFD37A', border: '1px solid rgba(255,211,122,.3)' }}>
-                {salvandoFatura ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
-                {salvandoFatura ? 'Fechando...' : 'Fechar Fatura'}
-              </button>
-            </form>
+            {/* Fatura em aberto */}
+            <div className="rounded-[18px] p-6 space-y-3 bg-warning/5 border border-warning/20" style={{ backdropFilter: 'blur(8px)' }}>
+              <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-warning">Fatura em Aberto</h3>
+              {faturasAbertas.length === 0 ? (
+                <p className="text-sm text-text-primary/50 py-6 text-center">Nenhuma fatura em aberto neste cartão.</p>
+              ) : (
+                <div className="space-y-2">
+                  {faturasAbertas.map((f, i) => (
+                    <div key={`${f.ano}-${f.mes}`} className="flex items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(250,250,250,.06)' }}>
+                      <div className="min-w-0">
+                        <p className="text-xs text-text-primary/50 font-mono uppercase tracking-widest">
+                          Fatura {String(f.mes).padStart(2, '0')}/{f.ano}
+                          {i === 0 && faturasAbertas.length > 1 && <span className="text-primary/70"> · atual</span>}
+                        </p>
+                        <p className="text-xl font-bold text-text-primary font-mono">R$ {brl(f.total)}</p>
+                        <p className="text-xs text-text-primary/40">{f.qtd} lançamento{f.qtd > 1 ? 's' : ''}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fecharFatura(f.mes, f.ano)}
+                        disabled={salvandoFatura || f.total <= 0}
+                        title={f.total <= 0 ? 'Fatura sem valor a fechar' : 'Fechar esta fatura'}
+                        className="min-h-[44px] font-bold px-4 rounded-xl hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-sm flex items-center gap-2 shrink-0 bg-warning/20 text-warning border border-warning/30"
+                      >
+                        {salvandoFatura ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                        Fechar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Filtro de lançamentos */}
@@ -494,7 +684,7 @@ export default function Cartoes() {
             <select
               className={`${inputCls} !w-auto min-w-[90px]`}
               value={filterMes}
-              onChange={(e) => setFilterMes(e.target.value)}
+              onChange={(e) => { setFilterMes(e.target.value); recarregarLancamentos({ mes: e.target.value || undefined, ano: filterAno || undefined, busca: busca || undefined }); }}
             >
               <option value="">Mês</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -506,10 +696,17 @@ export default function Cartoes() {
               className={`${inputCls} !w-auto min-w-[90px]`}
               placeholder="Ano"
               value={filterAno}
-              onChange={(e) => setFilterAno(e.target.value)}
+              onChange={(e) => { setFilterAno(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: e.target.value || undefined, busca: busca || undefined }); }}
             />
-            {(filterMes || filterAno) && (
-              <button onClick={() => { setFilterMes(''); setFilterAno(''); }} className="text-xs text-text-primary/40 hover:text-text-primary transition-colors underline underline-offset-2">
+            <input
+              type="search"
+              className={`${inputCls} !w-auto min-w-[160px]`}
+              placeholder="Buscar descrição, categoria..."
+              value={busca}
+              onChange={(e) => { setBusca(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: filterAno || undefined, busca: e.target.value || undefined }); }}
+            />
+            {(filterMes || filterAno || busca) && (
+              <button onClick={() => { setFilterMes(''); setFilterAno(''); setBusca(''); recarregarLancamentos(); }} className="text-xs text-text-primary/40 hover:text-text-primary transition-colors underline underline-offset-2">
                 Limpar filtros
               </button>
             )}
@@ -518,10 +715,97 @@ export default function Cartoes() {
           <DataTable
             columns={columns}
             data={lancsFiltrados}
-            loading={false}
+            loading={carregandoLancamentos}
             aria-label="Lançamentos do cartão"
             emptyState={<EmptyState icon={CreditCard} title="Nenhum lançamento" description="Adicione o primeiro lançamento neste cartão." />}
           />
+        </div>
+      )}
+
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+             onClick={() => !importing && setShowImport(false)}>
+          <div className="w-full max-w-lg rounded-[20px] p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-scale-in"
+               style={{ background: 'rgba(20,20,22,.96)', border: '1px solid rgba(250,250,250,.09)' }}
+               onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-text-primary">Importar planilha</h3>
+                  <p className="text-xs text-text-primary/40 mt-0.5">Cartão {cartaoSel?.nome}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => !importing && setShowImport(false)} aria-label="Fechar"
+                      className="text-text-primary/40 hover:text-text-primary">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {!importResult ? (
+              <>
+                <div className="text-xs text-text-primary/55 leading-relaxed rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
+                  A planilha (.xlsx) deve ter as colunas: <span className="text-text-primary/80 font-medium">Data da Compra, Descrição, Valor, Categoria, CGC PARCEIRO, Número de Parcelas</span>.
+                  <br />Categorias e parceiros que não existirem são criados automaticamente (parceiro pelo CNPJ, com dados da Receita).
+                </div>
+                <label className="block rounded-xl border border-dashed border-text-primary/20 hover:border-primary/40 transition-colors p-6 text-center cursor-pointer">
+                  <input type="file" accept=".xlsx,.xls" className="hidden"
+                         onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+                  <Upload className="w-6 h-6 mx-auto text-text-primary/40 mb-2" />
+                  <span className="text-sm text-text-primary/70">
+                    {importFile ? importFile.name : 'Clique para escolher a planilha'}
+                  </span>
+                </label>
+                <div className="flex gap-3 justify-end">
+                  <Button variant="ghost" onClick={() => setShowImport(false)} disabled={importing}
+                          className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
+                    Cancelar
+                  </Button>
+                  <Button onClick={importarPlanilha} loading={importing} disabled={!importFile}
+                          leftIcon={<Upload className="w-3.5 h-3.5" />}>
+                    {importing ? 'Importando...' : 'Importar'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl p-3 bg-primary/10 border border-primary/20">
+                    <p className="text-2xl font-bold text-primary">{importResult.lancamentosCriados}</p>
+                    <p className="text-xs text-text-primary/50">lançamentos criados</p>
+                  </div>
+                  <div className="rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
+                    <p className="text-2xl font-bold text-text-primary/80">{importResult.linhasImportadas}<span className="text-sm text-text-primary/40">/{importResult.totalLinhas}</span></p>
+                    <p className="text-xs text-text-primary/50">linhas importadas</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-primary/55">
+                  {importResult.categoriasCriadas > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.categoriasCriadas} categoria(s) nova(s)</span>}
+                  {importResult.parceirosCriados > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.parceirosCriados} parceiro(s) novo(s)</span>}
+                  {importResult.ignorados > 0 && <span>{importResult.ignorados} já existiam (ignoradas)</span>}
+                </div>
+                {importResult.erros?.length > 0 && (
+                  <div className="rounded-xl p-3 bg-error/8 border border-error/20 max-h-48 overflow-y-auto">
+                    <p className="text-xs font-bold uppercase tracking-wider text-error/80 mb-2 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />{importResult.erros.length} linha(s) com erro
+                    </p>
+                    <ul className="space-y-1 text-xs text-text-primary/60">
+                      {importResult.erros.map((er, i) => (
+                        <li key={i}><span className="text-text-primary/40">Linha {er.linha}:</span> {er.motivo}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex gap-3 justify-end">
+                  <Button variant="ghost" onClick={() => { setImportFile(null); setImportResult(null); }}
+                          className="border border-text-primary/10 text-text-primary/60 hover:text-text-primary">
+                    Importar outra
+                  </Button>
+                  <Button onClick={() => setShowImport(false)}>Concluir</Button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

@@ -4,14 +4,30 @@ import br.com.core4erp.parceiro.entity.Parceiro;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface ParceiroRepository extends JpaRepository<Parceiro, Long> {
-    List<Parceiro> findAllByUsuarioId(Long usuarioId);
-    Page<Parceiro> findAllByUsuarioId(Long usuarioId, Pageable pageable);
-    Optional<Parceiro> findByIdAndUsuarioId(Long id, Long usuarioId);
-    boolean existsByCpfCnpjAndUsuarioId(String cpfCnpj, Long usuarioId);
-    boolean existsByCpfCnpjAndUsuarioIdAndIdNot(String cpfCnpj, Long usuarioId, Long id);
+    List<Parceiro> findAllByEmpresaId(Long empresaId);
+    Page<Parceiro> findAllByEmpresaId(Long empresaId, Pageable pageable);
+    Optional<Parceiro> findByIdAndEmpresaId(Long id, Long empresaId);
+    boolean existsByCpfCnpjAndEmpresaId(String cpfCnpj, Long empresaId);
+    boolean existsByCpfCnpjAndEmpresaIdAndIdNot(String cpfCnpj, Long empresaId, Long id);
+
+    /** Casa parceiro por CPF/CNPJ (só dígitos) — usado no import de planilha para reaproveitar
+     *  o parceiro existente antes de criar um novo. */
+    Optional<Parceiro> findFirstByCpfCnpjAndEmpresaId(String cpfCnpj, Long empresaId);
+
+    /** Busca global: razão social, nome fantasia ou CPF/CNPJ contendo o termo. */
+    @Query("""
+            SELECT p FROM Parceiro p
+            WHERE p.empresaId = :eid
+              AND (LOWER(p.razaoSocial) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR LOWER(p.nomeFantasia) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR p.cpfCnpj LIKE CONCAT('%', :q, '%'))
+            """)
+    List<Parceiro> buscar(@Param("eid") Long eid, @Param("q") String q, Pageable pageable);
 }

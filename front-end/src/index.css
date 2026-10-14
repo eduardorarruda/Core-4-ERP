@@ -1,10 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* Fontes self-hosted (@fontsource) — sem @import bloqueante do Google, funciona offline no PWA */
+@import '@fontsource/sora/300.css';
+@import '@fontsource/sora/400.css';
+@import '@fontsource/sora/500.css';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+@import '@fontsource/sora/800.css';
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
 @import "tailwindcss";
 
 @theme {
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "DM Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Surface levels — alinhados ao design system */
@@ -18,6 +28,9 @@
   --color-on-primary: #003824;
   --color-secondary: #ACC7FF;
   --color-error: #FFB4AB;
+  --color-warning: #FFD37A;
+
+  --gradient-primary: linear-gradient(135deg, #6EFFC0, #2bdb96);
 
   --color-text-primary: #FAFAFA;
 
@@ -61,6 +74,9 @@
     --color-on-primary: #FFFFFF;
     --color-secondary: #2563EB;
     --color-error: #DC2626;
+    --color-warning: #B45309;
+
+    --gradient-primary: linear-gradient(135deg, #059669, #047857);
 
     --color-text-primary: #18181B;
 
@@ -209,6 +225,16 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* Gradiente primário — substitui os linear-gradient(135deg,#6EFFC0,#2bdb96) hardcoded */
+  .bg-gradient-primary { background: var(--gradient-primary); }
+
+  /* Safe-area (iOS notch / home-bar) — usar com viewport-fit=cover */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .min-h-dvh { min-height: 100dvh; }
 }
 
 /* ── Shared components ── */
@@ -306,3 +332,13 @@ html:not(.dark) .field-float textarea:focus {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Acessibilidade — respeitar preferência do usuário por menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,8 +1,12 @@
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useContext } from 'react';
+import { FileText } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import Modal from '../ui/Modal';
+import EmptyState from '../ui/EmptyState';
+import { ThemeContext } from '../../context/ThemeContext';
+import { formatDate } from '../../lib/formatters';
 
 function formatValue(v) {
   if (typeof v === 'number') {
@@ -11,10 +15,26 @@ function formatValue(v) {
   return v ?? '—';
 }
 
-const CHART_COLORS = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFF3AB'];
+// Cores do gráfico derivadas do tema — evita hex hardcoded no JSX.
+function chartTheme(dark) {
+  return {
+    series: ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFF3AB'],
+    grid: dark ? '#ffffff0a' : '#00000010',
+    axis: dark ? '#a1a1aa' : '#52525b',
+    tooltipBg: dark ? '#1C1B1B' : '#FFFFFF',
+    tooltipBorder: dark ? '#ffffff1a' : '#00000014',
+    tooltipLabel: dark ? '#ffffff' : '#111111',
+  };
+}
 
-export default function ReportModal({ titulo, periodo, dados, onClose }) {
-  const chartData = dados.grafico
+export default function ReportModal({ open, titulo, periodo, dados, onClose }) {
+  const themeCtx = useContext(ThemeContext);
+  const isDark = (themeCtx?.theme ?? 'dark') === 'dark';
+  const ct = chartTheme(isDark);
+
+  const temDados = !!dados && Array.isArray(dados.linhas) && dados.linhas.length > 0;
+
+  const chartData = temDados && dados.grafico
     ? dados.grafico.labels.map((label, i) => {
         const entry = { label };
         Object.entries(dados.grafico.series).forEach(([key, values]) => {
@@ -24,43 +44,37 @@ export default function ReportModal({ titulo, periodo, dados, onClose }) {
       })
     : null;
 
-  const seriesKeys = dados.grafico ? Object.keys(dados.grafico.series) : [];
+  const seriesKeys = temDados && dados.grafico ? Object.keys(dados.grafico.series) : [];
+
+  const periodoLabel = periodo
+    ? `Período: ${formatDate(periodo.inicio)} a ${formatDate(periodo.fim)}`
+    : null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-surface-low border border-text-primary/5 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-text-primary/5 shrink-0">
-          <div>
-            <h2 className="text-text-primary font-bold text-base">{titulo}</h2>
-            <p className="text-text-primary/50 text-xs mt-0.5">
-              Período: {periodo.inicio} a {periodo.fim}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-text-primary/50 hover:text-text-primary transition-colors p-1 rounded-lg hover:bg-surface-medium"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal open={open} onClose={onClose} title={titulo} size="xl">
+      {periodoLabel && (
+        <p className="text-text-primary/50 text-xs -mt-1 mb-4">{periodoLabel}</p>
+      )}
 
-        {/* Content */}
-        <div className="overflow-y-auto flex-1 p-6 space-y-6">
-          {/* Chart */}
+      {!temDados ? (
+        <EmptyState
+          icon={FileText}
+          title="Nenhum dado no período"
+          description="Não encontramos informações para o período e filtros selecionados. Ajuste as datas ou os filtros e tente novamente."
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* Gráfico */}
           {chartData && (
             <div className="bg-surface-medium rounded-xl p-4 border border-text-primary/5">
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff0a" />
-                  <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} />
-                  <YAxis tick={{ fill: '#71717a', fontSize: 11 }} tickFormatter={v => v.toLocaleString('pt-BR')} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
+                  <XAxis dataKey="label" tick={{ fill: ct.axis, fontSize: 11 }} />
+                  <YAxis tick={{ fill: ct.axis, fontSize: 11 }} tickFormatter={v => v.toLocaleString('pt-BR')} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1C1B1B', border: '1px solid #ffffff10', borderRadius: 12 }}
-                    labelStyle={{ color: '#fff', fontWeight: 700 }}
+                    contentStyle={{ backgroundColor: ct.tooltipBg, border: `1px solid ${ct.tooltipBorder}`, borderRadius: 12 }}
+                    labelStyle={{ color: ct.tooltipLabel, fontWeight: 700 }}
                     formatter={(v, name) => [
                       v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
                       name,
@@ -68,14 +82,14 @@ export default function ReportModal({ titulo, periodo, dados, onClose }) {
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   {seriesKeys.map((key, i) => (
-                    <Bar key={key} dataKey={key} name={key} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+                    <Bar key={key} dataKey={key} name={key} fill={ct.series[i % ct.series.length]} radius={[4, 4, 0, 0]} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
 
-          {/* Table */}
+          {/* Tabela */}
           <div className="overflow-x-auto rounded-xl border border-text-primary/5">
             <table className="w-full text-sm">
               <thead>
@@ -83,7 +97,7 @@ export default function ReportModal({ titulo, periodo, dados, onClose }) {
                   {dados.cabecalho.map((col, i) => (
                     <th
                       key={i}
-                      className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-text-primary/60 whitespace-nowrap"
+                      className="text-left px-4 py-3 text-xs font-bold uppercase tracking-widest text-text-primary/60 whitespace-nowrap"
                     >
                       {col}
                     </th>
@@ -113,7 +127,7 @@ export default function ReportModal({ titulo, periodo, dados, onClose }) {
             </table>
           </div>
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 }

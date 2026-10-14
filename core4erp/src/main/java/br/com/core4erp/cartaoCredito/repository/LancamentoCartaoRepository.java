@@ -1,6 +1,7 @@
 package br.com.core4erp.cartaoCredito.repository;
 
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,77 +12,254 @@ import java.util.Optional;
 
 public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCartao, Long> {
 
-    List<LancamentoCartao> findAllByCartaoCreditoIdAndUsuarioId(Long cartaoId, Long usuarioId);
+    List<LancamentoCartao> findAllByCartaoCreditoIdAndEmpresaId(Long cartaoId, Long empresaId);
 
-    List<LancamentoCartao> findAllByCartaoCreditoIdAndUsuarioIdAndMesFaturaAndAnoFatura(
-            Long cartaoId, Long usuarioId, Integer mes, Integer ano);
+    List<LancamentoCartao> findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(
+            Long cartaoId, Long empresaId, Integer mes, Integer ano);
 
-    Optional<LancamentoCartao> findByIdAndCartaoCreditoIdAndUsuarioId(Long id, Long cartaoId, Long usuarioId);
+    Optional<LancamentoCartao> findByIdAndCartaoCreditoIdAndEmpresaId(Long id, Long cartaoId, Long empresaId);
+
+    Optional<LancamentoCartao> findByIdAndEmpresaId(Long id, Long empresaId);
 
     boolean existsByCartaoCreditoId(Long cartaoId);
 
     boolean existsByAssinaturaIdAndMesFaturaAndAnoFatura(Long assinaturaId, Integer mes, Integer ano);
 
-    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
-           "WHERE l.cartaoCredito.id = :cartaoId AND l.anoFatura = :ano AND l.mesFatura = :mes")
+    /** Dedupe do import de planilha: evita relançar a mesma linha em reimportações. Checa a 1ª
+     *  parcela (numeroParcela=1) por cartão+data+descrição — sem valor, pois em parcelamento o
+     *  valor armazenado é o da parcela (total/N), o que quebraria o re-import de parcelas. */
+    boolean existsByCartaoCreditoIdAndEmpresaIdAndDataCompraAndDescricaoAndNumeroParcela(
+            Long cartaoId, Long empresaId, java.time.LocalDate dataCompra, String descricao,
+            Integer numeroParcela);
+
+    /** Busca global: lançamentos de cartão cuja descrição contém o termo. */
+    @Query("""
+            SELECT l FROM LancamentoCartao l
+            WHERE l.empresaId = :eid
+              AND LOWER(l.descricao) LIKE LOWER(CONCAT('%', :q, '%'))
+            """)
+    List<LancamentoCartao> buscarPorDescricao(@Param("eid") Long eid, @Param("q") String q, Pageable pageable);
+
+    @Query("""
+        SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id = :cartaoId AND l.anoFatura = :ano AND l.mesFatura = :mes
+    """)
     BigDecimal sumValorByCartaoAndFatura(@Param("cartaoId") Long cartaoId,
                                          @Param("ano") Integer ano,
                                          @Param("mes") Integer mes);
 
-    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
-           "WHERE l.cartaoCredito.id = :cartaoId " +
-           "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
-           "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)")
+    @Query("""
+        SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id = :cartaoId
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+    """)
     BigDecimal sumValorByCartaoAndPeriod(@Param("cartaoId") Long cartaoId,
                                          @Param("mesInicio") Integer mesInicio,
                                          @Param("anoInicio") Integer anoInicio,
                                          @Param("mesFim") Integer mesFim,
                                          @Param("anoFim") Integer anoFim);
 
-    @Query("SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
-           "WHERE l.usuario.id = :uid " +
-           "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
-           "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)")
-    BigDecimal sumValorByUsuarioAndPeriod(@Param("uid") Long uid,
+    @Query("""
+        SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.empresaId = :eid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+    """)
+    BigDecimal sumValorByEmpresaAndPeriod(@Param("eid") Long eid,
                                           @Param("mesInicio") Integer mesInicio,
                                           @Param("anoInicio") Integer anoInicio,
                                           @Param("mesFim") Integer mesFim,
                                           @Param("anoFim") Integer anoFim);
 
     @Query("SELECT l FROM LancamentoCartao l " +
-           "WHERE l.usuario.id = :uid " +
+           "WHERE l.empresaId = :eid " +
            "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
            "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim) " +
            "ORDER BY l.anoFatura, l.mesFatura, l.dataCompra")
-    List<LancamentoCartao> findByUsuarioIdAndFaturaPeriod(@Param("uid") Long uid,
+    List<LancamentoCartao> findByEmpresaIdAndFaturaPeriod(@Param("eid") Long eid,
                                                           @Param("mesInicio") Integer mesInicio,
                                                           @Param("anoInicio") Integer anoInicio,
                                                           @Param("mesFim") Integer mesFim,
                                                           @Param("anoFim") Integer anoFim);
 
-    /** Single query returning [cartaoId, sumValor] for a set of cards — avoids N+1 in listar(). */
-    @Query("SELECT l.cartaoCredito.id, COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l " +
-           "WHERE l.cartaoCredito.id IN :cartaoIds " +
-           "AND l.usuario.id = :uid " +
-           "AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio) " +
-           "AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim) " +
-           "GROUP BY l.cartaoCredito.id")
+    /** Single query returning [cartaoId, totalLiquido] for a set of cards — avoids N+1 in listar(). */
+    @Query("""
+        SELECT l.cartaoCredito.id,
+               COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id IN :cartaoIds
+        AND l.empresaId = :eid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+        GROUP BY l.cartaoCredito.id
+    """)
     List<Object[]> sumValorByCartaoIdsAndPeriod(@Param("cartaoIds") List<Long> cartaoIds,
-                                                @Param("uid") Long uid,
+                                                @Param("eid") Long eid,
                                                 @Param("mesInicio") Integer mesInicio,
                                                 @Param("anoInicio") Integer anoInicio,
                                                 @Param("mesFim") Integer mesFim,
                                                 @Param("anoFim") Integer anoFim);
 
     @Query("""
-        SELECT COALESCE(SUM(l.valor), 0) FROM LancamentoCartao l
-        WHERE l.usuario.id = :uid
+        SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.empresaId = :eid
         AND NOT EXISTS (
             SELECT 1 FROM FaturaCartao f
             WHERE f.cartaoCredito.id = l.cartaoCredito.id
             AND f.mes = l.mesFatura AND f.ano = l.anoFatura
-            AND f.status = 'FECHADA' AND f.usuario.id = :uid
+            AND f.status = 'FECHADA' AND f.empresaId = :eid
         )
     """)
-    BigDecimal sumLancamentosEmFaturasAbertasByUsuario(@Param("uid") Long uid);
+    BigDecimal sumLancamentosEmFaturasAbertasByEmpresa(@Param("eid") Long eid);
+
+    @Query("""
+        SELECT l FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id = :cartaoId
+        AND l.empresaId = :eid
+        AND l.dataCompra BETWEEN :dataMin AND :dataMax
+    """)
+    List<LancamentoCartao> findCandidatasParaConciliacao(@Param("cartaoId") Long cartaoId,
+                                                         @Param("eid") Long eid,
+                                                         @Param("dataMin") java.time.LocalDate dataMin,
+                                                         @Param("dataMax") java.time.LocalDate dataMax);
+
+    // Roll-up de subcategorias no total da categoria-pai (COALESCE). LEFT JOIN no pai
+    // preserva lançamentos em categorias raiz (join implícito em categoriaPai os excluiria).
+    @Query("""
+        SELECT COALESCE(pai.descricao, cat.descricao), l.mesFatura, l.anoFatura,
+               COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        JOIN l.categoria cat
+        LEFT JOIN cat.categoriaPai pai
+        WHERE l.empresaId = :eid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+        GROUP BY COALESCE(pai.descricao, cat.descricao), l.mesFatura, l.anoFatura
+        ORDER BY l.anoFatura, l.mesFatura, COALESCE(pai.descricao, cat.descricao)
+    """)
+    List<Object[]> resumoDashboardPorCategoria(@Param("eid") Long eid,
+                                               @Param("mesInicio") Integer mesInicio,
+                                               @Param("anoInicio") Integer anoInicio,
+                                               @Param("mesFim") Integer mesFim,
+                                               @Param("anoFim") Integer anoFim);
+
+    // ── §2 — Busca por texto em lançamentos ───────────────────────────────────
+
+    @Query("""
+        SELECT l FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id = :cartaoId
+        AND l.empresaId = :eid
+        AND (:mes IS NULL OR l.mesFatura = :mes)
+        AND (:ano IS NULL OR l.anoFatura = :ano)
+        AND (:busca IS NULL
+             OR LOWER(l.descricao) LIKE LOWER(CONCAT('%', :busca, '%'))
+             OR LOWER(l.categoria.descricao) LIKE LOWER(CONCAT('%', :busca, '%'))
+             OR LOWER(l.parceiro.nomeFantasia) LIKE LOWER(CONCAT('%', :busca, '%'))
+             OR LOWER(l.parceiro.razaoSocial) LIKE LOWER(CONCAT('%', :busca, '%')))
+    """)
+    List<LancamentoCartao> filtrar(@Param("cartaoId") Long cartaoId,
+                                   @Param("eid") Long eid,
+                                   @Param("mes") Integer mes,
+                                   @Param("ano") Integer ano,
+                                   @Param("busca") String busca);
+
+    // ── §7 — Queries BI ───────────────────────────────────────────────────────
+
+    @Query("""
+        SELECT l.mesFatura, l.anoFatura,
+               COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.empresaId = :eid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+        GROUP BY l.mesFatura, l.anoFatura
+        ORDER BY l.anoFatura, l.mesFatura
+    """)
+    List<Object[]> evolucaoMensalFatura(@Param("eid") Long eid,
+                                        @Param("mesInicio") Integer mesInicio,
+                                        @Param("anoInicio") Integer anoInicio,
+                                        @Param("mesFim") Integer mesFim,
+                                        @Param("anoFim") Integer anoFim);
+
+    @Query("""
+        SELECT COALESCE(p.nomeFantasia, p.razaoSocial, 'Sem parceiro'),
+               COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l LEFT JOIN l.parceiro p
+        WHERE l.empresaId = :eid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+        GROUP BY p.id, p.nomeFantasia, p.razaoSocial
+        ORDER BY 2 DESC
+    """)
+    List<Object[]> gastosPorParceiro(@Param("eid") Long eid,
+                                     @Param("mesInicio") Integer mesInicio,
+                                     @Param("anoInicio") Integer anoInicio,
+                                     @Param("mesFim") Integer mesFim,
+                                     @Param("anoFim") Integer anoFim,
+                                     org.springframework.data.domain.Pageable pageable);
+
+    @Query("""
+        SELECT l.mesFatura, l.anoFatura,
+               COALESCE(SUM(l.valor), 0),
+               COUNT(l.id)
+        FROM LancamentoCartao l
+        WHERE l.empresaId = :eid
+        AND l.totalParcelas > 1
+        AND l.tipo = 'SAIDA'
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoAtual * 100 + :mesAtual)
+        GROUP BY l.mesFatura, l.anoFatura
+        ORDER BY l.anoFatura, l.mesFatura
+    """)
+    List<Object[]> impactoParcelamentosFuturos(@Param("eid") Long eid,
+                                               @Param("mesAtual") Integer mesAtual,
+                                               @Param("anoAtual") Integer anoAtual);
+
+    @Query("""
+        SELECT
+          COALESCE(SUM(CASE WHEN l.assinatura IS NOT NULL AND l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN l.assinatura IS NULL     AND l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.empresaId = :eid
+        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
+        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
+    """)
+    Object[] assinaturasVsAvulsos(@Param("eid") Long eid,
+                                   @Param("mesInicio") Integer mesInicio,
+                                   @Param("anoInicio") Integer anoInicio,
+                                   @Param("mesFim") Integer mesFim,
+                                   @Param("anoFim") Integer anoFim);
+
+    @Query("""
+        SELECT
+          COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
+        - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+        FROM LancamentoCartao l
+        WHERE l.cartaoCredito.id = :cartaoId
+        AND l.empresaId = :eid
+        AND l.mesFatura = :mes
+        AND l.anoFatura = :ano
+        AND NOT EXISTS (
+            SELECT 1 FROM FaturaCartao f
+            WHERE f.cartaoCredito.id = l.cartaoCredito.id
+            AND f.mes = l.mesFatura AND f.ano = l.anoFatura
+            AND f.status = 'FECHADA' AND f.empresaId = :eid
+        )
+    """)
+    BigDecimal sumFaturaAbertaByCartaoAndPeriod(@Param("cartaoId") Long cartaoId,
+                                                @Param("eid") Long eid,
+                                                @Param("mes") Integer mes,
+                                                @Param("ano") Integer ano);
 }

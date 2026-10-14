@@ -6,5 +6,6 @@ public record MeResponseDto(
         String email,
         String telefone,
         String role,
-        String fotoPerfil
+        String fotoPerfil,
+        String tipoConta
 ) {}

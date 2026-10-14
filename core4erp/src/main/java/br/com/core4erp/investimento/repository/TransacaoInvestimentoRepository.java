@@ -10,17 +10,17 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface TransacaoInvestimentoRepository extends JpaRepository<TransacaoInvestimento, Long> {
-    List<TransacaoInvestimento> findAllByContaInvestimentoIdAndUsuarioId(Long contaId, Long usuarioId);
+    List<TransacaoInvestimento> findAllByContaInvestimentoIdAndEmpresaId(Long contaId, Long empresaId);
     boolean existsByContaInvestimentoId(Long contaId);
 
-    List<TransacaoInvestimento> findByUsuarioIdAndDataTransacaoBetweenOrderByDataTransacao(
-            Long usuarioId, LocalDate inicio, LocalDate fim);
+    List<TransacaoInvestimento> findByEmpresaIdAndDataTransacaoBetweenOrderByDataTransacao(
+            Long empresaId, LocalDate inicio, LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(t.valor), 0) FROM TransacaoInvestimento t " +
-           "WHERE t.usuario.id = :uid AND t.tipoTransacao = 'APORTE'")
-    BigDecimal sumTotalAportadoByUsuario(@Param("uid") Long uid);
+           "WHERE t.empresaId = :eid AND t.tipoTransacao = 'APORTE'")
+    BigDecimal sumTotalAportadoByEmpresa(@Param("eid") Long eid);
 
     @Query("SELECT COALESCE(SUM(t.valor), 0) FROM TransacaoInvestimento t " +
-           "WHERE t.usuario.id = :uid AND t.tipoTransacao = 'RESGATE'")
-    BigDecimal sumTotalResgatadoByUsuario(@Param("uid") Long uid);
+           "WHERE t.empresaId = :eid AND t.tipoTransacao = 'RESGATE'")
+    BigDecimal sumTotalResgatadoByEmpresa(@Param("eid") Long eid);
 }

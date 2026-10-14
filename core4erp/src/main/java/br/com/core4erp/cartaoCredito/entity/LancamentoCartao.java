@@ -1,8 +1,9 @@
 package br.com.core4erp.cartaoCredito.entity;
 
 import br.com.core4erp.assinatura.entity.Assinatura;
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 import br.com.core4erp.categoria.entity.Categoria;
-import br.com.core4erp.config.auditing.Auditable;
+import br.com.core4erp.config.auditing.TenantEntity;
 import br.com.core4erp.parceiro.entity.Parceiro;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -18,7 +19,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "tb_lancamento_cartao")
-public class LancamentoCartao extends Auditable {
+public class LancamentoCartao extends TenantEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,12 +40,24 @@ public class LancamentoCartao extends Auditable {
     @Column(nullable = false)
     private Integer anoFatura;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private TipoLancamentoCartao tipo = TipoLancamentoCartao.SAIDA;
+
     /** UUID para agrupar parcelas de um mesmo lançamento. */
     private String grupoParcelamento;
 
     private Integer numeroParcela = 1;
 
     private Integer totalParcelas = 1;
+
+    /** Marca que a categoria foi sugerida pela IA (a pedido do usuário). */
+    @Column(name = "classificado_por_ia", nullable = false)
+    private Boolean classificadoPorIa = false;
+
+    /** Confiança (0..1) reportada pela IA na classificação; null se não classificado por IA. */
+    @Column(name = "confianca_ia", precision = 5, scale = 4)
+    private BigDecimal confiancaIa;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assinatura_id")

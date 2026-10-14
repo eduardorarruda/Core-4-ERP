@@ -4,9 +4,11 @@ import br.com.core4erp.cartaoCredito.service.FaturaCartaoService;
 import br.com.core4erp.categoria.entity.Categoria;
 import br.com.core4erp.categoria.repository.CategoriaRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
+import br.com.core4erp.conta.dto.GastoContaCorrenteDto;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.entity.ContaBaixada;
 import br.com.core4erp.conta.repository.ContaBaixadaRepository;
@@ -28,6 +30,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import br.com.core4erp.utils.DtoValidator;
 import br.com.core4erp.utils.ParcelamentoHelper;
 
 import java.math.BigDecimal;
@@ -47,6 +50,8 @@ public class ContaService {
     private final ContaCorrenteRepository contaCorrenteRepository;
     private final FaturaCartaoService faturaCartaoService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public ContaService(ContaRepository contaRepository,
                         ContaBaixadaRepository baixadaRepository,
@@ -55,7 +60,9 @@ public class ContaService {
                         ContaCorrenteService contaCorrenteService,
                         ContaCorrenteRepository contaCorrenteRepository,
                         FaturaCartaoService faturaCartaoService,
-                        SecurityContextUtils securityCtx) {
+                        SecurityContextUtils securityCtx,
+                        TenantContext tenantCtx,
+                        DtoValidator dtoValidator) {
         this.contaRepository = contaRepository;
         this.baixadaRepository = baixadaRepository;
         this.categoriaRepository = categoriaRepository;
@@ -64,17 +71,19 @@ public class ContaService {
         this.contaCorrenteRepository = contaCorrenteRepository;
         this.faturaCartaoService = faturaCartaoService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Transactional(readOnly = true)
     public Page<ContaResponseDto> listar(Pageable pageable) {
-        return contaRepository.findAllByUsuarioId(securityCtx.getUsuarioId(), pageable)
+        return contaRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), pageable)
                 .map(ContaResponseDto::from);
     }
 
     @Transactional(readOnly = true)
     public Page<ContaResponseDto> listarPorTipo(TipoConta tipo, Pageable pageable) {
-        return contaRepository.findAllByUsuarioIdAndTipo(securityCtx.getUsuarioId(), tipo, pageable)
+        return contaRepository.findAllByEmpresaIdAndTipo(tenantCtx.getEmpresaId(), tipo, pageable)
                 .map(ContaResponseDto::from);
     }
 
@@ -85,7 +94,7 @@ public class ContaService {
             Long parceiroId, BigDecimal valorMin, BigDecimal valorMax,
             Long categoriaId, Pageable pageable) {
 
-        Specification<Conta> spec = ContaSpec.usuarioId(securityCtx.getUsuarioId());
+        Specification<Conta> spec = ContaSpec.empresaId(tenantCtx.getEmpresaId());
         if (tipo != null)               spec = spec.and(ContaSpec.tipo(tipo));
         if (status != null)             spec = spec.and(ContaSpec.status(status));
         if (numeroDocumento != null && !numeroDocumento.isBlank())
@@ -105,6 +114,16 @@ public class ContaService {
         return ContaResponseDto.from(findOwned(id));
     }
 
+    /** Total pago por conta corrente (saídas), do maior para o menor — para a IA. */
+    @Transactional(readOnly = true)
+    public List<GastoContaCorrenteDto> gastoPorContaCorrente() {
+        return baixadaRepository.gastoPorContaCorrente(tenantCtx.getEmpresaId()).stream()
+                .map(r -> new GastoContaCorrenteDto(
+                        (String) r[0],
+                        r[1] instanceof BigDecimal bd ? bd : new BigDecimal(r[1].toString())))
+                .toList();
+    }
+
     /**
      * Cria uma conta financeira com suporte a parcelamento: se {@code quantidadeParcelas > 1},
      * gera N registros com vencimentos espaçados por {@code intervaloMeses}. Quando
@@ -112,15 +131,16 @@ public class ContaService {
      */
     @Transactional
     public List<ContaResponseDto> criar(ContaCreateDto dto) {
+        dtoValidator.validar(dto);
         Usuario usuario = securityCtx.getUsuario();
-        Long usuarioId = usuario.getId();
+        Long empresaId = tenantCtx.getEmpresaId();
 
-        Categoria categoria = categoriaRepository.findByIdAndUsuarioId(dto.categoriaId(), usuarioId)
+        Categoria categoria = categoriaRepository.findByIdAndEmpresaId(dto.categoriaId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
 
         Parceiro parceiro = null;
         if (dto.parceiroId() != null) {
-            parceiro = parceiroRepository.findByIdAndUsuarioId(dto.parceiroId(), usuarioId)
+            parceiro = parceiroRepository.findByIdAndEmpresaId(dto.parceiroId(), empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         }
 
@@ -159,21 +179,46 @@ public class ContaService {
         return contaRepository.saveAll(criadas).stream().map(ContaResponseDto::from).toList();
     }
 
+    /**
+     * Marca contas como classificadas pela IA (categoria sugerida pelo assistente a pedido do
+     * usuário). Chamado pela tool do chat após criar as contas — mantém o rastreio sem acoplar a
+     * flag ao DTO de criação (reusado por fatura/conciliação, que não são ações da IA).
+     */
+    @Transactional
+    public void marcarClassificadaPorIa(List<Long> contaIds, BigDecimal confianca) {
+        if (contaIds == null || contaIds.isEmpty()) return;
+        Long empresaId = tenantCtx.getEmpresaId();
+        for (Long id : contaIds) {
+            contaRepository.findByIdAndEmpresaId(id, empresaId).ifPresent(c -> {
+                c.setClassificadaPorIa(true);
+                c.setConfiancaIa(confianca);
+            });
+        }
+    }
+
     @Transactional
     public ContaResponseDto atualizar(Long id, ContaCreateDto dto) {
+        dtoValidator.validar(dto);
         Conta conta = findOwned(id);
+
+        // S.1: conta já baixada é imutável (§16). Editar valor/vencimento de uma conta paga
+        // dessincronizaria o saldo da conta corrente. Para ajustar, estorne antes.
+        if (conta.getStatus() == StatusConta.PAGO || conta.getStatus() == StatusConta.RECEBIDO) {
+            throw new BusinessException("CONTA_BAIXADA",
+                    "Não é possível editar uma conta já baixada. Estorne a baixa antes de alterar os dados.");
+        }
 
         if (Boolean.TRUE.equals(conta.getConciliada())) {
             throw new BusinessException("CONTA_CONCILIADA",
                     "Não é possível editar uma conta conciliada via extrato bancário");
         }
 
-        Long usuarioId = securityCtx.getUsuarioId();
-        Categoria categoria = categoriaRepository.findByIdAndUsuarioId(dto.categoriaId(), usuarioId)
+        Long empresaId = tenantCtx.getEmpresaId();
+        Categoria categoria = categoriaRepository.findByIdAndEmpresaId(dto.categoriaId(), empresaId)
                 .orElseThrow(() -> new EntityNotFoundException("Categoria não encontrada"));
         Parceiro parceiro = null;
         if (dto.parceiroId() != null) {
-            parceiro = parceiroRepository.findByIdAndUsuarioId(dto.parceiroId(), usuarioId)
+            parceiro = parceiroRepository.findByIdAndEmpresaId(dto.parceiroId(), empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado"));
         }
 
@@ -226,8 +271,14 @@ public class ContaService {
         if (conta.getTipo() == TipoConta.PAGAR
                 && contaCorrente.getSaldo().compareTo(valorFinal) < 0
                 && !Boolean.TRUE.equals(contaCorrente.getPermitirSaldoNegativo())) {
-            throw new BusinessException("SALDO_INSUFICIENTE",
-                    "Operação bloqueada: saldo insuficiente e a conta não permite saldo negativo");
+            // Mensagem rica: diz QUAL conta corrente, o saldo dela e o valor — evita interpretações
+            // erradas (ex.: usuário/IA achando que "não há saldo" quando outra conta tem).
+            throw new BusinessException("SALDO_INSUFICIENTE", String.format(
+                    "Saldo insuficiente na conta corrente \"%s\" (saldo R$ %s; valor da baixa R$ %s) "
+                    + "e ela não permite ficar negativa. Escolha outra conta corrente com saldo suficiente.",
+                    contaCorrente.getDescricao(),
+                    contaCorrente.getSaldo().setScale(2, RoundingMode.HALF_UP).toPlainString().replace('.', ','),
+                    valorFinal.toPlainString().replace('.', ',')));
         }
 
         ContaBaixada baixada = new ContaBaixada();
@@ -290,7 +341,7 @@ public class ContaService {
     }
 
     private Conta findOwned(Long id) {
-        return contaRepository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return contaRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Conta não encontrada: " + id));
     }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 
-export default function PageHeader({ title, subtitle, actions, breadcrumb, className }) {
+export default function PageHeader({ title, subtitle, actions, breadcrumb, icon, className }) {
   return (
     <div className={cn('flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 anim-in', className)}>
       <div className="space-y-1 min-w-0">
@@ -21,7 +21,13 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb, class
           </div>
         )}
         <div className="flex items-center gap-3">
-          <span className="live-dot" style={{ width: 5, height: 5, flexShrink: 0 }} />
+          {icon ? (
+            <span className="grid place-items-center w-9 h-9 rounded-xl bg-gradient-primary text-on-primary shrink-0 [&>svg]:w-5 [&>svg]:h-5" aria-hidden="true">
+              {icon}
+            </span>
+          ) : (
+            <span className="live-dot" style={{ width: 5, height: 5, flexShrink: 0 }} />
+          )}
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary font-display leading-tight">
             {title}
           </h1>

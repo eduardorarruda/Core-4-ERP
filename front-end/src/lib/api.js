@@ -1,20 +1,80 @@
+import { traduzirErroPermissao } from './permissaoMessages.js';
+
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+// Persistência de sessão em localStorage: sessionStorage é isolado POR ABA, então abrir uma nova
+// aba exigia novo login mesmo com o cookie JWT (HttpOnly) válido. O token continua APENAS no
+// cookie — aqui fica só o estado de exibição (nome, empresas, permissões), que o backend revalida
+// a cada request (TenantFilter) e o polling de permissões atualiza a cada 30s.
 export function setUsuario(u) {
-  sessionStorage.setItem('usuario', JSON.stringify(u));
+  localStorage.setItem('usuario', JSON.stringify(u));
+  window.dispatchEvent(new CustomEvent('auth-change'));
+}
+
+export function setLoginState(result) {
+  localStorage.setItem('usuario', JSON.stringify(result?.usuario ?? result));
+  localStorage.setItem('loginState', JSON.stringify(result));
+  window.dispatchEvent(new CustomEvent('auth-change'));
+}
+
+export function getLoginState() {
+  // CR-F6: tratar JSON corrompido sem quebrar a app
+  try {
+    const state = JSON.parse(localStorage.getItem('loginState') || 'null');
+    if (state) return state;
+    // Migração suave: sessões antigas (pré-localStorage) continuam válidas na aba atual.
+    const legado = JSON.parse(sessionStorage.getItem('loginState') || 'null');
+    if (legado) {
+      localStorage.setItem('loginState', JSON.stringify(legado));
+      sessionStorage.removeItem('loginState');
+    }
+    return legado;
+  } catch {
+    localStorage.removeItem('loginState');
+    sessionStorage.removeItem('loginState');
+    return null;
+  }
+}
+
+// S.11: empresa ativa explícita (em vez de assumir sempre empresas[0]). Mantém compatibilidade
+// — se nada foi selecionado, cai no primeiro vínculo. Pronto para um seletor de empresa.
+export function getEmpresaAtiva() {
+  const state = getLoginState();
+  if (!state) return null;
+  const empresas = state.empresas ?? [];
+  const ativa = empresas.find((e) => e.id === state.empresaAtivaId);
+  return ativa ?? empresas[0] ?? null;
+}
+
+export function getEmpresaAtivaId() {
+  return getEmpresaAtiva()?.id ?? null;
+}
+
+export function setEmpresaAtiva(id) {
+  const state = getLoginState();
+  if (!state) return;
+  state.empresaAtivaId = id;
+  localStorage.setItem('loginState', JSON.stringify(state));
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 export function clearAuth() {
+  localStorage.removeItem('usuario');
+  localStorage.removeItem('loginState');
   sessionStorage.removeItem('usuario');
+  sessionStorage.removeItem('loginState');
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
 async function request(path, options = {}) {
   const { skipAuthRedirect, timeout = 30000, blob: expectBlob = false, ...fetchOptions } = options;
   const isFormData = fetchOptions.body instanceof FormData;
+
+  // Envia o id da empresa ATIVA em todo request para o TenantFilter resolver o contexto certo
+  const empresaAtualId = getEmpresaAtivaId();
   const headers = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(empresaAtualId ? { 'X-Empresa-Id': String(empresaAtualId) } : {}),
     ...fetchOptions.headers,
   };
 
@@ -44,29 +104,43 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ mensagem: res.statusText }));
-    throw new Error(body.mensagem || `Erro ${res.status}`);
+    throw new Error(traduzirErroPermissao(body.mensagem || `Erro ${res.status}`));
   }
 
   if (res.status === 204) return null;
-  return expectBlob ? res.blob() : res.json();
+  if (expectBlob) return res.blob();
+
+  // Lê como texto primeiro para evitar SyntaxError em body vazio
+  const text = await res.text();
+  if (!text || !text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const auth = {
-  login: async (email, senha) => {
-    const result = await request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true });
-    return result?.usuario ?? result;
-  },
+  login: (email, senha) =>
+    request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, senha }), skipAuthRedirect: true }),
 
   logout: async () => {
-    try { await request('/api/auth/logout', { method: 'POST' }); } catch {}
+    // CR-F2: logar falha de logout — sessão do servidor pode permanecer ativa
+    try {
+      await request('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Falha ao invalidar sessão no servidor:', err);
+    }
     clearAuth();
   },
 
-  registrar: (nome, email, senha, telefone) =>
-    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone }), skipAuthRedirect: true }),
+  registrar: (nome, email, senha, telefone, tipoConta, nomeEmpresa) =>
+    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone, tipoConta, nomeEmpresa }), skipAuthRedirect: true }),
 
   me: () => request('/api/auth/me'),
+
+  refreshPermissoes: () => request('/api/auth/me/permissoes'),
 
   esqueciSenha: (email) =>
     request('/api/auth/esqueci-senha', { method: 'POST', body: JSON.stringify({ email }), skipAuthRedirect: true }),
@@ -85,16 +159,87 @@ export const auth = {
 };
 
 export function getUsuario() {
-  return JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  try {
+    return JSON.parse(localStorage.getItem('usuario') || sessionStorage.getItem('usuario') || 'null');
+  } catch {
+    return null;
+  }
 }
+
+// ── Planos ────────────────────────────────────────────────────────────────────
+export const planos = {
+  listarAtivos: () => request('/api/planos/ativos', { skipAuthRedirect: true }),
+  listarTodos: () => request('/api/planos'),
+  criar: (dto) => request('/api/planos', { method: 'POST', body: JSON.stringify(dto) }),
+  atualizar: (id, dto) => request(`/api/planos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  desativar: (id) => request(`/api/planos/${id}/desativar`, { method: 'PATCH' }),
+  reativar: (id) => request(`/api/planos/${id}/reativar`, { method: 'PATCH' }),
+};
+
+// ── Convites ──────────────────────────────────────────────────────────────────
+export const convites = {
+  convidar: (dto) => request('/api/empresa/usuarios/convidar', { method: 'POST', body: JSON.stringify(dto) }),
+  pendentes: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/empresa/convites/pendentes${qs ? `?${qs}` : ''}`);
+  },
+  reenviar: (id) => request(`/api/empresa/convites/${id}/reenviar`, { method: 'POST' }),
+  buscarPorToken: (token) => request(`/api/auth/convite/${token}`, { skipAuthRedirect: true }),
+  aceitar: (dto) => request('/api/auth/aceitar-convite', { method: 'POST', body: JSON.stringify(dto), skipAuthRedirect: true }),
+};
+
+// ── Operadores ────────────────────────────────────────────────────────────────
+export const operadores = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/empresa/operadores${qs ? `?${qs}` : ''}`);
+  },
+  alterarPerfil: (usuarioId, perfilId) =>
+    request(`/api/empresa/operadores/${usuarioId}/perfil`, { method: 'PATCH', body: JSON.stringify({ perfilId }) }),
+  remover: (usuarioId) =>
+    request(`/api/empresa/operadores/${usuarioId}/remover`, { method: 'PATCH' }),
+  reativar: (usuarioId) =>
+    request(`/api/empresa/operadores/${usuarioId}/reativar`, { method: 'PATCH' }),
+};
+
+// ── Perfis de Acesso ──────────────────────────────────────────────────────────
+export const perfisAcesso = {
+  listar: () => request('/api/empresa/perfis'),
+  listarPermissoes: () => request('/api/empresa/permissoes'),
+  criar: (dto) => request('/api/empresa/perfis', { method: 'POST', body: JSON.stringify(dto) }),
+  atualizar: (id, dto) => request(`/api/empresa/perfis/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deletar: (id) => request(`/api/empresa/perfis/${id}`, { method: 'DELETE' }),
+};
+
+// ── Auditoria ─────────────────────────────────────────────────────────────────
+export const auditoria = {
+  listar: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    ).toString();
+    return request(`/api/auditoria${qs ? `?${qs}` : ''}`);
+  },
+};
+
+// ── Pagamentos ────────────────────────────────────────────────────────────────
+export const pagamentos = {
+  pagar: (dto) => request('/api/pagamentos', { method: 'POST', body: JSON.stringify(dto) }),
+  historico: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/api/pagamentos/historico${qs ? `?${qs}` : ''}`);
+  },
+};
 
 // ── Categorias ────────────────────────────────────────────────────────────────
 export const categorias = {
   listar: () => request('/api/categorias').then(p => p.content),
+  arvore: () => request('/api/categorias/arvore'),
   buscar: (id) => request(`/api/categorias/${id}`),
   criar: (dto) => request('/api/categorias', { method: 'POST', body: JSON.stringify(dto) }),
   atualizar: (id, dto) => request(`/api/categorias/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/categorias/${id}`, { method: 'DELETE' }),
+  reativar: (id) => request(`/api/categorias/${id}/reativar`, { method: 'PATCH' }),
+  sugerir: (dto) => request('/api/categorias/sugerir', { method: 'POST', body: JSON.stringify(dto) }),
 };
 
 // ── Parceiros ─────────────────────────────────────────────────────────────────
@@ -115,6 +260,11 @@ export const contasCorrentes = {
   atualizar: (id, dto) => request(`/api/contas-correntes/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/contas-correntes/${id}`, { method: 'DELETE' }),
   transferir: (dto) => request('/api/contas-correntes/transferir', { method: 'POST', body: JSON.stringify(dto) }),
+  transferencias: {
+    listar: () => request('/api/contas-correntes/transferencias'),
+    atualizar: (id, dto) => request(`/api/contas-correntes/transferencias/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+    deletar: (id) => request(`/api/contas-correntes/transferencias/${id}`, { method: 'DELETE' }),
+  },
 };
 
 // ── Contas (Pagar / Receber) ──────────────────────────────────────────────────
@@ -147,7 +297,20 @@ export const cartoes = {
     criar: (cartaoId, dto) => request(`/api/cartoes/${cartaoId}/lancamentos`, { method: 'POST', body: JSON.stringify(dto) }),
     atualizar: (cartaoId, id, dto) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     deletar: (cartaoId, id) => request(`/api/cartoes/${cartaoId}/lancamentos/${id}`, { method: 'DELETE' }),
+    // Importa lançamentos de uma planilha (.xlsx). Backend casa/cria categoria e parceiro.
+    importar: (cartaoId, arquivo) => {
+      const fd = new FormData();
+      fd.append('arquivo', arquivo);
+      return request(`/api/cartoes/${cartaoId}/lancamentos/importar`, { method: 'POST', body: fd, timeout: 120000 });
+    },
   },
+  dashboard: (qs) => request(`/api/cartoes/dashboard/resumo${qs ? `?${qs}` : ''}`),
+  dashboardBI: (qs) => request(`/api/cartoes/dashboard/bi${qs ? `?${qs}` : ''}`),
+};
+
+// ── Busca global ──────────────────────────────────────────────────────────────
+export const busca = {
+  global: (q) => request(`/api/busca?q=${encodeURIComponent(q)}`),
 };
 
 // ── Notificações ──────────────────────────────────────────────────────────────
@@ -188,16 +351,42 @@ export const assinaturas = {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 export const dashboard = {
-  resumo: () => request('/api/dashboard'),
+  resumo: (qs) => request(`/api/dashboard${qs ? `?${qs}` : ''}`),
   saldoDetalhado: () => request('/api/dashboard/saldo-detalhado'),
 };
 
 // ── Chat IA ───────────────────────────────────────────────────────────────────
+// canal: 'ASSISTENTE' (tela) ou 'BALAO' (balão flutuante). Cada canal tem conversa/contexto
+// PRÓPRIOS no backend — o assunto de um não vaza para o outro.
 export const chat = {
-  enviar: (mensagem) =>
-    request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }),
-  limparHistorico: () =>
-    request('/api/chat/historico', { method: 'DELETE' }),
+  enviar: (mensagem, canal = 'ASSISTENTE') =>
+    request('/api/chat', { method: 'POST', body: JSON.stringify({ mensagem, canal }) }),
+  // Conversa atual do canal (mesmo histórico que a IA usa como contexto naquela superfície).
+  historico: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/historico?canal=${canal}`, { method: 'GET' }),
+  limparHistorico: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/historico?canal=${canal}`, { method: 'DELETE' }),
+
+  // ── Conversas (threads estilo ChatGPT) ──
+  conversas: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/conversas?canal=${canal}`, { method: 'GET' }),
+  criarConversa: (canal = 'ASSISTENTE') =>
+    request(`/api/chat/conversas?canal=${canal}`, { method: 'POST' }),
+  mensagensConversa: (conversaId) =>
+    request(`/api/chat/conversas/${conversaId}/mensagens`, { method: 'GET' }),
+  renomearConversa: (conversaId, titulo) =>
+    request(`/api/chat/conversas/${conversaId}`, { method: 'PATCH', body: JSON.stringify({ titulo }) }),
+  excluirConversa: (conversaId) =>
+    request(`/api/chat/conversas/${conversaId}`, { method: 'DELETE' }),
+
+  // Envia um arquivo (planilha/OFX/PDF/MD) + a instrução do usuário, na conversa indicada.
+  enviarAnexo: (arquivo, mensagem, conversaId) => {
+    const fd = new FormData();
+    fd.append('arquivo', arquivo);
+    fd.append('mensagem', mensagem ?? '');
+    if (conversaId != null) fd.append('conversaId', String(conversaId));
+    return request('/api/chat/anexo', { method: 'POST', body: fd, timeout: 120000 });
+  },
 };
 
 // ── Conciliação Bancária ──────────────────────────────────────────────────────
@@ -217,6 +406,26 @@ export const conciliacao = {
   finalizar: (id, dto) => request(`/api/conciliacao/${id}/finalizar`, { method: 'POST', body: JSON.stringify(dto ?? {}) }),
   cancelar: (id) => request(`/api/conciliacao/${id}`, { method: 'DELETE' }),
   relatorio: (id) => request(`/api/conciliacao/${id}/relatorio`),
+};
+
+// ── Conciliação de Cartão ─────────────────────────────────────────────────────
+export const conciliacaoCartao = {
+  upload: (arquivo, cartaoId) => {
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
+    const qs = cartaoId ? `?cartaoId=${cartaoId}` : '';
+    return request(`/api/cartoes/conciliacao/upload${qs}`, { method: 'POST', body: formData, timeout: 60000 });
+  },
+  listar: () => request('/api/cartoes/conciliacao'),
+  buscar: (id) => request(`/api/cartoes/conciliacao/${id}`),
+  vincularItem: (id, itemId, dto) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/vincular`, { method: 'PUT', body: JSON.stringify(dto) }),
+  criarLancamento: (id, itemId, dto) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/novo-lancamento`, { method: 'POST', body: JSON.stringify(dto) }),
+  ignorarItem: (id, itemId) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/ignorar`, { method: 'PUT' }),
+  desfazerIgnorar: (id, itemId) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/desfazer-ignorar`, { method: 'PATCH' }),
+  desvincularItem: (id, itemId) => request(`/api/cartoes/conciliacao/${id}/itens/${itemId}/desvincular`, { method: 'PUT' }),
+  finalizar: (id, dto) => request(`/api/cartoes/conciliacao/${id}/finalizar`, { method: 'POST', body: JSON.stringify(dto ?? {}) }),
+  cancelar: (id) => request(`/api/cartoes/conciliacao/${id}`, { method: 'DELETE' }),
+  relatorio: (id) => request(`/api/cartoes/conciliacao/${id}/relatorio`),
 };
 
 // ── Relatórios (download binário) ─────────────────────────────────────────────

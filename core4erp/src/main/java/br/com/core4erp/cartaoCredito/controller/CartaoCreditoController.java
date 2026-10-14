@@ -2,6 +2,8 @@ package br.com.core4erp.cartaoCredito.controller;
 
 import br.com.core4erp.cartaoCredito.dto.*;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
+import br.com.core4erp.cartaoCredito.service.ImportacaoLancamentoCartaoService;
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.conta.dto.ContaResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,10 +12,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Cartões de Crédito", description = "Cartões, lançamentos e fechamento de fatura")
 @RestController
@@ -21,15 +26,19 @@ import java.util.List;
 public class CartaoCreditoController {
 
     private final CartaoCreditoService service;
+    private final ImportacaoLancamentoCartaoService importacaoService;
 
-    public CartaoCreditoController(CartaoCreditoService service) {
+    public CartaoCreditoController(CartaoCreditoService service,
+                                   ImportacaoLancamentoCartaoService importacaoService) {
         this.service = service;
+        this.importacaoService = importacaoService;
     }
 
     // ── Cartões ───────────────────────────────────────────────────────────────
 
     @Operation(summary = "Listar cartões do usuário com limite usado")
     @GetMapping
+    @Requer("CARTAO_VISUALIZAR")
     public ResponseEntity<Page<CartaoCreditoResponseDto>> listar(
             @PageableDefault(size = 200, sort = "nome") Pageable pageable) {
         return ResponseEntity.ok(service.listar(pageable));
@@ -37,18 +46,21 @@ public class CartaoCreditoController {
 
     @Operation(summary = "Buscar cartão por ID")
     @GetMapping("/{id}")
+    @Requer("CARTAO_VISUALIZAR")
     public ResponseEntity<CartaoCreditoResponseDto> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
     @Operation(summary = "Cadastrar novo cartão")
     @PostMapping
+    @Requer("CARTAO_CRIAR")
     public ResponseEntity<CartaoCreditoResponseDto> criar(@Valid @RequestBody CartaoCreditoRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.criar(dto));
     }
 
     @Operation(summary = "Atualizar cartão")
     @PutMapping("/{id}")
+    @Requer("CARTAO_EDITAR")
     public ResponseEntity<CartaoCreditoResponseDto> atualizar(@PathVariable Long id,
                                                                @Valid @RequestBody CartaoCreditoRequestDto dto) {
         return ResponseEntity.ok(service.atualizar(id, dto));
@@ -56,6 +68,7 @@ public class CartaoCreditoController {
 
     @Operation(summary = "Remover cartão")
     @DeleteMapping("/{id}")
+    @Requer("CARTAO_DELETAR")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         service.deletar(id);
         return ResponseEntity.noContent().build();
@@ -63,25 +76,40 @@ public class CartaoCreditoController {
 
     // ── Lançamentos ───────────────────────────────────────────────────────────
 
-    @Operation(summary = "Listar lançamentos do cartão (filtro opcional por mês/ano)")
+    @Operation(summary = "Listar lançamentos do cartão (filtro opcional por mês/ano/texto)")
     @GetMapping("/{id}/lancamentos")
+    @Requer("CARTAO_VISUALIZAR")
     public ResponseEntity<List<LancamentoResponseDto>> listarLancamentos(
             @PathVariable Long id,
             @RequestParam(required = false) Integer mes,
-            @RequestParam(required = false) Integer ano) {
-        return ResponseEntity.ok(service.listarLancamentos(id, mes, ano));
+            @RequestParam(required = false) Integer ano,
+            @RequestParam(required = false) String busca) {
+        return ResponseEntity.ok(service.listarLancamentos(id, mes, ano, busca));
     }
 
     @Operation(summary = "Registrar lançamento (cria parcelas se parcelado)")
     @PostMapping("/{id}/lancamentos")
+    @Requer("CARTAO_LANCAR")
     public ResponseEntity<List<LancamentoResponseDto>> criarLancamento(
             @PathVariable Long id,
             @Valid @RequestBody LancamentoRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.criarLancamento(id, dto));
     }
 
+    @Operation(summary = "Importar lançamentos de uma planilha (.xlsx) para o cartão",
+            description = "Colunas: Data da Compra, Descrição, Valor, Categoria, CGC PARCEIRO, Número de Parcelas. "
+                    + "Casa/cria categoria (por nome) e parceiro (por CNPJ, com BrasilAPI) automaticamente.")
+    @PostMapping(value = "/{id}/lancamentos/importar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Requer("CARTAO_LANCAR")
+    public ResponseEntity<ImportarLancamentosResponseDto> importarLancamentos(
+            @PathVariable Long id,
+            @RequestPart("arquivo") MultipartFile arquivo) {
+        return ResponseEntity.ok(importacaoService.importar(id, arquivo));
+    }
+
     @Operation(summary = "Atualizar lançamento")
     @PutMapping("/{id}/lancamentos/{lancamentoId}")
+    @Requer("CARTAO_LANCAR")
     public ResponseEntity<LancamentoResponseDto> atualizarLancamento(
             @PathVariable Long id,
             @PathVariable Long lancamentoId,
@@ -91,6 +119,7 @@ public class CartaoCreditoController {
 
     @Operation(summary = "Remover lançamento")
     @DeleteMapping("/{id}/lancamentos/{lancamentoId}")
+    @Requer("CARTAO_LANCAR")
     public ResponseEntity<Void> deletarLancamento(@PathVariable Long id, @PathVariable Long lancamentoId) {
         service.deletarLancamento(id, lancamentoId);
         return ResponseEntity.noContent().build();
@@ -100,9 +129,34 @@ public class CartaoCreditoController {
 
     @Operation(summary = "Fechar fatura e gerar conta a pagar")
     @PostMapping("/{id}/fechar-fatura")
+    @Requer("CARTAO_FECHAR_FATURA")
     public ResponseEntity<ContaResponseDto> fecharFatura(
             @PathVariable Long id,
             @Valid @RequestBody FechamentoFaturaRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.fecharFatura(id, dto));
+    }
+
+    // ── Dashboard ─────────────────────────────────────────────────────────────
+
+    @Operation(summary = "Resumo de gastos por categoria para o dashboard de cartão")
+    @GetMapping("/dashboard/resumo")
+    @Requer("CARTAO_VISUALIZAR")
+    public ResponseEntity<List<CartaoDashboardResumoDto>> dashboardResumo(
+            @RequestParam(required = false) Integer mesInicio,
+            @RequestParam(required = false) Integer anoInicio,
+            @RequestParam(required = false) Integer mesFim,
+            @RequestParam(required = false) Integer anoFim) {
+        return ResponseEntity.ok(service.dashboardResumo(mesInicio, anoInicio, mesFim, anoFim));
+    }
+
+    @Operation(summary = "Dashboard BI com 7 painéis analíticos de cartões")
+    @GetMapping("/dashboard/bi")
+    @Requer("CARTAO_VISUALIZAR")
+    public ResponseEntity<CartaoDashboardBIResponseDto> dashboardBI(
+            @RequestParam(required = false) Integer mesInicio,
+            @RequestParam(required = false) Integer anoInicio,
+            @RequestParam(required = false) Integer mesFim,
+            @RequestParam(required = false) Integer anoFim) {
+        return ResponseEntity.ok(service.dashboardBI(mesInicio, anoInicio, mesFim, anoFim));
     }
 }

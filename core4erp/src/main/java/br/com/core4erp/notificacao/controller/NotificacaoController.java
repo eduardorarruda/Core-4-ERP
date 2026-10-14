@@ -1,6 +1,6 @@
 package br.com.core4erp.notificacao.controller;
 
-import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.notificacao.dto.NotificacaoResponseDto;
 import br.com.core4erp.notificacao.service.NotificacaoService;
 import br.com.core4erp.notificacao.service.SincronizacaoService;
@@ -18,14 +18,14 @@ public class NotificacaoController {
 
     private final NotificacaoService notificacaoService;
     private final SincronizacaoService sincronizacaoService;
-    private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
 
     public NotificacaoController(NotificacaoService notificacaoService,
                                   SincronizacaoService sincronizacaoService,
-                                  SecurityContextUtils securityCtx) {
+                                  TenantContext tenantCtx) {
         this.notificacaoService = notificacaoService;
         this.sincronizacaoService = sincronizacaoService;
-        this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
     }
 
     @Operation(summary = "Listar notificações não lidas do usuário")
@@ -43,7 +43,8 @@ public class NotificacaoController {
     @Operation(summary = "Gerar/sincronizar notificações com base nas contas vencidas ou próximas")
     @PostMapping("/sincronizar")
     public ResponseEntity<Void> sincronizar() {
-        sincronizacaoService.sincronizar(securityCtx.getUsuarioId());
+        // Correção: a sincronização é por EMPRESA (antes passava o usuarioId no lugar do empresaId)
+        sincronizacaoService.sincronizar(tenantCtx.getEmpresaId());
         return ResponseEntity.noContent().build();
     }
 }

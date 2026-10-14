@@ -2,32 +2,46 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, LayoutDashboard, Users, Tag, Landmark, FileText,
-  CreditCard, TrendingUp, Repeat, Bell, CalendarDays, BarChart3,
-  Gavel, Settings, Plus, X, Clock,
+  CreditCard, TrendingUp, Repeat, CalendarDays, BarChart3,
+  Gavel, Settings, Plus, X, Clock, HelpCircle, LifeBuoy,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { busca } from '../../lib/api';
+import { useAuth } from '../../hooks/useAuth';
 
+// Ícone por tipo de registro retornado pela busca global do backend.
+const TIPO_ICON = { PARCEIRO: Users, CONTA: FileText, LANCAMENTO_CARTAO: CreditCard };
+
+// `permissao: null` → sempre visível. Demais são filtradas por temPermissao (gap conhecido corrigido).
 const PAGES = [
-  { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard',        desc: 'Visão geral financeira' },
-  { id: 'parceiros',        icon: Users,           label: 'Parceiros',        path: '/parceiros',        desc: 'Clientes e fornecedores' },
-  { id: 'categorias',       icon: Tag,             label: 'Categorias',       path: '/categorias',       desc: 'Categorias de lançamentos' },
-  { id: 'contas-correntes', icon: Landmark,        label: 'Contas Correntes', path: '/contas-correntes', desc: 'Suas contas bancárias' },
-  { id: 'contas',           icon: FileText,        label: 'Lançamentos',      path: '/contas',           desc: 'Contas a pagar e receber' },
-  { id: 'cartoes',          icon: CreditCard,      label: 'Cartões',          path: '/cartoes',          desc: 'Cartões de crédito' },
-  { id: 'investimentos',    icon: TrendingUp,      label: 'Investimentos',    path: '/investimentos',    desc: 'Carteira de investimentos' },
-  { id: 'assinaturas',      icon: Repeat,          label: 'Assinaturas',      path: '/assinaturas',      desc: 'Assinaturas recorrentes' },
-  { id: 'notificacoes',     icon: Bell,            label: 'Notificações',     path: '/notificacoes',     desc: 'Alertas e avisos' },
-  { id: 'calendario',       icon: CalendarDays,    label: 'Calendário',       path: '/calendario',       desc: 'Calendário financeiro' },
-  { id: 'reports',          icon: BarChart3,       label: 'Relatórios',       path: '/reports',          desc: 'Relatórios e exportações' },
-  { id: 'configuracoes',    icon: Settings,        label: 'Configurações',    path: '/configuracoes',    desc: 'Perfil e preferências' },
+  { id: 'dashboard',        icon: LayoutDashboard, label: 'Dashboard',        path: '/dashboard',        desc: 'Visão geral financeira',      permissao: 'DASHBOARD_VISUALIZAR' },
+  { id: 'parceiros',        icon: Users,           label: 'Parceiros',        path: '/parceiros',        desc: 'Clientes e fornecedores',     permissao: 'PARCEIRO_VISUALIZAR' },
+  { id: 'categorias',       icon: Tag,             label: 'Categorias',       path: '/categorias',       desc: 'Categorias de lançamentos',   permissao: 'CATEGORIA_VISUALIZAR' },
+  { id: 'contas-correntes', icon: Landmark,        label: 'Contas Correntes', path: '/contas-correntes', desc: 'Suas contas bancárias',       permissao: 'CONTA_CORRENTE_VISUALIZAR' },
+  { id: 'contas',           icon: FileText,        label: 'Lançamentos',      path: '/contas',           desc: 'Contas a pagar e receber',    permissao: 'CONTA_VISUALIZAR' },
+  { id: 'cartoes',          icon: CreditCard,      label: 'Cartões',          path: '/cartoes',          desc: 'Cartões de crédito',          permissao: 'CARTAO_LANCAR' },
+  { id: 'investimentos',    icon: TrendingUp,      label: 'Investimentos',    path: '/investimentos',    desc: 'Carteira de investimentos',   permissao: 'INVESTIMENTO_VISUALIZAR' },
+  { id: 'assinaturas',      icon: Repeat,          label: 'Assinaturas',      path: '/assinaturas',      desc: 'Assinaturas recorrentes',     permissao: 'ASSINATURA_VISUALIZAR' },
+  { id: 'calendario',       icon: CalendarDays,    label: 'Calendário',       path: '/calendario',       desc: 'Calendário financeiro',       permissao: 'CALENDARIO_VISUALIZAR' },
+  { id: 'reports',          icon: BarChart3,       label: 'Relatórios',       path: '/reports',          desc: 'Relatórios e exportações',    permissao: null },
+  { id: 'configuracoes',    icon: Settings,        label: 'Configurações',    path: '/configuracoes',    desc: 'Perfil e preferências',       permissao: null },
+  { id: 'ajuda',            icon: HelpCircle,      label: 'Central de Ajuda', path: '/ajuda',            desc: 'Aprenda a usar cada tela',    permissao: null },
 ];
 
 const ACTIONS = [
-  { id: 'nova-conta-pagar',  icon: Plus, label: 'Nova conta a pagar',    path: '/contas',       desc: 'Registrar nova despesa' },
-  { id: 'nova-conta-receber',icon: Plus, label: 'Nova conta a receber',   path: '/contas',       desc: 'Registrar nova receita' },
-  { id: 'novo-parceiro',     icon: Plus, label: 'Novo parceiro',          path: '/parceiros',    desc: 'Cadastrar cliente/fornecedor' },
-  { id: 'novo-investimento', icon: Plus, label: 'Novo investimento',      path: '/investimentos',desc: 'Registrar investimento' },
-  { id: 'nova-assinatura',   icon: Plus, label: 'Nova assinatura',        path: '/assinaturas',  desc: 'Adicionar assinatura recorrente' },
+  { id: 'nova-conta-pagar',  icon: Plus, label: 'Nova conta a pagar',    path: '/contas',       desc: 'Registrar nova despesa',           permissao: 'CONTA_CRIAR' },
+  { id: 'nova-conta-receber',icon: Plus, label: 'Nova conta a receber',   path: '/contas',       desc: 'Registrar nova receita',           permissao: 'CONTA_CRIAR' },
+  { id: 'novo-parceiro',     icon: Plus, label: 'Novo parceiro',          path: '/parceiros',    desc: 'Cadastrar cliente/fornecedor',     permissao: 'PARCEIRO_CRIAR' },
+  { id: 'novo-investimento', icon: Plus, label: 'Novo investimento',      path: '/investimentos',desc: 'Registrar investimento',           permissao: 'INVESTIMENTO_CRIAR' },
+  { id: 'nova-assinatura',   icon: Plus, label: 'Nova assinatura',        path: '/assinaturas',  desc: 'Adicionar assinatura recorrente',  permissao: 'ASSINATURA_CRIAR' },
+];
+
+// Atalhos "Como faço para…" — levam direto ao tópico da Central de Ajuda. Sempre visíveis.
+const HELP_TOPICS = [
+  { id: 'help-conciliacao', icon: LifeBuoy, label: 'Como faço para conciliar o extrato?', path: '/ajuda#conciliacao',        desc: 'Central de Ajuda' },
+  { id: 'help-aurea',       icon: LifeBuoy, label: 'Como uso a Áurea (assistente)?',      path: '/ajuda#aurea',             desc: 'Central de Ajuda' },
+  { id: 'help-baixar',      icon: LifeBuoy, label: 'Como faço para baixar uma conta?',    path: '/ajuda#lancamentos',       desc: 'Central de Ajuda' },
+  { id: 'help-instalar',    icon: LifeBuoy, label: 'Como instalo o app no celular?',      path: '/ajuda#pwa',               desc: 'Central de Ajuda' },
 ];
 
 const RECENT_KEY = 'c4_cmd_recent';
@@ -42,11 +56,19 @@ function saveRecent(id) {
 
 export default function CommandPalette({ onClose }) {
   const navigate = useNavigate();
+  const { temPermissao } = useAuth();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
+  const [resultados, setResultados] = useState([]);
+  const [buscando, setBuscando] = useState(false);
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const recent = getRecent();
+
+  // Só mostra páginas/ações que o usuário pode acessar (itens sem permissão são sempre visíveis).
+  const podeVer = (item) => item.permissao == null || temPermissao(item.permissao);
+  const pages = PAGES.filter(podeVer);
+  const actions = ACTIONS.filter(podeVer);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -55,28 +77,53 @@ export default function CommandPalette({ onClose }) {
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const allItems = query
+  // Busca de dados reais (contas, parceiros, lançamentos) no backend, com debounce.
+  useEffect(() => {
+    const termo = query.trim();
+    if (termo.length < 2) { setResultados([]); setBuscando(false); return; }
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try { setResultados(await busca.global(termo)); }
+      catch { setResultados([]); }
+      finally { setBuscando(false); }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const dataItems = resultados.map((r) => ({
+    id: `rec-${r.tipo}-${r.id}`,
+    icon: TIPO_ICON[r.tipo] ?? FileText,
+    label: r.titulo,
+    desc: r.subtitulo,
+    path: r.rota,
+    transient: true,
+  }));
+
+  const q = query.toLowerCase();
+  const pageActionItems = query
     ? [
-        ...PAGES.filter((p) => p.label.toLowerCase().includes(query.toLowerCase()) || p.desc.toLowerCase().includes(query.toLowerCase())),
-        ...ACTIONS.filter((a) => a.label.toLowerCase().includes(query.toLowerCase())),
+        ...pages.filter((p) => p.label.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)),
+        ...actions.filter((a) => a.label.toLowerCase().includes(q)),
       ]
-    : [
-        ...PAGES.filter((p) => recent.includes(p.id)),
-        ...PAGES.filter((p) => !recent.includes(p.id)),
-      ];
+    : [];
+  const helpItems = query ? HELP_TOPICS.filter((h) => h.label.toLowerCase().includes(q)) : [];
 
   const sections = query
-    ? [{ label: 'Resultados', items: allItems }]
+    ? [
+        { label: 'Registros', items: dataItems },
+        { label: 'Páginas e ações', items: pageActionItems },
+        { label: 'Ajuda', items: helpItems },
+      ].filter((s) => s.items.length)
     : [
-        { label: 'Recentes', items: PAGES.filter((p) => recent.includes(p.id)) },
-        { label: 'Páginas', items: PAGES.filter((p) => !recent.includes(p.id)) },
-        { label: 'Ações Rápidas', items: ACTIONS },
+        { label: 'Recentes', items: pages.filter((p) => recent.includes(p.id)) },
+        { label: 'Páginas', items: pages.filter((p) => !recent.includes(p.id)) },
+        { label: 'Ações Rápidas', items: actions },
       ].filter((s) => s.items.length);
 
   const flatItems = sections.flatMap((s) => s.items);
 
   const handleSelect = useCallback((item) => {
-    saveRecent(item.id);
+    if (!item.transient) saveRecent(item.id); // não guardar registros de dados como "recentes"
     navigate(item.path);
     onClose();
   }, [navigate, onClose]);
@@ -117,7 +164,7 @@ export default function CommandPalette({ onClose }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Buscar páginas e ações..."
+            placeholder="Buscar contas, parceiros, lançamentos, páginas..."
             aria-label="Busca global"
             className="flex-1 bg-transparent text-text-primary placeholder:text-text-primary/30 outline-none text-sm font-body"
           />
@@ -134,7 +181,9 @@ export default function CommandPalette({ onClose }) {
         {/* Results */}
         <div ref={listRef} className="overflow-y-auto max-h-[60vh] py-2">
           {flatItems.length === 0 && (
-            <p className="text-center text-sm text-text-primary/40 py-12">Nenhum resultado encontrado</p>
+            <p className="text-center text-sm text-text-primary/40 py-12">
+              {buscando ? 'Buscando...' : 'Nenhum resultado encontrado'}
+            </p>
           )}
           {sections.map((section) => (
             <div key={section.label}>

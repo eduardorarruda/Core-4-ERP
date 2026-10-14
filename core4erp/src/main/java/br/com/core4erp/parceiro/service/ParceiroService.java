@@ -1,8 +1,13 @@
 package br.com.core4erp.parceiro.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
+import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.enums.TipoParceiro;
+import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.parceiro.dto.ParceiroRequestDto;
+import br.com.core4erp.utils.DtoValidator;
 import br.com.core4erp.utils.Utils;
 import br.com.core4erp.parceiro.dto.ParceiroResponseDto;
 import br.com.core4erp.parceiro.entity.Parceiro;
@@ -17,20 +22,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class ParceiroService {
 
     private final ParceiroRepository parceiroRepository;
+    private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
     private final BrasilApiService brasilApiService;
+    private final TenantContext tenantCtx;
+    private final DtoValidator dtoValidator;
 
     public ParceiroService(ParceiroRepository parceiroRepository,
+                           ContaRepository contaRepository,
                            SecurityContextUtils securityCtx,
-                           BrasilApiService brasilApiService) {
+                           BrasilApiService brasilApiService,
+                           TenantContext tenantCtx,
+                           DtoValidator dtoValidator) {
         this.parceiroRepository = parceiroRepository;
+        this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
         this.brasilApiService = brasilApiService;
+        this.tenantCtx = tenantCtx;
+        this.dtoValidator = dtoValidator;
     }
 
     @Transactional(readOnly = true)
     public Page<ParceiroResponseDto> listar(Pageable pageable) {
-        return parceiroRepository.findAllByUsuarioId(securityCtx.getUsuarioId(), pageable)
+        return parceiroRepository.findAllByEmpresaId(tenantCtx.getEmpresaId(), pageable)
                 .map(ParceiroResponseDto::from);
     }
 
@@ -39,12 +53,19 @@ public class ParceiroService {
         return ParceiroResponseDto.from(findOwned(id));
     }
 
+    @Requer("PARCEIRO_CRIAR") // 3.1: defense-in-depth — cobre a porta do chat IA
     @Transactional
     public ParceiroResponseDto criar(ParceiroRequestDto dto) {
+        dtoValidator.validar(dto); // regras de negócio valem também p/ o chat IA (que chama o service direto)
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
+        // CPF/CNPJ é obrigatório na criação (a anotação saiu do DTO para não travar a ATUALIZAÇÃO
+        // de parceiros legados sem documento — o service é a fonte da regra, p/ tela e IA).
+        if (docNormalizado == null) {
+            throw new IllegalArgumentException("CPF/CNPJ é obrigatório");
+        }
         validarCpfCnpj(docNormalizado);
-        Long usuarioId = securityCtx.getUsuarioId();
-        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndUsuarioId(docNormalizado, usuarioId)) {
+        Long empresaId = tenantCtx.getEmpresaId();
+        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaId(docNormalizado, empresaId)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
         Parceiro parceiro = new Parceiro();
@@ -55,6 +76,7 @@ public class ParceiroService {
     }
 
     /** Altera apenas o tipo do parceiro (ex.: CLIENTE -> AMBOS), preservando os demais campos. */
+    @Requer("PARCEIRO_EDITAR") // 3.1: defense-in-depth — cobre a porta do chat IA
     @Transactional
     public ParceiroResponseDto atualizarTipo(Long id, TipoParceiro tipo) {
         Parceiro parceiro = findOwned(id);
@@ -62,23 +84,39 @@ public class ParceiroService {
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
     }
 
+    @Requer("PARCEIRO_EDITAR")
     @Transactional
     public ParceiroResponseDto atualizar(Long id, ParceiroRequestDto dto) {
+        Parceiro parceiro = findOwned(id);
+        // Na ATUALIZAÇÃO o CPF/CNPJ é tratado à parte: parceiros legados (criados quando o documento
+        // era opcional) não podem ficar impossíveis de editar. Se o DTO não trouxer documento,
+        // preserva o existente — nunca apaga.
+        dtoValidator.validar(dto, java.util.Set.of("cpfCnpj"));
         String docNormalizado = normalizarDocumento(dto.cpfCnpj());
+        if (docNormalizado == null) {
+            docNormalizado = parceiro.getCpfCnpj();
+        }
         validarCpfCnpj(docNormalizado);
-        Long usuarioId = securityCtx.getUsuarioId();
-        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndUsuarioIdAndIdNot(docNormalizado, usuarioId, id)) {
+        Long empresaId = tenantCtx.getEmpresaId();
+        if (docNormalizado != null && parceiroRepository.existsByCpfCnpjAndEmpresaIdAndIdNot(docNormalizado, empresaId, id)) {
             throw new IllegalArgumentException("Já existe um parceiro cadastrado com este CPF/CNPJ");
         }
-        Parceiro parceiro = findOwned(id);
         preencherCampos(parceiro, dto, docNormalizado);
         enrichCnpj(parceiro);
         return ParceiroResponseDto.from(parceiroRepository.save(parceiro));
     }
 
+    @Requer("PARCEIRO_DELETAR")
     @Transactional
     public void deletar(Long id) {
-        parceiroRepository.delete(findOwned(id));
+        Parceiro parceiro = findOwned(id);
+        // Integridade: não remover parceiro em uso por contas/lançamentos (mensagem clara ao usuário).
+        if (contaRepository.existsByParceiro_IdAndEmpresaId(id, tenantCtx.getEmpresaId())) {
+            throw new BusinessException("REGISTRO_EM_USO",
+                    "Não é possível excluir este parceiro porque há lançamentos vinculados a ele. "
+                    + "Remova ou altere esses lançamentos antes.");
+        }
+        parceiroRepository.delete(parceiro);
     }
 
     private void preencherCampos(Parceiro p, ParceiroRequestDto dto, String docNormalizado) {
@@ -137,7 +175,7 @@ public class ParceiroService {
     }
 
     private Parceiro findOwned(Long id) {
-        return parceiroRepository.findByIdAndUsuarioId(id, securityCtx.getUsuarioId())
+        return parceiroRepository.findByIdAndEmpresaId(id, tenantCtx.getEmpresaId())
                 .orElseThrow(() -> new EntityNotFoundException("Parceiro não encontrado: " + id));
     }
 }

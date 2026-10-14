@@ -1,15 +1,23 @@
 package br.com.core4erp.exception;
 
+import br.com.core4erp.exception.AcessoNegadoException;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.ai.retry.TransientAiException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -39,6 +47,31 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    // Anexo/parâmetro de formulário ausente ou upload malformado (ex.: POST /api/chat/anexo
+    // sem o arquivo) → 400 amigável, não 500.
+    @ExceptionHandler({
+            MissingServletRequestPartException.class,
+            MissingServletRequestParameterException.class,
+            MultipartException.class
+    })
+    public ResponseEntity<ErrorResponseDto> handleMissingPart(Exception e) {
+        return ResponseEntity.status(400).body(new ErrorResponseDto(
+                "REQUISICAO_INVALIDA",
+                "Nenhum arquivo válido foi enviado. Selecione um arquivo e tente novamente.",
+                LocalDateTime.now()
+        ));
+    }
+
+    // Content-Type não suportado pelo endpoint → 415 (mensagem neutra, vale p/ upload e JSON).
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponseDto> handleMediaType(HttpMediaTypeNotSupportedException e) {
+        return ResponseEntity.status(415).body(new ErrorResponseDto(
+                "FORMATO_NAO_SUPORTADO",
+                "Formato de requisição não suportado para esta operação.",
+                LocalDateTime.now()
+        ));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDto> handleValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
@@ -56,9 +89,35 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<ErrorResponseDto> handleAcessoNegado(AcessoNegadoException e) {
+        log.warn("Acesso negado: {}", e.getMessage());
+        return ResponseEntity.status(403).body(new ErrorResponseDto(
+                "ACESSO_NEGADO", e.getMessage(), LocalDateTime.now()
+        ));
+    }
+
+    // S.12: conflito de concorrência no saldo (lock otimista @Version) — peça para repetir a operação
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponseDto> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        log.warn("Conflito de concorrência: {}", e.getMessage());
+        return ResponseEntity.status(409).body(new ErrorResponseDto(
+                "CONFLITO_CONCORRENCIA",
+                "Este registro foi alterado por outra operação ao mesmo tempo. Tente novamente.",
+                LocalDateTime.now()
+        ));
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponseDto> handleBusiness(BusinessException e) {
-        return ResponseEntity.status(422).body(new ErrorResponseDto(
+        int status = switch (e.getCode()) {
+            case "CONVITE_PENDENTE", "USUARIO_JA_MEMBRO", "REGISTRO_EM_USO" -> 409;
+            case "LIMITE_PLANO", "OPERACAO_INVALIDA", "CONVITE_EXPIRADO" -> 422;
+            case "PLANO_INATIVO", "SENHA_INCORRETA" -> 400;
+            default -> 422;
+        };
+        log.warn("Regra de negócio violada: {} — {}", e.getCode(), e.getMessage());
+        return ResponseEntity.status(status).body(new ErrorResponseDto(
                 e.getCode(), e.getMessage(), LocalDateTime.now()
         ));
     }
@@ -110,6 +169,21 @@ public class GlobalExceptionHandler {
                 "O assistente está temporariamente indisponível. Tente novamente em instantes.",
                 LocalDateTime.now()
         ));
+    }
+
+    // Erros da OpenAI/Spring AI (ex.: 429 limite de tokens/min, indisponibilidade) → 503 amigável,
+    // nunca 500 genérico (CLAUDE.md §21). Detecta rate limit para orientar o usuário a aguardar.
+    @ExceptionHandler({NonTransientAiException.class, TransientAiException.class})
+    public ResponseEntity<ErrorResponseDto> handleAi(Exception e) {
+        String m = e.getMessage() != null ? e.getMessage() : "";
+        boolean rate = m.contains("429") || m.contains("rate_limit") || m.contains("Rate limit");
+        log.error("[ERRO_IA] {} — rate={} — {}", e.getClass().getSimpleName(), rate,
+                m.length() > 300 ? m.substring(0, 300) : m);
+        String msg = rate
+                ? "O assistente recebeu muitas solicitações em pouco tempo. Aguarde alguns segundos e tente novamente."
+                : "O assistente está temporariamente indisponível. Tente novamente em instantes.";
+        return ResponseEntity.status(503).body(new ErrorResponseDto(
+                "ERRO_SERVICO_EXTERNO", msg, LocalDateTime.now()));
     }
 
     @ExceptionHandler(Exception.class)

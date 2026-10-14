@@ -1,10 +1,12 @@
 package br.com.core4erp.dashboard.service;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.repository.ContaBaixadaRepository;
 import br.com.core4erp.conta.repository.ContaRepository;
 import br.com.core4erp.contaCorrente.repository.ContaCorrenteRepository;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 public class DashboardService {
 
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
     private final ContaCorrenteRepository contaCorrenteRepo;
     private final ContaRepository contaRepo;
     private final ContaInvestimentoRepository investimentoRepo;
@@ -43,6 +46,7 @@ public class DashboardService {
     private final AssinaturaRepository assinaturaRepo;
 
     public DashboardService(SecurityContextUtils securityCtx,
+                            TenantContext tenantCtx,
                             ContaCorrenteRepository contaCorrenteRepo,
                             ContaRepository contaRepo,
                             ContaInvestimentoRepository investimentoRepo,
@@ -53,6 +57,7 @@ public class DashboardService {
                             FaturaCartaoRepository faturaCartaoRepo,
                             AssinaturaRepository assinaturaRepo) {
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
         this.contaCorrenteRepo = contaCorrenteRepo;
         this.contaRepo = contaRepo;
         this.investimentoRepo = investimentoRepo;
@@ -70,27 +75,30 @@ public class DashboardService {
      * fluxo mensal dos últimos 6 meses e top-5 despesas por categoria do mês corrente.
      * Todas as somas são feitas via queries agregadas no banco para evitar carregamento em memória.
      */
+    @Requer("DASHBOARD_VISUALIZAR")
     @Transactional(readOnly = true)
-    public DashboardResponseDto getDashboard() {
-        Long uid = securityCtx.getUsuarioId();
+    public DashboardResponseDto getDashboard(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
+        Long uid = tenantCtx.getEmpresaId();
         LocalDate hoje = LocalDate.now();
         List<StatusConta> pendentes = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
 
-        BigDecimal saldoCC = contaCorrenteRepo.sumSaldoByUsuarioId(uid);
+        BigDecimal saldoCC = contaCorrenteRepo.sumSaldoByEmpresaId(uid);
 
         BigDecimal totalAPagar = contaRepo.sumByTipoAndStatus(uid, TipoConta.PAGAR, pendentes);
         BigDecimal totalAReceber = contaRepo.sumByTipoAndStatus(uid, TipoConta.RECEBER, pendentes);
 
-        BigDecimal patrimonio = investimentoRepo.sumSaldoAtualByUsuarioId(uid);
+        BigDecimal patrimonio = investimentoRepo.sumSaldoAtualByEmpresaId(uid);
 
-        BigDecimal limiteTotal = cartaoRepo.sumLimiteByUsuarioId(uid);
+        BigDecimal limiteTotal = cartaoRepo.sumLimiteByEmpresaId(uid);
 
         YearMonth now = YearMonth.now();
-        YearMonth sixAgo = now.minusMonths(5);
-        BigDecimal limiteUsado = lancamentoRepo.sumValorByUsuarioAndPeriod(
+        YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;
+        YearMonth inicio = (mesInicio != null && anoInicio != null) ? YearMonth.of(anoInicio, mesInicio) : fim.minusMonths(5);
+
+        BigDecimal limiteUsado = lancamentoRepo.sumValorByEmpresaAndPeriod(
                 uid,
-                sixAgo.getMonthValue(), sixAgo.getYear(),
-                now.getMonthValue(), now.getYear());
+                inicio.getMonthValue(), inicio.getYear(),
+                fim.getMonthValue(), fim.getYear());
 
         LocalDate inicioFluxo = hoje.withDayOfMonth(1).minusMonths(5);
         LocalDate fimFluxo = hoje.withDayOfMonth(hoje.lengthOfMonth());
@@ -123,7 +131,7 @@ public class DashboardService {
         Long vencendoHoje = contaRepo.countByStatusAndData(uid, pendentes, hoje);
         Long atrasadas = contaRepo.countByStatusAndDataBefore(uid, pendentes, hoje);
 
-        BigDecimal totalMensalAssinaturas = assinaturaRepo.sumValorAtivasByUsuarioId(uid);
+        BigDecimal totalMensalAssinaturas = assinaturaRepo.sumValorAtivasByEmpresaId(uid);
 
         return new DashboardResponseDto(
                 saldoCC, totalAPagar, totalAReceber, patrimonio,
@@ -133,22 +141,23 @@ public class DashboardService {
                 totalMensalAssinaturas);
     }
 
+    @Requer("DASHBOARD_CARTAO_VISUALIZAR")
     @Transactional(readOnly = true)
     public SaldoDetalhadoResponseDto getSaldoDetalhado() {
-        Long uid = securityCtx.getUsuarioId();
+        Long uid = tenantCtx.getEmpresaId();
         List<StatusConta> pendentes = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
 
-        BigDecimal saldoCC       = contaCorrenteRepo.sumSaldoByUsuarioId(uid);
-        BigDecimal totalPago     = baixadaRepo.sumTotalPagoByUsuario(uid);
-        BigDecimal totalReceb    = baixadaRepo.sumTotalRecebidoByUsuario(uid);
-        BigDecimal totalAport    = transacaoInvRepo.sumTotalAportadoByUsuario(uid);
-        BigDecimal totalRes      = transacaoInvRepo.sumTotalResgatadoByUsuario(uid);
+        BigDecimal saldoCC       = contaCorrenteRepo.sumSaldoByEmpresaId(uid);
+        BigDecimal totalPago     = baixadaRepo.sumTotalPagoByEmpresa(uid);
+        BigDecimal totalReceb    = baixadaRepo.sumTotalRecebidoByEmpresa(uid);
+        BigDecimal totalAport    = transacaoInvRepo.sumTotalAportadoByEmpresa(uid);
+        BigDecimal totalRes      = transacaoInvRepo.sumTotalResgatadoByEmpresa(uid);
         BigDecimal aPagar        = contaRepo.sumByTipoAndStatus(uid, TipoConta.PAGAR, pendentes);
         BigDecimal aReceber      = contaRepo.sumByTipoAndStatus(uid, TipoConta.RECEBER, pendentes);
         BigDecimal emAberto      = aReceber.subtract(aPagar);
-        BigDecimal cartaoAberto  = lancamentoRepo.sumLancamentosEmFaturasAbertasByUsuario(uid);
-        BigDecimal faturasPend   = faturaCartaoRepo.sumFaturasFechadasPendentesByUsuario(uid);
-        BigDecimal patrimonio    = investimentoRepo.sumSaldoAtualByUsuarioId(uid);
+        BigDecimal cartaoAberto  = lancamentoRepo.sumLancamentosEmFaturasAbertasByEmpresa(uid);
+        BigDecimal faturasPend   = faturaCartaoRepo.sumFaturasFechadasPendentesByEmpresa(uid);
+        BigDecimal patrimonio    = investimentoRepo.sumSaldoAtualByEmpresaId(uid);
         BigDecimal saldoPrevisto = saldoCC.add(emAberto);
 
         return new SaldoDetalhadoResponseDto(

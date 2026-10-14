@@ -2,13 +2,17 @@ package br.com.core4erp.chat.tools.lancamento;
 
 import br.com.core4erp.cartaoCredito.dto.LancamentoRequestDto;
 import br.com.core4erp.cartaoCredito.dto.LancamentoResponseDto;
+import br.com.core4erp.cartaoCredito.enums.TipoLancamentoCartao;
 import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
+import br.com.core4erp.categoria.service.ClassificacaoIaService;
 import br.com.core4erp.conta.dto.BaixaRequestDto;
 import br.com.core4erp.conta.dto.ContaCreateDto;
 import br.com.core4erp.conta.dto.ContaResponseDto;
 import br.com.core4erp.conta.service.ContaService;
 import br.com.core4erp.contaCorrente.dto.TransferenciaRequestDto;
+import br.com.core4erp.contaCorrente.dto.TransferenciaResponseDto;
 import br.com.core4erp.contaCorrente.service.ContaCorrenteService;
+import br.com.core4erp.enums.StatusConta;
 import br.com.core4erp.enums.TipoConta;
 import br.com.core4erp.enums.TipoTransacaoInvestimento;
 import br.com.core4erp.investimento.dto.TransacaoInvestimentoRequestDto;
@@ -16,15 +20,16 @@ import br.com.core4erp.investimento.dto.TransacaoInvestimentoResponseDto;
 import br.com.core4erp.investimento.service.InvestimentoService;
 import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
+import br.com.core4erp.config.tenant.TenantContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -34,38 +39,48 @@ public class LancamentoTools {
     private final ContaCorrenteService contaCorrenteService;
     private final CartaoCreditoService cartaoCreditoService;
     private final InvestimentoService investimentoService;
+    private final ClassificacaoIaService classificacaoIaService;
     private final SecurityContextUtils securityCtx;
+    private final TenantContext tenantCtx;
     private final ChatAuditoriaService auditoria;
 
     public LancamentoTools(ContaService contaService,
                            ContaCorrenteService contaCorrenteService,
                            CartaoCreditoService cartaoCreditoService,
                            InvestimentoService investimentoService,
+                           ClassificacaoIaService classificacaoIaService,
                            SecurityContextUtils securityCtx,
+                           TenantContext tenantCtx,
                            ChatAuditoriaService auditoria) {
         this.contaService = contaService;
         this.contaCorrenteService = contaCorrenteService;
         this.cartaoCreditoService = cartaoCreditoService;
         this.investimentoService = investimentoService;
+        this.classificacaoIaService = classificacaoIaService;
         this.securityCtx = securityCtx;
+        this.tenantCtx = tenantCtx;
         this.auditoria = auditoria;
     }
 
     @Tool(description = """
-            Registra conta a pagar ou a receber (chame só APÓS o usuário confirmar). Se não souber
-            o categoriaId, use consultarCategorias antes. Retorna as contas criadas (uma por parcela).
+            Registra conta a pagar ou a receber (chame só APÓS o usuário confirmar). O categoriaId é
+            OPCIONAL: se o usuário não informar a categoria, passe null e o sistema sugere a categoria
+            automaticamente a partir da descrição. Retorna as contas criadas (uma por parcela).
             """)
     public List<ContaResponseDto> registrarConta(
             @ToolParam(description = "Descrição da conta. Ex: 'Conta de Luz', 'Salário'") String descricao,
             @ToolParam(description = "Valor em reais. Ex: 250.00") BigDecimal valorOriginal,
             @ToolParam(description = "Data de vencimento no formato YYYY-MM-DD") LocalDate dataVencimento,
             @ToolParam(description = "PAGAR para despesas, RECEBER para receitas") String tipo,
-            @ToolParam(description = "ID da categoria. Use consultarCategorias para descobrir o ID correto") Long categoriaId,
+            @ToolParam(description = "ID da categoria. Se o usuário indicar a categoria, resolva com consultarCategorias e passe o ID; se ele não indicar, passe null e o sistema classifica automaticamente pela descrição") Long categoriaId,
             @ToolParam(description = "ID do parceiro/fornecedor. Opcional, pode ser null") Long parceiroId,
             @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
             @ToolParam(description = "Se true, divide o valor total entre as parcelas") Boolean dividirValor) {
+        // 3.1: ContaService.criar é reusado internamente (fechamento de fatura/conciliação), por isso
+        // a barreira de permissão fica aqui, na porta do chat, e não com @Requer no service.
+        tenantCtx.exigirPermissao("CONTA_CRIAR");
         log.info("[CHAT-AUDIT] user={} tool=registrarConta descricao={} valor={} tipo={}",
-                securityCtx.getEmail(), descricao, valorOriginal, tipo);
+                securityCtx.getUsuarioId(), descricao, valorOriginal, tipo);
         auditoria.registrar("registrarConta",
                 "descricao=" + descricao + " valor=" + valorOriginal + " tipo=" + tipo);
         TipoConta tipoConta;
@@ -74,6 +89,31 @@ public class LancamentoTools {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Tipo de conta inválido: '" + tipo + "'. Use PAGAR ou RECEBER.");
         }
+
+        // Classificação automática (best-effort): usuário não informou categoria → IA tenta sugerir a
+        // partir da descrição. Nunca deve derrubar o lançamento — em qualquer falha ou confiança baixa
+        // (sugestão vazia), segue sem categoria (categoriaId = null).
+        BigDecimal confiancaIa = null;
+        if (categoriaId == null) {
+            try {
+                var sugestao = classificacaoIaService.sugerir(descricao, null);
+                if (sugestao.isPresent()) {
+                    categoriaId = sugestao.get().categoriaId();
+                    confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+                }
+            } catch (Exception e) {
+                log.warn("[CHAT] classificação automática de categoria falhou — seguindo sem categoria. motivo={}",
+                        e.getMessage());
+            }
+        }
+        // Categoria é obrigatória (regra de negócio). Se a classificação automática não resolveu,
+        // não derrube com um erro técnico — instrua a IA a pedir a categoria ao usuário.
+        if (categoriaId == null) {
+            throw new IllegalArgumentException(
+                    "Não identifiquei a categoria pela descrição. Pergunte ao usuário qual categoria usar "
+                    + "ou use consultarCategorias para localizar a categoria correta.");
+        }
+
         ContaCreateDto dto = new ContaCreateDto(
                 descricao,
                 valorOriginal,
@@ -86,53 +126,100 @@ public class LancamentoTools {
                 Boolean.TRUE.equals(dividirValor),
                 null, null, null
         );
-        return contaService.criar(dto);
+        List<ContaResponseDto> criadas = contaService.criar(dto);
+        if (confiancaIa != null) {
+            contaService.marcarClassificadaPorIa(criadas.stream().map(ContaResponseDto::id).toList(), confiancaIa);
+        }
+        return criadas;
     }
 
     @Tool(description = """
             Registra lançamento em cartão de crédito (suporta parcelamento). Use consultarCartoes
-            para o cartaoId e consultarCategorias para o categoriaId. A fatura é calculada pela data
-            da compra e dia de fechamento. Chame só APÓS o usuário confirmar.
+            para o cartaoId, consultarCategorias para o categoriaId e consultarParceiros para o
+            parceiroId. O parceiro é OBRIGATÓRIO em lançamento de cartão. O cartão aceita SAÍDA
+            (gasto/compra) e ENTRADA (crédito/estorno recebido); informe o campo tipo — o valor é
+            sempre POSITIVO, o tipo é que indica a direção. A fatura é calculada pela data da compra
+            e dia de fechamento. Chame só APÓS o usuário confirmar.
             """)
     public List<LancamentoResponseDto> registrarLancamentoCartao(
             @ToolParam(description = "ID do cartão de crédito. Use consultarCartoes para descobrir") Long cartaoId,
             @ToolParam(description = "Descrição da compra") String descricao,
-            @ToolParam(description = "Valor da compra em reais") BigDecimal valor,
+            @ToolParam(description = "Valor da compra em reais (sempre positivo; o tipo indica a direção)") BigDecimal valor,
             @ToolParam(description = "Data da compra no formato YYYY-MM-DD") LocalDate dataCompra,
-            @ToolParam(description = "ID da categoria") Long categoriaId,
-            @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas) {
-        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={}",
-                securityCtx.getEmail(), cartaoId, descricao, valor);
+            @ToolParam(description = "ID da categoria. Se o usuário indicar a categoria, resolva com consultarCategorias e passe o ID; se ele não indicar, passe null e o sistema classifica automaticamente pela descrição") Long categoriaId,
+            @ToolParam(description = "ID do parceiro (fornecedor/cliente) — OBRIGATÓRIO em lançamento de cartão. Use consultarParceiros para descobrir; se não existir, cadastre com registrarParceiro") Long parceiroId,
+            @ToolParam(description = "Número de parcelas. Padrão: 1") Integer quantidadeParcelas,
+            @ToolParam(description = "Tipo do lançamento: SAIDA para gasto/compra (padrão), ENTRADA para crédito/estorno recebido no cartão. Se o usuário não indicar, use SAIDA.") String tipo) {
+        log.info("[CHAT-AUDIT] user={} tool=registrarLancamentoCartao cartaoId={} descricao={} valor={} parceiroId={} tipo={}",
+                securityCtx.getUsuarioId(), cartaoId, descricao, valor, parceiroId, tipo);
         auditoria.registrar("registrarLancamentoCartao",
-                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor);
+                "cartaoId=" + cartaoId + " descricao=" + descricao + " valor=" + valor + " parceiroId=" + parceiroId + " tipo=" + tipo);
+
+        // Tipo do lançamento: SAIDA (gasto) ou ENTRADA (crédito/estorno). null/valor inválido → SAIDA.
+        TipoLancamentoCartao tipoEnum = TipoLancamentoCartao.SAIDA;
+        if (tipo != null && !tipo.isBlank()) {
+            try {
+                tipoEnum = TipoLancamentoCartao.valueOf(tipo.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                tipoEnum = TipoLancamentoCartao.SAIDA;
+            }
+        }
+
+        // Classificação automática (best-effort) quando o usuário não informa a categoria. Nunca
+        // deve derrubar o lançamento — em qualquer falha ou confiança baixa, segue sem categoria.
+        BigDecimal confiancaIa = null;
+        if (categoriaId == null) {
+            try {
+                var sugestao = classificacaoIaService.sugerir(descricao, null);
+                if (sugestao.isPresent()) {
+                    categoriaId = sugestao.get().categoriaId();
+                    confiancaIa = BigDecimal.valueOf(sugestao.get().confianca());
+                }
+            } catch (Exception e) {
+                log.warn("[CHAT] classificação automática de categoria falhou — seguindo sem categoria. motivo={}",
+                        e.getMessage());
+            }
+        }
+        // Categoria é obrigatória (regra de negócio). Se a classificação automática não resolveu,
+        // instrua a IA a pedir a categoria ao usuário em vez de deixar o service lançar erro técnico.
+        if (categoriaId == null) {
+            throw new IllegalArgumentException(
+                    "Não identifiquei a categoria pela descrição. Pergunte ao usuário qual categoria usar "
+                    + "ou use consultarCategorias para localizar a categoria correta.");
+        }
+
         LancamentoRequestDto dto = new LancamentoRequestDto(
                 descricao,
                 valor,
                 dataCompra,
                 categoriaId,
-                null,
+                parceiroId,
                 quantidadeParcelas != null ? quantidadeParcelas : 1,
-                true
+                true,
+                tipoEnum
         );
-        return cartaoCreditoService.criarLancamento(cartaoId, dto);
+        List<LancamentoResponseDto> criados = cartaoCreditoService.criarLancamento(cartaoId, dto);
+        if (confiancaIa != null) {
+            cartaoCreditoService.marcarClassificadoPorIa(criados.stream().map(LancamentoResponseDto::id).toList(), confiancaIa);
+        }
+        return criados;
     }
 
     @Tool(description = """
             Transfere valor entre duas contas correntes. Use consultarContasCorrentes para os IDs.
             Data obrigatória. Chame só APÓS o usuário confirmar.
             """)
-    public Map<String, String> transferirEntreContas(
+    public TransferenciaResponseDto transferirEntreContas(
             @ToolParam(description = "ID da conta corrente de origem") Long contaOrigemId,
             @ToolParam(description = "ID da conta corrente de destino") Long contaDestinoId,
             @ToolParam(description = "Valor a transferir em reais") BigDecimal valor,
             @ToolParam(description = "Data em que a transferência ocorreu no formato YYYY-MM-DD") LocalDate dataTransferencia) {
         log.info("[CHAT-AUDIT] user={} tool=transferirEntreContas origem={} destino={} valor={} data={}",
-                securityCtx.getEmail(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
+                securityCtx.getUsuarioId(), contaOrigemId, contaDestinoId, valor, dataTransferencia);
         auditoria.registrar("transferirEntreContas",
                 "origem=" + contaOrigemId + " destino=" + contaDestinoId + " valor=" + valor);
         TransferenciaRequestDto dto = new TransferenciaRequestDto(contaOrigemId, contaDestinoId, valor, dataTransferencia);
-        contaCorrenteService.transferir(dto);
-        return Map.of("status", "Transferência realizada com sucesso");
+        return contaCorrenteService.transferir(dto);
     }
 
     @Tool(description = """
@@ -145,8 +232,9 @@ public class LancamentoTools {
             @ToolParam(description = "Data do pagamento/recebimento no formato YYYY-MM-DD") LocalDate dataPagamento,
             @ToolParam(description = "Valor de juros. Padrão: 0") BigDecimal juros,
             @ToolParam(description = "Valor de multa. Padrão: 0") BigDecimal multa) {
+        tenantCtx.exigirPermissao("CONTA_BAIXAR"); // 3.1: barreira na porta do chat (service reusado)
         log.info("[CHAT-AUDIT] user={} tool=baixarConta contaId={} contaCorrenteId={} data={}",
-                securityCtx.getEmail(), contaId, contaCorrenteId, dataPagamento);
+                securityCtx.getUsuarioId(), contaId, contaCorrenteId, dataPagamento);
         auditoria.registrar("baixarConta",
                 "contaId=" + contaId + " contaCorrenteId=" + contaCorrenteId + " data=" + dataPagamento);
         BaixaRequestDto dto = new BaixaRequestDto(
@@ -171,7 +259,7 @@ public class LancamentoTools {
             @ToolParam(description = "Data da transação no formato YYYY-MM-DD") LocalDate dataTransacao,
             @ToolParam(description = "ID da conta corrente para débito (apenas para APORTE). Opcional") Long contaCorrenteOrigemId) {
         log.info("[CHAT-AUDIT] user={} tool=registrarTransacaoInvestimento contaId={} tipo={} valor={}",
-                securityCtx.getEmail(), contaInvestimentoId, tipoTransacao, valor);
+                securityCtx.getUsuarioId(), contaInvestimentoId, tipoTransacao, valor);
         auditoria.registrar("registrarTransacaoInvestimento",
                 "contaInvestimentoId=" + contaInvestimentoId + " tipo=" + tipoTransacao + " valor=" + valor);
         TipoTransacaoInvestimento tipoEnum;
@@ -187,5 +275,88 @@ public class LancamentoTools {
                 contaCorrenteOrigemId
         );
         return investimentoService.registrarTransacao(contaInvestimentoId, dto);
+    }
+
+    // ── Conta a pagar / receber (consultar, editar, excluir, estornar) ─────────
+
+    @Tool(description = """
+            Lista contas a pagar/receber, com o ID de cada uma. Filtre por tipo (PAGAR ou RECEBER)
+            e/ou status (PENDENTE, PAGO, RECEBIDO, ATRASADO). Ao filtrar por ATRASADO, a busca já
+            inclui as contas PENDENTE com vencimento passado (atrasadas de fato, mesmo que o status
+            ainda não tenha sido sincronizado). Use para obter o ID antes de editar, excluir ou
+            estornar uma conta.
+            """)
+    public List<ContaResponseDto> consultarContas(
+            @ToolParam(description = "Tipo: PAGAR ou RECEBER (opcional)") String tipo,
+            @ToolParam(description = "Status: PENDENTE, PAGO, RECEBIDO, ATRASADO (opcional)") String status) {
+        TipoConta t = parseTipo(tipo);
+        StatusConta s = parseStatus(status);
+        // "Atrasada" é um ESTADO DERIVADO: status ATRASADO ou PENDENTE com vencimento < hoje.
+        // Buscar só pelo enum devolvia vazio quando o scheduler ainda não tinha marcado — a IA
+        // respondia "não há contas atrasadas" com 22 vencidas na tela (falso negativo).
+        if (s == StatusConta.ATRASADO) {
+            LocalDate ontem = LocalDate.now().minusDays(1);
+            return contaService.listarComFiltros(t, null, null, null, ontem, null, null, null, null,
+                            PageRequest.of(0, 100)).getContent().stream()
+                    .filter(c -> c.status() == StatusConta.ATRASADO || c.status() == StatusConta.PENDENTE)
+                    .toList();
+        }
+        return contaService.listarComFiltros(t, s, null, null, null, null, null, null, null,
+                PageRequest.of(0, 100)).getContent();
+    }
+
+    @Tool(description = """
+            Edita uma conta a pagar/receber (pelo ID, obtido em consultarContas). Informe só o que
+            mudar. BLOQUEADO se a conta já estiver baixada (PAGO/RECEBIDO) — nesse caso, estorne
+            antes. Confirme antes de executar.
+            """)
+    public ContaResponseDto atualizarConta(
+            @ToolParam(description = "ID da conta (de consultarContas)") Long contaId,
+            @ToolParam(description = "Nova descrição (opcional)") String descricao,
+            @ToolParam(description = "Novo valor (opcional)") BigDecimal valor,
+            @ToolParam(description = "Nova data de vencimento YYYY-MM-DD (opcional)") LocalDate dataVencimento) {
+        tenantCtx.exigirPermissao("CONTA_EDITAR");
+        auditoria.registrar("atualizarConta", "id=" + contaId);
+        ContaResponseDto atual = contaService.buscarPorId(contaId);
+        ContaCreateDto dto = new ContaCreateDto(
+                descricao != null ? descricao : atual.descricao(),
+                valor != null ? valor : atual.valorOriginal(),
+                dataVencimento != null ? dataVencimento : atual.dataVencimento(),
+                atual.tipo(), atual.categoriaId(), atual.parceiroId(),
+                1, 1, false, atual.numeroDocumento(), atual.acrescimo(), atual.desconto());
+        return contaService.atualizar(contaId, dto);
+    }
+
+    @Tool(description = """
+            Exclui uma conta a pagar/receber (pelo ID de consultarContas). BLOQUEADO se já estiver
+            baixada. Confirme antes de executar.
+            """)
+    public String excluirConta(@ToolParam(description = "ID da conta a excluir") Long contaId) {
+        tenantCtx.exigirPermissao("CONTA_DELETAR");
+        auditoria.registrar("excluirConta", "id=" + contaId);
+        contaService.deletar(contaId);
+        return "Conta excluída com sucesso.";
+    }
+
+    @Tool(description = """
+            Estorna a baixa de uma conta (desfaz o pagamento/recebimento, revertendo o saldo da conta
+            corrente). A conta volta para PENDENTE. Use o ID de consultarContas. Confirme antes.
+            """)
+    public ContaResponseDto estornarConta(@ToolParam(description = "ID da conta a estornar") Long contaId) {
+        tenantCtx.exigirPermissao("CONTA_ESTORNAR");
+        auditoria.registrar("estornarConta", "id=" + contaId);
+        return contaService.estornar(contaId);
+    }
+
+    private TipoConta parseTipo(String tipo) {
+        if (tipo == null || tipo.isBlank()) return null;
+        try { return TipoConta.valueOf(tipo.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
+    }
+
+    private StatusConta parseStatus(String status) {
+        if (status == null || status.isBlank()) return null;
+        try { return StatusConta.valueOf(status.toUpperCase()); }
+        catch (IllegalArgumentException e) { return null; }
     }
 }
