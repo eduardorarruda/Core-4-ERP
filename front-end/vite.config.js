@@ -15,16 +15,16 @@ export default defineConfig(({ mode }) => {
         registerType: 'prompt', // usuário decide atualizar — evita recarga no meio de um lançamento
         includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'robots.txt'],
         manifest: {
-          name: 'Core 4 ERP',
-          short_name: 'Core4',
+          name: 'Core 4',
+          short_name: 'Core 4',
           id: '/',
           scope: '/',
           description: 'Gestão financeira para uso pessoal e pequenas empresas: contas, cartões, conciliação bancária e relatórios.',
           lang: 'pt-BR',
           start_url: '/',
           display: 'standalone',
-          background_color: '#0c0c0c',
-          theme_color: '#0c0c0c',
+          background_color: '#030A0B',
+          theme_color: '#030A0B',
           categories: ['finance', 'productivity'],
           icons: [
             { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

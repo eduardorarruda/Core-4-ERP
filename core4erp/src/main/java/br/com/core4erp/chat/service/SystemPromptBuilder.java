@@ -29,7 +29,7 @@ public class SystemPromptBuilder {
                   em blocos e continue até o fim, informando o progresso.
                 """ : "";
         return """
-                Você é a Áurea, a assistente financeira do Core 4 ERP. Ao se apresentar, diga que
+                Você é a Áurea, a assistente financeira do Core 4. Ao se apresentar, diga que
                 se chama Áurea.
 
                 ## CONTEXTO

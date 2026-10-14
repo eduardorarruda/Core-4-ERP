@@ -1,6 +1,33 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { cn } from '../../lib/utils';
 import SkeletonCard from './SkeletonCard';
+
+/**
+ * Cartão de painel do Core 4 (`.c4-card`): título em Sora, subtítulo explicativo em texto
+ * normal, ação no canto e um selo de variação opcional.
+ *
+ * Props:
+ * - title, subtitle, headerAction, children, className
+ * - loading:     mostra o esqueleto no lugar do conteúdo
+ * - accentChip:  texto do selo de variação (ex.: "▲ 12%", "+R$ 300", "▼ 4%") — começa com
+ *                ▲ ou + → cor de receita (income); senão → cor de despesa (expense)
+ * - accentColor: fio de cor na borda esquerda. Aceita um token ('primary' | 'income' |
+ *                'expense' | 'invest' | 'secondary' | 'warning') ou uma cor CSS (var(--…)).
+ * - destaque:    halo esmeralda no canto — para o número principal da tela (opcional)
+ */
+const ACENTOS = {
+  primary: 'var(--color-primary)',
+  income: 'var(--color-income)',
+  expense: 'var(--color-expense)',
+  invest: 'var(--color-invest)',
+  secondary: 'var(--color-secondary)',
+  warning: 'var(--color-warning)',
+};
+
+function chipPositivo(chip) {
+  const texto = String(chip).trim();
+  return texto.startsWith('▲') || texto.startsWith('+');
+}
 
 export default function BentoCard({
   children,
@@ -11,57 +38,57 @@ export default function BentoCard({
   loading,
   accentColor,
   accentChip,
+  destaque = false,
 }) {
+  const tituloId = useId();
   if (loading) {
     return <SkeletonCard className={className} />;
   }
 
+  const acento = accentColor ? (ACENTOS[accentColor] ?? accentColor) : null;
+
   return (
     <section
-      className={cn(
-        'rounded-[18px] p-6 flex flex-col',
-        'transition-all duration-200',
-        className
-      )}
-      style={{
-        background: 'rgba(255,255,255,0.025)',
-        border: accentColor
-          ? `2px solid ${accentColor}33`
-          : '1px solid rgba(250,250,250,0.08)',
-        backdropFilter: 'blur(8px)',
-        boxShadow: '0 1px 3px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.2)',
-        ...(accentColor && !accentChip ? { borderLeftWidth: 2, borderLeftColor: accentColor } : {}),
-      }}
+      aria-labelledby={title ? tituloId : undefined}
+      className={cn('c4-card p-5 sm:p-6 flex flex-col', destaque && 'c4-card--destaque', className)}
     >
+      {acento && (
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-5 bottom-5 w-[3px] rounded-r-full bg-[var(--c4-acento)] shadow-[0_0_14px_var(--c4-acento)]"
+          style={{ '--c4-acento': acento }}
+        />
+      )}
       {(title || headerAction || accentChip) && (
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex justify-between items-start gap-4 mb-5">
           <div className="min-w-0">
             {title && (
-              <h2 className="text-lg font-semibold tracking-tight text-text-primary font-display">{title}</h2>
+              <h2 id={tituloId} className="text-base sm:text-lg font-semibold tracking-tight text-text-primary font-display">
+                {title}
+              </h2>
             )}
             {subtitle && (
-              <p className="text-xs text-text-primary/70 uppercase font-bold tracking-widest mt-1 font-mono">{subtitle}</p>
+              <p className="mt-0.5 text-sm text-text-primary/60 leading-snug">{subtitle}</p>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0 ml-4">
-            {accentChip && (
-              <span style={{
-                fontSize: 10, fontWeight: 600,
-                padding: '2px 8px', borderRadius: 4,
-                background: accentChip.startsWith('▲') || accentChip.startsWith('+')
-                  ? 'rgba(110,255,192,.12)' : 'rgba(255,180,171,.12)',
-                color: accentChip.startsWith('▲') || accentChip.startsWith('+')
-                  ? '#6EFFC0' : '#FFB4AB',
-                fontFamily: 'monospace',
-              }}>
-                {accentChip}
-              </span>
-            )}
-            {headerAction}
-          </div>
+          {(accentChip || headerAction) && (
+            <div className="flex items-center gap-2 shrink-0">
+              {accentChip && (
+                <span className={cn(
+                  'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold tabular-nums',
+                  chipPositivo(accentChip)
+                    ? 'text-income bg-income/[0.12] border-income/25'
+                    : 'text-expense bg-expense/[0.12] border-expense/25'
+                )}>
+                  {accentChip}
+                </span>
+              )}
+              {headerAction}
+            </div>
+          )}
         </div>
       )}
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         {children}
       </div>
     </section>

@@ -23,18 +23,18 @@ export default function Termos() {
     title: 'Termos de Uso',
     canonical: '/termos',
     description:
-      'Regras de uso do Core 4 ERP, sistema gratuito de gestão financeira desenvolvido como projeto acadêmico: conta, contas de empresa, assistente de IA, responsabilidades e encerramento.',
+      'Regras de uso do Core 4, sistema gratuito de gestão financeira desenvolvido como projeto acadêmico: conta, contas de empresa, assistente de IA, responsabilidades e encerramento.',
   });
 
   return (
     <LegalLayout
       titulo="Termos de Uso"
-      resumo="Estes termos regulam o uso do Core 4 ERP. Ao criar uma conta ou usar o sistema, você declara que leu e concorda com eles e com a Política de Privacidade. Se não concordar, não use o serviço."
+      resumo="Estes termos regulam o uso do Core 4. Ao criar uma conta ou usar o sistema, você declara que leu e concorda com eles e com a Política de Privacidade. Se não concordar, não use o serviço."
       secoes={SECOES}
     >
       <LegalSection id="objeto" titulo="1. O que é o serviço">
         <p>
-          O Core 4 ERP, disponível em <span className="font-mono">{URL_APP}</span>, é um software de gestão financeira
+          O Core 4, disponível em <span className="font-mono">{URL_APP}</span>, é um software de gestão financeira
           para pessoas e empresas: contas a pagar e a receber, contas correntes, cartões, conciliação de extratos OFX,
           investimentos, assinaturas, relatórios e um assistente de inteligência artificial.
         </p>
@@ -170,12 +170,12 @@ export default function Termos() {
 
       <LegalSection id="propriedade" titulo="10. Propriedade intelectual">
         <p>
-          O código-fonte do Core 4 ERP é distribuído sob a licença MIT, que permite usá-lo, copiá-lo e modificá-lo nos
+          O código-fonte do Core 4 é distribuído sob a licença MIT, que permite usá-lo, copiá-lo e modificá-lo nos
           termos dessa licença. Essa licença cobre o código, não a instância em produção: o uso do serviço hospedado em{' '}
           <span className="font-mono">{URL_APP}</span> segue estes termos.
         </p>
         <p>
-          O nome e a marca Core 4 ERP identificam o projeto e não podem ser usados de forma a sugerir que uma versão
+          O nome e a marca Core 4 identificam o projeto e não podem ser usados de forma a sugerir que uma versão
           modificada ou outro serviço é mantido pelos autores.
         </p>
       </LegalSection>

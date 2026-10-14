@@ -2,7 +2,7 @@
 
 <img src="front-end/public/pwa-192.png" alt="" width="96">
 
-# Core 4 ERP
+# Core 4
 
 **Sistema de gestão financeira pessoal, com assistente de IA integrado.**
 Contas, cartões, conciliação, investimentos, relatórios e a Áurea — uma assistente que consulta
@@ -279,7 +279,7 @@ A documentação completa e interativa está no Swagger UI.
 
 ## 📌 Status do projeto
 
-O Core 4 ERP é um **pré-projeto**: um protótipo funcional que acompanha o TCC. Ele roda de ponta a
+O Core 4 é um **pré-projeto**: um protótipo funcional que acompanha o TCC. Ele roda de ponta a
 ponta, mas não passou pelo ciclo de endurecimento, testes e suporte de um produto.
 
 **Funciona**
@@ -344,7 +344,7 @@ Distribuído sob a licença [MIT](LICENSE).
 <details>
 <summary><b>English summary</b></summary>
 
-Core 4 ERP is a personal finance management system built as an undergraduate final project (TCC)
+Core 4 is a personal finance management system built as an undergraduate final project (TCC)
 in Information Systems and Software Engineering at UNIALFA (Goiânia, Brazil, 2026). It covers
 payables and receivables, bank accounts and transfers, credit cards with statements and spreadsheet
 import, OFX reconciliation, investments, subscriptions, reports (Excel/PDF) and dashboards, plus

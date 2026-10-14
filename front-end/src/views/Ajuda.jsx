@@ -116,7 +116,7 @@ export default function Ajuda() {
 
   return (
     <div className="space-y-6 pb-16">
-      <PageHeader title="Central de Ajuda" subtitle="Aprenda a usar cada tela do Core 4 ERP" />
+      <PageHeader title="Central de Ajuda" subtitle="Aprenda a usar cada tela do Core 4" />
 
       {/* Busca */}
       <div role="search" className="relative max-w-xl">

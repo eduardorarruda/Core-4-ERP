@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Tag, Users } from 'lucide-react';
 import { categorias as catApi, parceiros as parApi } from '../../lib/api';
 import FormField, { inputCls } from './FormField';
 import IconDropdown from './IconDropdown';
@@ -65,7 +65,16 @@ export default function ModalCriacaoRapida({ tipo, onCriado, onFechar }) {
   }
 
   return (
-    <Modal open onClose={onFechar} size="sm" title={isCat ? 'Nova categoria' : 'Novo parceiro'}>
+    <Modal
+      open
+      onClose={onFechar}
+      size="sm"
+      icon={isCat ? Tag : Users}
+      title={isCat ? 'Nova categoria' : 'Novo parceiro'}
+      description={isCat
+        ? 'Crie a categoria sem sair do lançamento — ela já fica selecionada.'
+        : 'Cadastre o cliente ou fornecedor sem sair do lançamento — ele já fica selecionado.'}
+    >
       <form onSubmit={salvar} className="space-y-3" noValidate>
         {isCat ? (
           <>
@@ -118,7 +127,11 @@ export default function ModalCriacaoRapida({ tipo, onCriado, onFechar }) {
           </>
         )}
 
-        {erro && <p role="alert" className="text-xs text-error">{erro}</p>}
+        {erro && (
+          <p role="alert" className="rounded-xl border border-error/25 bg-error/[0.08] px-3 py-2 text-sm text-error">
+            {erro}
+          </p>
+        )}
 
         <Modal.Footer>
           <Button variant="ghost" onClick={onFechar}>Cancelar</Button>

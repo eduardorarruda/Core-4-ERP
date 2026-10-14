@@ -1,6 +1,10 @@
-# CLAUDE.md — Core 4 ERP
+# CLAUDE.md — Core 4
 
 Guia de contexto para IAs assistindo no desenvolvimento. Leia antes de qualquer tarefa.
+
+> O produto se chama **Core 4** (sem "ERP") em todo texto visível ao usuário. Pastas, pacotes Java,
+> domínios e e-mails (`core4erp/`, `br.com.core4erp`, `core4erp.codes`) continuam com o nome técnico.
+> Identidade visual: `docs/DESIGN_SYSTEM_CORE4.md`.
 
 ---
 

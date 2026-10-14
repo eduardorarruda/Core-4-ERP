@@ -1,48 +1,90 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
+import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+
+/**
+ * Cabeçalho de tela do Core 4 — "explicativo por padrão".
+ *
+ * Props:
+ * - title:      nome da tela (Sora, grande)
+ * - subtitle:   UMA frase em texto normal dizendo para que a tela serve
+ * - icon:       ícone em ladrilho esmeralda — elemento (`<CreditCard />`) ou componente (`CreditCard`)
+ * - actions:    botões à direita (no celular quebram para baixo do título)
+ * - breadcrumb: trilha acima do título — strings ou { label, to } (o último é a tela atual)
+ * - className
+ */
+function renderIcone(icon) {
+  if (React.isValidElement(icon)) return icon;
+  const Icone = icon;
+  return <Icone />;
+}
+
+function Trilha({ itens }) {
+  return (
+    <nav aria-label="Você está em" className="mb-2">
+      <ol className="flex flex-wrap items-center gap-1 text-xs text-text-primary/60">
+        {itens.map((item, i) => {
+          const ultimo = i === itens.length - 1;
+          const label = typeof item === 'string' ? item : item.label;
+          const to = typeof item === 'string' ? null : item.to;
+          return (
+            <li key={`${label}-${i}`} className="flex items-center gap-1">
+              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-text-primary/35" aria-hidden="true" />}
+              {to && !ultimo ? (
+                <Link to={to} className="rounded hover:text-primary transition-colors">{label}</Link>
+              ) : (
+                <span aria-current={ultimo ? 'page' : undefined} className={cn(ultimo && 'text-text-primary/80 font-medium')}>
+                  {label}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
 
 export default function PageHeader({ title, subtitle, actions, breadcrumb, icon, className }) {
   return (
-    <div className={cn('flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 anim-in', className)}>
-      <div className="space-y-1 min-w-0">
-        {breadcrumb && breadcrumb.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-2">
-            {breadcrumb.map((crumb, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <span className="text-text-primary/60 text-xs font-mono">·</span>}
-                <span className={cn(
-                  'text-xs font-bold uppercase tracking-widest font-mono',
-                  i === breadcrumb.length - 1 ? 'text-primary' : 'text-text-primary/60'
-                )}>
-                  {crumb}
-                </span>
-              </React.Fragment>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-3">
-          {icon ? (
-            <span className="grid place-items-center w-9 h-9 rounded-xl bg-gradient-primary text-on-primary shrink-0 [&>svg]:w-5 [&>svg]:h-5" aria-hidden="true">
-              {icon}
+    <motion.header
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+      className={cn('flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4', className)}
+    >
+      <div className="min-w-0">
+        {breadcrumb?.length > 0 && <Trilha itens={breadcrumb} />}
+        <div className="flex items-center gap-3.5">
+          {icon && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'relative grid place-items-center w-11 h-11 shrink-0 rounded-[0.9rem] text-on-primary',
+                'bg-gradient-primary shadow-[var(--shadow-primary)] ring-1 ring-inset ring-text-primary/10',
+                '[&>svg]:w-5 [&>svg]:h-5',
+              )}
+            >
+              {renderIcone(icon)}
             </span>
-          ) : (
-            <span className="live-dot" style={{ width: 5, height: 5, flexShrink: 0 }} />
           )}
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text-primary font-display leading-tight">
+          <h1 className="min-w-0 text-2xl sm:text-3xl font-bold tracking-tight text-text-primary font-display leading-tight">
             {title}
           </h1>
         </div>
         {subtitle && (
-          <p className="text-xs uppercase tracking-widest text-text-primary/60 font-mono pl-[17px]">
+          <p className={cn('mt-1.5 text-sm sm:text-[0.95rem] text-text-primary/65 leading-relaxed max-w-2xl text-pretty', icon && 'sm:pl-[3.6rem]')}>
             {subtitle}
           </p>
         )}
       </div>
       {actions && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {actions}
         </div>
       )}
-    </div>
+    </motion.header>
   );
 }

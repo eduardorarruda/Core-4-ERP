@@ -1,28 +1,39 @@
 import React, { forwardRef } from 'react';
-import { Loader2 } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 /**
- * Botão reutilizável do sistema.
+ * Botão do Core 4.
  *
  * Props:
  * - variant: 'primary' | 'secondary' | 'ghost' | 'danger'  (default: 'primary')
- * - size:    'sm' | 'md' | 'icon'                           (default: 'md' — 44px)
- * - loading: quando true, mostra spinner à esquerda e desabilita o botão
- * - leftIcon: ícone renderizado antes do texto (ignorado enquanto loading)
- * - type/disabled/onClick e demais atributos são repassados via ...rest
+ *     primary   → degradê esmeralda com brilho (a ação principal da tela — uma só por contexto)
+ *     secondary → superfície com borda fina (ações de apoio: exportar, filtrar…)
+ *     ghost     → só texto/ícone (cancelar, ações em linha)
+ *     danger    → ação destrutiva (excluir, estornar)
+ * - size:    'sm' (36px) | 'md' (44px, alvo de toque) | 'lg' (48px) | 'icon' (44×44)  (default: 'md')
+ * - loading: mostra o giro no lugar do ícone e desabilita o botão (aria-busy)
+ * - leftIcon / rightIcon: ícones antes/depois do texto (o esquerdo some enquanto carrega)
+ * - type/disabled/onClick e demais atributos são repassados ao <button>
  */
 const VARIANTS = {
-  primary: 'bg-primary text-on-primary hover:opacity-90',
-  secondary: 'bg-surface-high text-text-primary hover:bg-surface-highest',
-  ghost: 'bg-transparent text-text-primary hover:bg-surface-high',
-  danger: 'bg-error text-on-primary hover:opacity-90',
+  primary: cn(
+    'bg-gradient-primary text-on-primary font-semibold shadow-[var(--shadow-primary)]',
+    'hover:brightness-110 hover:shadow-[0_10px_32px_-6px_color-mix(in_srgb,var(--color-primary)_45%,transparent)]',
+  ),
+  secondary: cn(
+    'bg-surface-medium/70 text-text-primary border border-text-primary/[0.10]',
+    'hover:bg-surface-high hover:border-text-primary/[0.16]',
+  ),
+  ghost: 'bg-transparent text-text-primary/80 hover:text-text-primary hover:bg-text-primary/[0.06]',
+  danger: 'bg-error text-on-primary font-semibold hover:brightness-110 shadow-[0_8px_24px_-10px_var(--color-error)]',
 };
 
 const SIZES = {
-  sm: 'h-9 px-3 text-sm',
-  md: 'h-11 px-4 text-sm',
-  icon: 'w-11 h-11 grid place-items-center',
+  sm: 'h-9 px-3 text-sm gap-1.5 rounded-lg',
+  md: 'h-11 px-4 text-sm gap-2 rounded-xl',
+  lg: 'h-12 px-5 text-base gap-2 rounded-xl',
+  icon: 'w-11 h-11 grid place-items-center rounded-xl',
 };
 
 const Button = forwardRef(function Button(
@@ -31,6 +42,7 @@ const Button = forwardRef(function Button(
     size = 'md',
     loading = false,
     leftIcon = null,
+    rightIcon = null,
     type = 'button',
     disabled = false,
     className,
@@ -44,9 +56,12 @@ const Button = forwardRef(function Button(
       ref={ref}
       type={type}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
-        'rounded-xl font-medium inline-flex items-center justify-center gap-2 transition',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
+        'relative inline-flex items-center justify-center font-medium whitespace-nowrap select-none',
+        'transition-[transform,background-color,border-color,color,box-shadow,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
+        'active:scale-[0.98] disabled:active:scale-100',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none disabled:hover:brightness-100',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
         VARIANTS[variant] || VARIANTS.primary,
         SIZES[size] || SIZES.md,
@@ -54,9 +69,10 @@ const Button = forwardRef(function Button(
       )}
       {...rest}
     >
-      {loading && <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+      {loading && <LoaderCircle className="w-4 h-4 animate-spin shrink-0" aria-hidden="true" />}
       {!loading && leftIcon}
       {children}
+      {rightIcon}
     </button>
   );
 });

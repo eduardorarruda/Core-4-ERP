@@ -1,4 +1,4 @@
-# Core 4 ERP — só as páginas públicas podem ser indexadas.
+# Core 4 — só as páginas públicas podem ser indexadas.
 # A área logada fica bloqueada.
 User-agent: *
 Allow: /$

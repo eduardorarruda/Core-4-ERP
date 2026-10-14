@@ -10,55 +10,77 @@
 @import "tailwindcss";
 
 @theme {
+  /* ── Core 4 — identidade visual (2026-10) ──────────────────────────────────
+     Paleta tirada da logo: esmeralda (o "C" e a haste do "4") sobre um preto com
+     fio de verde-petróleo, e prata (o traço do "4" e o "Core"). Os NOMES dos tokens
+     são os mesmos de antes — as telas herdam a identidade nova sem reescrever classe. */
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
   --font-body: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Surface levels — alinhados ao design system */
-  --color-surface:         #0c0c0c;
-  --color-surface-low:     #131313;
-  --color-surface-medium:  #1C1B1B;
-  --color-surface-high:    #2A2A2A;
-  --color-surface-highest: #353534;
+  /* Superfícies — neutros com matiz verde-petróleo (nunca cinza puro) */
+  --color-surface:         #030A0B;
+  --color-surface-low:     #071315;
+  --color-surface-medium:  #0C1B1E;
+  --color-surface-high:    #132629;
+  --color-surface-highest: #1E3539;
 
-  --color-primary: #6EFFC0;
-  --color-on-primary: #003824;
-  --color-secondary: #ACC7FF;
-  --color-error: #FFB4AB;
-  --color-warning: #FFD37A;
+  /* Marca */
+  --color-primary: #14E29C;
+  --color-primary-strong: #0BB27E;
+  --color-on-primary: #01231A;
+  --color-silver: #C9D6DD;
+  --color-secondary: #7CC7FF;
+  --color-error: #FF7A85;
+  --color-warning: #FFC857;
 
-  --gradient-primary: linear-gradient(135deg, #6EFFC0, #2bdb96);
+  /* Cores com significado fixo em todo o app (entrou / saiu / investido) */
+  --color-income: #2EE6A1;
+  --color-expense: #FF7A85;
+  --color-invest: #F5B83D;
+
+  --gradient-primary: linear-gradient(135deg, #3CF5B8 0%, #14E29C 45%, #0BA877 100%);
+  --gradient-silver: linear-gradient(135deg, #FFFFFF 0%, #D3DEE4 50%, #93A7B3 100%);
 
   /* Séries de gráfico (tema escuro); o tema claro redefine abaixo */
-  --color-chart-1: #6EFFC0;
-  --color-chart-2: #ACC7FF;
-  --color-chart-3: #FFD37A;
-  --color-chart-4: #FFB4AB;
-  --color-chart-grid: rgba(250, 250, 250, 0.08);
-  --color-chart-axis: #A1A1AA;
+  --color-chart-1: #14E29C;
+  --color-chart-2: #7CC7FF;
+  --color-chart-3: #F5B83D;
+  --color-chart-4: #FF7A85;
+  --color-chart-5: #B9A2FF;
+  --color-chart-6: #C9D6DD;
+  --color-chart-grid: rgba(201, 214, 221, 0.07);
+  --color-chart-axis: #8FA3AB;
 
-  --color-text-primary: #FAFAFA;
+  --color-text-primary: #E8F1F3;
 
-  --color-success-surface: #022c22;
-  --color-success-text: #6ee7b7;
-  --color-success-border: rgba(52, 211, 153, 0.3);
-  --color-error-surface: #450a0a;
-  --color-error-text: #fca5a5;
-  --color-error-border: rgba(239, 68, 68, 0.3);
+  --color-success-surface: #04261C;
+  --color-success-text: #6FF0C0;
+  --color-success-border: rgba(20, 226, 156, 0.3);
+  --color-error-surface: #2E0D12;
+  --color-error-text: #FFB3BA;
+  --color-error-border: rgba(255, 122, 133, 0.32);
 
-  --radius-xl: 0.75rem;
-  --radius-card: 1rem;
+  --radius-xl: 0.875rem;
+  --radius-card: 1.25rem;
 
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.2);
-  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.25), 0 16px 48px rgba(0,0,0,0.2);
-  --shadow-primary: 0 4px 24px rgba(110,255,192,0.15);
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 32px -14px rgba(0,0,0,0.75);
+  --shadow-elevated: 0 18px 48px -12px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.35);
+  --shadow-primary: 0 8px 28px -6px rgba(20,226,156,0.35);
 
-  --transition-base: 200ms cubic-bezier(0.4,0,0.2,1);
-  --transition-spring: 400ms cubic-bezier(0.34,1.56,0.64,1);
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-base: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @layer base {
+  html {
+    /* Números tabulares em todo o app: colunas de valores alinham sem font-mono */
+    font-feature-settings: "tnum" 1, "cv11" 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-surface antialiased;
     font-family: var(--font-body);
@@ -67,59 +89,191 @@
 
   h1, h2, h3 {
     font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
   }
 
   html:not(.dark) {
-    --color-surface: #F4F4F5;
+    --color-surface: #F3F6F5;
     --color-surface-low: #FFFFFF;
-    --color-surface-medium: #E4E4E7;
-    --color-surface-high: #D4D4D8;
-    --color-surface-highest: #A1A1AA;
+    --color-surface-medium: #E7EDEC;
+    --color-surface-high: #D5DFDD;
+    --color-surface-highest: #A9BAB8;
 
-    /* #047857: contraste 5,1:1 sobre #F4F4F5 (o #059669 anterior ficava em 3,6:1 — reprovado para texto) */
-    --color-primary: #047857;
+    /* #05795B: contraste 5,4:1 sobre branco (o verde da logo sozinho fica em 2,1:1 — só para preenchimento) */
+    --color-primary: #05795B;
+    --color-primary-strong: #046148;
     --color-on-primary: #FFFFFF;
-    --color-secondary: #2563EB;
-    --color-error: #DC2626;
-    --color-warning: #B45309;
+    --color-silver: #4F6470;
+    --color-secondary: #1D63C9;
+    --color-error: #C81E3A;
+    --color-warning: #9A5B00;
 
-    --gradient-primary: linear-gradient(135deg, #047857, #065F46);
+    --color-income: #05795B;
+    --color-expense: #C81E3A;
+    --color-invest: #9A5B00;
+
+    --gradient-primary: linear-gradient(135deg, #0FB884 0%, #05795B 100%);
+    --gradient-silver: linear-gradient(135deg, #5D7480 0%, #2E3F48 100%);
 
     /* Séries de gráfico: contraste mínimo de 3:1 sobre fundo branco (WCAG 1.4.11) */
-    --color-chart-1: #047857;
-    --color-chart-2: #2563EB;
-    --color-chart-3: #B45309;
-    --color-chart-4: #DC2626;
-    --color-chart-grid: rgba(24, 24, 27, 0.12);
-    --color-chart-axis: #52525B;
+    --color-chart-1: #05795B;
+    --color-chart-2: #1D63C9;
+    --color-chart-3: #9A5B00;
+    --color-chart-4: #C81E3A;
+    --color-chart-5: #6D4ED6;
+    --color-chart-6: #4F6470;
+    --color-chart-grid: rgba(3, 30, 28, 0.09);
+    --color-chart-axis: #4D5F5E;
 
-    --color-text-primary: #18181B;
+    --color-text-primary: #0B1A1C;
 
-    --color-success-surface: #ECFDF5;
-    --color-success-text: #065F46;
-    --color-success-border: rgba(16, 185, 129, 0.3);
-    --color-error-surface: #FEF2F2;
-    --color-error-text: #991B1B;
-    --color-error-border: rgba(239, 68, 68, 0.3);
+    --color-success-surface: #E8F8F1;
+    --color-success-text: #04583F;
+    --color-success-border: rgba(5, 121, 91, 0.3);
+    --color-error-surface: #FDECEF;
+    --color-error-text: #8F1027;
+    --color-error-border: rgba(200, 30, 58, 0.3);
 
-    --shadow-primary: 0 4px 24px rgba(5,150,105,0.15);
+    --shadow-card: 0 1px 2px rgba(3,30,28,0.06), 0 10px 28px -16px rgba(3,30,28,0.22);
+    --shadow-elevated: 0 18px 48px -14px rgba(3,30,28,0.28), 0 2px 6px rgba(3,30,28,0.08);
+    --shadow-primary: 0 8px 24px -8px rgba(5,121,91,0.45);
   }
 
   ::selection {
-    background: var(--color-primary);
-    color: var(--color-on-primary);
+    background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    color: var(--color-text-primary);
   }
 
-  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--color-surface-highest); border-radius: 2px; }
-  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--color-primary) 40%, transparent); }
+  ::-webkit-scrollbar-thumb { background: var(--color-surface-highest); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--color-primary) 45%, transparent); }
 
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-surface-highest) transparent;
   }
 }
+
+/* ── Componentes de identidade (classes de apoio às peças em components/ui) ── */
+@layer components {
+  /* Cartão Core 4: degradê sutil + fio de luz na borda (máscara) — o "metal" da logo */
+  .c4-card {
+    position: relative;
+    border-radius: var(--radius-card);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 70%, transparent), var(--color-surface-low));
+    border: 1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+    box-shadow: var(--shadow-card);
+    isolation: isolate;
+  }
+  .c4-card::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(160deg,
+      color-mix(in srgb, var(--color-silver) 22%, transparent) 0%,
+      transparent 38%,
+      transparent 70%,
+      color-mix(in srgb, var(--color-primary) 18%, transparent) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .c4-card--destaque {
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 55%),
+      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 70%, transparent), var(--color-surface-low));
+  }
+  .c4-card--interativo {
+    cursor: pointer;
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  }
+  .c4-card--interativo:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+    box-shadow: var(--shadow-elevated);
+  }
+
+  /* Rótulo de seção (eyebrow): pequeno, espaçado, prata — como a assinatura da logo */
+  .c4-eyebrow {
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--color-text-primary) 62%, transparent);
+  }
+
+  /* Texto em prata metálica (wordmark) e em esmeralda (o "4") */
+  .c4-text-silver {
+    background: var(--gradient-silver);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .c4-text-emerald {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Modo privacidade (tecla P): valores borrados até passar o mouse/focar */
+  html.privado .valor-privado {
+    filter: blur(7px);
+    transition: filter 160ms ease;
+  }
+  html.privado .valor-privado:hover,
+  html.privado .valor-privado:focus-visible {
+    filter: none;
+  }
+}
+
+/* Fundo vivo do app: manchas de luz esmeralda que derivam devagar (CSS puro, sem
+   filter: blur — leve em GPU fraca) + os fios curvos dos cantos da arte da logo. */
+.c4-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.c4-backdrop span {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.55;
+  will-change: transform;
+}
+.c4-backdrop .b1 {
+  width: 60vmax; height: 60vmax; left: -22vmax; top: -26vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 13%, transparent) 0%, transparent 62%);
+  animation: c4Drift1 46s ease-in-out infinite alternate;
+}
+.c4-backdrop .b2 {
+  width: 52vmax; height: 52vmax; right: -24vmax; bottom: -28vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 9%, transparent) 0%, transparent 60%);
+  animation: c4Drift2 52s ease-in-out infinite alternate;
+}
+.c4-backdrop .b3 {
+  width: 40vmax; height: 40vmax; right: 10vmax; top: -20vmax;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-secondary) 6%, transparent) 0%, transparent 60%);
+  animation: c4Drift1 38s ease-in-out infinite alternate-reverse;
+}
+.c4-backdrop svg { position: absolute; color: var(--color-primary); }
+html:not(.dark) .c4-backdrop span { opacity: 0.8; }
+@keyframes c4Drift1 { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(6vmax,4vmax,0) scale(1.08); } }
+@keyframes c4Drift2 { from { transform: translate3d(0,0,0) scale(1.05); } to { transform: translate3d(-5vmax,-4vmax,0) scale(0.95); } }
 
 @layer utilities {
   .text-base-content {
@@ -291,7 +445,7 @@
 .field-float input:focus,
 .field-float textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(110,255,192,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 .field-float label {
   position: absolute;
@@ -309,7 +463,7 @@
 }
 .field-float.has-error input {
   border-color: var(--color-error);
-  box-shadow: 0 0 0 3px rgba(255,180,171,.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 14%, transparent);
 }
 .field-float.has-error label {
   color: var(--color-error);
@@ -334,7 +488,7 @@ html:not(.dark) .field-float input,
 html:not(.dark) .field-float textarea {
   background: #fff;
   border-color: rgba(0,0,0,.12);
-  color: #18181B;
+  color: var(--color-text-primary);
 }
 html:not(.dark) .field-float label {
   color: rgba(0,0,0,.65);
@@ -342,7 +496,7 @@ html:not(.dark) .field-float label {
 html:not(.dark) .field-float input:focus,
 html:not(.dark) .field-float textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(5,150,105,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useCallback, useContext, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
@@ -19,6 +19,26 @@ import Button from './components/ui/Button';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
 import { getFirstAccessibleRoute } from './lib/routeUtils';
+import { ThemeContext } from './context/ThemeContext';
+import { useAtalhosGlobais } from './hooks/useAtalhos';
+import { PageTransition } from './components/motion/Movimento';
+
+/* Fundo vivo: luz esmeralda que deriva devagar + os fios curvos dos cantos da logo */
+function FundoCore4() {
+  return (
+    <div className="c4-backdrop" aria-hidden="true">
+      <span className="b1" />
+      <span className="b2" />
+      <span className="b3" />
+      <svg className="-left-px -top-px w-[38vmin] h-[38vmin] opacity-40" viewBox="0 0 200 200" fill="none">
+        <path d="M200 0 L60 140 Q40 160 0 160" stroke="currentColor" strokeWidth="1" />
+      </svg>
+      <svg className="-right-px -bottom-px w-[38vmin] h-[38vmin] opacity-40" viewBox="0 0 200 200" fill="none">
+        <path d="M0 200 L140 60 Q160 40 200 40" stroke="currentColor" strokeWidth="1" />
+      </svg>
+    </div>
+  );
+}
 
 const DashboardHome     = lazy(() => import('./views/DashboardHome'));
 const Login             = lazy(() => import('./views/Login'));
@@ -129,6 +149,7 @@ function ProtectedLayout({ children }) {
   // exceto em Configurações, onde a troca é feita.
   const exibirModalSenha = senhaProvisoria && pathname !== '/configuracoes';
 
+  const { toggleTheme } = useContext(ThemeContext);
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
   const abrirMenu = useCallback(() => {
@@ -136,6 +157,9 @@ function ProtectedLayout({ children }) {
     setIsSidebarOpen(true);
   }, []);
   const fecharMenu = useCallback(() => setIsSidebarOpen(false), []);
+
+  // Atalhos: Alt+1…9 telas · P privacidade · T tema · / busca
+  useAtalhosGlobais({ navegar: navigate, alternarTema: toggleTheme, abrirBusca: openCmd });
 
   // Telas autenticadas não devem ser indexadas por buscadores
   useEffect(() => {
@@ -163,6 +187,7 @@ function ProtectedLayout({ children }) {
 
   return (
     <div className="h-dvh bg-surface flex relative overflow-hidden">
+      <FundoCore4 />
       {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div
@@ -197,14 +222,14 @@ function ProtectedLayout({ children }) {
       </div>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-[1]">
         <TopNav
           onMenuClick={abrirMenu}
           onCommandPaletteOpen={openCmd}
         />
         <PwaStatus />
         <main id="main-content" className={cn(
-          'flex-1 min-h-0 animate-fade-in',
+          'flex-1 min-h-0',
           fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 pb-24 lg:pb-8 overflow-y-auto no-scrollbar'
         )}>
           {fullBleed ? (
@@ -212,11 +237,11 @@ function ProtectedLayout({ children }) {
               {children}
             </Suspense>
           ) : (
-            <div className="max-w-7xl mx-auto">
+            <PageTransition key={pathname} className="max-w-7xl mx-auto">
               <Suspense fallback={<PageSkeleton />}>
                 {children}
               </Suspense>
-            </div>
+            </PageTransition>
           )}
         </main>
       </div>

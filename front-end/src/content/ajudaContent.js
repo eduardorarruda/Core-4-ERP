@@ -26,7 +26,7 @@ export const AJUDA_SECOES = [
     rota: null,
     permissao: null,
     icone: 'Sparkles',
-    resumo: 'Um roteiro rápido para começar a usar o Core 4 ERP do zero e organizar suas finanças em poucos minutos.',
+    resumo: 'Um roteiro rápido para começar a usar o Core 4 do zero e organizar suas finanças em poucos minutos.',
     comoUsar: [
       'Cadastre suas contas correntes: informe cada banco e conta que você usa no dia a dia.',
       'Crie suas categorias (por exemplo, Mercado, Salário, Transporte) para organizar as entradas e saídas.',
@@ -320,7 +320,7 @@ export const AJUDA_SECOES = [
     rota: '/assistente',
     permissao: null,
     icone: 'Sparkles',
-    resumo: 'A assistente do Core 4 ERP, que consulta informações e faz lançamentos por você usando linguagem natural.',
+    resumo: 'A assistente do Core 4, que consulta informações e faz lançamentos por você usando linguagem natural.',
     comoUsar: [
       'Abra a Áurea pelo balão no canto da tela ou pela tela do Assistente.',
       'Escreva como você falaria com uma pessoa, por exemplo: "quanto gastei em mercado este mês?".',
@@ -419,7 +419,7 @@ export const AJUDA_SECOES = [
     rota: null,
     permissao: null,
     icone: 'Smartphone',
-    resumo: 'O Core 4 ERP funciona como um aplicativo, direto na tela inicial do seu celular ou computador.',
+    resumo: 'O Core 4 funciona como um aplicativo, direto na tela inicial do seu celular ou computador.',
     comoUsar: [
       'No Android ou no computador: toque no botão "Instalar" que aparece no aviso do sistema.',
       'No iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início".',

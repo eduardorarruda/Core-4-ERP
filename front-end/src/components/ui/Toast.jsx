@@ -1,47 +1,43 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle, XCircle, Info, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { CircleCheck, CircleX, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast, useToastList } from '../../hooks/useToast';
 
-const ICONS = { success: CheckCircle, error: XCircle, info: Info };
-
-const STYLES = {
-  success: 'bg-[var(--color-success-surface)] border-[var(--color-success-border)] text-[var(--color-success-text)]',
-  error: 'bg-[var(--color-error-surface)] border-[var(--color-error-border)] text-[var(--color-error-text)]',
-  info: 'bg-surface-low border-secondary/30 text-text-primary',
+const TIPOS = {
+  success: { Icone: CircleCheck, ladrilho: 'bg-primary/[0.14] text-primary', fio: 'bg-primary', titulo: 'Pronto' },
+  error: { Icone: CircleX, ladrilho: 'bg-error/[0.14] text-error', fio: 'bg-error', titulo: 'Não deu certo' },
+  info: { Icone: Info, ladrilho: 'bg-secondary/[0.14] text-secondary', fio: 'bg-secondary', titulo: 'Aviso' },
 };
 
-const DURACAO_SAIDA_MS = 300;
+const MOLA = { type: 'spring', stiffness: 460, damping: 36, mass: 0.7 };
 
 /**
- * Toast visual. O anúncio para leitores de tela é feito pelas regiões vivas do
- * ToastContainer (fixas no DOM), então o item em si não tem role/aria-live — evita
- * regiões aninhadas e anúncios duplicados.
+ * Aviso flutuante. O anúncio para leitores de tela é feito pelas regiões vivas do
+ * ToastContainer (fixas no DOM), então o item não tem role/aria-live — evita anúncios duplos.
  * O tempo pausa com o mouse em cima ou com o foco dentro (WCAG 2.2.1).
  */
 function ToastItem({ id, message, type = 'success', duration = 4000 }) {
   const { dismiss } = useToast();
-  const [exiting, setExiting] = useState(false);
   const [pausado, setPausado] = useState(false);
   const restante = useRef(duration);
   const inicio = useRef(0);
 
-  const close = useCallback(() => {
-    setExiting(true);
-    setTimeout(() => dismiss(id), DURACAO_SAIDA_MS);
-  }, [dismiss, id]);
+  // A saída animada é do AnimatePresence do contêiner: aqui só tiramos o item da lista.
+  const close = useCallback(() => dismiss(id), [dismiss, id]);
 
   useEffect(() => {
-    if (pausado || exiting) return undefined;
+    if (pausado) return undefined;
     inicio.current = Date.now();
     const t = setTimeout(close, restante.current);
     return () => {
       clearTimeout(t);
       restante.current = Math.max(0, restante.current - (Date.now() - inicio.current));
     };
-  }, [pausado, exiting, close]);
+  }, [pausado, close]);
 
-  const Icon = ICONS[type] ?? Info;
+  const tipo = TIPOS[type] ?? TIPOS.info;
+  const { Icone } = tipo;
 
   return (
     <div
@@ -50,25 +46,30 @@ function ToastItem({ id, message, type = 'success', duration = 4000 }) {
       onFocus={() => setPausado(true)}
       onBlur={() => setPausado(false)}
       className={cn(
-        'relative flex items-center gap-3 pl-4 pr-1 py-1 rounded-xl shadow-2xl border text-sm font-medium max-w-sm w-full overflow-hidden',
-        'transition-all duration-300',
-        exiting ? 'opacity-0 translate-x-4' : 'opacity-100 animate-slide-in-right',
-        STYLES[type] ?? STYLES.info
+        'relative flex items-start gap-3 pl-3 pr-1 py-2 w-full sm:w-[22rem] overflow-hidden',
+        'rounded-2xl border border-text-primary/[0.10] bg-surface-low/95 backdrop-blur-xl',
+        'shadow-[var(--shadow-elevated)] text-text-primary',
       )}
     >
-      <Icon className="w-5 h-5 shrink-0" aria-hidden="true" />
-      <span className="flex-1 py-2">{message}</span>
+      <span aria-hidden="true" className={cn('grid place-items-center w-9 h-9 mt-0.5 shrink-0 rounded-xl', tipo.ladrilho)}>
+        <Icone className="w-5 h-5" />
+      </span>
+      <div className="flex-1 min-w-0 py-1">
+        <p className="text-sm font-semibold leading-tight">{tipo.titulo}</p>
+        <p className="mt-0.5 text-sm text-text-primary/75 leading-snug break-words">{message}</p>
+      </div>
       <button
         type="button"
         onClick={close}
-        aria-label="Fechar notificação"
-        className="min-w-11 min-h-11 grid place-items-center rounded-lg opacity-70 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current"
+        aria-label="Fechar aviso"
+        className="min-w-11 min-h-11 grid place-items-center rounded-xl text-text-primary/55 hover:text-text-primary hover:bg-text-primary/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <X className="w-4 h-4" aria-hidden="true" />
       </button>
+      {/* Tempo restante: barra que encolhe e pausa junto com o relógio */}
       <div
         aria-hidden="true"
-        className="absolute bottom-0 left-0 h-0.5 rounded-full bg-current opacity-30"
+        className={cn('absolute bottom-0 left-0 h-0.5 opacity-60', tipo.fio)}
         style={{ animation: `progressBar ${duration}ms linear forwards`, animationPlayState: pausado ? 'paused' : 'running' }}
       />
     </div>
@@ -91,11 +92,21 @@ export function ToastContainer() {
       </div>
 
       <div className="fixed bottom-24 lg:bottom-6 right-4 left-4 sm:left-auto sm:right-6 z-[200] flex flex-col gap-2 items-end pointer-events-none">
-        {toasts.map((t) => (
-          <div key={t.id} className="pointer-events-auto w-full sm:w-auto flex justify-end">
-            <ToastItem {...t} />
-          </div>
-        ))}
+        <AnimatePresence initial={false}>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              layout
+              initial={{ opacity: 0, x: 48, scale: 0.96 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 48, scale: 0.96, transition: { duration: 0.18 } }}
+              transition={MOLA}
+              className="pointer-events-auto w-full sm:w-auto flex justify-end"
+            >
+              <ToastItem {...t} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const SUFIXO_TITULO = 'Core 4 ERP';
+const SUFIXO_TITULO = 'Core 4';
 const ROBOTS_NOINDEX = 'noindex, nofollow';
 // Endereço público do front (primeiro valor de CORS_ORIGINS em produção)
 const ORIGEM_CANONICA = 'https://front.core4erp.codes';

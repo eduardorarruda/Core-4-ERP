@@ -12,10 +12,10 @@ import org.springframework.context.annotation.Configuration;
 
 @OpenAPIDefinition(
         info = @Info(
-                title = "Core 4 ERP — API",
+                title = "Core 4 — API",
                 version = "1.0.0",
-                description = "API REST do sistema ERP financeiro. Endpoints protegidos exigem autenticação JWT via cookie httpOnly (produção) ou Bearer token (Swagger UI).",
-                contact = @Contact(name = "Core 4 ERP", email = "suporte@core4erp.com.br")
+                description = "API REST do Core 4, sistema de gestão financeira. Endpoints protegidos exigem autenticação JWT via cookie httpOnly (produção) ou Bearer token (Swagger UI).",
+                contact = @Contact(name = "Core 4", email = "suporte@core4erp.com.br")
         ),
         servers = {
                 @Server(url = "/", description = "Servidor atual"),

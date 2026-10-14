@@ -229,7 +229,7 @@ function AbaPrivacidade({ toast }) {
     try {
       const blob = await auth.exportarDados();
       if (!blob) throw new Error('O servidor não devolveu o arquivo. Tente novamente.');
-      baixarArquivo(blob, 'core4erp-meus-dados.json');
+      baixarArquivo(blob, 'core4-meus-dados.json');
       toast.success('Arquivo com seus dados baixado.');
     } catch (err) {
       toast.error(err.message || 'Não foi possível gerar o arquivo com seus dados.');
@@ -256,7 +256,7 @@ function AbaPrivacidade({ toast }) {
       <section aria-labelledby="titulo-baixar" className="rounded-xl border border-text-primary/10 p-4 space-y-3">
         <h3 id="titulo-baixar" className="text-sm font-bold text-text-primary">Baixar meus dados</h3>
         <p className="text-sm text-text-primary/80">
-          Gera um arquivo JSON com seus dados pessoais e de uso guardados no Core 4 ERP.
+          Gera um arquivo JSON com seus dados pessoais e de uso guardados no Core 4.
         </p>
         <Button variant="secondary" loading={baixando} onClick={baixarDados} leftIcon={<Download className="w-4 h-4" aria-hidden="true" />}>
           {baixando ? 'Gerando arquivo...' : 'Baixar meus dados'}

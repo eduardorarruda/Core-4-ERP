@@ -53,7 +53,7 @@ export default function InstalarPwaBanner() {
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-text-primary">Instalar o Core 4 ERP</p>
+            <p className="text-sm font-bold text-text-primary">Instalar o Core 4</p>
 
             {mostrarAndroid ? (
               <>

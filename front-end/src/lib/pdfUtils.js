@@ -76,7 +76,7 @@ export function gerarPDF(titulo, periodo, dados) {
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
     const geradoEm = new Date().toLocaleString('pt-BR');
-    doc.text(`Core 4 ERP — Gerado em ${geradoEm}`, 10, 205);
+    doc.text(`Core 4 — Gerado em ${geradoEm}`, 10, 205);
     doc.text(`Página ${i} de ${pageCount}`, 260, 205);
   }
 
@@ -132,7 +132,7 @@ export function exportarRelatorioConciliacaoPdf({ titulo, subtitulo, cabecalho, 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(150, 150, 150);
-    doc.text(`Core 4 ERP — Gerado em ${new Date().toLocaleString('pt-BR')}`, 10, 205);
+    doc.text(`Core 4 — Gerado em ${new Date().toLocaleString('pt-BR')}`, 10, 205);
     doc.text(`Página ${i} de ${pages}`, 260, 205);
   }
 
