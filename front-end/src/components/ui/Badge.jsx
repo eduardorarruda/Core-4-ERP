@@ -6,11 +6,12 @@ import { cn } from '../../lib/utils';
  * para estado. Variantes de significado fixo do app: income (entrou), expense (saiu),
  * invest (investido) — as mesmas cores dos números e gráficos.
  *
- * Props: variant ('success' | 'warning' | 'error' | 'info' | 'neutral' | 'income' | 'expense' | 'invest'),
+ * Props: variant ('success' | 'primary' | 'warning' | 'error' | 'info' | 'neutral' | 'income' | 'expense' | 'invest'),
  *        size ('sm' | 'md'), dot (bolinha à esquerda), className.
  */
 const VARIANTS = {
   success: 'bg-primary/[0.12] text-primary border-primary/25',
+  primary: 'bg-primary/[0.12] text-primary border-primary/25',
   warning: 'bg-warning/[0.12] text-warning border-warning/25',
   error: 'bg-error/[0.12] text-error border-error/25',
   info: 'bg-secondary/[0.12] text-secondary border-secondary/25',
@@ -22,6 +23,7 @@ const VARIANTS = {
 
 const DOT = {
   success: 'bg-primary',
+  primary: 'bg-primary',
   warning: 'bg-warning',
   error: 'bg-error animate-pulse-dot',
   info: 'bg-secondary',

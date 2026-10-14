@@ -1,44 +1,32 @@
 import React, { lazy, Suspense, useState, useCallback, useContext, useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
+import BottomNav from './components/layout/BottomNav';
+import FundoVivo from './components/layout/FundoVivo';
 import PwaStatus from './components/layout/PwaStatus';
 import InstalarPwaBanner from './components/layout/InstalarPwaBanner';
 import ChatLauncher from './components/chat/ChatLauncher';
-import BottomNav from './components/layout/BottomNav';
 import ErrorBoundary from './components/ui/ErrorBoundary';
-import { ToastProvider } from './hooks/useToast';
-import { ConfirmProvider } from './hooks/useConfirm';
-import { ToastContainer } from './components/ui/Toast';
-import { useAuth } from './hooks/useAuth';
-import { AuthProvider } from './context/AuthContext';
-import { useMediaQuery } from './hooks/useMediaQuery';
-import { setRobotsNoindex } from './hooks/usePageMeta';
 import Modal from './components/ui/Modal';
 import Button from './components/ui/Button';
-import { cn } from './lib/utils';
-import SkeletonCard from './components/ui/SkeletonCard';
-import { getFirstAccessibleRoute } from './lib/routeUtils';
-import { ThemeContext } from './context/ThemeContext';
-import { useAtalhosGlobais } from './hooks/useAtalhos';
+import { PageSkeleton } from './components/ui/Skeleton';
+import { ToastContainer } from './components/ui/Toast';
 import { PageTransition } from './components/motion/Movimento';
-
-/* Fundo vivo: luz esmeralda que deriva devagar + os fios curvos dos cantos da logo */
-function FundoCore4() {
-  return (
-    <div className="c4-backdrop" aria-hidden="true">
-      <span className="b1" />
-      <span className="b2" />
-      <span className="b3" />
-      <svg className="-left-px -top-px w-[38vmin] h-[38vmin] opacity-40" viewBox="0 0 200 200" fill="none">
-        <path d="M200 0 L60 140 Q40 160 0 160" stroke="currentColor" strokeWidth="1" />
-      </svg>
-      <svg className="-right-px -bottom-px w-[38vmin] h-[38vmin] opacity-40" viewBox="0 0 200 200" fill="none">
-        <path d="M0 200 L140 60 Q160 40 200 40" stroke="currentColor" strokeWidth="1" />
-      </svg>
-    </div>
-  );
-}
+import { variantesDrawer, variantesOverlay } from './components/motion/presets';
+import { ToastProvider } from './hooks/useToast';
+import { ConfirmProvider } from './hooks/useConfirm';
+import { useAuth } from './hooks/useAuth';
+import { useMediaQuery } from './hooks/useMediaQuery';
+import { usePageMeta } from './hooks/usePageMeta';
+import { useAtalhosGlobais } from './hooks/useAtalhos';
+import { useFocusTrap } from './hooks/useFocusTrap';
+import { AuthProvider } from './context/AuthContext';
+import { ThemeContext } from './context/ThemeContext';
+import { getFirstAccessibleRoute } from './lib/routeUtils';
+import { tituloDaRota } from './lib/navigation';
+import { cn } from './lib/utils';
 
 const DashboardHome     = lazy(() => import('./views/DashboardHome'));
 const Login             = lazy(() => import('./views/Login'));
@@ -63,6 +51,8 @@ const ContasCorrentes = lazy(() => import('./views/ContasCorrentes'));
 const ContasFinanceiras = lazy(() => import('./views/ContasFinanceiras'));
 const Cartoes         = lazy(() => import('./views/Cartoes'));
 const Investimentos   = lazy(() => import('./views/Investimentos'));
+const Orcamentos      = lazy(() => import('./views/Orcamentos'));
+const Insights        = lazy(() => import('./views/Insights'));
 const Configuracoes   = lazy(() => import('./views/Configuracoes'));
 const CommandPalette  = lazy(() => import('./components/ui/CommandPalette'));
 const AceitarConvite     = lazy(() => import('./views/AceitarConvite'));
@@ -72,22 +62,16 @@ const Ajuda              = lazy(() => import('./views/Ajuda'));
 const Privacidade        = lazy(() => import('./views/Privacidade'));
 const Termos             = lazy(() => import('./views/Termos'));
 
-function PageSkeleton() {
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <SkeletonCard className="h-24" rows={1} />
-      <div className="grid grid-cols-12 gap-6">
-        <SkeletonCard className="col-span-12 lg:col-span-8" rows={4} />
-        <SkeletonCard className="col-span-12 lg:col-span-4" rows={3} />
-      </div>
-    </div>
-  );
-}
+const CHAVE_SIDEBAR = 'c4_sidebar_recolhida';
 
 function isAuthenticated() {
   // localStorage: sessão compartilhada entre abas (o JWT continua só no cookie HttpOnly).
   // Fallback ao sessionStorage cobre sessões abertas antes da migração.
   return Boolean(localStorage.getItem('usuario') || sessionStorage.getItem('usuario'));
+}
+
+function lerSidebarRecolhida() {
+  try { return localStorage.getItem(CHAVE_SIDEBAR) === '1'; } catch { return false; }
 }
 
 function NavigateToFirstAccessible() {
@@ -121,7 +105,7 @@ function SenhaProvisoriaModal({ open, onConfirm, onSair }) {
       showClose={false}
       size="sm"
       title="Troque sua senha"
-      description="Você entrou com uma senha provisória. Defina uma senha sua para liberar o acesso ao sistema."
+      description="Você entrou com uma senha provisória. Defina uma senha sua para liberar o acesso ao Core 4."
     >
       <Modal.Footer className="flex-col-reverse sm:flex-row">
         <Button variant="ghost" onClick={onSair} className="w-full sm:w-auto">Sair</Button>
@@ -131,129 +115,123 @@ function SenhaProvisoriaModal({ open, onConfirm, onSair }) {
   );
 }
 
-const FOCAVEIS_DRAWER = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** Menu lateral no celular: gaveta da esquerda com mola, foco preso e Esc para fechar. */
+function MenuMobile({ aberto, onFechar, onBuscar }) {
+  const painelRef = useRef(null);
+  const reduzir = useReducedMotion();
+  useFocusTrap(aberto, painelRef, { onClose: onFechar });
+  return (
+    <AnimatePresence>
+      {aberto && (
+        <motion.div key="menu-mobile" className="fixed inset-0 z-[60] lg:hidden" initial="inicial" animate="visivel" exit="saida">
+          <motion.div
+            aria-hidden="true"
+            variants={variantesOverlay}
+            className="absolute inset-0 bg-surface-overlay backdrop-blur-sm"
+            onClick={onFechar}
+          />
+          <motion.div
+            ref={painelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu principal"
+            tabIndex={-1}
+            variants={reduzir ? variantesOverlay : variantesDrawer('left')}
+            className="absolute inset-y-0 left-0 outline-none shadow-elevated"
+          >
+            <Sidebar drawer onNavigate={onFechar} onBuscar={() => { onFechar(); onBuscar(); }} />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
-function ProtectedLayout({ children }) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+function ProtectedLayout() {
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [recolhida, setRecolhida] = useState(lerSidebarRecolhida);
   const [cmdOpen, setCmdOpen] = useState(false);
   const { senhaProvisoria, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const desktop = useMediaQuery('(min-width: 1024px)');
-  const drawerRef = useRef(null);
-  const focoAntesDoDrawer = useRef(null);
-  // Rotas "tela cheia": ocupam toda a área (sem padding/max-width) — ex.: a tela da Áurea, que
-  // precisa dos 2 painéis do tamanho da janela, estilo ChatGPT.
+  const mainRef = useRef(null);
+  const { toggleTheme } = useContext(ThemeContext);
+
+  // Rotas "tela cheia": a Áurea ocupa toda a área (dois painéis do tamanho da janela)
   const fullBleed = pathname === '/assistente';
   // Com senha provisória o backend bloqueia quase tudo: o modal fica aberto em qualquer tela,
   // exceto em Configurações, onde a troca é feita.
   const exibirModalSenha = senhaProvisoria && pathname !== '/configuracoes';
 
-  const { toggleTheme } = useContext(ThemeContext);
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
-  const abrirMenu = useCallback(() => {
-    focoAntesDoDrawer.current = document.activeElement;
-    setIsSidebarOpen(true);
-  }, []);
-  const fecharMenu = useCallback(() => setIsSidebarOpen(false), []);
-
-  // Atalhos: Alt+1…9 telas · P privacidade · T tema · / busca
-  useAtalhosGlobais({ navegar: navigate, alternarTema: toggleTheme, abrirBusca: openCmd });
-
-  // Telas autenticadas não devem ser indexadas por buscadores
-  useEffect(() => {
-    setRobotsNoindex(true);
-    return () => setRobotsNoindex(false);
+  const abrirMenu = useCallback(() => setMenuAberto(true), []);
+  const fecharMenu = useCallback(() => setMenuAberto(false), []);
+  const alternarRecolhida = useCallback(() => {
+    setRecolhida((v) => {
+      try { localStorage.setItem(CHAVE_SIDEBAR, v ? '0' : '1'); } catch { /* sem storage */ }
+      return !v;
+    });
   }, []);
 
-  // Drawer mobile: foco entra no menu ao abrir, Esc fecha e o foco volta para quem abriu
-  const drawerAberto = isSidebarOpen && !desktop;
+  // Atalhos: Ctrl/⌘+K busca · Alt+T tema · Alt+P privacidade
+  useAtalhosGlobais({ alternarTema: toggleTheme, abrirBusca: openCmd });
+
+  // Título da aba a partir da navegação; telas autenticadas não são indexadas
+  usePageMeta({ title: tituloDaRota(pathname) ?? 'Core 4', noindex: true });
+
+  // Cada tela começa do topo (o <main> é o contêiner que rola)
   useEffect(() => {
-    if (!drawerAberto) return undefined;
-    drawerRef.current?.querySelector(FOCAVEIS_DRAWER)?.focus();
-    const onKey = (e) => { if (e.key === 'Escape') setIsSidebarOpen(false); };
-    document.addEventListener('keydown', onKey);
-    const quemAbriu = focoAntesDoDrawer.current;
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      quemAbriu?.focus?.();
-    };
-  }, [drawerAberto]);
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="h-dvh bg-surface flex relative overflow-hidden">
-      <FundoCore4 />
-      {/* Mobile sidebar overlay */}
-      {isSidebarOpen && (
-        <div
-          aria-hidden="true"
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={fecharMenu}
-        />
-      )}
+    <div className="h-dvh flex relative overflow-hidden bg-surface">
+      <FundoVivo />
 
-      {/* Sidebar — no mobile vira drawer; fechado fica `inert` (fora do Tab e do leitor de tela) */}
-      <div
-        ref={drawerRef}
-        inert={!desktop && !isSidebarOpen ? true : undefined}
-        role={drawerAberto ? 'dialog' : undefined}
-        aria-modal={drawerAberto ? 'true' : undefined}
-        aria-label={drawerAberto ? 'Menu principal' : undefined}
-        className={cn(
-          'fixed inset-y-0 left-0 transform lg:relative lg:translate-x-0 transition duration-200 ease-in-out z-50',
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        {/*
-          expandido = drawer aberto no mobile → rótulos sempre visíveis (w-56).
-          No desktop isSidebarOpen é sempre false → mantém o rail w-16 com hover/foco.
-          onNavigate fecha o drawer ao clicar num item de menu.
-        */}
-        <Sidebar
-          expandido={isSidebarOpen}
-          onNavigate={fecharMenu}
-          onClose={fecharMenu}
-        />
+      {/* Menu lateral fixo (desktop) */}
+      <div className="hidden lg:block relative z-30 shrink-0">
+        <Sidebar recolhida={recolhida} onAlternarRecolhida={alternarRecolhida} onBuscar={openCmd} />
       </div>
 
-      {/* Main */}
+      {/* Menu lateral em gaveta (celular) */}
+      <MenuMobile aberto={menuAberto && !desktop} onFechar={fecharMenu} onBuscar={openCmd} />
+
+      {/* Área principal */}
       <div className="flex-1 flex flex-col min-w-0 relative z-[1]">
-        <TopNav
-          onMenuClick={abrirMenu}
-          onCommandPaletteOpen={openCmd}
-        />
+        <TopNav onCommandPaletteOpen={openCmd} />
         <PwaStatus />
-        <main id="main-content" className={cn(
-          'flex-1 min-h-0',
-          fullBleed ? 'overflow-hidden' : 'p-4 lg:p-8 pb-24 lg:pb-8 overflow-y-auto no-scrollbar'
-        )}>
+        <main
+          id="main-content"
+          ref={mainRef}
+          tabIndex={-1}
+          className={cn('flex-1 min-h-0 outline-none', fullBleed ? 'overflow-hidden' : 'overflow-y-auto overscroll-contain')}
+        >
           {fullBleed ? (
-            <Suspense fallback={<PageSkeleton />}>
-              {children}
+            <Suspense fallback={<div className="p-6"><PageSkeleton kpis={0} /></div>}>
+              <Outlet />
             </Suspense>
           ) : (
-            <PageTransition key={pathname} className="max-w-7xl mx-auto">
-              <Suspense fallback={<PageSkeleton />}>
-                {children}
-              </Suspense>
-            </PageTransition>
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-28 lg:pb-12">
+              <PageTransition key={pathname}>
+                <Suspense fallback={<PageSkeleton />}>
+                  <Outlet />
+                </Suspense>
+              </PageTransition>
+            </div>
           )}
         </main>
       </div>
 
       <ChatLauncher />
-
-      {/* Navegação inferior — apenas mobile (lg:hidden). Abre o mesmo drawer do Sidebar. */}
       <BottomNav onAbrirMenu={abrirMenu} />
-
       <ToastContainer />
 
-      {/* Command Palette */}
       {cmdOpen && (
         <Suspense fallback={null}>
           <CommandPalette onClose={closeCmd} />
@@ -269,13 +247,19 @@ function ProtectedLayout({ children }) {
   );
 }
 
+/** Atalho para rota protegida por permissão. */
+const comPermissao = (permissao, elemento) => <PermissaoRoute permissao={permissao}>{elemento}</PermissaoRoute>;
+const soEmpresa = (permissao, elemento) => (
+  <ContaEmpresaRoute><PermissaoRoute permissao={permissao}>{elemento}</PermissaoRoute></ContaEmpresaRoute>
+);
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
-          {/* Skip navigation for accessibility */}
+          {/* Pular navegação (acessibilidade) */}
           <a
             href="#main-content"
             className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[999] focus:px-4 focus:py-2 focus:bg-primary focus:text-on-primary focus:rounded-lg focus:text-sm focus:font-bold"
@@ -284,7 +268,7 @@ export default function App() {
           </a>
 
           <ErrorBoundary>
-          <Suspense fallback={<PageSkeleton />}>
+          <Suspense fallback={<div className="min-h-dvh bg-surface" />}>
           <Routes>
             <Route path="/login"              element={<Login />} />
             <Route path="/register"           element={<Register />} />
@@ -293,33 +277,38 @@ export default function App() {
             <Route path="/privacidade"        element={<Privacidade />} />
             <Route path="/termos"             element={<Termos />} />
 
-            <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><DashboardHome /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/conciliacao"              element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/conciliacao/historico"   element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><ConciliacaoHistorico /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/conciliacao/:id"          element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/conciliacao/:id/relatorio" element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><ConciliacaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/assinaturas"      element={<ProtectedLayout><PermissaoRoute permissao="ASSINATURA_VISUALIZAR"><Assinaturas /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/calendario"       element={<ProtectedLayout><PermissaoRoute permissao="CALENDARIO_VISUALIZAR"><Calendario /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/reports"          element={<ProtectedLayout><Reports /></ProtectedLayout>} />
-            <Route path="/assistente"       element={<ProtectedLayout><Assistente /></ProtectedLayout>} />
-            <Route path="/audit"            element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="AUDITORIA_VISUALIZAR"><Audit /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
-            <Route path="/parceiros"        element={<ProtectedLayout><PermissaoRoute permissao="PARCEIRO_VISUALIZAR"><Parceiros /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/categorias"       element={<ProtectedLayout><PermissaoRoute permissao="CATEGORIA_VISUALIZAR"><Categorias /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/contas-correntes" element={<ProtectedLayout><PermissaoRoute permissao="CONTA_CORRENTE_VISUALIZAR"><ContasCorrentes /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/contas"           element={<ProtectedLayout><PermissaoRoute permissao="CONTA_VISUALIZAR"><ContasFinanceiras /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/cartoes"                              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_LANCAR"><Cartoes /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/cartoes/dashboard"                    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_VISUALIZAR"><CartaoDashboard /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao"                  element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao/historico"        element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoHistorico /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao/:id"              element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartao /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/cartoes/conciliacao/:id/relatorio"    element={<ProtectedLayout><PermissaoRoute permissao="CARTAO_CONCILIACAO_VISUALIZAR"><ConciliacaoCartaoRelatorio /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/investimentos"    element={<ProtectedLayout><PermissaoRoute permissao="INVESTIMENTO_VISUALIZAR"><Investimentos /></PermissaoRoute></ProtectedLayout>} />
-            <Route path="/configuracoes"    element={<ProtectedLayout><Configuracoes /></ProtectedLayout>} />
-            <Route path="/ajuda"            element={<ProtectedLayout><Ajuda /></ProtectedLayout>} />
-            <Route path="/help"             element={<Navigate to="/ajuda" replace />} />
-            <Route path="/empresa/operadores" element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="USUARIO_VISUALIZAR"><GestaoOperadores /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
-            <Route path="/empresa/perfis"     element={<ProtectedLayout><ContaEmpresaRoute><PermissaoRoute permissao="CONFIGURACAO_EDITAR"><GestaoPerfis /></PermissaoRoute></ContaEmpresaRoute></ProtectedLayout>} />
+            {/* Área logada: um único layout (menu, barra, transição) para todas as telas */}
+            <Route element={<ProtectedLayout />}>
+              <Route path="/dashboard"        element={comPermissao('DASHBOARD_VISUALIZAR', <DashboardHome />)} />
+              <Route path="/insights"         element={comPermissao('DASHBOARD_VISUALIZAR', <Insights />)} />
+              <Route path="/orcamentos"       element={comPermissao('ORCAMENTO_VISUALIZAR', <Orcamentos />)} />
+              <Route path="/conciliacao"                element={comPermissao('CONCILIACAO_VISUALIZAR', <Conciliacao />)} />
+              <Route path="/conciliacao/historico"      element={comPermissao('CONCILIACAO_VISUALIZAR', <ConciliacaoHistorico />)} />
+              <Route path="/conciliacao/:id"            element={comPermissao('CONCILIACAO_VISUALIZAR', <Conciliacao />)} />
+              <Route path="/conciliacao/:id/relatorio"  element={comPermissao('CONCILIACAO_VISUALIZAR', <ConciliacaoRelatorio />)} />
+              <Route path="/assinaturas"      element={comPermissao('ASSINATURA_VISUALIZAR', <Assinaturas />)} />
+              <Route path="/calendario"       element={comPermissao('CALENDARIO_VISUALIZAR', <Calendario />)} />
+              <Route path="/reports"          element={<Reports />} />
+              <Route path="/assistente"       element={<Assistente />} />
+              <Route path="/audit"            element={soEmpresa('AUDITORIA_VISUALIZAR', <Audit />)} />
+              <Route path="/parceiros"        element={comPermissao('PARCEIRO_VISUALIZAR', <Parceiros />)} />
+              <Route path="/categorias"       element={comPermissao('CATEGORIA_VISUALIZAR', <Categorias />)} />
+              <Route path="/contas-correntes" element={comPermissao('CONTA_CORRENTE_VISUALIZAR', <ContasCorrentes />)} />
+              <Route path="/contas"           element={comPermissao('CONTA_VISUALIZAR', <ContasFinanceiras />)} />
+              <Route path="/cartoes"                            element={comPermissao('CARTAO_LANCAR', <Cartoes />)} />
+              <Route path="/cartoes/dashboard"                  element={comPermissao('CARTAO_VISUALIZAR', <CartaoDashboard />)} />
+              <Route path="/cartoes/conciliacao"                element={comPermissao('CARTAO_CONCILIACAO_VISUALIZAR', <ConciliacaoCartao />)} />
+              <Route path="/cartoes/conciliacao/historico"      element={comPermissao('CARTAO_CONCILIACAO_VISUALIZAR', <ConciliacaoCartaoHistorico />)} />
+              <Route path="/cartoes/conciliacao/:id"            element={comPermissao('CARTAO_CONCILIACAO_VISUALIZAR', <ConciliacaoCartao />)} />
+              <Route path="/cartoes/conciliacao/:id/relatorio"  element={comPermissao('CARTAO_CONCILIACAO_VISUALIZAR', <ConciliacaoCartaoRelatorio />)} />
+              <Route path="/investimentos"    element={comPermissao('INVESTIMENTO_VISUALIZAR', <Investimentos />)} />
+              <Route path="/configuracoes"    element={<Configuracoes />} />
+              <Route path="/ajuda"            element={<Ajuda />} />
+              <Route path="/empresa/operadores" element={soEmpresa('USUARIO_VISUALIZAR', <GestaoOperadores />)} />
+              <Route path="/empresa/perfis"     element={soEmpresa('CONFIGURACAO_EDITAR', <GestaoPerfis />)} />
+            </Route>
 
+            <Route path="/help" element={<Navigate to="/ajuda" replace />} />
             <Route path="/"  element={<NavigateToFirstAccessible />} />
             <Route path="*"  element={<NavigateToFirstAccessible />} />
           </Routes>

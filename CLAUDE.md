@@ -36,7 +36,14 @@ Guia de contexto para IAs assistindo no desenvolvimento. Leia antes de qualquer 
 
 ## 1. Visão Geral do Projeto
 
-Sistema ERP de gestão financeira pessoal full-stack. Permite controle de contas a pagar/receber, conciliação bancária e de cartão (OFX), investimentos, assinaturas recorrentes, relatórios e um assistente de IA integrado.
+Sistema de gestão financeira full-stack (pessoal e empresarial). Permite controle de contas a pagar/receber, conciliação bancária e de cartão (OFX), investimentos, assinaturas recorrentes, relatórios e um assistente de IA integrado.
+
+**Marca:** o nome do produto é **Core 4** (com espaço; no wordmark gráfico, "Core4" com o "4" em esmeralda).
+Logo e símbolo ficam em `front-end/src/assets/brand/` (componentes `BrandMark`/`BrandLogo`). A palavra
+"ERP" **não** é usada em nenhum texto visível ao usuário (telas, e-mails, prompts da IA, relatórios, OpenAPI,
+mensagens do n8n). Identificadores técnicos mantêm o nome antigo e não devem ser renomeados: pacote
+`br.com.core4erp`, pasta/artefato `core4erp`, serviços/containers Docker, bancos, variáveis de ambiente,
+domínio `core4erp.codes` e migrations Flyway já aplicadas.
 
 **Domínio:** Português Brasileiro. Todas as entidades, DTOs, endpoints, variáveis e mensagens ao usuário devem ser em pt-BR.
 

@@ -1,8 +1,10 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { variantesOverlay, variantesPainel } from '../motion/presets';
 
 /**
  * Modal base acessível — portal no body, entrada/saída animadas (fundo esmaece, painel
@@ -28,79 +30,11 @@ const SIZES = {
   xl: 'sm:max-w-4xl',
 };
 
-const MOLA = { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 };
-
-// Pilha de modais abertos: só o do topo responde a Esc/Tab (modal sobre modal)
-const pilhaModais = [];
-
-const FOCAVEIS =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 function renderIcone(icon) {
   if (!icon) return null;
   if (React.isValidElement(icon)) return icon;
   const Icone = icon;
   return <Icone className="w-5 h-5" aria-hidden="true" />;
-}
-
-/** Foco, Esc, Tab preso no painel e scroll do body travado enquanto `ativo`. */
-function useArmadilhaDeFoco(ativo, painelRef, { onClose, closeOnEsc, initialFocusRef }) {
-  // Em refs: o efeito depende só de `ativo`. Se dependesse de onClose (inline no pai, muda a
-  // cada render) ele re-executaria e roubaria o foco do campo em digitação.
-  const opcoes = useRef({ onClose, closeOnEsc, initialFocusRef });
-  useEffect(() => {
-    opcoes.current = { onClose, closeOnEsc, initialFocusRef };
-  });
-
-  useEffect(() => {
-    if (!ativo) return undefined;
-    const quemTinhaFoco = document.activeElement;
-    const overflowAnterior = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const painel = painelRef.current;
-    const focavel = opcoes.current.initialFocusRef?.current
-      ?? painel?.querySelector(`[data-modal-corpo] :is(${FOCAVEIS})`)
-      ?? painel?.querySelector(FOCAVEIS);
-    const marcador = {};
-    pilhaModais.push(marcador);
-    (focavel || painel)?.focus({ preventScroll: true });
-
-    const handleKey = (e) => {
-      if (pilhaModais[pilhaModais.length - 1] !== marcador) return;
-      if (e.key === 'Escape' && opcoes.current.closeOnEsc) {
-        e.stopPropagation();
-        opcoes.current.onClose?.();
-        return;
-      }
-      if (e.key !== 'Tab') return;
-      const focaveis = Array.from(painel?.querySelectorAll(FOCAVEIS) || []).filter(
-        (el) => el.offsetParent !== null || el === document.activeElement
-      );
-      if (focaveis.length === 0) {
-        e.preventDefault();
-        painel?.focus();
-        return;
-      }
-      const primeiro = focaveis[0];
-      const ultimo = focaveis[focaveis.length - 1];
-      const ativoEl = document.activeElement;
-      if (e.shiftKey) {
-        if (ativoEl === primeiro || !painel?.contains(ativoEl)) { e.preventDefault(); ultimo.focus(); }
-      } else if (ativoEl === ultimo || !painel?.contains(ativoEl)) {
-        e.preventDefault();
-        primeiro.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      pilhaModais.splice(pilhaModais.indexOf(marcador), 1);
-      document.body.style.overflow = overflowAnterior;
-      quemTinhaFoco?.focus?.({ preventScroll: true });
-    };
-  }, [ativo, painelRef]);
 }
 
 function Modal({
@@ -121,7 +55,7 @@ function Modal({
   const painelRef = useRef(null);
   const tituloId = useId();
   const descricaoId = useId();
-  useArmadilhaDeFoco(Boolean(open), painelRef, { onClose, closeOnEsc, initialFocusRef });
+  useFocusTrap(Boolean(open), painelRef, { onClose, closeOnEsc, initialFocusRef });
 
   const telaCheiaNoCelular = size === 'lg' || size === 'xl';
   const handleOverlay = (e) => {
@@ -134,14 +68,14 @@ function Modal({
         <motion.div
           key="c4-modal"
           className={cn(
-            'fixed inset-0 z-[100] flex justify-center bg-surface/70 backdrop-blur-md',
+            'fixed inset-0 z-[100] flex justify-center bg-surface-overlay backdrop-blur-md',
             telaCheiaNoCelular ? 'items-stretch sm:items-center sm:p-4' : 'items-center p-4',
           )}
           onMouseDown={handleOverlay}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.16 } }}
-          transition={{ duration: 0.2 }}
+          variants={variantesOverlay}
+          initial="inicial"
+          animate="visivel"
+          exit="saida"
         >
           <motion.div
             ref={painelRef}
@@ -150,13 +84,10 @@ function Modal({
             aria-labelledby={tituloId}
             aria-describedby={description ? descricaoId : undefined}
             tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 6, transition: { duration: 0.14 } }}
-            transition={MOLA}
+            variants={variantesPainel}
             className={cn(
               'relative w-full flex flex-col overflow-hidden outline-none text-text-primary',
-              'bg-surface-low border border-text-primary/[0.09] shadow-[var(--shadow-elevated)]',
+              'bg-surface-low border border-border-strong shadow-[var(--shadow-elevated)]',
               'rounded-[var(--radius-card)] max-h-[88dvh]',
               telaCheiaNoCelular && 'max-sm:h-full max-sm:max-h-[100dvh] max-sm:rounded-none max-sm:border-0 max-sm:pt-safe max-sm:pb-safe',
               SIZES[size] || SIZES.md,
@@ -206,7 +137,7 @@ function Modal({
 
 Modal.Footer = function ModalFooter({ children, className }) {
   return (
-    <div className={cn('flex flex-wrap items-center justify-end gap-2 sm:gap-3 pt-5 mt-1 border-t border-text-primary/[0.06]', className)}>
+    <div className={cn('flex flex-wrap items-center justify-end gap-2 sm:gap-3 pt-5 mt-1 border-t border-border', className)}>
       {children}
     </div>
   );

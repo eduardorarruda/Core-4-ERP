@@ -127,7 +127,7 @@ flowchart LR
     BE -. "traces OTLP (opcional)" .-> OT[Coletor OpenTelemetry]
 ```
 
-O n8n nunca acessa o banco do ERP: toda leitura e escrita passa pela API, com o JWT do usuário,
+O n8n nunca acessa o banco da aplicação: toda leitura e escrita passa pela API, com o JWT do usuário,
 preservando permissões, isolamento por empresa e auditoria.
 
 | Pasta | O que tem |

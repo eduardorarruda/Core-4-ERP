@@ -107,7 +107,7 @@ async function request(path, options = {}) {
       signal: controller.signal,
     });
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('Tempo limite da requisição esgotado');
+    if (err.name === 'AbortError') throw new Error('Tempo limite da requisição esgotado', { cause: err });
     throw err;
   } finally {
     clearTimeout(timeoutId);

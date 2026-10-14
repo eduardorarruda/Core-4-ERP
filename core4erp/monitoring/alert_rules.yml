@@ -8,7 +8,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Backend Core 4 ERP fora do ar"
+          summary: "Backend Core 4 fora do ar"
           description: "O Prometheus não consegue coletar {{ $labels.instance }} há mais de 2 minutos."
 
       # P95 agregado de TODAS as rotas (sum by le) — sem o sum, o histogram_quantile seria

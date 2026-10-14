@@ -2,26 +2,29 @@ import React, { useId, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-const FOCO = 'focus-visible:ring-2 focus-visible:ring-primary';
+const FOCO = 'focus-visible:ring-2 focus-visible:ring-primary/70 focus:border-primary/60';
+
+// Base dos campos: altura de toque ≥ 44px, borda fina, foco com anel esmeralda.
+const CAMPO = 'w-full bg-surface-low border rounded-xl text-text-primary outline-none text-sm font-body transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-text-primary/45 disabled:opacity-60 disabled:cursor-not-allowed';
 
 export const inputCls =
-  `w-full bg-surface-low border border-text-primary/15 rounded-xl px-4 py-3 text-text-primary outline-none ${FOCO} text-sm transition-all placeholder:text-text-primary/50 font-body`;
+  `${CAMPO} border-border-strong hover:border-text-primary/25 px-4 py-3 min-h-11 ${FOCO}`;
 
 export const inputSmCls =
-  `w-full bg-surface-low border border-text-primary/15 rounded-xl px-4 py-2 min-h-11 text-text-primary outline-none ${FOCO} text-sm transition-all placeholder:text-text-primary/50 font-body`;
+  `${CAMPO} border-border-strong hover:border-text-primary/25 px-3.5 py-2 min-h-11 ${FOCO}`;
 
 export const labelCls =
-  'text-xs font-bold uppercase tracking-wider text-text-primary/70 font-body';
+  'text-[0.8125rem] font-medium text-text-primary/75 font-body';
 
 export const inputErrorCls =
-  'w-full bg-surface-low border border-error/60 rounded-xl px-4 py-3 text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-error text-sm transition-all placeholder:text-text-primary/50 font-body';
+  `${CAMPO} border-error/60 px-4 py-3 min-h-11 focus-visible:ring-2 focus-visible:ring-error/60`;
 
 /** id da mensagem de erro de um campo (usado por aria-describedby). */
 const idErro = (id) => (id ? `${id}-erro` : undefined);
 
 /** Mensagem de erro de campo: anunciada pelo leitor de tela assim que aparece. */
 function MensagemErro({ id, children }) {
-  return <p id={id} role="alert" className="text-error text-xs mt-1">{children}</p>;
+  return <p id={id} role="alert" className="text-error text-xs mt-1.5 font-medium">{children}</p>;
 }
 
 /** Junta ids de aria-describedby ignorando vazios. */
@@ -137,7 +140,7 @@ export function FormSelect({ error, small, children, className, ...props }) {
   return (
     <div className="w-full">
       <select
-        className={cn(base, 'appearance-none', className)}
+        className={cn(base, 'appearance-none pr-10 bg-no-repeat bg-[length:16px] bg-[position:right_0.85rem_center] bg-[image:var(--c4-seta-select)]', className)}
         aria-invalid={error ? true : undefined}
         {...props}
         aria-describedby={juntarIds(props['aria-describedby'], error && idErro(props.id))}
@@ -235,7 +238,7 @@ export default function FormField({ label, required, error, help, htmlFor, child
         </FormLabel>
       )}
       {conteudo}
-      {help && <p id={ajudaId} className="text-xs text-text-primary/70">{help}</p>}
+      {help && <p id={ajudaId} className="text-xs text-text-primary/60 leading-relaxed">{help}</p>}
       {error && !controleMostraErro && <MensagemErro id={erroId}>{error}</MensagemErro>}
     </div>
   );

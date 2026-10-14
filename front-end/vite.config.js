@@ -102,12 +102,8 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
           secure: false,
-          configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              proxyReq.removeHeader('origin');
-              proxyReq.removeHeader('referer');
-            });
-          },
+          // Origin/Referer seguem intactos: o OrigemRequisicaoFilter (CSRF) do backend exige
+          // a origem do front (http://localhost:5173 está na allowlist local).
         },
       },
     },

@@ -76,8 +76,9 @@ export default function DataTable({
 
   if (loading) {
     return (
-      <div className={cn('bg-surface-medium rounded-2xl overflow-hidden', className)}>
-        <div className="divide-y divide-text-primary/5 px-4">
+      <div role="status" aria-live="polite" className={cn('c4-card overflow-hidden', className)}>
+        <span className="sr-only">Carregando…</span>
+        <div className="divide-y divide-border px-4">
           {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
         </div>
       </div>
@@ -86,7 +87,7 @@ export default function DataTable({
 
   if (!rows.length) {
     return (
-      <div className={cn('bg-surface-medium rounded-2xl', className)}>
+      <div className={cn('c4-card', className)}>
         {emptyState ?? (
           <EmptyState icon={FileText} title="Nenhum item encontrado" description="Não há dados para exibir no momento." />
         )}
@@ -122,8 +123,8 @@ export default function DataTable({
               key={key}
               {...clickableProps(row)}
               className={cn(
-                'bg-surface-medium rounded-2xl border border-text-primary/5',
-                onRowClick && 'cursor-pointer hover:border-text-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                'c4-card',
+                onRowClick && 'c4-card--interativo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
               )}
             >
               {renderCard(row)}
@@ -135,14 +136,14 @@ export default function DataTable({
             key={key}
             {...clickableProps(row)}
             className={cn(
-              'bg-surface-medium rounded-2xl p-4 border border-text-primary/5',
-              onRowClick && 'cursor-pointer hover:border-text-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+              'c4-card p-4',
+              onRowClick && 'c4-card--interativo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
             )}
           >
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {columns.map((col) => (
                 <div key={col.key} className={cn('min-w-0', col.className)}>
-                  <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60 mb-0.5">{col.label}</p>
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-text-primary/55 mb-0.5">{col.label}</p>
                   <div className="text-sm text-text-primary">
                     {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
                   </div>
@@ -156,11 +157,11 @@ export default function DataTable({
   );
 
   const renderTable = (wrapperClass) => (
-    <div className={cn('rounded-2xl overflow-hidden border border-text-primary/5', wrapperClass)}>
+    <div className={cn('c4-card overflow-hidden', wrapperClass)}>
       <div className="overflow-x-auto">
         <table className="w-full" aria-label={caption ? undefined : rotulo}>
           {caption && <caption className="sr-only">{caption}</caption>}
-          <thead className="bg-surface-medium backdrop-blur-sm">
+          <thead className="bg-text-primary/[0.025] border-b border-border">
             <tr>
               {columns.map((col) => {
                 const isActive = sortKey === col.key;
@@ -173,7 +174,7 @@ export default function DataTable({
                     scope="col"
                     aria-sort={ariaSort}
                     className={cn(
-                      'px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-text-primary/70 whitespace-nowrap',
+                      'px-4 py-3 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-text-primary/60 whitespace-nowrap',
                       col.className
                     )}
                   >
@@ -181,7 +182,7 @@ export default function DataTable({
                       <button
                         type="button"
                         onClick={() => handleSort(col.key)}
-                        className="flex items-center gap-1 uppercase tracking-widest hover:text-text-primary transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                        className="inline-flex items-center gap-1 min-h-8 uppercase tracking-[0.12em] hover:text-text-primary transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                       >
                         {col.label}
                         {isActive && (
@@ -198,7 +199,7 @@ export default function DataTable({
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-text-primary/5 bg-surface-low">
+          <tbody className="divide-y divide-border">
             {rows.map((row, ri) => {
               const key = rowKey(row, ri);
               return (
@@ -206,12 +207,12 @@ export default function DataTable({
                   key={key}
                   {...clickableProps(row)}
                   className={cn(
-                    'transition-colors',
-                    onRowClick && 'cursor-pointer hover:bg-surface-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset'
+                    'transition-colors hover:bg-text-primary/[0.025]',
+                    onRowClick && 'cursor-pointer hover:bg-primary/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset'
                   )}
                 >
                   {columns.map((col) => (
-                    <td key={col.key} className={cn('px-4 py-3 text-sm text-text-primary', col.className)}>
+                    <td key={col.key} className={cn('px-4 py-3.5 text-sm text-text-primary tabular-nums', col.className)}>
                       {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
                     </td>
                   ))}

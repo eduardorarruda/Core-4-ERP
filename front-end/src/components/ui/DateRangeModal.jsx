@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isValid, parse, isAfter, isBefore, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -17,11 +17,13 @@ function DateInput({ label, value, onChange, error }) {
   const id = useId();
   const erroId = `${id}-erro`;
   const [raw, setRaw] = useState(value ? format(value, 'dd/MM/yyyy') : '');
+  const [valorAnterior, setValorAnterior] = useState(value);
 
-  // Sincroniza o texto quando a data muda pelo calendário
-  useEffect(() => {
+  // Sincroniza o texto quando a data muda pelo calendário (ajuste durante o render, sem efeito)
+  if (value !== valorAnterior) {
+    setValorAnterior(value);
     setRaw(value ? format(value, 'dd/MM/yyyy') : '');
-  }, [value]);
+  }
 
   function handleChange(e) {
     let v = e.target.value.replace(/\D/g, '').slice(0, 8);
@@ -112,6 +114,10 @@ function MiniCalendar({ month, rangeStart, rangeEnd, onSelect, onPrev, onNext })
   );
 }
 
+/**
+ * @deprecated Use o PeriodoSelector (intervalo personalizado já vem no painel). Mantido só até
+ * as telas migrarem. onApply devolve { inicio, fim } (yyyy-MM-dd) e também { mesInicio, anoInicio, mesFim, anoFim }.
+ */
 export default function DateRangeModal({ onApply, onCancel }) {
   const [inicio, setInicio] = useState(null);
   const [fim, setFim] = useState(null);
@@ -138,6 +144,8 @@ export default function DateRangeModal({ onApply, onCancel }) {
     if (inicio && fim && isAfter(inicio, fim)) errs.fim = 'A data de fim deve ser depois do início';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     onApply({
+      inicio: format(inicio, 'yyyy-MM-dd'),
+      fim: format(fim, 'yyyy-MM-dd'),
       mesInicio: inicio.getMonth() + 1,
       anoInicio: inicio.getFullYear(),
       mesFim: fim.getMonth() + 1,

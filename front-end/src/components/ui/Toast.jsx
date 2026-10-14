@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { CircleCheck, CircleX, Info, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useToast, useToastList } from '../../hooks/useToast';
+import { variantesToast } from '../motion/presets';
 
 const TIPOS = {
   success: { Icone: CircleCheck, ladrilho: 'bg-primary/[0.14] text-primary', fio: 'bg-primary', titulo: 'Pronto' },
@@ -10,7 +11,6 @@ const TIPOS = {
   info: { Icone: Info, ladrilho: 'bg-secondary/[0.14] text-secondary', fio: 'bg-secondary', titulo: 'Aviso' },
 };
 
-const MOLA = { type: 'spring', stiffness: 460, damping: 36, mass: 0.7 };
 
 /**
  * Aviso flutuante. O anúncio para leitores de tela é feito pelas regiões vivas do
@@ -47,7 +47,7 @@ function ToastItem({ id, message, type = 'success', duration = 4000 }) {
       onBlur={() => setPausado(false)}
       className={cn(
         'relative flex items-start gap-3 pl-3 pr-1 py-2 w-full sm:w-[22rem] overflow-hidden',
-        'rounded-2xl border border-text-primary/[0.10] bg-surface-low/95 backdrop-blur-xl',
+        'rounded-2xl border border-border-strong bg-surface-low/90 backdrop-blur-xl',
         'shadow-[var(--shadow-elevated)] text-text-primary',
       )}
     >
@@ -69,7 +69,7 @@ function ToastItem({ id, message, type = 'success', duration = 4000 }) {
       {/* Tempo restante: barra que encolhe e pausa junto com o relógio */}
       <div
         aria-hidden="true"
-        className={cn('absolute bottom-0 left-0 h-0.5 opacity-60', tipo.fio)}
+        className={cn('absolute bottom-0 inset-x-0 h-0.5 opacity-70 origin-left', tipo.fio)}
         style={{ animation: `progressBar ${duration}ms linear forwards`, animationPlayState: pausado ? 'paused' : 'running' }}
       />
     </div>
@@ -97,10 +97,10 @@ export function ToastContainer() {
             <motion.div
               key={t.id}
               layout
-              initial={{ opacity: 0, x: 48, scale: 0.96 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: 48, scale: 0.96, transition: { duration: 0.18 } }}
-              transition={MOLA}
+              variants={variantesToast}
+              initial="inicial"
+              animate="visivel"
+              exit="saida"
               className="pointer-events-auto w-full sm:w-auto flex justify-end"
             >
               <ToastItem {...t} />

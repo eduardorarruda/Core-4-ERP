@@ -3,28 +3,47 @@
 @import '@fontsource/sora/500.css';
 @import '@fontsource/sora/600.css';
 @import '@fontsource/sora/700.css';
+@import '@fontsource/sora/800.css';
 @import '@fontsource-variable/dm-sans';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
 @import '@fontsource/jetbrains-mono/600.css';
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   Core 4 — tokens de design (escuro primeiro; o tema claro redefine abaixo).
+   Paleta tirada da logo: esmeralda (o "C" e a haste do "4"), prata (o traço do "4" e o
+   "Core") sobre preto com matiz verde-petróleo. Os NOMES antigos continuam valendo —
+   as telas herdam a identidade sem reescrever classe. Guia de uso: components/ui/README.md
+   ═══════════════════════════════════════════════════════════════════════════════ */
 @theme {
-  /* ── Core 4 — identidade visual (2026-10) ──────────────────────────────────
-     Paleta tirada da logo: esmeralda (o "C" e a haste do "4") sobre um preto com
-     fio de verde-petróleo, e prata (o traço do "4" e o "Core"). Os NOMES dos tokens
-     são os mesmos de antes — as telas herdam a identidade nova sem reescrever classe. */
   --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
   --font-body: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "DM Sans Variable", "DM Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Superfícies — neutros com matiz verde-petróleo (nunca cinza puro) */
+  /* Escala tipográfica extra (o resto é a escala padrão do Tailwind) */
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.03em;
+  --text-kpi: 1.875rem;
+  --text-kpi--line-height: 1.1;
+  --text-kpi--letter-spacing: -0.02em;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1.2;
+  --text-eyebrow--letter-spacing: 0.14em;
+
+  /* Superfícies em camadas — neutros com matiz verde-petróleo (nunca cinza puro) */
   --color-surface:         #030A0B;
   --color-surface-low:     #071315;
   --color-surface-medium:  #0C1B1E;
   --color-surface-high:    #132629;
   --color-surface-highest: #1E3539;
+  --color-surface-overlay: rgba(3, 10, 11, 0.72);
+
+  /* Bordas de 1px com baixa opacidade */
+  --color-border: rgba(201, 222, 228, 0.08);
+  --color-border-strong: rgba(201, 222, 228, 0.16);
 
   /* Marca */
   --color-primary: #14E29C;
@@ -32,28 +51,18 @@
   --color-on-primary: #01231A;
   --color-silver: #C9D6DD;
   --color-secondary: #7CC7FF;
+  --color-info: #7CC7FF;
   --color-error: #FF7A85;
   --color-warning: #FFC857;
+  --color-success: #2EE6A1;
 
-  /* Cores com significado fixo em todo o app (entrou / saiu / investido) */
+  /* Significado fixo em todo o app: entrou / saiu / investido */
   --color-income: #2EE6A1;
   --color-expense: #FF7A85;
   --color-invest: #F5B83D;
 
-  --gradient-primary: linear-gradient(135deg, #3CF5B8 0%, #14E29C 45%, #0BA877 100%);
-  --gradient-silver: linear-gradient(135deg, #FFFFFF 0%, #D3DEE4 50%, #93A7B3 100%);
-
-  /* Séries de gráfico (tema escuro); o tema claro redefine abaixo */
-  --color-chart-1: #14E29C;
-  --color-chart-2: #7CC7FF;
-  --color-chart-3: #F5B83D;
-  --color-chart-4: #FF7A85;
-  --color-chart-5: #B9A2FF;
-  --color-chart-6: #C9D6DD;
-  --color-chart-grid: rgba(201, 214, 221, 0.07);
-  --color-chart-axis: #8FA3AB;
-
   --color-text-primary: #E8F1F3;
+  --color-text-muted: #9DB0B6;
 
   --color-success-surface: #04261C;
   --color-success-text: #6FF0C0;
@@ -62,61 +71,85 @@
   --color-error-text: #FFB3BA;
   --color-error-border: rgba(255, 122, 133, 0.32);
 
-  --radius-xl: 0.875rem;
-  --radius-card: 1.25rem;
+  /* Séries de gráfico (Recharts lê via lib/chartTheme.js) */
+  --color-chart-1: #14E29C;
+  --color-chart-2: #7CC7FF;
+  --color-chart-3: #F5B83D;
+  --color-chart-4: #FF7A85;
+  --color-chart-5: #B9A2FF;
+  --color-chart-6: #C9D6DD;
+  --color-chart-grid: rgba(201, 214, 221, 0.07);
+  --color-chart-axis: #8FA3AB;
+  --color-chart-cursor: rgba(20, 226, 156, 0.08);
 
-  --shadow-card: 0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 32px -14px rgba(0,0,0,0.75);
-  --shadow-elevated: 0 18px 48px -12px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.35);
-  --shadow-primary: 0 8px 28px -6px rgba(20,226,156,0.35);
+  --gradient-primary: linear-gradient(135deg, #3CF5B8 0%, #14E29C 45%, #0BA877 100%);
+  --gradient-silver: linear-gradient(180deg, #FFFFFF 0%, #D3DEE4 55%, #93A7B3 100%);
+
+  /* Raios: 8 / 12 / 16 / 24 (rounded-lg / xl / 2xl / 3xl). Cartões usam --radius-card. */
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.035) inset, 0 12px 32px -18px rgba(0,0,0,0.8);
+  --shadow-elevated: 0 24px 56px -16px rgba(0,0,0,0.75), 0 2px 8px rgba(0,0,0,0.35);
+  --shadow-primary: 0 8px 26px -8px rgba(20,226,156,0.42);
+  --shadow-glow: 0 0 0 1px rgba(20,226,156,0.18), 0 10px 40px -12px rgba(20,226,156,0.35);
 
   --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
   --transition-base: 220ms cubic-bezier(0.22, 1, 0.36, 1);
   --transition-spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Tokens do símbolo (BrandMark) — fora do @theme porque não geram utilitários */
+:root {
+  --brand-emerald-1: #3CF5B8;
+  --brand-emerald-2: #14E29C;
+  --brand-emerald-3: #0BA877;
+  --brand-silver-1: #FFFFFF;
+  --brand-silver-2: #D3DEE4;
+  --brand-silver-3: #93A7B3;
+  /* Seta dos <select> do FormSelect (cor neutra que funciona nos dois temas) */
+  --c4-seta-select: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238FA3AB' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  color-scheme: dark;
 }
 
 @layer base {
-  html {
-    /* Números tabulares em todo o app: colunas de valores alinham sem font-mono */
-    font-feature-settings: "tnum" 1, "cv11" 1;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  body {
-    @apply bg-surface antialiased;
-    font-family: var(--font-body);
-    color: var(--color-text-primary);
-  }
-
-  h1, h2, h3 {
-    font-family: var(--font-display);
-    letter-spacing: -0.015em;
-    text-wrap: balance;
-  }
-
+  /* ── Tema claro: mesmos tokens, contraste AA (4,5:1 texto, 3:1 gráficos/bordas de controle) ── */
   html:not(.dark) {
-    --color-surface: #F3F6F5;
+    color-scheme: light;
+    --color-surface: #F2F5F4;
     --color-surface-low: #FFFFFF;
-    --color-surface-medium: #E7EDEC;
-    --color-surface-high: #D5DFDD;
-    --color-surface-highest: #A9BAB8;
+    --color-surface-medium: #E9EEED;
+    --color-surface-high: #DCE4E2;
+    --color-surface-highest: #B6C4C2;
+    --color-surface-overlay: rgba(242, 245, 244, 0.72);
 
-    /* #05795B: contraste 5,4:1 sobre branco (o verde da logo sozinho fica em 2,1:1 — só para preenchimento) */
+    --color-border: rgba(6, 34, 32, 0.09);
+    --color-border-strong: rgba(6, 34, 32, 0.18);
+
+    /* #05795B: 5,4:1 sobre branco (o verde da logo sozinho fica em 1,9:1 — só preenchimento) */
     --color-primary: #05795B;
     --color-primary-strong: #046148;
     --color-on-primary: #FFFFFF;
     --color-silver: #4F6470;
     --color-secondary: #1D63C9;
+    --color-info: #1D63C9;
     --color-error: #C81E3A;
-    --color-warning: #9A5B00;
+    --color-warning: #8F5400;
+    --color-success: #05795B;
 
     --color-income: #05795B;
     --color-expense: #C81E3A;
-    --color-invest: #9A5B00;
+    --color-invest: #8F5400;
 
-    --gradient-primary: linear-gradient(135deg, #0FB884 0%, #05795B 100%);
-    --gradient-silver: linear-gradient(135deg, #5D7480 0%, #2E3F48 100%);
+    --color-text-primary: #0B1A1C;
+    --color-text-muted: #4D5F5E;
 
-    /* Séries de gráfico: contraste mínimo de 3:1 sobre fundo branco (WCAG 1.4.11) */
+    /* Degradê do botão principal com texto branco ≥ 4,5:1 nas duas pontas */
+    --gradient-primary: linear-gradient(135deg, #067F5F 0%, #04614A 100%);
+    --gradient-silver: linear-gradient(180deg, #3E525C 0%, #1C2A30 100%);
+
     --color-chart-1: #05795B;
     --color-chart-2: #1D63C9;
     --color-chart-3: #9A5B00;
@@ -125,8 +158,7 @@
     --color-chart-6: #4F6470;
     --color-chart-grid: rgba(3, 30, 28, 0.09);
     --color-chart-axis: #4D5F5E;
-
-    --color-text-primary: #0B1A1C;
+    --color-chart-cursor: rgba(5, 121, 91, 0.07);
 
     --color-success-surface: #E8F8F1;
     --color-success-text: #04583F;
@@ -135,13 +167,42 @@
     --color-error-text: #8F1027;
     --color-error-border: rgba(200, 30, 58, 0.3);
 
-    --shadow-card: 0 1px 2px rgba(3,30,28,0.06), 0 10px 28px -16px rgba(3,30,28,0.22);
-    --shadow-elevated: 0 18px 48px -14px rgba(3,30,28,0.28), 0 2px 6px rgba(3,30,28,0.08);
-    --shadow-primary: 0 8px 24px -8px rgba(5,121,91,0.45);
+    --shadow-card: 0 1px 2px rgba(3,30,28,0.05), 0 10px 28px -18px rgba(3,30,28,0.25);
+    --shadow-elevated: 0 24px 56px -18px rgba(3,30,28,0.3), 0 2px 6px rgba(3,30,28,0.08);
+    --shadow-primary: 0 8px 22px -10px rgba(5,121,91,0.55);
+    --shadow-glow: 0 0 0 1px rgba(5,121,91,0.18), 0 10px 32px -14px rgba(5,121,91,0.35);
+
+    /* Símbolo no claro: prata vira grafite, esmeralda escurece (3:1 sobre branco) */
+    --brand-emerald-1: #14C88C;
+    --brand-emerald-2: #0A9E72;
+    --brand-emerald-3: #05795B;
+    --brand-silver-1: #7D919C;
+    --brand-silver-2: #4F6470;
+    --brand-silver-3: #2E3F48;
+  }
+
+  html {
+    /* Números tabulares em todo o app: colunas de valores alinham sem font-mono */
+    font-feature-settings: "tnum" 1, "cv11" 1;
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface antialiased;
+    font-family: var(--font-body);
+    color: var(--color-text-primary);
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 32%, transparent);
     color: var(--color-text-primary);
   }
 
@@ -150,15 +211,28 @@
     outline-offset: 2px;
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--color-surface-highest); border-radius: 999px; }
-  ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--color-primary) 45%, transparent); }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-text-primary) 14%, transparent);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--color-primary) 50%, transparent);
+    background-clip: padding-box;
+  }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-surface-highest) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-text-primary) 16%, transparent) transparent;
   }
+
+  /* Campos numéricos sem as setinhas do navegador (o app usa máscara/teclado numérico) */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
 }
 
 /* ── Componentes de identidade (classes de apoio às peças em components/ui) ── */
@@ -168,8 +242,8 @@
     position: relative;
     border-radius: var(--radius-card);
     background:
-      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 70%, transparent), var(--color-surface-low));
-    border: 1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent);
+      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 72%, transparent), var(--color-surface-low));
+    border: 1px solid var(--color-border);
     box-shadow: var(--shadow-card);
     isolation: isolate;
   }
@@ -180,20 +254,31 @@
     border-radius: inherit;
     padding: 1px;
     background: linear-gradient(160deg,
-      color-mix(in srgb, var(--color-silver) 22%, transparent) 0%,
-      transparent 38%,
-      transparent 70%,
-      color-mix(in srgb, var(--color-primary) 18%, transparent) 100%);
+      color-mix(in srgb, var(--color-silver) 20%, transparent) 0%,
+      transparent 36%,
+      transparent 72%,
+      color-mix(in srgb, var(--color-primary) 16%, transparent) 100%);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
     z-index: -1;
   }
+  html:not(.dark) .c4-card {
+    background: var(--color-surface-low);
+  }
+  html:not(.dark) .c4-card::before {
+    background: linear-gradient(160deg, rgba(255,255,255,0.9) 0%, transparent 40%, transparent 75%, color-mix(in srgb, var(--color-primary) 14%, transparent) 100%);
+  }
   .c4-card--destaque {
     background:
-      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 55%),
-      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 70%, transparent), var(--color-surface-low));
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--color-primary) 13%, transparent), transparent 55%),
+      linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 72%, transparent), var(--color-surface-low));
+  }
+  html:not(.dark) .c4-card--destaque {
+    background:
+      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 55%),
+      var(--color-surface-low);
   }
   .c4-card--interativo {
     cursor: pointer;
@@ -201,18 +286,47 @@
   }
   .c4-card--interativo:hover {
     transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+    border-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
     box-shadow: var(--shadow-elevated);
+  }
+  .c4-card--interativo:active { transform: translateY(0) scale(0.995); }
+
+  /* Superfície de vidro — só para overlays e navegação (TopNav, BottomNav, menus) */
+  .c4-glass {
+    background: color-mix(in srgb, var(--color-surface-low) 78%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    backdrop-filter: blur(18px) saturate(1.4);
+    border-color: var(--color-border);
   }
 
   /* Rótulo de seção (eyebrow): pequeno, espaçado, prata — como a assinatura da logo */
   .c4-eyebrow {
     font-family: var(--font-body);
-    font-size: 0.72rem;
+    font-size: var(--text-eyebrow);
+    line-height: 1.2;
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: color-mix(in srgb, var(--color-text-primary) 62%, transparent);
+  }
+
+  /* Tagline da marca: caixa alta, tracking largo */
+  .c4-tagline {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--color-silver) 85%, transparent);
+  }
+
+  /* Número grande de KPI */
+  .c4-kpi {
+    font-family: var(--font-display);
+    font-size: var(--text-kpi);
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Texto em prata metálica (wordmark) e em esmeralda (o "4") */
@@ -223,13 +337,82 @@
     -webkit-text-fill-color: transparent;
   }
   .c4-text-emerald {
-    background: var(--gradient-primary);
+    background: linear-gradient(180deg, var(--brand-emerald-1), var(--brand-emerald-3));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
   }
 
-  /* Modo privacidade (tecla P): valores borrados até passar o mouse/focar */
+  /* Força as cores da marca do tema escuro (logo sobre fundo petróleo, mesmo no tema claro) */
+  .c4-marca-escura {
+    --brand-emerald-1: #3CF5B8;
+    --brand-emerald-2: #14E29C;
+    --brand-emerald-3: #0BA877;
+    --brand-silver-1: #FFFFFF;
+    --brand-silver-2: #D3DEE4;
+    --brand-silver-3: #93A7B3;
+    --gradient-silver: linear-gradient(180deg, #FFFFFF 0%, #D3DEE4 55%, #93A7B3 100%);
+    --color-silver: #C9D6DD;
+  }
+
+  /* Subárvore sempre escura (painel da marca no login), mesmo com o app no tema claro */
+  .c4-tema-escuro {
+    --color-surface: #030A0B;
+    --color-surface-low: #071315;
+    --color-surface-medium: #0C1B1E;
+    --color-surface-high: #132629;
+    --color-surface-highest: #1E3539;
+    --color-border: rgba(201, 222, 228, 0.08);
+    --color-border-strong: rgba(201, 222, 228, 0.16);
+    --color-primary: #14E29C;
+    --color-on-primary: #01231A;
+    --color-silver: #C9D6DD;
+    --color-secondary: #7CC7FF;
+    --color-info: #7CC7FF;
+    --color-income: #2EE6A1;
+    --color-expense: #FF7A85;
+    --color-invest: #F5B83D;
+    --color-text-primary: #E8F1F3;
+    --color-chart-grid: rgba(201, 214, 221, 0.07);
+    --color-chart-axis: #8FA3AB;
+    --gradient-primary: linear-gradient(135deg, #3CF5B8 0%, #14E29C 45%, #0BA877 100%);
+    --gradient-silver: linear-gradient(180deg, #FFFFFF 0%, #D3DEE4 55%, #93A7B3 100%);
+    --brand-emerald-1: #3CF5B8;
+    --brand-emerald-2: #14E29C;
+    --brand-emerald-3: #0BA877;
+    --brand-silver-1: #FFFFFF;
+    --brand-silver-2: #D3DEE4;
+    --brand-silver-3: #93A7B3;
+    --shadow-card: 0 1px 0 rgba(255,255,255,0.035) inset, 0 12px 32px -18px rgba(0,0,0,0.8);
+    color: var(--color-text-primary);
+    color-scheme: dark;
+  }
+  html:not(.dark) .c4-tema-escuro .c4-card { background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-medium) 72%, transparent), var(--color-surface-low)); }
+
+  /* Divisor com brilho esmeralda no centro */
+  .c4-hairline {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-primary) 40%, transparent), transparent);
+  }
+
+  /* Tecla de atalho */
+  .c4-kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 1.5rem;
+    justify-content: center;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--color-border-strong);
+    background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
+  }
+
+  /* Modo privacidade (Alt+P): valores borrados até passar o mouse/focar */
   html.privado .valor-privado {
     filter: blur(7px);
     transition: filter 160ms ease;
@@ -240,8 +423,9 @@
   }
 }
 
-/* Fundo vivo do app: manchas de luz esmeralda que derivam devagar (CSS puro, sem
-   filter: blur — leve em GPU fraca) + os fios curvos dos cantos da arte da logo. */
+/* ── Fundo vivo do app (portado do Fluxo): manchas de luz que derivam devagar + grão.
+   Só transform/opacity (GPU), borda macia pelo radial-gradient — nada de filter: blur.
+   Os fios finos esmeralda dos cantos ecoam a arte da logo. Some com "reduzir movimento". ── */
 .c4-backdrop {
   position: fixed;
   inset: 0;
@@ -249,50 +433,56 @@
   pointer-events: none;
   overflow: hidden;
 }
-.c4-backdrop span {
+.c4-backdrop__mancha {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.55;
+  opacity: 0.5;
   will-change: transform;
+  background: radial-gradient(closest-side, var(--c4-mancha), transparent);
 }
-.c4-backdrop .b1 {
-  width: 60vmax; height: 60vmax; left: -22vmax; top: -26vmax;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 13%, transparent) 0%, transparent 62%);
-  animation: c4Drift1 46s ease-in-out infinite alternate;
+.c4-backdrop__mancha--a {
+  width: 62vmax; height: 62vmax; left: -22vmax; top: -24vmax;
+  --c4-mancha: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  animation: c4DerivarA 46s ease-in-out infinite alternate;
 }
-.c4-backdrop .b2 {
-  width: 52vmax; height: 52vmax; right: -24vmax; bottom: -28vmax;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-primary) 9%, transparent) 0%, transparent 60%);
-  animation: c4Drift2 52s ease-in-out infinite alternate;
+.c4-backdrop__mancha--b {
+  width: 54vmax; height: 54vmax; right: -24vmax; bottom: -28vmax;
+  --c4-mancha: color-mix(in srgb, var(--color-secondary) 12%, transparent);
+  animation: c4DerivarB 52s ease-in-out infinite alternate;
 }
-.c4-backdrop .b3 {
-  width: 40vmax; height: 40vmax; right: 10vmax; top: -20vmax;
-  background: radial-gradient(circle, color-mix(in srgb, var(--color-secondary) 6%, transparent) 0%, transparent 60%);
-  animation: c4Drift1 38s ease-in-out infinite alternate-reverse;
+.c4-backdrop__mancha--c {
+  width: 40vmax; height: 40vmax; right: 12vmax; top: -18vmax;
+  --c4-mancha: color-mix(in srgb, var(--color-silver) 8%, transparent);
+  animation: c4DerivarA 38s ease-in-out infinite alternate-reverse;
 }
-.c4-backdrop svg { position: absolute; color: var(--color-primary); }
-html:not(.dark) .c4-backdrop span { opacity: 0.8; }
-@keyframes c4Drift1 { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(6vmax,4vmax,0) scale(1.08); } }
-@keyframes c4Drift2 { from { transform: translate3d(0,0,0) scale(1.05); } to { transform: translate3d(-5vmax,-4vmax,0) scale(0.95); } }
+.c4-backdrop__grao {
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.c4-backdrop__fio {
+  position: absolute;
+  width: 34vmin;
+  height: 34vmin;
+  color: var(--color-primary);
+  opacity: 0.3;
+}
+html:not(.dark) .c4-backdrop__mancha { opacity: 0.55; }
+html:not(.dark) .c4-backdrop__mancha--a { --c4-mancha: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+html:not(.dark) .c4-backdrop__grao { opacity: 0.025; }
+html:not(.dark) .c4-backdrop__fio { opacity: 0.2; }
+@keyframes c4DerivarA { to { transform: translate3d(7vmax, 5vmax, 0) scale(1.12); } }
+@keyframes c4DerivarB { to { transform: translate3d(-6vmax, -5vmax, 0) scale(0.94); } }
 
 @layer utilities {
-  .text-base-content {
-    color: var(--color-text-primary);
-  }
+  .text-base-content { color: var(--color-text-primary); }
+  .font-display { font-family: var(--font-display); }
+  .font-body { font-family: var(--font-body); }
+  .font-mono { font-family: var(--font-mono); }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 
-  .font-display {
-    font-family: var(--font-display);
-  }
-
-  .font-body {
-    font-family: var(--font-body);
-  }
-
-  .font-mono {
-    font-family: var(--font-mono);
-  }
-
-  /* ── Animações ── */
+  /* ── Animações CSS (legado das telas; componentes novos usam components/motion) ── */
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: none; }
@@ -310,8 +500,8 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
     to { opacity: 1; transform: scale(1); }
   }
   @keyframes shimmer {
-    from { background-position: -200% 0; }
-    to { background-position: 200% 0; }
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
   }
   @keyframes pulseDot {
     0%, 100% { opacity: 1; transform: scale(1); }
@@ -325,17 +515,15 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
     80% { transform: translateX(3px); }
   }
   @keyframes progressBar {
-    from { width: 100%; }
-    to { width: 0%; }
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
   }
   @keyframes typing {
     0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
     30% { transform: translateY(-4px); opacity: 1; }
   }
-
-  /* Design system animations */
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(14px); }
+    from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: none; }
   }
   @keyframes ticker {
@@ -349,53 +537,68 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
     from { opacity: 0; transform: scale(0.88); }
     to   { opacity: 1; transform: scale(1); }
   }
+  @keyframes c4Listras { to { background-position: 17px 0; } }
+  @keyframes c4Pulso {
+    0% { opacity: 0; transform: scale(0.6); }
+    10% { opacity: 0.45; }
+    100% { opacity: 0; transform: scale(1.8); }
+  }
+  .c4-pulso { animation: c4Pulso 1.8s ease-out infinite both; }
+  @keyframes c4Sino {
+    0%, 100% { transform: rotate(0); }
+    15% { transform: rotate(-14deg); }
+    30% { transform: rotate(12deg); }
+    45% { transform: rotate(-8deg); }
+    60% { transform: rotate(5deg); }
+    75% { transform: rotate(0); }
+  }
   @keyframes orbFloat {
     0%, 100% { transform: translateY(0px) scale(1); }
     50%       { transform: translateY(-20px) scale(1.04); }
   }
 
-  /* Utility animation classes */
   .animate-fade-in-up { animation: fadeInUp var(--transition-base) both; }
   .animate-fade-in { animation: fadeIn var(--transition-base) both; }
   .animate-slide-in-right { animation: slideInRight var(--transition-base) both; }
-  .animate-scale-in { animation: scaleIn var(--transition-spring) both; }
-  .animate-stagger-1 { animation-delay: 50ms; }
-  .animate-stagger-2 { animation-delay: 100ms; }
-  .animate-stagger-3 { animation-delay: 150ms; }
-  .animate-stagger-4 { animation-delay: 200ms; }
-  .animate-stagger-5 { animation-delay: 250ms; }
-  .animate-stagger-6 { animation-delay: 300ms; }
+  .animate-scale-in { animation: scaleIn 200ms var(--ease-out-expo) both; }
+  .animate-stagger-1 { animation-delay: 40ms; }
+  .animate-stagger-2 { animation-delay: 80ms; }
+  .animate-stagger-3 { animation-delay: 120ms; }
+  .animate-stagger-4 { animation-delay: 160ms; }
+  .animate-stagger-5 { animation-delay: 200ms; }
+  .animate-stagger-6 { animation-delay: 240ms; }
 
   .animate-pulse-dot { animation: pulseDot 1.5s ease-in-out infinite; }
   .animate-shake { animation: shake 0.4s ease-in-out; }
   .animate-typing { animation: typing 1.2s ease-in-out infinite; }
 
-  /* Design system stagger classes */
-  .anim-in { animation: fadeUp 500ms cubic-bezier(.4,0,.2,1) both; }
-  .d1 { animation-delay: 50ms; }
-  .d2 { animation-delay: 120ms; }
-  .d3 { animation-delay: 200ms; }
-  .d4 { animation-delay: 280ms; }
-  .d5 { animation-delay: 360ms; }
-  .d6 { animation-delay: 440ms; }
+  /* Entrada escalonada em CSS (legado): 220ms, 40ms entre itens */
+  .anim-in { animation: fadeUp 260ms var(--ease-out-expo) both; }
+  .d1 { animation-delay: 40ms; }
+  .d2 { animation-delay: 80ms; }
+  .d3 { animation-delay: 120ms; }
+  .d4 { animation-delay: 160ms; }
+  .d5 { animation-delay: 200ms; }
+  .d6 { animation-delay: 240ms; }
 
-  /* Ticker animation */
   .ticker-scroll { animation: ticker 40s linear infinite; }
 
   .shimmer-bg {
-    background: linear-gradient(90deg, transparent 0%, var(--color-surface-highest) 50%, transparent 100%);
+    background: linear-gradient(100deg,
+      color-mix(in srgb, var(--color-text-primary) 5%, transparent) 20%,
+      color-mix(in srgb, var(--color-text-primary) 11%, transparent) 50%,
+      color-mix(in srgb, var(--color-text-primary) 5%, transparent) 80%);
     background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
+    animation: shimmer 1.8s ease-in-out infinite;
   }
 
   .text-gradient-primary {
-    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    background: var(--gradient-primary);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* Gradiente primário — substitui os linear-gradient(135deg,#6EFFC0,#2bdb96) hardcoded */
   .bg-gradient-primary { background: var(--gradient-primary); }
 
   /* Safe-area (iOS notch / home-bar) — usar com viewport-fit=cover */
@@ -404,15 +607,18 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
   .pl-safe { padding-left: env(safe-area-inset-left); }
   .pr-safe { padding-right: env(safe-area-inset-right); }
   .min-h-dvh { min-height: 100dvh; }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
 
-/* ── Shared components ── */
+/* ── Peças compartilhadas legadas ── */
 .glass-panel {
   background: color-mix(in srgb, var(--color-surface-medium) 60%, transparent);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
 
-/* Live dot indicator */
 .live-dot {
   width: 6px;
   height: 6px;
@@ -424,38 +630,51 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
   flex-shrink: 0;
 }
 
-/* Floating label inputs */
-.field-float {
-  position: relative;
-}
+/* Campos com rótulo flutuante (login, cadastro, convite) */
+.field-float { position: relative; }
 .field-float input,
 .field-float textarea {
   display: block;
   width: 100%;
-  padding: 22px 16px 10px;
-  background: var(--color-surface-low);
-  border: 1px solid color-mix(in srgb, var(--color-text-primary) 15%, transparent);
-  border-radius: 14px;
+  min-height: 3.5rem;
+  padding: 22px 16px 8px;
+  background: color-mix(in srgb, var(--color-surface-low) 85%, transparent);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
   color: var(--color-text-primary);
-  font-size: 14px;
+  font-size: 15px;
   font-family: var(--font-body);
   outline: none;
-  transition: border-color 200ms, box-shadow 200ms;
+  transition: border-color 180ms, box-shadow 180ms, background-color 180ms;
+}
+.field-float input:hover,
+.field-float textarea:hover {
+  border-color: color-mix(in srgb, var(--color-text-primary) 26%, transparent);
 }
 .field-float input:focus,
 .field-float textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: var(--color-surface-low);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 .field-float label {
   position: absolute;
   left: 16px;
-  top: 8px;
-  font-size: 12px;
-  color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
+  top: 17px;
+  font-size: 15px;
+  color: color-mix(in srgb, var(--color-text-primary) 66%, transparent);
   font-family: var(--font-body);
   pointer-events: none;
-  transition: color 200ms;
+  transform-origin: left top;
+  transition: transform 180ms var(--ease-out-expo), color 180ms;
+}
+/* Rótulo sobe quando o campo tem foco ou valor (placeholder=" " no input) */
+.field-float input:focus ~ label,
+.field-float input:not(:placeholder-shown) ~ label,
+.field-float input:-webkit-autofill ~ label,
+.field-float textarea:focus ~ label,
+.field-float textarea:not(:placeholder-shown) ~ label {
+  transform: translateY(-9px) scale(0.8);
 }
 .field-float input:focus ~ label,
 .field-float textarea:focus ~ label {
@@ -463,15 +682,13 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
 }
 .field-float.has-error input {
   border-color: var(--color-error);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 14%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-error) 12%, transparent);
 }
-.field-float.has-error label {
-  color: var(--color-error);
-}
+.field-float.has-error label { color: var(--color-error); }
 .field-float .field-icon {
   position: absolute;
   right: 14px;
-  top: 50%;
+  top: 28px;
   transform: translateY(-50%);
   color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
   cursor: pointer;
@@ -482,25 +699,10 @@ html:not(.dark) .c4-backdrop span { opacity: 0.8; }
   align-items: center;
 }
 .field-float .field-icon.valid { color: var(--color-primary); }
-
-/* Light mode adjustments for floating fields */
 html:not(.dark) .field-float input,
 html:not(.dark) .field-float textarea {
   background: #fff;
-  border-color: rgba(0,0,0,.12);
-  color: var(--color-text-primary);
 }
-html:not(.dark) .field-float label {
-  color: rgba(0,0,0,.65);
-}
-html:not(.dark) .field-float input:focus,
-html:not(.dark) .field-float textarea:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 16%, transparent);
-}
-
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* Acessibilidade — respeitar preferência do usuário por menos movimento */
 @media (prefers-reduced-motion: reduce) {

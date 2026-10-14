@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import { FadeIn } from '../motion/Movimento';
 import { cn } from '../../lib/utils';
 
 /**
@@ -9,11 +9,15 @@ import { cn } from '../../lib/utils';
  *
  * Props:
  * - title:      nome da tela (Sora, grande)
- * - subtitle:   UMA frase em texto normal dizendo para que a tela serve
+ * - subtitle (ou description): UMA frase em texto normal dizendo para que a tela serve
+ * - eyebrow:    rótulo pequeno acima do título (ex.: nome do módulo) — opcional
  * - icon:       ícone em ladrilho esmeralda — elemento (`<CreditCard />`) ou componente (`CreditCard`)
  * - actions:    botões à direita (no celular quebram para baixo do título)
  * - breadcrumb: trilha acima do título — strings ou { label, to } (o último é a tela atual)
+ * - children:   conteúdo logo abaixo do cabeçalho (ex.: <Tabs.Links> do módulo)
  * - className
+ *
+ * Entrada animada (fade + 8px) que respeita "reduzir movimento".
  */
 function renderIcone(icon) {
   if (React.isValidElement(icon)) return icon;
@@ -47,16 +51,14 @@ function Trilha({ itens }) {
   );
 }
 
-export default function PageHeader({ title, subtitle, actions, breadcrumb, icon, className }) {
+export default function PageHeader({ title, subtitle, description, eyebrow, actions, breadcrumb, icon, children, className }) {
+  const apoio = subtitle ?? description;
   return (
-    <motion.header
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-      className={cn('flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4', className)}
-    >
+    <FadeIn as="header" className={cn('space-y-4', className)}>
+    <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div className="min-w-0">
         {breadcrumb?.length > 0 && <Trilha itens={breadcrumb} />}
+        {eyebrow && !breadcrumb?.length && <p className="c4-eyebrow mb-2">{eyebrow}</p>}
         <div className="flex items-center gap-3.5">
           {icon && (
             <span
@@ -70,13 +72,13 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb, icon,
               {renderIcone(icon)}
             </span>
           )}
-          <h1 className="min-w-0 text-2xl sm:text-3xl font-bold tracking-tight text-text-primary font-display leading-tight">
+          <h1 className="min-w-0 text-[1.625rem] sm:text-[2rem] font-semibold tracking-[-0.025em] text-text-primary font-display leading-tight">
             {title}
           </h1>
         </div>
-        {subtitle && (
+        {apoio && (
           <p className={cn('mt-1.5 text-sm sm:text-[0.95rem] text-text-primary/65 leading-relaxed max-w-2xl text-pretty', icon && 'sm:pl-[3.6rem]')}>
-            {subtitle}
+            {apoio}
           </p>
         )}
       </div>
@@ -85,6 +87,8 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb, icon,
           {actions}
         </div>
       )}
-    </motion.header>
+    </div>
+    {children}
+    </FadeIn>
   );
 }

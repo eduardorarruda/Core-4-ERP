@@ -1,5 +1,5 @@
 #!/bin/sh
-# Entrypoint do Alertmanager do Core 4 ERP.
+# Entrypoint do Alertmanager do Core 4.
 #
 # O Alertmanager NÃO expande variáveis de ambiente no alertmanager.yml. Este script gera a
 # configuração a partir das envs (definidas no .env → docker-compose.yml) e inicia o processo.
