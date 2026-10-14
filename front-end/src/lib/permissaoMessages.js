@@ -77,6 +77,9 @@ const PERMISSAO_MESSAGES = {
   CALENDARIO_VISUALIZAR:      'Você não tem permissão para visualizar o calendário.',
   DASHBOARD_VISUALIZAR:       'Você não tem permissão para acessar o painel principal.',
   DASHBOARD_CARTAO_VISUALIZAR:'Você não tem permissão para visualizar o resumo detalhado de cartões.',
+  // Orçamentos
+  ORCAMENTO_VISUALIZAR:       'Você não tem permissão para visualizar os orçamentos.',
+  ORCAMENTO_EDITAR:           'Você não tem permissão para criar, alterar ou remover orçamentos.',
 };
 
 const PREFIXO = 'Permissão necessária: ';

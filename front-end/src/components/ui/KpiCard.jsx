@@ -112,7 +112,7 @@ export default function KpiCard({
   return (
     <article
       className={cn(
-        'c4-card relative overflow-hidden p-4 sm:p-5 flex flex-col gap-3 min-h-[8.5rem]',
+        '@container c4-card relative overflow-hidden p-4 sm:p-5 flex flex-col gap-3 min-h-[8.5rem]',
         destaque && 'c4-card--destaque border-primary/25',
         className
       )}
@@ -125,7 +125,8 @@ export default function KpiCard({
       />
       <header className="relative flex items-center gap-2.5 min-w-0">
         <IconeKpi icon={icon} classe={t.icone} />
-        <h3 className="text-sm font-medium text-text-primary/70 font-body tracking-normal truncate">{rotulo}</h3>
+        {/* <p> e não <h3>: rótulo de número não é seção — h3 solto depois do h1 quebrava a ordem dos títulos */}
+        <p className="min-w-0 text-sm font-medium text-text-primary/75 font-body tracking-normal leading-snug hyphens-auto">{rotulo}</p>
         {ajuda && (
           <Tooltip conteudo={ajuda}>
             <button type="button" aria-label={`Como é calculado: ${rotulo}`} className="ml-auto -mr-1 w-7 h-7 grid place-items-center rounded-full text-text-primary/45 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -143,7 +144,9 @@ export default function KpiCard({
             value={numero}
             format={formatoAnim}
             colorir={colorirSinal}
-            className={cn('c4-kpi block text-text-primary', destaque && 'sm:text-[2.125rem]')}
+            className="c4-kpi block text-text-primary [overflow-wrap:anywhere]"
+            // Cabe no cartão com qualquer tamanho de texto (175%, zoom 200%): encolhe com a largura do cartão
+            style={{ fontSize: destaque ? 'min(2.125rem, 13cqi)' : 'min(var(--text-kpi), 12.5cqi)' }}
           />
         )}
         {loading && <span className="sr-only">Carregando…</span>}
@@ -155,7 +158,7 @@ export default function KpiCard({
             {temDelta && (
               <>
                 <Delta atual={numero} anterior={anterior} variacao={tendencia} inverter={inverterDelta} />
-                <span className="truncate">{contexto}</span>
+                <span className="min-w-0 leading-snug">{contexto}</span>
               </>
             )}
             {children}
@@ -172,9 +175,12 @@ export default function KpiCard({
  * Props: cols (2 | 3 | 4, padrão 4), className.
  */
 export function KpiGrid({ children, cols = 4, className }) {
-  const colunas = { 2: 'lg:grid-cols-2', 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4' }[cols] ?? 'lg:grid-cols-4';
+  const n = [2, 3, 4].includes(cols) ? cols : 4;
+  // Colunas pelo espaço (em rem), no máximo `cols`: com texto ampliado ou zoom a grade
+  // perde colunas em vez de cortar valores (WCAG 1.4.4 / 1.4.10).
+  const grade = `repeat(auto-fit, minmax(min(100%, max(10rem, calc((100% - ${n - 1} * 1rem) / ${n}))), 1fr))`;
   return (
-    <Stagger className={cn('grid grid-cols-1 min-[380px]:grid-cols-2 gap-3 sm:gap-4', colunas, className)}>
+    <Stagger className={cn('grid gap-3 sm:gap-4', className)} style={{ gridTemplateColumns: grade }}>
       {React.Children.map(children, (filho) => (filho ? <StaggerItem className="min-w-0 [&>article]:h-full">{filho}</StaggerItem> : null))}
     </Stagger>
   );

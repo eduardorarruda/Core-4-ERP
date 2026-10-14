@@ -1,10 +1,12 @@
 import React, { lazy, Suspense, useState, useCallback, useContext, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import BottomNav from './components/layout/BottomNav';
 import FundoVivo from './components/layout/FundoVivo';
+import RodapeApp from './components/layout/RodapeApp';
+import CamadaAcessibilidade from './components/acessibilidade/CamadaAcessibilidade';
 import PwaStatus from './components/layout/PwaStatus';
 import InstalarPwaBanner from './components/layout/InstalarPwaBanner';
 import ChatLauncher from './components/chat/ChatLauncher';
@@ -22,11 +24,11 @@ import { useMediaQuery } from './hooks/useMediaQuery';
 import { usePageMeta } from './hooks/usePageMeta';
 import { useAtalhosGlobais } from './hooks/useAtalhos';
 import { useFocusTrap } from './hooks/useFocusTrap';
+import { useMovimentoReduzido } from './hooks/useAcessibilidade';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeContext } from './context/ThemeContext';
 import { getFirstAccessibleRoute } from './lib/routeUtils';
 import { tituloDaRota } from './lib/navigation';
-import { cn } from './lib/utils';
 
 const DashboardHome     = lazy(() => import('./views/DashboardHome'));
 const Login             = lazy(() => import('./views/Login'));
@@ -61,6 +63,7 @@ const GestaoPerfis       = lazy(() => import('./views/GestaoPerfis'));
 const Ajuda              = lazy(() => import('./views/Ajuda'));
 const Privacidade        = lazy(() => import('./views/Privacidade'));
 const Termos             = lazy(() => import('./views/Termos'));
+const Acessibilidade     = lazy(() => import('./views/Acessibilidade'));
 
 const CHAVE_SIDEBAR = 'c4_sidebar_recolhida';
 
@@ -118,7 +121,7 @@ function SenhaProvisoriaModal({ open, onConfirm, onSair }) {
 /** Menu lateral no celular: gaveta da esquerda com mola, foco preso e Esc para fechar. */
 function MenuMobile({ aberto, onFechar, onBuscar }) {
   const painelRef = useRef(null);
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   useFocusTrap(aberto, painelRef, { onClose: onFechar });
   return (
     <AnimatePresence>
@@ -181,7 +184,7 @@ function ProtectedLayout() {
   // Título da aba a partir da navegação; telas autenticadas não são indexadas
   usePageMeta({ title: tituloDaRota(pathname) ?? 'Core 4', noindex: true });
 
-  // Cada tela começa do topo (o <main> é o contêiner que rola)
+  // Cada tela começa do topo (o contêiner do <main> é quem rola)
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [pathname]);
@@ -206,26 +209,29 @@ function ProtectedLayout() {
       <div className="flex-1 flex flex-col min-w-0 relative z-[1]">
         <TopNav onCommandPaletteOpen={openCmd} />
         <PwaStatus />
-        <main
-          id="main-content"
-          ref={mainRef}
-          tabIndex={-1}
-          className={cn('flex-1 min-h-0 outline-none', fullBleed ? 'overflow-hidden' : 'overflow-y-auto overscroll-contain')}
-        >
-          {fullBleed ? (
+        {fullBleed ? (
+          <main id="main-content" ref={mainRef} tabIndex={-1} className="flex-1 min-h-0 outline-none overflow-hidden">
             <Suspense fallback={<div className="p-6"><PageSkeleton kpis={0} /></div>}>
               <Outlet />
             </Suspense>
-          ) : (
-            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-28 lg:pb-12">
+          </main>
+        ) : (
+          // O contêiner rola; dentro dele, <main> (conteúdo) + <footer> (ajuda e documentos, sempre no mesmo lugar)
+          <div ref={mainRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col">
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-10 outline-none"
+            >
               <PageTransition key={pathname}>
                 <Suspense fallback={<PageSkeleton />}>
                   <Outlet />
                 </Suspense>
               </PageTransition>
-            </div>
-          )}
-        </main>
+            </main>
+            <RodapeApp className="pb-28 lg:pb-6" />
+          </div>
+        )}
       </div>
 
       <ChatLauncher />
@@ -259,13 +265,8 @@ export default function App() {
       <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
-          {/* Pular navegação (acessibilidade) */}
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[999] focus:px-4 focus:py-2 focus:bg-primary focus:text-on-primary focus:rounded-lg focus:text-sm focus:font-bold"
-          >
-            Ir para o conteúdo
-          </a>
+          {/* Modo de acessibilidade: links "pular para…", anúncio de troca de página, guia de leitura e painel (Alt+A) */}
+          <CamadaAcessibilidade />
 
           <ErrorBoundary>
           <Suspense fallback={<div className="min-h-dvh bg-surface" />}>
@@ -276,6 +277,7 @@ export default function App() {
             <Route path="/aceitar-convite"    element={<AceitarConvite />} />
             <Route path="/privacidade"        element={<Privacidade />} />
             <Route path="/termos"             element={<Termos />} />
+            <Route path="/acessibilidade"     element={<Acessibilidade />} />
 
             {/* Área logada: um único layout (menu, barra, transição) para todas as telas */}
             <Route element={<ProtectedLayout />}>

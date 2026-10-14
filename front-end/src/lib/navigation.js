@@ -3,7 +3,7 @@ import {
   ReceiptText, CreditCard, Landmark, TrendingUp, GitMerge,
   Users, Tag, Repeat,
   UserCog, ShieldCheck, Gavel,
-  Settings, HelpCircle,
+  Settings, HelpCircle, Accessibility,
 } from 'lucide-react';
 
 /*
@@ -130,6 +130,8 @@ export const NAV = [
 export const NAV_CONTA = [
   { id: 'configuracoes', label: 'Configurações', icon: Settings, path: '/configuracoes', rotas: ['/configuracoes'], desc: 'Perfil, segurança e preferências' },
   { id: 'ajuda', label: 'Central de Ajuda', icon: HelpCircle, path: '/ajuda', rotas: ['/ajuda'], desc: 'Aprenda a usar cada tela' },
+  // Página pública (declaração); o painel de ajustes abre com Alt+A ou pela busca
+  { id: 'acessibilidade', label: 'Acessibilidade', icon: Accessibility, path: '/acessibilidade', rotas: ['/acessibilidade'], desc: 'Declaração de acessibilidade e modos disponíveis' },
 ];
 
 /**

@@ -211,4 +211,58 @@ Fonte única: Sidebar, BottomNav, CommandPalette, trilha da TopNav e `document.t
 de destino ler `?novo=` e abrir o formulário.
 
 ## Atalhos
-Ctrl/⌘+K busca · Alt+T tema · Alt+P modo privacidade (valores com `valor-privado` ficam borrados).
+Ctrl/⌘+K busca · Alt+T tema · Alt+P modo privacidade (valores com `valor-privado` ficam borrados) · Alt+A acessibilidade.
+
+## Acessibilidade (modo A11y · WCAG 2.2 AA)
+
+O painel **Acessibilidade** (botão na TopNav, login, busca ou **Alt+A**) grava preferências em `localStorage`
+(`core4.acessibilidade`) e as aplica como atributos no `<html>`. O CSS (`index.css › MODO DE ACESSIBILIDADE`)
+faz o resto — **a tela só acompanha se usar tokens**. Declaração pública: `/acessibilidade`.
+
+| Atributo no `<html>` | Efeito |
+|---|---|
+| `data-texto="112_5\|125\|150\|175"` | escala a raiz (tudo em `rem` cresce) |
+| `data-contraste="alto"` | tokens AAA, superfícies sólidas, `text-text-primary/NN` vira 100%, sem vidro |
+| `data-movimento="reduzido\|desligado"`, `data-pausar` | CSS sem animação; `MotionConfig reducedMotion="always"`; "desligado/pausar" = motion instantâneo |
+| `data-fonte="legibilidade\|dislexia"` | Atkinson Hyperlegible / Lexend (carregadas sob demanda) |
+| `data-espacamento="amplo"` | WCAG 1.4.12 (linha 1.5, letra .12em, palavra .16em, parágrafo 2em) |
+| `data-daltonismo="protanopia\|deuteranopia\|tritanopia\|monocromia"` | troca `--color-chart-*`, `income/expense/invest` |
+| `data-padroes` | texturas nas séries de gráfico |
+| `data-leitura="simplificada"` | some `.c4-backdrop`, `[data-decorativo]`, auras e brilhos |
+| `data-sublinhar-links`, `data-foco="destacado"`, `data-alvos="amplos"`, `data-cursor="grande"` | links sublinhados, foco preto/amarelo, alvos 48px, cursor grande |
+
+**APIs**
+```jsx
+import { useAcessibilidade, useMovimentoReduzido } from '../hooks/useAcessibilidade';
+const { efetivo, abrirPainel, anunciar, padroesAtivos } = useAcessibilidade();
+const reduzir = useMovimentoReduzido();   // use NO LUGAR de useReducedMotion (que só olha o sistema)
+anunciar('Conta salva.');                  // fala no leitor de tela (aria-live polite)
+
+import { usePadroesGrafico, CORES_GRAFICO } from '../lib/chartTheme';
+const padroes = usePadroesGrafico();       // ou usePadroesGrafico([CORES_GRAFICO.entrada, CORES_GRAFICO.saida])
+<BarChart><defs>{padroes.defs}</defs>
+  <Bar dataKey="a" fill={padroes.preencher(0)} /><Bar dataKey="b" fill={padroes.preencher(1)} /></BarChart>
+<span style={padroes.estiloAmostra(0)} />   // amostra da legenda HTML com a mesma textura
+```
+`areaProps`/`barraProps`/`pizzaProps` já desligam a animação do Recharts com movimento reduzido — espalhe-os.
+`DonutChart` já usa padrões. `KpiGrid` perde colunas com texto grande (não corta valores).
+
+**Regras para TODAS as telas**
+1. Só tokens: cores (`text-*`, `bg-*`, `var(--color-*)`), raios, fontes; nada de hex/rgba nem `px` em fonte (use `text-sm`, `rem`).
+   Texto de apoio no mínimo `text-text-primary/65` (abaixo disso só placeholder/ícone decorativo). Campos: `border-border-control`.
+2. Animação só com `motion/react` + `components/motion` (e `useMovimentoReduzido`). Nada de `animate-*` infinito novo.
+3. Gráficos: `--color-chart-*` via `chartTheme`, `GraficoAcessivel` (resumo + tabela), legenda com texto, `usePadroesGrafico`
+   quando houver séries lado a lado. Entrada/saída com sinal (+/−) e ícone, nunca só cor.
+4. Status = texto + ícone. Ícone decorativo `aria-hidden`. Ilustração/brilho decorativo: `data-decorativo` (some na leitura simplificada).
+5. Um `<h1>` por tela (o `PageHeader`); depois `h2` (títulos de `Card`/`BentoCard`), `h3`… sem pular nível.
+   `GroupedList` usa `h2` (passe `nivelTitulo={3}` dentro de um Card). Rótulo de KPI não é título.
+6. Alvos ≥ 44px no toque (o CSS já garante mínimo 24px e 44px em `pointer: coarse`; `data-alvo-compacto` só com justificativa).
+7. Formulário: rótulo visível (`FormField`), ajuda/erro por `aria-describedby`, `autocomplete` certo, sem limite de tempo,
+   sem bloquear colar; não pedir de novo o que já foi digitado no mesmo fluxo (3.3.7).
+8. Nada só no hover; tudo por teclado; `Modal`/`Drawer` (foco preso, Esc, foco volta). Arrastar sempre com alternativa de clique (2.5.7).
+9. Reflow: 320px de largura e texto 175–200% sem rolagem lateral. Evite `truncate`/`whitespace-nowrap` em texto essencial
+   e larguras mínimas fixas (`min-w-[12rem]` → `min-w-[min(12rem,100%)]`). Tabela `sr-only` sempre dentro de `<div className="sr-only">`.
+10. Linguagem simples; erro diz o que fazer. Toast de erro não some sozinho.
+
+Shell (já pronto, não repetir nas telas): links "Pular para…", landmarks (header/nav/main/footer), anúncio
+"Página X carregada" + foco no `<h1>` ao trocar de rota, rodapé com Ajuda/Acessibilidade/Privacidade/Termos.

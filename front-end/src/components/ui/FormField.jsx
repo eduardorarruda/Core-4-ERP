@@ -8,10 +8,10 @@ const FOCO = 'focus-visible:ring-2 focus-visible:ring-primary/70 focus:border-pr
 const CAMPO = 'w-full bg-surface-low border rounded-xl text-text-primary outline-none text-sm font-body transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-text-primary/45 disabled:opacity-60 disabled:cursor-not-allowed';
 
 export const inputCls =
-  `${CAMPO} border-border-strong hover:border-text-primary/25 px-4 py-3 min-h-11 ${FOCO}`;
+  `${CAMPO} border-border-control hover:border-text-primary/60 px-4 py-3 min-h-11 ${FOCO}`;
 
 export const inputSmCls =
-  `${CAMPO} border-border-strong hover:border-text-primary/25 px-3.5 py-2 min-h-11 ${FOCO}`;
+  `${CAMPO} border-border-control hover:border-text-primary/60 px-3.5 py-2 min-h-11 ${FOCO}`;
 
 export const labelCls =
   'text-[0.8125rem] font-medium text-text-primary/75 font-body';

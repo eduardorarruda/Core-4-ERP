@@ -30,6 +30,7 @@ export default function Sidebar({ recolhida = false, onAlternarRecolhida, onNavi
 
   return (
     <aside
+      aria-label="Menu lateral"
       className={cn(
         'h-dvh flex flex-col bg-surface-low/80 backdrop-blur-xl border-r border-border pt-safe pb-safe',
         'transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
@@ -41,10 +42,10 @@ export default function Sidebar({ recolhida = false, onAlternarRecolhida, onNavi
         <NavLink
           to={inicio}
           onClick={onNavigate}
-          aria-label="Core 4 — ir para o início"
           className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <BrandLogo size="sm" somenteSimbolo={compacta} as="span" />
+          <span className="sr-only">, ir para o início</span>
         </NavLink>
         {drawer && (
           <button
@@ -65,7 +66,8 @@ export default function Sidebar({ recolhida = false, onAlternarRecolhida, onNavi
             type="button"
             onClick={onBuscar}
             title={compacta ? 'Buscar (Ctrl+K)' : undefined}
-            aria-label="Buscar no Core 4 (Ctrl+K)"
+            aria-label={compacta ? 'Buscar' : undefined}
+            aria-keyshortcuts="Control+K"
             className={cn(
               'w-full flex items-center gap-2.5 min-h-10 rounded-xl text-sm text-text-primary/60',
               'bg-text-primary/[0.04] border border-border hover:border-border-strong hover:text-text-primary transition-colors',
@@ -86,7 +88,7 @@ export default function Sidebar({ recolhida = false, onAlternarRecolhida, onNavi
 
       {/* Navegação */}
       <IndicatorGroup id={drawer ? "sidebar-drawer" : "sidebar"}>
-        <nav aria-label="Menu principal" className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-3 pt-3 pb-4">
+        <nav id={drawer ? undefined : "navegacao-principal"} aria-label="Menu principal" data-navegacao-principal="" className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-3 pt-3 pb-4">
           {grupos.map((grupo, gi) => (
             <div key={grupo.id} className={cn(gi > 0 && 'mt-5')}>
               {compacta ? (

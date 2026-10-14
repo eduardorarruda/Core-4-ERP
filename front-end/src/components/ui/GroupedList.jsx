@@ -21,7 +21,8 @@ import { Stagger, StaggerItem } from '../motion/Movimento';
  *
  * Props: grupos [{ id, titulo, tom ('critico'|'atencao'|'info'|'neutro'|'sucesso'), icon, total, itens }],
  *        renderItem(item, grupo), keyItem(item), formatoTotal ((n) => string; padrão moeda),
- *        ocultarVazios (true), className.
+ *        ocultarVazios (true), className,
+ *        nivelTitulo (2): nível do título de cada grupo — use 3 quando a lista estiver dentro de um Card (h2).
  */
 const TONS = {
   critico: { titulo: 'text-expense', caixa: 'border-expense/30 bg-expense/[0.05]' },
@@ -38,7 +39,8 @@ function IconeGrupo({ icon }) {
   return <Comp className="w-3.5 h-3.5" aria-hidden="true" />;
 }
 
-export default function GroupedList({ grupos = [], renderItem, keyItem = (i) => i.id, formatoTotal = (n) => formatarMoeda(n), ocultarVazios = true, className }) {
+export default function GroupedList({ grupos = [], renderItem, keyItem = (i) => i.id, formatoTotal = (n) => formatarMoeda(n), ocultarVazios = true, className, nivelTitulo = 2 }) {
+  const Titulo = `h${Math.min(6, Math.max(2, Number(nivelTitulo) || 2))}`;
   const visiveis = ocultarVazios ? grupos.filter((g) => g.itens?.length) : grupos;
   return (
     <div className={cn('space-y-5', className)}>
@@ -48,11 +50,11 @@ export default function GroupedList({ grupos = [], renderItem, keyItem = (i) => 
         return (
           <section key={g.id} aria-labelledby={idTitulo} className={cn('rounded-2xl', tom.caixa && cn('border p-2 sm:p-3', tom.caixa))}>
             <header className="flex items-center justify-between gap-3 px-2 pb-2">
-              <h3 id={idTitulo} className={cn('flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] font-body', tom.titulo)}>
+              <Titulo id={idTitulo} className={cn('flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] font-body', tom.titulo)}>
                 <IconeGrupo icon={g.icon} />
                 {g.titulo}
-                <span className="ml-1 text-text-primary/45 tabular-nums">· {g.itens?.length ?? 0}</span>
-              </h3>
+                <span className="ml-1 text-text-primary/65 tabular-nums">· {g.itens?.length ?? 0}</span>
+              </Titulo>
               {g.total != null && (
                 <span className="text-sm font-semibold tabular-nums valor-privado">{formatoTotal(g.total)}</span>
               )}

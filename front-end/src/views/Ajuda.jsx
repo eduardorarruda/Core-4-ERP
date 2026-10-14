@@ -1,77 +1,105 @@
-import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
-  Search, X, ChevronDown, ExternalLink, Lightbulb, Lock,
-  // ícones das seções (resolvidos por nome via ICON_MAP)
-  Sparkles, LayoutDashboard, FileText, Landmark, CalendarDays,
-  CreditCard, ReceiptText, GitCompareArrows, ArrowLeftRight, Users, Tag,
-  TrendingUp, Repeat, BarChart3, Gavel, UserCog, ShieldCheck, Settings, Smartphone,
+  Accessibility, ArrowRight, BarChart3, CalendarDays, ChevronDown, CreditCard, ExternalLink, FileText, Gavel,
+  GitCompareArrows, Keyboard, Landmark, LayoutDashboard, LifeBuoy, Lightbulb, Lock, ReceiptText, Repeat, Search,
+  MessageSquareText, Settings, ShieldCheck, Smartphone, Sparkles, Tag, Target, TrendingUp, UserCog, Users, Wallet, X,
 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
+import Button from '../components/ui/Button';
+import { Revelar, Stagger, StaggerItem } from '../components/motion/Movimento';
 import { useAuth } from '../hooks/useAuth';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useAcessibilidade } from '../hooks/useAcessibilidade';
+import ListaAtalhos from '../components/configuracoes/ListaAtalhos';
+import { ATALHOS } from '../components/acessibilidade/textos';
 import { AJUDA_GRUPOS, AJUDA_SECOES } from '../content/ajudaContent';
+import { cn } from '../lib/utils';
 
-// Mapa nome-do-ícone (string no conteúdo) → componente lucide. Fallback: FileText.
-const ICON_MAP = {
-  Sparkles, LayoutDashboard, FileText, Landmark, CalendarDays,
-  CreditCard, ReceiptText, GitCompareArrows, ArrowLeftRight, Users, Tag,
-  TrendingUp, Repeat, BarChart3, Gavel, UserCog, ShieldCheck, Settings, Smartphone,
+// Nome do ícone (string no conteúdo) → componente lucide. Fallback: FileText.
+const ICONES = {
+  Sparkles, LayoutDashboard, FileText, Landmark, CalendarDays, CreditCard, ReceiptText, GitCompareArrows, Users, Tag,
+  TrendingUp, Repeat, BarChart3, Gavel, UserCog, ShieldCheck, Settings, Smartphone, Lightbulb, Target, Wallet, Accessibility, MessageSquareText,
 };
 function Icone({ nome, className }) {
-  const Cmp = ICON_MAP[nome] ?? FileText;
+  const Cmp = ICONES[nome] ?? FileText;
   return <Cmp className={className} aria-hidden="true" />;
 }
 
+const PERGUNTAS_RAPIDAS = [
+  { rotulo: 'Como baixo uma conta?', ancora: 'lancamentos' },
+  { rotulo: 'Como concilio o extrato?', ancora: 'conciliacao' },
+  { rotulo: 'Como a Áurea confirma ações?', ancora: 'aurea' },
+  { rotulo: 'Como convido alguém?', ancora: 'operadores' },
+  { rotulo: 'Atalhos de teclado', ancora: 'atalhos' },
+];
+
+const normalizar = (t) => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 function combina(secao, termo) {
   if (!termo) return true;
-  const t = termo.toLowerCase();
-  const alvo = [
-    secao.titulo,
-    secao.resumo,
-    ...(secao.comoUsar ?? []),
-    ...(secao.dicas ?? []),
-    ...(secao.faq ?? []).flatMap((f) => [f.p, f.r]),
-  ].join(' ').toLowerCase();
-  return alvo.includes(t);
+  const alvo = normalizar([
+    secao.titulo, secao.resumo, ...(secao.comoUsar ?? []), ...(secao.dicas ?? []),
+    ...(secao.faq ?? []).flatMap((f) => [f.p, f.r]), ...(secao.palavras ?? []),
+  ].join(' '));
+  return normalizar(termo).split(/\s+/).every((p) => alvo.includes(p));
 }
 
-// Cartão de uma seção — conteúdo compartilhado entre desktop e mobile.
-function ConteudoSecao({ secao, temAcesso }) {
+/** Destaca o termo buscado (ignora acentos e caixa). */
+function Destaque({ texto, termo }) {
+  if (!termo || !texto) return texto;
+  const alvo = normalizar(texto);
+  const t = normalizar(termo.trim().split(/\s+/)[0]);
+  const i = t ? alvo.indexOf(t) : -1;
+  if (i < 0) return texto;
   return (
     <>
-      <p className="text-sm text-text-primary/70 leading-relaxed">{secao.resumo}</p>
+      {texto.slice(0, i)}
+      <mark className="rounded px-0.5 bg-primary/25 text-text-primary">{texto.slice(i, i + t.length)}</mark>
+      {texto.slice(i + t.length)}
+    </>
+  );
+}
 
+function ConteudoSecao({ secao, temAcesso, termo }) {
+  return (
+    <div className="space-y-5">
       {secao.comoUsar?.length > 0 && (
-        <div className="mt-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary/70 mb-2">Como usar</h4>
-          <ol className="list-decimal pl-5 space-y-1.5 text-sm text-text-primary/80 marker:text-primary marker:font-bold">
-            {secao.comoUsar.map((passo, i) => <li key={i} className="leading-relaxed">{passo}</li>)}
+        <div>
+          <h4 className="c4-eyebrow mb-2.5">Como funciona</h4>
+          <ol className="space-y-2">
+            {secao.comoUsar.map((passo, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm text-text-primary/85 leading-relaxed">
+                <span className="grid place-items-center w-6 h-6 shrink-0 rounded-full bg-primary/12 text-primary text-xs font-semibold tabular-nums" aria-hidden="true">{i + 1}</span>
+                <span className="pt-0.5"><Destaque texto={passo} termo={termo} /></span>
+              </li>
+            ))}
           </ol>
         </div>
       )}
 
       {secao.dicas?.length > 0 && (
-        <div className="mt-4 rounded-xl bg-surface-medium p-3">
-          <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary mb-1.5">
-            <Lightbulb className="w-3.5 h-3.5" aria-hidden="true" /> Dicas
+        <div className="rounded-xl border border-primary/20 bg-primary/[0.06] p-3.5">
+          <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text-primary mb-1.5">
+            <Lightbulb className="w-4 h-4 text-primary" aria-hidden="true" /> Dicas
           </h4>
-          <ul className="space-y-1 text-sm text-text-primary/75">
-            {secao.dicas.map((d, i) => <li key={i} className="leading-relaxed">{d}</li>)}
+          <ul className="space-y-1 text-sm text-text-primary/80 list-disc pl-5 marker:text-primary/60">
+            {secao.dicas.map((d, i) => <li key={i} className="leading-relaxed"><Destaque texto={d} termo={termo} /></li>)}
           </ul>
         </div>
       )}
 
       {secao.faq?.length > 0 && (
-        <div className="mt-4">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-text-primary/70 mb-2">Perguntas frequentes</h4>
+        <div>
+          <h4 className="c4-eyebrow mb-2">Perguntas frequentes</h4>
           <div className="space-y-2">
             {secao.faq.map((f, i) => (
-              <details key={i} className="group rounded-xl bg-surface-medium overflow-hidden">
-                <summary className="flex items-center justify-between gap-2 cursor-pointer list-none min-h-11 px-3 py-2 text-sm font-medium text-text-primary">
-                  <span>{f.p}</span>
-                  <ChevronDown className="w-4 h-4 shrink-0 text-text-primary/40 transition-transform group-open:rotate-180" aria-hidden="true" />
+              <details key={i} className="group rounded-xl border border-border bg-surface overflow-hidden" open={Boolean(termo) && combina({ titulo: f.p, resumo: f.r }, termo)}>
+                <summary className="flex items-center justify-between gap-2 cursor-pointer list-none min-h-11 px-3.5 py-2.5 text-sm font-medium text-text-primary hover:bg-surface-medium/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+                  <span><Destaque texto={f.p} termo={termo} /></span>
+                  <ChevronDown className="w-4 h-4 shrink-0 text-text-primary/50 transition-transform group-open:rotate-180" aria-hidden="true" />
                 </summary>
-                <p className="px-3 pb-3 text-sm text-text-primary/70 leading-relaxed">{f.r}</p>
+                <p className="px-3.5 pb-3.5 text-sm text-text-primary/75 leading-relaxed"><Destaque texto={f.r} termo={termo} /></p>
               </details>
             ))}
           </div>
@@ -81,214 +109,268 @@ function ConteudoSecao({ secao, temAcesso }) {
       {secao.rota && temAcesso && (
         <Link
           to={secao.rota}
-          className="mt-4 inline-flex items-center gap-1.5 min-h-11 text-sm font-medium text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-primary rounded-lg hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          <ExternalLink className="w-4 h-4" aria-hidden="true" /> Abrir esta tela
+          Abrir {secao.titulo.split(',')[0]} <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Link>
       )}
+    </div>
+  );
+}
+
+/** Um tópico: aberto no desktop; no celular vira um item de acordeão. */
+function Artigo({ secao, temAcesso, termo, recolhivel, aberto, onAlternar }) {
+  const corpoId = `ajuda-corpo-${secao.id}`;
+  const cabecalho = (
+    <>
+      <span className="grid place-items-center w-10 h-10 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 shrink-0">
+        <Icone nome={secao.icone} className="w-5 h-5" />
+      </span>
+      <span className="min-w-0 flex-1 text-left">
+        <span className="block text-base font-semibold text-text-primary font-display"><Destaque texto={secao.titulo} termo={termo} /></span>
+        <span className="block text-sm text-text-primary/70 leading-relaxed mt-0.5"><Destaque texto={secao.resumo} termo={termo} /></span>
+      </span>
     </>
+  );
+  return (
+    <article id={secao.id} className="scroll-mt-24 c4-card p-4 sm:p-5">
+      {recolhivel ? (
+        <h3>
+          <button
+            type="button"
+            onClick={onAlternar}
+            aria-expanded={aberto}
+            aria-controls={corpoId}
+            className="w-full flex items-start gap-3 rounded-xl -m-1 p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {cabecalho}
+            <ChevronDown className={cn('w-5 h-5 mt-2.5 shrink-0 text-text-primary/50 transition-transform', aberto && 'rotate-180')} aria-hidden="true" />
+          </button>
+        </h3>
+      ) : (
+        <h3 className="flex items-start gap-3">{cabecalho}</h3>
+      )}
+      {recolhivel ? (
+        <Revelar aberto={aberto} id={corpoId}>
+          <div className="pt-4"><ConteudoSecao secao={secao} temAcesso={temAcesso} termo={termo} /></div>
+        </Revelar>
+      ) : (
+        <div className="pt-4 sm:pl-[3.25rem]"><ConteudoSecao secao={secao} temAcesso={temAcesso} termo={termo} /></div>
+      )}
+    </article>
+  );
+}
+
+function SecaoAtalhos() {
+  const { abrirPainel } = useAcessibilidade();
+  return (
+    <section id="atalhos" aria-labelledby="titulo-atalhos" className="scroll-mt-24 c4-card p-4 sm:p-5">
+      <h2 id="titulo-atalhos" className="flex items-center gap-3 text-lg font-semibold text-text-primary font-display">
+        <span className="grid place-items-center w-10 h-10 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20" aria-hidden="true">
+          <Keyboard className="w-5 h-5" />
+        </span>
+        Atalhos de teclado e acessibilidade
+      </h2>
+      <p className="mt-2 text-sm text-text-primary/70 leading-relaxed">
+        Todos os atalhos usam uma tecla junto (Alt ou Ctrl), para não dispararem sem querer. Dá para desligar os atalhos com Alt no painel de acessibilidade.
+      </p>
+      <div className="mt-4"><ListaAtalhos atalhos={ATALHOS} /></div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={abrirPainel} leftIcon={<Accessibility className="w-4 h-4" aria-hidden="true" />}>
+          Abrir opções de acessibilidade
+        </Button>
+        <Link to="/acessibilidade" className="inline-flex items-center gap-1.5 min-h-11 px-3 text-sm font-medium text-primary rounded-lg hover:underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          Declaração de acessibilidade <ExternalLink className="w-4 h-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function OutrosRecursos({ secoes }) {
+  return (
+    <details className="group c4-card overflow-hidden">
+      <summary className="flex items-center gap-3 cursor-pointer list-none min-h-11 p-4 sm:p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary">
+        <span className="grid place-items-center w-10 h-10 rounded-xl bg-surface-medium shrink-0">
+          <Lock className="w-5 h-5 text-text-primary/60" aria-hidden="true" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-base font-semibold text-text-primary">Telas que seu perfil não abre</span>
+          <span className="block text-sm text-text-primary/70">Existem no Core 4, mas pedem um acesso que você não tem.</span>
+        </span>
+        <ChevronDown className="w-5 h-5 shrink-0 text-text-primary/50 transition-transform group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="px-4 sm:px-5 pb-5 space-y-3">
+        <p className="text-sm text-text-primary/70 leading-relaxed">Se precisar de alguma, fale com o administrador da sua empresa.</p>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {secoes.map((s) => (
+            <li key={s.id} className="rounded-xl bg-surface-medium/70 p-3.5">
+              <p className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                <Icone nome={s.icone} className="w-4 h-4 text-text-primary/60" /> {s.titulo}
+              </p>
+              <p className="text-sm text-text-primary/70 leading-relaxed mt-1">{s.resumo}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }
 
 export default function Ajuda() {
   const { temPermissao } = useAuth();
+  const { hash } = useLocation();
+  const largo = useMediaQuery('(min-width: 1024px)');
   const [busca, setBusca] = useState('');
-  const [abertoMobile, setAbertoMobile] = useState(null); // id da seção aberta no accordion mobile
+  const [abertos, setAbertos] = useState(() => new Set());
+  const ancora = decodeURIComponent(hash.slice(1));
+  const termo = busca.trim();
 
-  const temAcesso = (secao) => secao.permissao == null || temPermissao(secao.permissao);
+  const temAcesso = (s) => {
+    if (s.permissoesAlguma) return s.permissoesAlguma.some((p) => temPermissao(p));
+    return s.permissao == null || temPermissao(s.permissao);
+  };
 
-  // Seções filtradas pela busca.
-  const filtradas = useMemo(
-    () => AJUDA_SECOES.filter((s) => combina(s, busca.trim())),
-    [busca]
-  );
-
-  // Separa em acessíveis (agrupadas) e sem-acesso (bloco final).
+  const filtradas = useMemo(() => AJUDA_SECOES.filter((s) => combina(s, termo)), [termo]);
   const acessiveis = filtradas.filter(temAcesso);
   const semAcesso = filtradas.filter((s) => !temAcesso(s));
-
-  // Grupos que têm ao menos uma seção acessível após a busca.
-  const gruposVisiveis = AJUDA_GRUPOS
+  const grupos = AJUDA_GRUPOS
     .map((g) => ({ ...g, secoes: acessiveis.filter((s) => s.grupo === g.id) }))
     .filter((g) => g.secoes.length > 0);
+  const atalhosCombina = !termo || combina({ titulo: 'Atalhos de teclado acessibilidade', palavras: ['atalho', 'teclado', 'alt', 'ctrl'] }, termo);
 
-  const total = filtradas.length;
+  // Link com âncora (ex.: /ajuda#aurea, vindo da busca Ctrl+K): rola até o tópico
+  useEffect(() => {
+    if (!ancora) return;
+    const el = document.getElementById(ancora);
+    el?.scrollIntoView({ block: 'start' });
+  }, [ancora]);
+
+  const alternar = (id) => setAbertos((atual) => {
+    const prox = new Set(atual);
+    if (prox.has(id)) prox.delete(id); else prox.add(id);
+    return prox;
+  });
+  // No celular, com busca ativa ou âncora, o tópico já abre
+  const estaAberto = (id) => abertos.has(id) || id === ancora || (termo && filtradas.length <= 3);
+
+  const total = filtradas.length + (termo && atalhosCombina ? 1 : 0);
 
   return (
-    <div className="space-y-6 pb-16">
-      <PageHeader title="Central de Ajuda" subtitle="Aprenda a usar cada tela do Core 4" />
+    <div className="space-y-8 pb-16">
+      <PageHeader title="Central de Ajuda" subtitle="Como cada tela funciona, em poucas linhas." icon={LifeBuoy} />
 
-      {/* Busca */}
-      <div role="search" className="relative max-w-xl">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-primary/40 pointer-events-none" aria-hidden="true" />
-        <input
-          type="search"
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar na ajuda (ex.: baixar conta, cartão, convidar)..."
-          aria-label="Buscar na Central de Ajuda"
-          className="w-full min-h-11 rounded-xl bg-surface-low border border-text-primary/10 pl-10 pr-10 text-sm text-text-primary placeholder:text-text-primary/50 outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        />
-        {busca && (
-          <button
-            type="button"
-            onClick={() => setBusca('')}
-            aria-label="Limpar busca"
-            className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center w-9 h-9 rounded-lg text-text-primary/60 hover:text-text-primary hover:bg-surface-medium"
-          >
-            <X className="w-4 h-4" aria-hidden="true" />
-          </button>
+      <section aria-label="Buscar na ajuda" className="c4-card c4-card--destaque p-5 sm:p-7">
+        <h2 className="text-lg sm:text-xl font-semibold text-text-primary font-display">Em que podemos ajudar?</h2>
+        <div role="search" className="relative mt-4 max-w-2xl">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-primary/50 pointer-events-none" aria-hidden="true" />
+          <label htmlFor="busca-ajuda" className="sr-only">Buscar na Central de Ajuda</label>
+          <input
+            id="busca-ajuda"
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Ex.: baixar conta, fatura, convidar, contraste"
+            className="w-full min-h-13 rounded-2xl bg-surface border border-border-strong pl-12 pr-12 text-base text-text-primary placeholder:text-text-primary/50 outline-none focus-visible:ring-2 focus-visible:ring-primary focus:border-primary/50"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => setBusca('')}
+              aria-label="Limpar busca"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center w-11 h-11 rounded-xl text-text-primary/60 hover:text-text-primary hover:bg-surface-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <p aria-live="polite" className={cn('mt-3 text-sm text-text-primary/70', !termo && 'sr-only')}>
+          {termo ? `${total} ${total === 1 ? 'tópico encontrado' : 'tópicos encontrados'} para “${termo}”.` : ''}
+        </p>
+        {!termo && (
+          <ul className="mt-4 flex flex-wrap gap-2" aria-label="Perguntas comuns">
+            {PERGUNTAS_RAPIDAS.map((p) => (
+              <li key={p.ancora}>
+                <a href={`#${p.ancora}`} className="inline-flex items-center min-h-11 px-3.5 rounded-full border border-border-strong bg-surface/70 text-sm text-text-primary/85 hover:border-primary/50 hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  {p.rotulo}
+                </a>
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
-      <p aria-live="polite" className="sr-only">{total} tópicos encontrados</p>
-      {busca && (
-        <p className="text-sm text-text-primary/70 -mt-3">{total} {total === 1 ? 'tópico encontrado' : 'tópicos encontrados'}</p>
+      </section>
+
+      {!termo && (
+        <nav aria-label="Assuntos da ajuda">
+          <h2 className="c4-eyebrow mb-3">Navegue por assunto</h2>
+          <Stagger as="ul" className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {AJUDA_GRUPOS.filter((g) => grupos.some((x) => x.id === g.id)).map((g) => (
+              <StaggerItem as="li" key={g.id}>
+                <a href={`#grupo-${g.id}`} className="c4-card c4-card--interativo h-full flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <Icone nome={g.icone} className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-semibold text-text-primary">{g.titulo}</span>
+                  <span className="text-xs text-text-primary/65 leading-snug">{g.descricao}</span>
+                </a>
+              </StaggerItem>
+            ))}
+          </Stagger>
+        </nav>
       )}
 
       {total === 0 && (
-        <div className="rounded-2xl bg-surface-low p-8 text-center">
-          <p className="text-sm text-text-primary/60">Nenhum tópico encontrado para “{busca}”. Tente outras palavras.</p>
+        <div className="c4-card p-8 text-center">
+          <p className="text-base font-semibold text-text-primary">Nada encontrado para “{termo}”.</p>
+          <p className="mt-1 text-sm text-text-primary/70">Tente outra palavra, ou pergunte à Áurea: ela conhece as telas do Core 4.</p>
+          <Link to="/assistente" className="mt-4 inline-flex items-center gap-1.5 min-h-11 text-sm font-semibold text-primary hover:underline underline-offset-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            <Sparkles className="w-4 h-4" aria-hidden="true" /> Perguntar à Áurea
+          </Link>
         </div>
       )}
 
-      {/* ───────── DESKTOP: TOC + conteúdo ───────── */}
-      <div className="hidden lg:grid lg:grid-cols-[240px_1fr] lg:gap-8 lg:items-start">
-        {/* TOC */}
-        <nav aria-label="Índice da ajuda" className="sticky top-20 space-y-4 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
-          {gruposVisiveis.map((g) => (
-            <div key={g.id}>
-              <p className="text-xs font-bold uppercase tracking-wider text-text-primary/60 mb-1.5">{g.titulo}</p>
-              <ul className="space-y-0.5">
-                {g.secoes.map((s) => (
-                  <li key={s.id}>
-                    <a
-                      href={`#${s.id}`}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-primary/70 hover:bg-surface-medium hover:text-text-primary transition-colors"
-                    >
-                      <Icone nome={s.icone} className="w-4 h-4 text-primary shrink-0" />
-                      <span className="truncate">{s.titulo}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-          {semAcesso.length > 0 && (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-text-primary/60 mb-1.5">Outros recursos</p>
-              <a href="#outros-recursos" className="block rounded-lg px-2 py-1.5 text-sm text-text-primary/70 hover:bg-surface-medium">
-                Telas sem acesso no seu perfil
-              </a>
-            </div>
-          )}
-        </nav>
-
-        {/* Conteúdo */}
-        <div className="space-y-8 min-w-0">
-          {gruposVisiveis.map((g) => (
-            <section key={g.id} aria-labelledby={`grupo-${g.id}`}>
-              <h2 id={`grupo-${g.id}`} className="text-lg font-bold text-text-primary mb-3">{g.titulo}</h2>
-              <div className="space-y-4">
-                {g.secoes.map((s) => (
-                  <article key={s.id} id={s.id} className="scroll-mt-24 bg-surface-low rounded-2xl p-5">
-                    <h3 className="flex items-center gap-2.5 text-base font-bold text-text-primary mb-3">
-                      <span className="grid place-items-center w-9 h-9 rounded-xl bg-surface-medium shrink-0">
-                        <Icone nome={s.icone} className="w-5 h-5 text-primary" />
-                      </span>
-                      {s.titulo}
-                    </h3>
-                    <ConteudoSecao secao={s} temAcesso={temAcesso(s)} />
-                  </article>
-                ))}
+      <div className="lg:grid lg:grid-cols-[13.5rem_1fr] lg:gap-8 lg:items-start">
+        {largo && (
+          <nav aria-label="Índice da ajuda" className="sticky top-4 space-y-4 max-h-[calc(100dvh-8rem)] overflow-y-auto pr-2 no-scrollbar">
+            {grupos.map((g) => (
+              <div key={g.id}>
+                <p className="c4-eyebrow mb-1.5">{g.titulo}</p>
+                <ul className="space-y-0.5">
+                  {g.secoes.map((s) => (
+                    <li key={s.id}>
+                      <a href={`#${s.id}`} className={cn('flex items-center gap-2 rounded-lg px-2 min-h-9 text-sm transition-colors hover:bg-surface-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary', ancora === s.id ? 'text-primary font-medium' : 'text-text-primary/75 hover:text-text-primary')}>
+                        <span className="truncate">{s.titulo}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
               </div>
+            ))}
+            {atalhosCombina && <a href="#atalhos" className="block rounded-lg px-2 py-1.5 text-sm text-text-primary/75 hover:bg-surface-medium hover:text-text-primary">Atalhos de teclado</a>}
+          </nav>
+        )}
+
+        <div className="space-y-10 min-w-0">
+          {grupos.map((g) => (
+            <section key={g.id} id={`grupo-${g.id}`} aria-labelledby={`titulo-grupo-${g.id}`} className="scroll-mt-24 space-y-3">
+              <h2 id={`titulo-grupo-${g.id}`} className="flex items-center gap-2 text-xl font-semibold text-text-primary font-display">{g.titulo}</h2>
+              {g.secoes.map((s) => (
+                <Artigo
+                  key={s.id}
+                  secao={s}
+                  temAcesso
+                  termo={termo}
+                  recolhivel={!largo}
+                  aberto={estaAberto(s.id)}
+                  onAlternar={() => alternar(s.id)}
+                />
+              ))}
             </section>
           ))}
 
-          {semAcesso.length > 0 && (
-            <BlocoOutrosRecursos secoes={semAcesso} anchorId="outros-recursos" />
-          )}
+          {atalhosCombina && <SecaoAtalhos />}
+
+          {semAcesso.length > 0 && <OutrosRecursos secoes={semAcesso} />}
         </div>
-      </div>
-
-      {/* ───────── MOBILE: accordion único ───────── */}
-      <div className="lg:hidden space-y-6">
-        {gruposVisiveis.map((g) => (
-          <section key={g.id} aria-labelledby={`m-grupo-${g.id}`}>
-            <h2 id={`m-grupo-${g.id}`} className="text-base font-bold text-text-primary mb-2">{g.titulo}</h2>
-            <div className="space-y-2">
-              {g.secoes.map((s) => {
-                const aberto = abertoMobile === s.id;
-                return (
-                  <div key={s.id} className="bg-surface-low rounded-2xl overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setAbertoMobile(aberto ? null : s.id)}
-                      aria-expanded={aberto}
-                      className="w-full min-h-11 flex items-center gap-2.5 px-4 py-3 text-left"
-                    >
-                      <span className="grid place-items-center w-9 h-9 rounded-xl bg-surface-medium shrink-0">
-                        <Icone nome={s.icone} className="w-5 h-5 text-primary" />
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-bold text-text-primary">{s.titulo}</span>
-                        <span className="block text-xs text-text-primary/70 truncate">{s.resumo}</span>
-                      </span>
-                      <ChevronDown className={`w-5 h-5 shrink-0 text-text-primary/40 transition-transform ${aberto ? 'rotate-180' : ''}`} aria-hidden="true" />
-                    </button>
-                    {aberto && (
-                      <div className="px-4 pb-4">
-                        <ConteudoSecao secao={s} temAcesso={temAcesso(s)} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))}
-
-        {semAcesso.length > 0 && (
-          <BlocoOutrosRecursos secoes={semAcesso} />
-        )}
       </div>
     </div>
-  );
-}
-
-// Bloco final "Outros recursos" — telas sem acesso, colapsado por padrão.
-// `anchorId` só é passado na árvore desktop (alvo da âncora do índice), evitando id duplicado.
-function BlocoOutrosRecursos({ secoes, anchorId }) {
-  return (
-    <section id={anchorId} className="scroll-mt-24">
-      <details className="group bg-surface-low rounded-2xl overflow-hidden">
-        <summary className="flex items-center gap-2.5 cursor-pointer list-none min-h-11 px-5 py-4">
-          <span className="grid place-items-center w-9 h-9 rounded-xl bg-surface-medium shrink-0">
-            <Lock className="w-5 h-5 text-text-primary/50" aria-hidden="true" />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-base font-bold text-text-primary">Outros recursos do sistema</span>
-            <span className="block text-xs text-text-primary/70">Telas que seu perfil ainda não acessa</span>
-          </span>
-          <ChevronDown className="w-5 h-5 shrink-0 text-text-primary/40 transition-transform group-open:rotate-180" aria-hidden="true" />
-        </summary>
-        <div className="px-5 pb-5">
-          <p className="text-sm text-text-primary/60 leading-relaxed mb-4">
-            Estas telas existem no sistema, mas seu perfil atual não tem acesso a elas.
-            Fale com o administrador da sua empresa se precisar usá-las.
-          </p>
-          <div className="space-y-3">
-            {secoes.map((s) => (
-              <div key={s.id} className="rounded-xl bg-surface-medium p-4">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-text-primary mb-1">
-                  <Icone nome={s.icone} className="w-4 h-4 text-text-primary/50" />
-                  {s.titulo}
-                </h3>
-                <p className="text-sm text-text-primary/60 leading-relaxed">{s.resumo}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </details>
-    </section>
   );
 }

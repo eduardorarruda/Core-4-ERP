@@ -1,5 +1,6 @@
 import React, { useId, useLayoutEffect, useMemo, useRef } from 'react';
-import { AnimatePresence, LayoutGroup, animate, motion, useInView, useReducedMotion } from 'motion/react';
+import { AnimatePresence, LayoutGroup, animate, motion, useInView } from 'motion/react';
+import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import { cn } from '../../lib/utils';
 import { formatarNumero } from '../../lib/formatters';
 import {
@@ -15,7 +16,7 @@ import {
 
 /** Entrada de página: fade + 8px, 220ms. Use com `key={pathname}` para reanimar por rota. */
 export function PageTransition({ children, className, as = 'div' }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const Comp = motion[as] ?? motion.div;
   return (
     <Comp
@@ -31,7 +32,7 @@ export function PageTransition({ children, className, as = 'div' }) {
 
 /** Aparece com fade + leve subida. `delay` em segundos; `y` em px (0 = só fade). */
 export function FadeIn({ children, className, delay = 0, y = 8, as = 'div', ...rest }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const Comp = motion[as] ?? motion.div;
   return (
     <Comp
@@ -51,7 +52,7 @@ export function FadeIn({ children, className, delay = 0, y = 8, as = 'div', ...r
  * animar são <StaggerItem>. `aoRolar` anima só quando entra na tela.
  */
 export function Stagger({ children, className, delay = 0, aoRolar = false, as = 'div', ...rest }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const Comp = motion[as] ?? motion.div;
   const gatilho = aoRolar
     ? { whileInView: 'visivel', viewport: { once: true, amount: 0.15 } }
@@ -80,7 +81,7 @@ export function StaggerItem({ children, className, as = 'div', ...rest }) {
 
 /** Ícone/ilustração que "brota" (escala com mola). Usado no EmptyState. */
 export function Brotar({ children, className, delay = 0.05 }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   return (
     <motion.div
       className={className}
@@ -98,7 +99,7 @@ export function Brotar({ children, className, delay = 0.05 }) {
  * Mantém o conteúdo fora do DOM quando fechado.
  */
 export function Revelar({ aberto, children, className, id }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   return (
     <AnimatePresence initial={false}>
       {aberto && (
@@ -123,7 +124,7 @@ export function Revelar({ aberto, children, className, id }) {
  * `origem` define o transform-origin (ex.: 'top right' para menus no canto).
  */
 export function PopPresence({ aberto, children, className, origem = 'top', ...rest }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   return (
     <AnimatePresence>
       {aberto && (
@@ -155,7 +156,7 @@ export function IndicatorGroup({ children, id }) {
 }
 
 export function LayoutIndicator({ className, layoutId = 'c4-indicador', ...rest }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   return (
     <motion.span
       aria-hidden="true"
@@ -190,8 +191,9 @@ export function AnimatedNumber({
   className,
   colorir = false,
   privado = true,
+  style,
 }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const raizRef = useRef(null);
   const spanRef = useRef(null);
   const atual = useRef(null);
@@ -228,6 +230,7 @@ export function AnimatedNumber({
   return (
     <span
       ref={raizRef}
+      style={style}
       className={cn(
         'tabular-nums',
         privado && 'valor-privado',

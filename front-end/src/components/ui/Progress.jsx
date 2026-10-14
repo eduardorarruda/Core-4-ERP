@@ -1,5 +1,6 @@
 import React, { useId } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
+import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import { cn } from '../../lib/utils';
 import { formatarNumero } from '../../lib/formatters';
 
@@ -30,7 +31,7 @@ const corDe = (tom, cor) => cor ?? COR_TOM[tom] ?? COR_TOM.primary;
  * Dica: troque o tom para 'expense' quando valor > 1 e 'warning' quando passar do ritmo.
  */
 export function ProgressBar({ valor = 0, tom = 'primary', cor, marca, altura = 8, label, mostrarValor = false, className }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const fracao = Math.max(0, Number(valor) || 0);
   const largura = `${Math.min(100, fracao * 100)}%`;
   const estourou = fracao > 1;
@@ -91,7 +92,7 @@ export function ProgressBar({ valor = 0, tom = 'primary', cor, marca, altura = 8
  * Props: valor (0–1), tom ou cor, tamanho (px, 64), espessura (px, 7), label, children, className.
  */
 export function ProgressRing({ valor = 0, tom = 'primary', cor, tamanho = 64, espessura = 7, label, children, className }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const id = `anel-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const r = (tamanho - espessura) / 2;
   const circ = 2 * Math.PI * r;

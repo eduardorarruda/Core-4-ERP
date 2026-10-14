@@ -3,15 +3,20 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
-import { MotionConfig } from 'motion/react'
+import { AcessibilidadeProvider } from './context/AcessibilidadeContext.jsx'
+import { aplicarPreferenciasSalvas } from './components/acessibilidade/preferencias'
+
+// Modo de acessibilidade: aplica as preferências salvas no <html> ANTES do 1º render
+// (sem "piscar" no padrão). Feito aqui, e não num <script> inline, para não mexer na CSP.
+aplicarPreferenciasSalvas()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
-      {/* reducedMotion="user": com "reduzir movimento" ligado no sistema, nada anima */}
-      <MotionConfig reducedMotion="user">
+      {/* Inclui o MotionConfig da raiz: "reduzir movimento" do sistema OU do painel → nada desliza */}
+      <AcessibilidadeProvider>
         <App />
-      </MotionConfig>
+      </AcessibilidadeProvider>
     </ThemeProvider>
   </StrictMode>,
 )

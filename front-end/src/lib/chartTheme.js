@@ -1,4 +1,8 @@
 import { formatarNumero } from './formatters';
+import { movimentoReduzidoAgora } from '../components/acessibilidade/preferencias';
+
+// Padrões/texturas por série (modo daltonismo) — veja components/acessibilidade/padroesGrafico.js
+export { usePadroesGrafico, estiloAmostraPadrao, TIPOS_PADRAO } from '../components/acessibilidade/padroesGrafico';
 
 /**
  * Tema único dos gráficos Recharts do Core 4.
@@ -79,6 +83,8 @@ export const areaProps = {
   activeDot: { r: 4, strokeWidth: 2, stroke: 'var(--color-surface-low)' },
   animationDuration: 700,
   animationEasing: 'ease-out',
+  // Getter: lido a cada `{...areaProps}` — com "reduzir movimento" (sistema ou painel) não anima
+  get isAnimationActive() { return !movimentoReduzidoAgora(); },
 };
 
 /** Barras: cantos de 6px no topo e largura máxima confortável. */
@@ -87,6 +93,7 @@ export const barraProps = {
   maxBarSize: 36,
   animationDuration: 600,
   animationEasing: 'ease-out',
+  get isAnimationActive() { return !movimentoReduzidoAgora(); },
 };
 
 /** Rosca/pizza: fatias com respiro entre si. */
@@ -97,6 +104,7 @@ export const pizzaProps = {
   cornerRadius: 4,
   stroke: 'none',
   animationDuration: 700,
+  get isAnimationActive() { return !movimentoReduzidoAgora(); },
 };
 
 /** Rótulos de eixo em moeda compacta: R$ 1,2 mil. */

@@ -1,5 +1,6 @@
 import React, { cloneElement, isValidElement, useId, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import { cn } from '../../lib/utils';
 
 /**
@@ -21,7 +22,7 @@ export default function Tooltip({ conteudo, lado = 'top', atraso = 250, children
   const id = useId();
   const [aberto, setAberto] = useState(false);
   const timer = useRef(null);
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
 
   const abrir = (imediato) => {
     clearTimeout(timer.current);

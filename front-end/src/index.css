@@ -44,6 +44,8 @@
   /* Bordas de 1px com baixa opacidade */
   --color-border: rgba(201, 222, 228, 0.08);
   --color-border-strong: rgba(201, 222, 228, 0.16);
+  /* Contorno de campos de formulário: 3:1 contra as superfícies (WCAG 1.4.11) */
+  --color-border-control: rgba(201, 222, 228, 0.44);
 
   /* Marca */
   --color-primary: #14E29C;
@@ -127,20 +129,21 @@
 
     --color-border: rgba(6, 34, 32, 0.09);
     --color-border-strong: rgba(6, 34, 32, 0.18);
+    --color-border-control: rgba(6, 34, 32, 0.52);
 
-    /* #05795B: 5,4:1 sobre branco (o verde da logo sozinho fica em 1,9:1 — só preenchimento) */
-    --color-primary: #05795B;
+    /* #047356: 5,8:1 sobre branco e ≥ 4,5:1 até surface-high (o verde da logo sozinho fica em 1,9:1 — só preenchimento) */
+    --color-primary: #047356;
     --color-primary-strong: #046148;
     --color-on-primary: #FFFFFF;
     --color-silver: #4F6470;
-    --color-secondary: #1D63C9;
-    --color-info: #1D63C9;
-    --color-error: #C81E3A;
+    --color-secondary: #1A5DBE;
+    --color-info: #1A5DBE;
+    --color-error: #BE1A36;
     --color-warning: #8F5400;
-    --color-success: #05795B;
+    --color-success: #047356;
 
-    --color-income: #05795B;
-    --color-expense: #C81E3A;
+    --color-income: #047356;
+    --color-expense: #BE1A36;
     --color-invest: #8F5400;
 
     --color-text-primary: #0B1A1C;
@@ -150,10 +153,10 @@
     --gradient-primary: linear-gradient(135deg, #067F5F 0%, #04614A 100%);
     --gradient-silver: linear-gradient(180deg, #3E525C 0%, #1C2A30 100%);
 
-    --color-chart-1: #05795B;
-    --color-chart-2: #1D63C9;
+    --color-chart-1: #047356;
+    --color-chart-2: #1A5DBE;
     --color-chart-3: #9A5B00;
-    --color-chart-4: #C81E3A;
+    --color-chart-4: #BE1A36;
     --color-chart-5: #6D4ED6;
     --color-chart-6: #4F6470;
     --color-chart-grid: rgba(3, 30, 28, 0.09);
@@ -364,6 +367,7 @@
     --color-surface-highest: #1E3539;
     --color-border: rgba(201, 222, 228, 0.08);
     --color-border-strong: rgba(201, 222, 228, 0.16);
+    --color-border-control: rgba(201, 222, 228, 0.44);
     --color-primary: #14E29C;
     --color-on-primary: #01231A;
     --color-silver: #C9D6DD;
@@ -637,12 +641,12 @@ html:not(.dark) .c4-backdrop__fio { opacity: 0.2; }
   display: block;
   width: 100%;
   min-height: 3.5rem;
-  padding: 22px 16px 8px;
+  padding: 1.375rem 1rem 0.5rem;
   background: color-mix(in srgb, var(--color-surface-low) 85%, transparent);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border-control);
   border-radius: var(--radius-control);
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-family: var(--font-body);
   outline: none;
   transition: border-color 180ms, box-shadow 180ms, background-color 180ms;
@@ -659,9 +663,9 @@ html:not(.dark) .c4-backdrop__fio { opacity: 0.2; }
 }
 .field-float label {
   position: absolute;
-  left: 16px;
-  top: 17px;
-  font-size: 15px;
+  left: 1rem;
+  top: 1.0625rem;
+  font-size: 0.9375rem;
   color: color-mix(in srgb, var(--color-text-primary) 66%, transparent);
   font-family: var(--font-body);
   pointer-events: none;
@@ -687,8 +691,8 @@ html:not(.dark) .c4-backdrop__fio { opacity: 0.2; }
 .field-float.has-error label { color: var(--color-error); }
 .field-float .field-icon {
   position: absolute;
-  right: 14px;
-  top: 28px;
+  right: 0.875rem;
+  top: 1.75rem;
   transform: translateY(-50%);
   color: color-mix(in srgb, var(--color-text-primary) 70%, transparent);
   cursor: pointer;
@@ -711,5 +715,306 @@ html:not(.dark) .field-float textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   MODO DE ACESSIBILIDADE (A11y · Design Inclusivo · Design Universal · WCAG 2.2)
+   As preferências do painel viram atributos no <html> (components/acessibilidade/preferencias.js).
+   Regras fora de @layer de propósito: vencem os utilitários do Tailwind sem !important.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Base WCAG para todos ── */
+h1[tabindex="-1"]:focus:not(:focus-visible),
+main[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }
+::placeholder { opacity: 1; }
+
+/* 2.5.8 Tamanho do alvo (mínimo 24px). :where = especificidade zero (classes da tela vencem) */
+:where(button, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="option"], select) {
+  min-height: 24px;
+  min-width: 24px;
+}
+/* Toque: 44px (2.5.5). Use data-alvo-compacto só em casos justificados (ex.: grade densa). */
+@media (pointer: coarse) {
+  :where(button, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], select,
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="hidden"], [type="file"])):not([data-alvo-compacto]) {
+    min-height: 44px;
+  }
+  :where(button, [role="button"]):not([data-alvo-compacto]) { min-width: 44px; }
+}
+
+/* Links "pular para…" (2.4.1) */
+.c4-pular {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
+  transform: translateY(-200%);
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--color-surface-low);
+  color: var(--color-text-primary);
+  border: 2px solid var(--color-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  box-shadow: var(--shadow-elevated);
+}
+.c4-pular:focus, .c4-pular:focus-visible { transform: none; }
+
+/* ── Tamanho do texto (1.4.4): escala a raiz; tudo em rem acompanha ── */
+html[data-texto="112_5"] { font-size: 112.5%; }
+html[data-texto="125"]   { font-size: 125%; }
+html[data-texto="150"]   { font-size: 150%; }
+html[data-texto="175"]   { font-size: 175%; }
+
+/* ── Fonte para leitura ── */
+html[data-fonte="legibilidade"] {
+  --font-body: "Atkinson Hyperlegible Next Variable", "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body);
+  --font-display: var(--font-body);
+}
+html[data-fonte="dislexia"] {
+  --font-body: "Lexend Variable", "Lexend", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body);
+  --font-display: var(--font-body);
+}
+html[data-fonte] h1, html[data-fonte] h2, html[data-fonte] h3 { letter-spacing: 0; }
+
+/* ── Espaçamento de texto (1.4.12) ── */
+html[data-espacamento="amplo"] body *:not(svg, svg *) {
+  line-height: 1.5;
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
+}
+html[data-espacamento="amplo"] :is(main, [role="dialog"]) p:not(:last-child) { margin-bottom: 2em; }
+
+/* ── Sublinhar links (1.4.1) ── */
+html[data-sublinhar-links] :is(main, footer, [role="dialog"]) a:not([role="tab"], [role="menuitem"], [role="button"], [role="option"]) {
+  text-decoration-line: underline;
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: max(1px, 0.08em);
+}
+
+/* ── Foco destacado (2.4.13): preto/amarelo/preto, visível em qualquer fundo ── */
+html[data-foco="destacado"] :focus-visible {
+  outline: 3px solid #000 !important;
+  outline-offset: 0 !important;
+  box-shadow: 0 0 0 6px #FFD60A, 0 0 0 9px #000 !important;
+  border-radius: 0.375rem;
+}
+
+/* ── Alvos amplos (2.5.5 + espaço extra) ── */
+html[data-alvos="amplos"] :is(button, [role="button"], [role="tab"], [role="switch"], [role="menuitem"], [role="option"], select,
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="hidden"], [type="file"]), nav a) {
+  min-height: 48px;
+}
+html[data-alvos="amplos"] :is(button, [role="button"]) { min-width: 48px; }
+html[data-alvos="amplos"] input:is([type="checkbox"], [type="radio"]) { width: 1.5rem; height: 1.5rem; }
+html[data-alvos="amplos"] :is(ul, ol)[class*="space-y-0"] > li + li { margin-top: 0.25rem; }
+
+/* ── Cursor grande ── */
+html[data-cursor="grande"], html[data-cursor="grande"] * {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24'><path d='M4 2v18l5-5 3.5 7 3-1.5-3.5-7H19z' fill='black' stroke='white' stroke-width='1.4' stroke-linejoin='round'/></svg>") 8 4, auto !important;
+}
+html[data-cursor="grande"] :is(a, button, [role="button"], [role="tab"], [role="switch"], [role="option"], [role="menuitem"], label, summary, select),
+html[data-cursor="grande"] :is(a, button, [role="button"], [role="tab"], [role="switch"], [role="option"], [role="menuitem"], label, summary) * {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24'><path d='M4 2v18l5-5 3.5 7 3-1.5-3.5-7H19z' fill='%230BA877' stroke='white' stroke-width='1.4' stroke-linejoin='round'/></svg>") 8 4, pointer !important;
+}
+html[data-cursor="grande"] :is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, [contenteditable="true"]) {
+  cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'><path d='M8 3h8M12 3v18M8 21h8' stroke='white' stroke-width='4' stroke-linecap='round'/><path d='M8 3h8M12 3v18M8 21h8' stroke='black' stroke-width='2' stroke-linecap='round'/></svg>") 20 20, text !important;
+}
+
+/* ── Movimento reduzido / desligado (2.3.3) e "pausar tudo" (2.2.2) ── */
+html[data-movimento] *, html[data-movimento] *::before, html[data-movimento] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+html[data-movimento] .c4-backdrop__mancha { animation: none !important; }
+html[data-movimento] .c4-card--interativo:hover { transform: none; }
+html[data-pausar] *, html[data-pausar] *::before, html[data-pausar] *::after { animation-play-state: paused !important; }
+
+/* ── Leitura simplificada: tira enfeites, mantém a informação ── */
+html[data-leitura="simplificada"] {
+  --shadow-glow: none;
+  --shadow-primary: none;
+}
+html[data-leitura="simplificada"] :is(.c4-backdrop, [data-decorativo]) { display: none !important; }
+html[data-leitura="simplificada"] .c4-card::before { display: none; }
+html[data-leitura="simplificada"] :is(.c4-card, .c4-card--destaque) { background: var(--color-surface-low); }
+html[data-leitura="simplificada"] .c4-glass { background: var(--color-surface-low); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-leitura="simplificada"] :is(.c4-text-silver, .text-gradient-primary) { background: none; -webkit-text-fill-color: currentColor; color: var(--color-text-primary); }
+html[data-leitura="simplificada"] .c4-text-emerald { background: none; -webkit-text-fill-color: currentColor; color: var(--color-primary); }
+html[data-leitura="simplificada"] main p { max-inline-size: 75ch; }
+
+/* ── Visão de cores (daltonismo): paletas seguras (Okabe-Ito / IBM) ──
+   Troca gráficos e as cores de significado (entrou/saiu/investido). Sempre com sinal e ícone. */
+html[data-daltonismo="protanopia"][data-daltonismo], html[data-daltonismo="deuteranopia"][data-daltonismo] {
+  --color-income: #56B4E9; --color-success: #56B4E9; --color-expense: #E69F00; --color-invest: #CC79A7;
+  --color-chart-1: #56B4E9; --color-chart-2: #E69F00; --color-chart-3: #009E73;
+  --color-chart-4: #F0E442; --color-chart-5: #CC79A7; --color-chart-6: #4A9BD9;
+}
+html[data-daltonismo="tritanopia"][data-daltonismo] {
+  --color-income: #3FCFC0; --color-success: #3FCFC0; --color-expense: #FF6B7D; --color-invest: #F2F2F2;
+  --color-chart-1: #3FCFC0; --color-chart-2: #FF6B7D; --color-chart-3: #F2F2F2;
+  --color-chart-4: #FF9FC3; --color-chart-5: #8C8C8C; --color-chart-6: #D77BE0;
+}
+html[data-daltonismo="monocromia"][data-daltonismo] {
+  --color-income: #FFFFFF; --color-success: #FFFFFF; --color-expense: #B8C2C6; --color-invest: #DADFE1;
+  --color-chart-1: #FFFFFF; --color-chart-2: #C2C2C2; --color-chart-3: #8C8C8C;
+  --color-chart-4: #E3E3E3; --color-chart-5: #6E6E6E; --color-chart-6: #A6A6A6;
+}
+html:not(.dark)[data-daltonismo="protanopia"][data-daltonismo], html:not(.dark)[data-daltonismo="deuteranopia"][data-daltonismo] {
+  --color-income: #0067A5; --color-success: #0067A5; --color-expense: #A44A00; --color-invest: #95377A;
+  --color-chart-1: #0072B2; --color-chart-2: #C05200; --color-chart-3: #00805C;
+  --color-chart-4: #857500; --color-chart-5: #A84F86; --color-chart-6: #1F2B30;
+}
+html:not(.dark)[data-daltonismo="tritanopia"][data-daltonismo] {
+  --color-income: #006B61; --color-success: #006B61; --color-expense: #B8152F; --color-invest: #2B2B2B;
+  --color-chart-1: #00796B; --color-chart-2: #C0152F; --color-chart-3: #222222;
+  --color-chart-4: #B3326F; --color-chart-5: #6B6B6B; --color-chart-6: #8E24AA;
+}
+html:not(.dark)[data-daltonismo="monocromia"][data-daltonismo] {
+  --color-income: #000000; --color-success: #000000; --color-expense: #4A4A4A; --color-invest: #2E2E2E;
+  --color-chart-1: #000000; --color-chart-2: #3D3D3D; --color-chart-3: #6E6E6E;
+  --color-chart-4: #1F1F1F; --color-chart-5: #565656; --color-chart-6: #808080;
+}
+
+/* ── Alto contraste (orientado a AAA: texto 7:1, superfícies sólidas, bordas fortes) ── */
+html[data-contraste="alto"] {
+  --color-surface: #000000;
+  --color-surface-low: #060B0C;
+  --color-surface-medium: #0E1516;
+  --color-surface-high: #172022;
+  --color-surface-highest: #263235;
+  --color-surface-overlay: rgba(0, 0, 0, 0.88);
+  --color-border: #8FA4AA;
+  --color-border-strong: #DCE6E9;
+  --color-border-control: #DCE6E9;
+  --color-primary: #3CF5B8;
+  --color-primary-strong: #14E29C;
+  --color-on-primary: #000000;
+  --color-silver: #E6EEF1;
+  --color-secondary: #A6D8FF;
+  --color-info: #A6D8FF;
+  --color-error: #FFA3AB;
+  --color-warning: #FFD37A;
+  --color-success: #5CF0BA;
+  --color-income: #5CF0BA;
+  --color-expense: #FFA3AB;
+  --color-invest: #FFCB66;
+  --color-text-primary: #FFFFFF;
+  --color-text-muted: #E0E8EA;
+  --color-success-surface: #000000;
+  --color-success-text: #9AF7D3;
+  --color-success-border: #5CF0BA;
+  --color-error-surface: #000000;
+  --color-error-text: #FFC6CB;
+  --color-error-border: #FFA3AB;
+  --color-chart-grid: rgba(255, 255, 255, 0.24);
+  --color-chart-axis: #E0E8EA;
+  --gradient-primary: linear-gradient(#3CF5B8, #3CF5B8);
+  --gradient-silver: linear-gradient(#FFFFFF, #FFFFFF);
+  --shadow-card: none;
+  --shadow-glow: none;
+  --shadow-primary: none;
+  --shadow-elevated: 0 0 0 1px var(--color-border-strong);
+}
+html[data-contraste="alto"]:not(.dark) {
+  --color-surface: #FFFFFF;
+  --color-surface-low: #FFFFFF;
+  --color-surface-medium: #F1F4F4;
+  --color-surface-high: #E3E9E8;
+  --color-surface-highest: #C9D3D2;
+  --color-surface-overlay: rgba(255, 255, 255, 0.92);
+  --color-border: #56676A;
+  --color-border-strong: #1C2726;
+  --color-border-control: #1C2726;
+  --color-primary: #00523D;
+  --color-primary-strong: #003D2D;
+  --color-on-primary: #FFFFFF;
+  --color-silver: #26343B;
+  --color-secondary: #0A4595;
+  --color-info: #0A4595;
+  --color-error: #8F0019;
+  --color-warning: #5E3600;
+  --color-success: #00523D;
+  --color-income: #00523D;
+  --color-expense: #8F0019;
+  --color-invest: #5E3600;
+  --color-text-primary: #000000;
+  --color-text-muted: #1F2B2B;
+  --color-success-surface: #FFFFFF;
+  --color-success-text: #00402F;
+  --color-success-border: #00523D;
+  --color-error-surface: #FFFFFF;
+  --color-error-text: #7A0015;
+  --color-error-border: #8F0019;
+  --color-chart-grid: rgba(0, 0, 0, 0.28);
+  --color-chart-axis: #1F2B2B;
+  --gradient-primary: linear-gradient(#00523D, #00523D);
+  --gradient-silver: linear-gradient(#000000, #000000);
+  --shadow-elevated: 0 0 0 1px var(--color-border-strong);
+}
+/* Texto "apagado" (text-text-primary/65 etc.) volta a 100% e vidro vira superfície sólida */
+html[data-contraste="alto"] [class*="text-text-primary/"] { color: var(--color-text-primary); }
+html[data-contraste="alto"] ::placeholder { color: var(--color-text-muted); }
+html[data-contraste="alto"] :is(.c4-eyebrow, .c4-tagline, .c4-kbd) { color: var(--color-text-primary); }
+html[data-contraste="alto"] [class*="border-text-primary/"] { border-color: var(--color-border); }
+html[data-contraste="alto"] :is([class*="backdrop-blur"], .c4-glass, .glass-panel) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-contraste="alto"] .c4-glass, html[data-contraste="alto"] .glass-panel,
+html[data-contraste="alto"] [class*="bg-surface-low/"] { background: var(--color-surface-low); }
+html[data-contraste="alto"] [class*="bg-surface/"] { background: var(--color-surface); }
+html[data-contraste="alto"] .c4-card { background: var(--color-surface-low); border-color: var(--color-border); }
+html[data-contraste="alto"] .c4-card::before { display: none; }
+html[data-contraste="alto"] .c4-backdrop { display: none; }
+html[data-contraste="alto"] .c4-tema-escuro { --color-text-primary: #FFFFFF; --color-surface: #000000; --color-surface-low: #060B0C; }
+html[data-contraste="alto"] :is(.c4-text-silver, .text-gradient-primary) { background: none; -webkit-text-fill-color: currentColor; color: var(--color-text-primary); }
+html[data-contraste="alto"] .c4-text-emerald { background: none; -webkit-text-fill-color: currentColor; color: var(--color-primary); }
+html[data-contraste="alto"] .field-float input, html[data-contraste="alto"] .field-float textarea { background: var(--color-surface-low); border-color: var(--color-border-strong); }
+html[data-contraste="alto"] :focus-visible {
+  outline: 3px solid var(--color-text-primary);
+  outline-offset: 2px;
+}
+html[data-contraste="alto"] a:not([role]) { text-underline-offset: 0.2em; }
+
+/* ── Cores forçadas do sistema (Alto Contraste do Windows) ── */
+@media (forced-colors: active) {
+  :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px !important; }
+  .c4-backdrop { display: none; }
+  :is(.c4-card, [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"], .c4-glass) { border: 1px solid CanvasText; }
+  :is(button, [role="button"], [role="tab"], [role="switch"], [role="radio"]):not([role="option"]) { outline: 1px solid ButtonText; outline-offset: -1px; }
+  [aria-current="page"], [aria-selected="true"], [aria-pressed="true"], [aria-checked="true"] { outline: 2px solid Highlight !important; outline-offset: -2px !important; }
+  :is(.c4-text-silver, .c4-text-emerald, .text-gradient-primary) { -webkit-text-fill-color: CanvasText; background: none; }
+  /* Gráficos mantêm as cores (com padrões, se ligados) — senão todas as séries ficam iguais */
+  :is(.recharts-wrapper, [data-grafico], .c4-amostra) { forced-color-adjust: none; }
+}
+
+/* ── Guia de leitura (régua que segue o ponteiro/foco) ── */
+.c4-guia-leitura {
+  position: fixed;
+  inset-inline: 0;
+  pointer-events: none;
+  z-index: 950;
+  background: rgba(0, 0, 0, 0.5);
+}
+.c4-guia-leitura__faixa {
+  position: fixed;
+  inset-inline: 0;
+  pointer-events: none;
+  z-index: 950;
+  border-block: 2px solid #FFD60A;
+}
+
+/* Texto ampliado: selos e rótulos curtos quebram linha em vez de vazar da tela (1.4.10) */
+html[data-texto] .c4-badge { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 30rem) {
+  html[data-texto] :is(main, [role="dialog"]) :is(.truncate, .whitespace-nowrap):not(svg *, .sr-only) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
   }
 }

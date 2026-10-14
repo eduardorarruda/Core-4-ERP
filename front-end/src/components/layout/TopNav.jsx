@@ -11,6 +11,7 @@ import NotificacoesPopover from './NotificacoesPopover';
 import BrandMark from '../ui/BrandMark';
 import Avatar from '../ui/Avatar';
 import Tooltip from '../ui/Tooltip';
+import BotaoAcessibilidade from '../acessibilidade/BotaoAcessibilidade';
 
 /**
  * Barra superior. Desktop: trilha "Grupo › Tela" (o título fica só no PageHeader), busca,
@@ -68,7 +69,7 @@ export default function TopNav({ onCommandPaletteOpen }) {
                     {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-text-primary/30 shrink-0" aria-hidden="true" />}
                     <span
                       aria-current={i === trilha.length - 1 ? 'page' : undefined}
-                      className={cn('truncate', i === trilha.length - 1 ? 'text-text-primary/85 font-medium' : 'text-text-primary/50')}
+                      className={cn('truncate', i === trilha.length - 1 ? 'text-text-primary/85 font-medium' : 'text-text-primary/65')}
                     >
                       {parte}
                     </span>
@@ -84,7 +85,7 @@ export default function TopNav({ onCommandPaletteOpen }) {
           <button
             type="button"
             onClick={onCommandPaletteOpen}
-            aria-label="Buscar no Core 4 (Ctrl+K)"
+            aria-keyshortcuts="Control+K"
             className="hidden md:flex lg:hidden items-center gap-2.5 h-10 pl-3 pr-2 mr-1 w-56 rounded-xl text-sm text-text-primary/55 bg-text-primary/[0.04] border border-border hover:border-border-strong hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Search className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -118,6 +119,9 @@ export default function TopNav({ onCommandPaletteOpen }) {
             </button>
           </Tooltip>
 
+          {/* Acessibilidade: visível em todos os tamanhos e sempre no mesmo lugar (Alt+A) */}
+          <BotaoAcessibilidade />
+
           <Tooltip conteudo="Central de Ajuda" lado="bottom">
             <button type="button" onClick={() => navigate('/ajuda')} aria-label="Abrir a Central de Ajuda" className={cn(BOTAO_ICONE, 'hidden sm:grid')}>
               <HelpCircle className="w-5 h-5" aria-hidden="true" />
@@ -132,13 +136,15 @@ export default function TopNav({ onCommandPaletteOpen }) {
               ref={botaoAvatarRef}
               type="button"
               onClick={() => setOpen((v) => !v)}
-              aria-label="Menu da conta"
               aria-haspopup="menu"
               aria-expanded={open}
               aria-controls={open ? menuId : undefined}
               className="w-11 h-11 grid place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <Avatar nome={usuario?.nome} src={usuario?.fotoPerfil} size="md" className={cn('transition-shadow', open && 'ring-2 ring-primary/60')} />
+              <span aria-hidden="true">
+                <Avatar nome={usuario?.nome} src={usuario?.fotoPerfil} size="md" className={cn('transition-shadow', open && 'ring-2 ring-primary/60')} />
+              </span>
+              <span className="sr-only">Menu da conta</span>
             </button>
 
             <PopPresence

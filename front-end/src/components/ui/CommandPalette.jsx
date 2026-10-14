@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, FileText, Users, CreditCard, Plus, X, Clock, LifeBuoy, CornerDownLeft } from 'lucide-react';
+import { Search, FileText, Users, CreditCard, Plus, X, Clock, LifeBuoy, CornerDownLeft, Accessibility } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { busca } from '../../lib/api';
 import { useAuth } from '../../hooks/useAuth';
+import { useAcessibilidade } from '../../hooks/useAcessibilidade';
 import { itensVisiveis, NAV_ACOES, NAV_CONTA } from '../../lib/navigation';
 import Modal from './Modal';
 
@@ -43,6 +44,7 @@ const normalizar = (t) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase
 export default function CommandPalette({ onClose }) {
   const navigate = useNavigate();
   const { temPermissao, tipoConta } = useAuth();
+  const { abrirPainel } = useAcessibilidade();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   // Resposta guardada junto com o termo que a gerou: "buscando" é derivado, sem setState em efeito
@@ -59,9 +61,13 @@ export default function CommandPalette({ onClose }) {
 
   const pages = [...itensVisiveis({ temPermissao, tipoConta }), ...NAV_CONTA.map((i) => ({ ...i, to: i.path }))]
     .map((i) => ({ id: i.id, icon: i.icon, label: i.label, desc: i.desc, path: i.to ?? i.path }));
-  const actions = NAV_ACOES
-    .filter((a) => a.ativa && (!a.permissao || temPermissao(a.permissao)))
-    .map((a) => ({ ...a, icon: Plus }));
+  const actions = [
+    // Sempre disponível: abre o painel de acessibilidade (mesmo do Alt+A)
+    { id: 'abrir-acessibilidade', label: 'Opções de acessibilidade', desc: 'Texto maior, contraste, movimento, cores (Alt+A)', icon: Accessibility, acao: abrirPainel, transient: true },
+    ...NAV_ACOES
+      .filter((a) => a.ativa && (!a.permissao || temPermissao(a.permissao)))
+      .map((a) => ({ ...a, icon: Plus })),
+  ];
 
   // Busca de dados reais no backend, com debounce
   useEffect(() => {
@@ -91,7 +97,7 @@ export default function CommandPalette({ onClose }) {
   const casa = (texto) => normalizar(texto ?? '').includes(q);
   const sections = q
     ? [
-        { label: 'Telas e ações', items: [...pages.filter((p) => casa(p.label) || casa(p.desc)), ...actions.filter((a) => casa(a.label))] },
+        { label: 'Telas e ações', items: [...pages.filter((p) => casa(p.label) || casa(p.desc)), ...actions.filter((a) => casa(a.label) || casa(a.desc))] },
         { label: 'Registros', items: dataItems },
         { label: 'Ajuda', items: HELP_TOPICS.filter((h) => casa(h.label)) },
       ].filter((s) => s.items.length)
@@ -106,8 +112,9 @@ export default function CommandPalette({ onClose }) {
 
   const handleSelect = useCallback((item) => {
     if (!item.transient) saveRecent(item.id); // registros de dados não entram em "recentes"
-    navigate(item.path);
     onClose();
+    if (item.acao) item.acao();
+    else navigate(item.path);
   }, [navigate, onClose]);
 
   const handleKeyDown = (e) => {

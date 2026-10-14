@@ -29,7 +29,7 @@ export default function FilterBar({ busca, periodo, children, filtrosAtivos = 0,
   return (
     <div role="search" className={cn('flex flex-wrap items-center gap-2 sm:gap-3', className)}>
       {busca && (
-        <label className="relative flex-1 min-w-[12rem] max-w-md">
+        <label className="relative flex-1 min-w-[min(12rem,100%)] max-w-md">
           <span className="sr-only">{busca.label ?? 'Buscar'}</span>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-primary/50 pointer-events-none" aria-hidden="true" />
           <input

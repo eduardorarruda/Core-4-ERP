@@ -1,45 +1,22 @@
-import React, { useContext } from 'react';
+import React from 'react';
 import { FileText } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import Modal from '../ui/Modal';
 import EmptyState from '../ui/EmptyState';
-import { ThemeContext } from '../../context/ThemeContext';
-import { formatDate } from '../../lib/formatters';
-import { chartTheme as temaGrafico, readCssVar } from '../dashboard/chartTheme';
+import { formatDate, formatarNumero } from '../../lib/formatters';
+import { barraProps, corSerie, eixoXProps, eixoYProps, formatarEixoMoeda, gradeProps, tooltipProps } from '../../lib/chartTheme';
+import ChartTooltip from '../ui/ChartTooltip';
 import GraficoAcessivel from '../ui/GraficoAcessivel';
 
+/** Números com 2 casas no padrão brasileiro (as colunas do relatório já dizem "(R$)"). */
 function formatValue(v) {
-  if (typeof v === 'number') {
-    return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
+  if (typeof v === 'number') return formatarNumero(v, 'number', { casas: 2 });
   return v ?? '—';
 }
 
-// Cores do gráfico a partir dos tokens do tema (index.css) — sem hex fixo por tema
-function chartTheme(dark) {
-  const t = temaGrafico(dark);
-  return {
-    series: [
-      readCssVar('--color-chart-1', dark ? '#6EFFC0' : '#047857'),
-      readCssVar('--color-chart-2', dark ? '#ACC7FF' : '#2563EB'),
-      readCssVar('--color-chart-4', dark ? '#FFB4AB' : '#DC2626'),
-      readCssVar('--color-chart-3', dark ? '#FFD37A' : '#B45309'),
-    ],
-    grid: t.gridColor,
-    axis: t.axisColor,
-    tooltipBg: t.tooltipBg,
-    tooltipBorder: readCssVar('--color-chart-grid', dark ? 'rgba(250,250,250,.08)' : 'rgba(24,24,27,.12)'),
-    tooltipLabel: t.tooltipTextColor,
-  };
-}
-
 export default function ReportModal({ open, titulo, periodo, dados, onClose }) {
-  const themeCtx = useContext(ThemeContext);
-  const isDark = (themeCtx?.theme ?? 'dark') === 'dark';
-  const ct = chartTheme(isDark);
-
   const temDados = !!dados && Array.isArray(dados.linhas) && dados.linhas.length > 0;
 
   const chartData = temDados && dados.grafico
@@ -74,24 +51,17 @@ export default function ReportModal({ open, titulo, periodo, dados, onClose }) {
         <div className="space-y-6">
           {/* Gráfico */}
           {chartData && (
-            <div className="bg-surface-medium rounded-xl p-4 border border-text-primary/5">
+            <div className="bg-surface-medium/60 rounded-xl p-4 border border-border">
               <GraficoAcessivel resumo={`Gráfico de barras do relatório ${titulo}. Os valores estão na tabela abaixo.`}>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                  <XAxis dataKey="label" tick={{ fill: ct.axis, fontSize: 12 }} />
-                  <YAxis tick={{ fill: ct.axis, fontSize: 12 }} tickFormatter={v => v.toLocaleString('pt-BR')} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: ct.tooltipBg, border: `1px solid ${ct.tooltipBorder}`, borderRadius: 12 }}
-                    labelStyle={{ color: ct.tooltipLabel, fontWeight: 700 }}
-                    formatter={(v, name) => [
-                      v.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-                      name,
-                    ]}
-                  />
+                  <CartesianGrid {...gradeProps} />
+                  <XAxis dataKey="label" {...eixoXProps} />
+                  <YAxis {...eixoYProps} tickFormatter={formatarEixoMoeda} />
+                  <Tooltip {...tooltipProps} content={<ChartTooltip formato="currency" />} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {seriesKeys.map((key, i) => (
-                    <Bar key={key} dataKey={key} name={key} fill={ct.series[i % ct.series.length]} radius={[4, 4, 0, 0]} />
+                    <Bar key={key} dataKey={key} name={key} fill={corSerie(i)} {...barraProps} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
@@ -100,7 +70,7 @@ export default function ReportModal({ open, titulo, periodo, dados, onClose }) {
           )}
 
           {/* Tabela */}
-          <div className="overflow-x-auto rounded-xl border border-text-primary/5">
+          <div className="overflow-x-auto rounded-xl border border-border" tabIndex={0} role="region" aria-label={`Tabela: ${titulo}`}>
             <table className="w-full text-sm">
               <caption className="sr-only">{titulo}{periodoLabel ? ` — ${periodoLabel}` : ''}</caption>
               <thead>

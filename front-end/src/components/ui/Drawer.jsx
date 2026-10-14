@@ -1,6 +1,7 @@
 import React, { useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -36,7 +37,7 @@ export default function Drawer({
   const painelRef = useRef(null);
   const tituloId = useId();
   const descricaoId = useId();
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   useFocusTrap(Boolean(open), painelRef, { onClose, closeOnEsc, initialFocusRef });
 
   const baixo = side === 'bottom';

@@ -1,303 +1,247 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, AlertTriangle, Info, Search, Filter, User, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronRight, Gavel, History, RefreshCw, Sparkles } from 'lucide-react';
+import { auditoria } from '../lib/api';
+import { useCarga } from '../hooks/useCarga';
+import { useAuth } from '../hooks/useAuth';
+import { usePeriodoUrl } from '../hooks/usePeriodoUrl';
 import PageHeader from '../components/ui/PageHeader';
-import DataTable from '../components/ui/DataTable';
+import PeriodoSelector from '../components/ui/PeriodoSelector';
+import FilterBar from '../components/ui/FilterBar';
+import { FormSelect } from '../components/ui/FormField';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { useToast } from '../hooks/useToast';
-import { auditoria } from '../lib/api';
+import Drawer from '../components/ui/Drawer';
+import EmptyState from '../components/ui/EmptyState';
+import AlertaErro from '../components/ui/AlertaErro';
+import Skeleton from '../components/ui/Skeleton';
+import { Stagger, StaggerItem } from '../components/motion/Movimento';
+import {
+  ACOES, diaDe, diferencas, entidadeComArtigo, horaDe, infoAcao, nomeEntidade, rotuloDia, rotuloRegistro,
+} from '../components/configuracoes/auditoriaUtils';
+import { cn } from '../lib/utils';
 
-const TAMANHO_PAGINA = 20;
+const TAMANHO_PAGINA = 25;
+const ATALHOS = ['hoje', '7d', '30d', '90d', 'mes', 'ano'];
 
-const ACAO_SEV = {
-  CRIAR:    'info',
-  ATUALIZAR:'info',
-  DELETAR:  'warning',
-  LOGIN:    'info',
-  LOGOUT:   'info',
-  ACESSO_NEGADO: 'critical',
-  EXPORTAR: 'info',
+const quem = (evento, meuId) => {
+  if (evento.usuarioId == null) return 'O sistema';
+  if (evento.usuarioId === meuId) return 'Você';
+  return `Usuário nº ${evento.usuarioId}`;
 };
 
-// Severidade → variante do Badge de UI.
-const SEV_BADGE = {
-  critical: { variant: 'error',   label: 'Crítico' },
-  warning:  { variant: 'warning', label: 'Alerta' },
-  info:     { variant: 'info',    label: 'Info' },
-};
-
-function fmtData(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  if (isNaN(d)) return String(ts);
-  return d.toLocaleString('pt-BR');
+function frase(evento, meuId) {
+  const acao = infoAcao(evento.acao);
+  const { nome, id } = rotuloRegistro(evento);
+  let alvo = entidadeComArtigo(evento.entidade);
+  if (evento.acao === 'TRANSFERIR') alvo = 'contas bancárias';
+  else if (/^(deu baixa em|estornou a baixa de|fechou a fatura de)$/.test(acao.verbo)) alvo = alvo.replace(/^(a|o) /, (m) => (m === 'a ' ? 'uma ' : 'um '));
+  if (!nome && id != null && evento.acao !== 'TRANSFERIR') alvo = `${alvo} nº ${id}`;
+  return { autor: quem(evento, meuId), verbo: acao.verbo, alvo, nome, entidade: nomeEntidade(evento.entidade) };
 }
 
-function acaoLabel(acao) {
-  const map = {
-    CRIAR: 'Criação', ATUALIZAR: 'Atualização', EDITAR: 'Atualização', DELETAR: 'Exclusão',
-    BAIXAR: 'Baixa', ESTORNAR: 'Estorno', TRANSFERIR: 'Transferência', FECHAR_FATURA: 'Fechamento de Fatura',
-    LOGIN: 'Login', LOGOUT: 'Logout', ACESSO_NEGADO: 'Acesso Negado', EXPORTAR: 'Exportação',
-  };
-  return map[acao] ?? acao;
+function LinhaEvento({ evento, meuId, onAbrir }) {
+  const acao = infoAcao(evento.acao);
+  const Icone = acao.icon;
+  const f = frase(evento, meuId);
+  return (
+    <button
+      type="button"
+      onClick={() => onAbrir(evento)}
+      className="group w-full flex items-start gap-3 text-left px-3 py-3 rounded-xl hover:bg-surface-medium/70 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <span className="relative mt-0.5 grid place-items-center w-9 h-9 shrink-0 rounded-xl bg-surface-medium ring-1 ring-border text-text-primary/80" aria-hidden="true">
+        <Icone className="w-4 h-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm text-text-primary leading-relaxed">
+          <strong className="font-semibold">{f.autor}</strong> {f.verbo} {f.alvo}
+          {f.nome && <> <span className="font-medium">“{f.nome}”</span></>}
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-1.5">
+          <Badge variant={acao.tom} size="sm">{acao.rotulo}</Badge>
+          {evento.aiAction && <Badge variant="primary" size="sm"><Sparkles className="w-3 h-3" aria-hidden="true" /> Pela Áurea</Badge>}
+          <span className="text-xs text-text-primary/60 tabular-nums">{horaDe(evento.timestamp)}</span>
+        </span>
+      </span>
+      <ChevronRight className="w-4 h-4 mt-2.5 shrink-0 text-text-primary/40 group-hover:text-text-primary/70" aria-hidden="true" />
+    </button>
+  );
 }
 
-// Rótulo amigável para o usuário — a API só devolve o id numérico.
-function usuarioLabel(id) {
-  return id == null ? 'Sistema' : `Usuário #${id}`;
+function DetalheEvento({ evento, meuId, onClose }) {
+  const acao = infoAcao(evento?.acao);
+  const f = evento ? frase(evento, meuId) : null;
+  const { id } = evento ? rotuloRegistro(evento) : {};
+  const difs = evento ? diferencas(evento) : [];
+  const criacaoOuExclusao = evento && (evento.acao === 'CRIAR' || evento.acao === 'DELETAR');
+  return (
+    <Drawer
+      open={Boolean(evento)}
+      onClose={onClose}
+      title={acao.rotulo}
+      description={evento ? new Date(evento.timestamp).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'medium' }) : undefined}
+    >
+      {evento && (
+        <div className="space-y-5">
+          <p className="text-sm text-text-primary leading-relaxed">
+            <strong>{f.autor}</strong> {f.verbo} {f.alvo}{f.nome ? <> “{f.nome}”</> : null}.
+            {evento.aiAction && ' A ação foi feita pela Áurea, a pedido dessa pessoa.'}
+          </p>
+
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm rounded-xl border border-border p-4">
+            <div><dt className="c4-eyebrow mb-0.5">Quem</dt><dd className="text-text-primary">{f.autor}</dd></div>
+            <div><dt className="c4-eyebrow mb-0.5">Origem</dt><dd className="text-text-primary">{evento.aiAction ? 'Áurea (assistente)' : 'Tela do sistema'}</dd></div>
+            <div><dt className="c4-eyebrow mb-0.5">Registro</dt><dd className="text-text-primary first-letter:uppercase">{f.entidade}{id != null ? ` nº ${id}` : ''}</dd></div>
+            <div><dt className="c4-eyebrow mb-0.5">Endereço IP</dt><dd className="font-mono text-text-primary/80">{evento.ipAddress ?? '—'}</dd></div>
+            <div className="col-span-2"><dt className="c4-eyebrow mb-0.5">Código da requisição</dt><dd className="font-mono text-xs text-text-primary/70 break-all">{evento.requestId ?? '—'}</dd></div>
+          </dl>
+
+          <section aria-labelledby="aud-mudancas">
+            <h3 id="aud-mudancas" className="text-sm font-semibold text-text-primary mb-2">
+              {criacaoOuExclusao ? 'Dados do registro' : 'O que mudou'}
+            </h3>
+            {difs.length === 0 ? (
+              <p className="text-sm text-text-primary/65">Nenhum detalhe foi guardado para este evento.</p>
+            ) : (
+              <div className="rounded-xl border border-border overflow-x-auto">
+                <table className="w-full text-sm">
+                  <caption className="sr-only">Campos do registro antes e depois</caption>
+                  <thead className="bg-surface-medium/70">
+                    <tr>
+                      <th scope="col" className="text-left px-3 py-2 font-semibold">Campo</th>
+                      {!criacaoOuExclusao && <th scope="col" className="text-left px-3 py-2 font-semibold">Antes</th>}
+                      <th scope="col" className="text-left px-3 py-2 font-semibold">{criacaoOuExclusao ? 'Valor' : 'Depois'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {difs.map((d) => (
+                      <tr key={d.chave} className="border-t border-border align-top">
+                        <th scope="row" className="text-left px-3 py-2 font-medium text-text-primary/80">{d.campo}</th>
+                        {!criacaoOuExclusao && <td className="px-3 py-2 text-text-primary/70 break-words">{d.antes}</td>}
+                        <td className="px-3 py-2 text-text-primary break-words">{evento.acao === 'DELETAR' ? d.antes : d.depois}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+    </Drawer>
+  );
 }
 
 export default function Audit() {
-  const toast = useToast();
-  const [logs, setLogs] = useState([]);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filtroAcao, setFiltroAcao] = useState('');
-  const [dataInicio, setDataInicio] = useState('');
-  const [dataFim, setDataFim] = useState('');
-  const [showFiltros, setShowFiltros] = useState(false);
+  const { usuario } = useAuth();
+  const [periodo, setPeriodo] = usePeriodoUrl('30d');
+  const [acao, setAcao] = useState('');
+  const [busca, setBusca] = useState('');
+  const [aberto, setAberto] = useState(null);
 
-  const carregar = useCallback(() => {
-    setLoading(true);
-    auditoria.listar({
-      acao: filtroAcao || undefined,
-      dataInicio: dataInicio || undefined,
-      dataFim: dataFim || undefined,
-      page,
-      size: TAMANHO_PAGINA,
-    }).then((resp) => {
-      setLogs(resp?.content ?? []);
-      setTotalPages(resp?.totalPages ?? 0);
-      setTotalElements(resp?.totalElements ?? 0);
-    }).catch((err) => {
-      setLogs([]);
-      toast.error(err?.message || 'Não foi possível carregar os registros de auditoria. Tente novamente.');
-    }).finally(() => setLoading(false));
-  }, [filtroAcao, dataInicio, dataFim, page, toast]);
+  // A página volta para a 1ª sempre que um filtro do servidor muda (derivado, sem efeito)
+  const chaveFiltros = `${periodo.inicio}|${periodo.fim}|${acao}`;
+  const [pag, setPag] = useState({ chave: chaveFiltros, n: 0 });
+  const page = pag.chave === chaveFiltros ? pag.n : 0;
 
-  useEffect(() => { carregar(); }, [carregar]);
+  const { dados, erro, carregando, recarregar } = useCarga(
+    () => auditoria.listar({ acao: acao || undefined, dataInicio: periodo.inicio, dataFim: periodo.fim, page, size: TAMANHO_PAGINA }),
+    [acao, periodo.inicio, periodo.fim, page],
+  );
 
-  // Ao mudar um filtro server-side, volta para a primeira página.
-  const aplicarFiltro = (setter) => (valor) => {
-    setPage(0);
-    setter(valor);
-  };
+  const eventos = dados?.content ?? [];
+  const termo = busca.trim().toLowerCase();
+  const filtrados = termo
+    ? eventos.filter((e) => {
+      const f = frase(e, usuario?.id);
+      return [f.autor, f.verbo, f.alvo, f.nome, infoAcao(e.acao).rotulo, e.ipAddress].some((t) => (t || '').toLowerCase().includes(termo));
+    })
+    : eventos;
 
-  const limparFiltros = () => {
-    setPage(0);
-    setFiltroAcao('');
-    setDataInicio('');
-    setDataFim('');
-  };
+  const grupos = [];
+  filtrados.forEach((e) => {
+    const dia = diaDe(e.timestamp);
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo?.dia === dia) ultimo.itens.push(e);
+    else grupos.push({ dia, itens: [e] });
+  });
 
-  // Busca textual é apenas local (a API não oferece busca por texto) — filtra
-  // somente os itens já carregados nesta página.
-  const filtered = search.trim()
-    ? logs.filter((l) =>
-        String(l.entidade ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        String(l.acao ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        String(l.usuarioId ?? '').includes(search)
-      )
-    : logs;
-
-  const criticosPagina = filtered.filter((l) => ACAO_SEV[l.acao] === 'critical').length;
-
-  const stats = [
-    { label: 'Total de eventos', hint: 'Todos os registros', value: totalElements, icon: Info, color: 'text-primary' },
-    { label: 'Eventos críticos', hint: 'Nesta página', value: criticosPagina, icon: AlertTriangle, color: 'text-error' },
-    { label: 'Exibindo', hint: 'Após busca local', value: filtered.length, icon: User, color: 'text-secondary', live: true },
-  ];
-
-  const columns = [
-    {
-      key: 'timestamp',
-      label: 'Data e hora',
-      render: (v) => <span className="text-xs font-mono text-text-primary/70 whitespace-nowrap">{fmtData(v)}</span>,
-    },
-    {
-      key: 'usuarioId',
-      label: 'Usuário',
-      render: (v, row) => (
-        <span className="inline-flex items-center gap-2">
-          <span className="text-sm font-bold text-text-primary font-display">{usuarioLabel(v)}</span>
-          {row.aiAction && (
-            <span
-              role="img"
-              aria-label={`Ação executada pela assistente de IA (Áurea) a pedido do ${usuarioLabel(v)}`}
-              className="inline-flex items-center rounded-full font-bold uppercase tracking-wider text-xs px-2 py-0.5 bg-secondary/15 text-secondary border border-secondary/20"
-            >
-              <span aria-hidden="true">IA</span>
-            </span>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: 'entidade',
-      label: 'Entidade',
-      render: (v) => <span className="text-sm text-text-primary/80">{v ?? '—'}</span>,
-    },
-    {
-      key: 'entidadeId',
-      label: 'Registro',
-      render: (v) => <span className="text-xs font-mono text-text-primary/60">{v ?? '—'}</span>,
-    },
-    {
-      key: 'acao',
-      label: 'Ação',
-      render: (v) => <Badge variant="neutral" size="sm">{acaoLabel(v)}</Badge>,
-    },
-    {
-      key: 'severidade',
-      label: 'Severidade',
-      render: (_v, row) => {
-        const sev = SEV_BADGE[ACAO_SEV[row.acao] ?? 'info'];
-        return <Badge variant={sev.variant} size="sm" dot>{sev.label}</Badge>;
-      },
-    },
-    {
-      key: 'ipAddress',
-      label: 'IP',
-      render: (v) => <span className="text-xs font-mono text-text-primary/60">{v ?? '—'}</span>,
-    },
-  ];
+  const filtrosAtivos = (acao ? 1 : 0) + (termo ? 1 : 0);
+  const limpar = () => { setAcao(''); setBusca(''); };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Auditoria"
-        subtitle="Rastreabilidade total e logs de segurança em tempo real"
-        icon={<Shield />}
-        actions={
-          <Button
-            variant="ghost"
-            size="md"
-            className="border border-text-primary/10 text-text-primary/70 font-bold text-xs uppercase tracking-widest font-mono"
-            leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}
-            onClick={carregar}
-            loading={loading}
-          >
+        subtitle="Quem fez o quê e quando."
+        icon={Gavel}
+        actions={(
+          <Button variant="secondary" onClick={recarregar} loading={carregando && Boolean(dados)} leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}>
             Atualizar
           </Button>
-        }
+        )}
       />
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stats.map((stat, i) => (
-          <div
-            key={stat.label}
-            className={`anim-in d${i + 1} rounded-[18px] p-5 flex flex-col gap-3 relative overflow-hidden bg-surface-medium border border-text-primary/8`}
-          >
-            <div className="absolute -right-3 -top-3 opacity-[0.06] text-text-primary" aria-hidden="true">
-              <stat.icon className="w-20 h-20" />
-            </div>
-            <div className="flex items-center gap-2">
-              {stat.live && <span className="live-dot" style={{ width: 5, height: 5 }} />}
-              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono">{stat.label}</span>
-            </div>
-            <p className={`text-4xl font-bold font-display leading-none ${stat.color}`}>
-              {loading ? '—' : stat.value}
-            </p>
-            <span className="text-xs uppercase tracking-widest text-text-primary/60 font-mono">{stat.hint}</span>
-          </div>
-        ))}
-      </div>
+      <FilterBar
+        busca={{ value: busca, onChange: setBusca, placeholder: 'Buscar nesta página', label: 'Buscar nos eventos desta página' }}
+        periodo={<PeriodoSelector value={periodo} onChange={setPeriodo} granularidade="dia" atalhos={ATALHOS} label="Período" />}
+        filtrosAtivos={filtrosAtivos}
+        onLimpar={limpar}
+      >
+        <label className="flex items-center gap-2">
+          <span className="sr-only md:not-sr-only text-sm text-text-primary/70 whitespace-nowrap">Tipo de ação</span>
+          <FormSelect value={acao} onChange={(e) => setAcao(e.target.value)} className="min-w-44">
+            <option value="">Todas as ações</option>
+            {Object.entries(ACOES).map(([valor, a]) => <option key={valor} value={valor}>{a.rotulo}</option>)}
+          </FormSelect>
+        </label>
+      </FilterBar>
 
-      {/* Toolbar */}
-      <div className="rounded-[18px] overflow-hidden bg-surface-medium border border-text-primary/8">
-        <div className="p-5 border-b border-text-primary/5 flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-primary/30" aria-hidden="true" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filtrar nesta página por entidade, ação ou usuário..."
-              aria-label="Filtrar registros exibidos nesta página"
-              className="w-full bg-surface-high border border-text-primary/8 rounded-xl pl-9 pr-4 py-2.5 text-sm text-text-primary focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all placeholder:text-text-primary/50"
-            />
-          </div>
-          <Button
-            variant="ghost"
-            size="md"
-            className="border border-text-primary/8 text-text-primary/60 text-xs font-bold uppercase tracking-widest font-mono hover:text-primary"
-            leftIcon={<Filter className="w-3 h-3" aria-hidden="true" />}
-            onClick={() => setShowFiltros((v) => !v)}
-            aria-expanded={showFiltros}
-          >
-            Filtros
-          </Button>
-        </div>
+      {erro && <AlertaErro mensagem={erro.message} onTentarNovamente={recarregar} />}
 
-        {showFiltros && (
-          <div className="p-4 border-b border-text-primary/5 flex flex-wrap gap-4 items-end">
-            <div>
-              <label htmlFor="audit-acao" className="block text-xs font-mono uppercase tracking-wider text-text-primary/70 mb-1">Ação</label>
-              <select id="audit-acao"
-                value={filtroAcao}
-                onChange={(e) => aplicarFiltro(setFiltroAcao)(e.target.value)}
-                className="bg-surface-high border border-text-primary/15 rounded-xl px-3 py-2 min-h-11 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <option value="">Todas</option>
-                {['CRIAR', 'ATUALIZAR', 'DELETAR', 'LOGIN', 'LOGOUT', 'ACESSO_NEGADO', 'EXPORTAR'].map((a) => (
-                  <option key={a} value={a}>{acaoLabel(a)}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="audit-inicio" className="block text-xs font-mono uppercase tracking-wider text-text-primary/70 mb-1">Data início</label>
-              <input id="audit-inicio"
-                type="date"
-                value={dataInicio}
-                onChange={(e) => aplicarFiltro(setDataInicio)(e.target.value)}
-                className="bg-surface-high border border-text-primary/15 rounded-xl px-3 py-2 min-h-11 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
-            <div>
-              <label htmlFor="audit-fim" className="block text-xs font-mono uppercase tracking-wider text-text-primary/70 mb-1">Data fim</label>
-              <input id="audit-fim"
-                type="date"
-                value={dataFim}
-                onChange={(e) => aplicarFiltro(setDataFim)(e.target.value)}
-                className="bg-surface-high border border-text-primary/15 rounded-xl px-3 py-2 min-h-11 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
-            <button
-              onClick={limparFiltros}
-              className="px-3 min-h-11 rounded-xl text-text-primary/70 text-xs font-mono uppercase tracking-wider hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              Limpar
-            </button>
+      <section aria-label="Eventos de auditoria" className="c4-card p-2 sm:p-3">
+        {carregando && !dados ? (
+          <div className="space-y-2 p-2" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
+        ) : filtrados.length === 0 ? (
+          <EmptyState
+            compact
+            icon={History}
+            title={termo ? 'Nada com essa busca nesta página' : 'Nenhum evento neste período'}
+            description={termo ? 'A busca olha só os eventos já carregados. Troque de página ou limpe a busca.' : 'Amplie o período ou escolha “Todas as ações” para ver mais.'}
+          />
+        ) : (
+          <div className={cn('space-y-4 transition-opacity', carregando && 'opacity-60')} aria-busy={carregando || undefined}>
+            {grupos.map((g) => (
+              <section key={g.dia} aria-labelledby={`dia-${g.dia}`}>
+                <h2 id={`dia-${g.dia}`} className="sticky top-0 z-[1] px-3 py-1.5 c4-eyebrow first-letter:uppercase bg-surface-low/90 backdrop-blur-sm rounded-lg">
+                  {rotuloDia(g.dia)}
+                </h2>
+                <Stagger as="ul" className="mt-1 relative before:absolute before:left-[2.05rem] before:top-2 before:bottom-2 before:w-px before:bg-border">
+                  {g.itens.map((e) => (
+                    <StaggerItem as="li" key={e.id} className="relative">
+                      <LinhaEvento evento={e} meuId={usuario?.id} onAbrir={setAberto} />
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              </section>
+            ))}
           </div>
         )}
+      </section>
 
-        {/* Tabela (desktop) + cards (mobile), paginação real server-side */}
-        <div className="p-4 space-y-4">
-          <DataTable
-            caption="Registros de auditoria"
-            columns={columns}
-            data={filtered}
-            loading={loading}
-            serverSort
-            keyExtractor={(r) => r.id}
-            emptyState={
-              <div className="py-12 text-center text-text-primary/60 text-sm">
-                Nenhum evento de auditoria encontrado para os filtros selecionados.
-              </div>
-            }
-          />
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            totalElements={totalElements}
-            onChange={setPage}
-          />
-        </div>
-      </div>
+      {dados && (
+        <Pagination
+          page={page}
+          totalPages={dados.totalPages ?? 0}
+          totalElements={dados.totalElements ?? 0}
+          onChange={(n) => setPag({ chave: chaveFiltros, n })}
+        />
+      )}
+
+      <DetalheEvento evento={aberto} meuId={usuario?.id} onClose={() => setAberto(null)} />
     </div>
   );
 }

@@ -42,7 +42,8 @@ export default function Badge({ variant = 'neutral', size = 'sm', children, clas
   const v = VARIANTS[variant] ? variant : 'neutral';
   return (
     <span className={cn(
-      'inline-flex items-center gap-1.5 rounded-full border font-semibold leading-tight whitespace-nowrap',
+      // c4-badge: com texto ampliado (painel de acessibilidade) o selo pode quebrar linha em vez de vazar (1.4.10)
+      'c4-badge inline-flex items-center gap-1.5 max-w-full rounded-full border font-semibold leading-tight whitespace-nowrap',
       VARIANTS[v],
       SIZES[size] ?? SIZES.sm,
       className

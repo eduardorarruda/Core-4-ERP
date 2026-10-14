@@ -4,7 +4,7 @@
  * Regras da casa:
  * - UI comum dura no máximo 300ms; nada bloqueia clique nem atrasa dado.
  * - Com "reduzir movimento" ligado, os componentes de `Movimento.jsx` não animam
- *   (usam `useReducedMotion`); o `MotionConfig reducedMotion="user"` do main.jsx
+ *   (usam `useMovimentoReduzido`, que soma o sistema e o painel de acessibilidade); o MotionConfig da raiz
  *   cobre qualquer `motion.*` solto.
  */
 

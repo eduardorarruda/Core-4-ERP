@@ -5,6 +5,7 @@ import BrandLogo from '../ui/BrandLogo';
 import FundoVivo from '../layout/FundoVivo';
 import { FadeIn } from '../motion/Movimento';
 import { VERSAO_TERMOS, VIGENCIA } from '../../content/legal';
+import BotaoAcessibilidade from '../acessibilidade/BotaoAcessibilidade';
 
 const FOCO = 'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface';
 const LINK_TEXTO = `text-primary font-medium underline underline-offset-2 hover:opacity-80 transition-opacity ${FOCO}`;
@@ -89,26 +90,34 @@ function BotaoVoltar() {
  * Casca pública (sem autenticação) das páginas legais.
  * Recebe o único <h1> da página em `titulo`; as seções usam <LegalSection> (h2/h3).
  */
-export default function LegalLayout({ titulo, resumo, secoes, children }) {
+export default function LegalLayout({ titulo, resumo, secoes, children, eyebrow = 'Documento legal', meta }) {
   return (
     <div className="relative min-h-dvh bg-surface text-text-primary overflow-x-hidden">
       <FundoVivo />
       <header className="sticky top-0 z-20 c4-glass border-b pt-safe">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <Link to="/login" aria-label="Core 4 — ir para o login" className={FOCO}>
+          <Link to="/login" className={FOCO}>
             <BrandLogo size="sm" as="span" />
+            <span className="sr-only">, ir para o login</span>
           </Link>
-          <BotaoVoltar />
+          <div className="flex items-center gap-1">
+            <BotaoAcessibilidade />
+            <BotaoVoltar />
+          </div>
         </div>
       </header>
 
-      <main id="main-content" className="relative z-[1] mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-14">
+      <main id="main-content" tabIndex={-1} className="outline-none relative z-[1] mx-auto max-w-6xl px-4 sm:px-6 py-10 sm:py-14">
         <FadeIn className="max-w-3xl">
-          <p className="c4-eyebrow mb-3">Documento legal</p>
+          <p className="c4-eyebrow mb-3">{eyebrow}</p>
           <h1 className="font-display text-[2rem] sm:text-[2.5rem] font-semibold tracking-[-0.03em] leading-tight">{titulo}</h1>
-          <p className="mt-3 inline-flex flex-wrap items-center gap-2 text-xs sm:text-sm text-text-primary/65">
-            <span className="rounded-full border border-border-strong px-2.5 py-0.5">Versão <span className="font-mono">{VERSAO_TERMOS}</span></span>
-            <span>Vigente desde {VIGENCIA}</span>
+          <p className="mt-3 inline-flex flex-wrap items-center gap-2 text-xs sm:text-sm text-text-primary/70">
+            {meta ?? (
+              <>
+                <span className="rounded-full border border-border-strong px-2.5 py-0.5">Versão <span className="font-mono">{VERSAO_TERMOS}</span></span>
+                <span>Vigente desde {VIGENCIA}</span>
+              </>
+            )}
           </p>
           {resumo && <p className="mt-5 text-base leading-relaxed text-text-primary/80 text-pretty">{resumo}</p>}
         </FadeIn>
@@ -125,6 +134,8 @@ export default function LegalLayout({ titulo, resumo, secoes, children }) {
             <Link to="/privacidade" className={`hover:text-primary transition-colors ${FOCO}`}>Política de Privacidade</Link>
             <span aria-hidden="true">·</span>
             <Link to="/termos" className={`hover:text-primary transition-colors ${FOCO}`}>Termos de Uso</Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/acessibilidade" className={`hover:text-primary transition-colors ${FOCO}`}>Acessibilidade</Link>
           </nav>
           <p>© 2026 Core 4 · Versão <span className="font-mono">{VERSAO_TERMOS}</span></p>
         </div>

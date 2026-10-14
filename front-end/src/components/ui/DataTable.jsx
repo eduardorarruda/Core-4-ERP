@@ -143,7 +143,7 @@ export default function DataTable({
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {columns.map((col) => (
                 <div key={col.key} className={cn('min-w-0', col.className)}>
-                  <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-text-primary/55 mb-0.5">{col.label}</p>
+                  <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.12em] text-text-primary/70 mb-0.5">{col.label}</p>
                   <div className="text-sm text-text-primary">
                     {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
                   </div>

@@ -312,6 +312,7 @@ export const cartoes = {
   atualizar: (id, dto) => request(`/api/cartoes/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deletar: (id) => request(`/api/cartoes/${id}`, { method: 'DELETE' }),
   fecharFatura: (id, dto) => request(`/api/cartoes/${id}/fechar-fatura`, { method: 'POST', body: JSON.stringify(dto) }),
+  parcelamentos: () => request('/api/cartoes/parcelamentos'),
   lancamentos: {
     listar: (cartaoId, params = {}) => {
       const qs = new URLSearchParams(params).toString();

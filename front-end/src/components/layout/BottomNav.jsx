@@ -37,6 +37,7 @@ export default function BottomNav({ onAbrirMenu }) {
   return (
     <nav
       aria-label="Navegação principal"
+      data-navegacao-principal=""
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 c4-glass border-t pb-safe"
     >
       <IndicatorGroup id="bottomnav">

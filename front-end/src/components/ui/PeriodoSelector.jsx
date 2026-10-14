@@ -1,14 +1,21 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import { CalendarRange, Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { endOfMonth } from 'date-fns';
 import { cn } from '../../lib/utils';
-import { MESES_COMPLETOS } from '../../lib/constants';
+import { MESES_ABREV, MESES_COMPLETOS } from '../../lib/constants';
 import {
   ATALHOS, ATALHOS_PADRAO, atalhoDoPeriodo, deIso, deMesAno, mesAtual, paraIso, paraMesAno,
   rotuloMes, rotuloPeriodo, somarMeses, validarPeriodo,
 } from '../../lib/periodo';
 import { PopPresence } from '../motion/Movimento';
+
+/** "2026-10" → "Out 2026" (rótulo curto para espaço estreito). */
+const rotuloMesCurto = (anoMes) => {
+  const [ano, mes] = String(anoMes ?? '').split('-').map(Number);
+  return ano && mes ? `${MESES_ABREV[mes - 1]} ${ano}` : '';
+};
 import Button from './Button';
 
 /**
@@ -247,7 +254,7 @@ function SeletorMesAno({ id, rotulo, valor, onMudar }) {
  * Props: value 'yyyy-MM', onChange(yyyy-MM), min/max 'yyyy-MM' (opcionais), label.
  */
 export function MonthSelector({ value, onChange, min, max, label = 'Mês', className }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const [direcao, setDirecao] = useState(0);
   const atual = value ?? mesAtual();
   const ehHoje = atual === mesAtual();
@@ -264,8 +271,8 @@ export function MonthSelector({ value, onChange, min, max, label = 'Mês', class
   };
 
   return (
-    <div className={cn('inline-flex items-center gap-2', className)} role="group" aria-label={label}>
-      <div className="inline-flex items-center rounded-xl bg-surface-medium/70 border border-border-strong">
+    <div className={cn('inline-flex flex-wrap items-center gap-2 max-w-full', className)} role="group" aria-label={label}>
+      <div className="inline-flex items-center max-w-full min-w-0 rounded-xl bg-surface-medium/70 border border-border-strong">
         <button
           type="button"
           onClick={() => ir(-1)}
@@ -275,17 +282,20 @@ export function MonthSelector({ value, onChange, min, max, label = 'Mês', class
         >
           <ChevronLeft className="w-4 h-4" aria-hidden="true" />
         </button>
-        <span className="relative w-40 h-11 overflow-hidden grid place-items-center" aria-live="polite">
+        {/* Encolhe em tela estreita com texto ampliado (WCAG 1.4.10): abaixo de 9rem o rótulo vira "Out 2026" */}
+        <span className="@container relative w-40 min-w-0 shrink h-11 overflow-hidden grid place-items-center" aria-live="polite">
           <AnimatePresence mode="popLayout" initial={false} custom={direcao}>
             <motion.span
               key={atual}
-              className="absolute text-sm font-semibold capitalize whitespace-nowrap"
+              className="absolute text-sm font-semibold capitalize whitespace-nowrap max-w-full"
               initial={reduzir ? { opacity: 0 } : { opacity: 0, y: direcao >= 0 ? 14 : -14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={reduzir ? { opacity: 0 } : { opacity: 0, y: direcao >= 0 ? -14 : 14 }}
               transition={{ type: 'spring', stiffness: 500, damping: 36 }}
             >
-              {rotuloMes(atual)}
+              <span className="hidden @[9rem]:inline">{rotuloMes(atual)}</span>
+              <span className="@[9rem]:hidden" aria-hidden="true">{rotuloMesCurto(atual)}</span>
+              <span className="sr-only @[9rem]:hidden">{rotuloMes(atual)}</span>
             </motion.span>
           </AnimatePresence>
         </span>

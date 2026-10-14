@@ -211,7 +211,7 @@ export default function NotificacoesPopover() {
                     </div>
                     <div className="flex-1 min-w-0 space-y-1 pt-0.5">
                       <p className="text-sm text-text-primary/90 leading-snug">{n.mensagem}</p>
-                      <span className="inline-flex items-center gap-1 text-xs text-text-primary/55 tabular-nums">
+                      <span className="inline-flex items-center gap-1 text-xs text-text-primary/70 tabular-nums">
                         <Clock className="w-3 h-3" aria-hidden="true" />
                         {formatDateTime(n.dataCriacao)}
                       </span>

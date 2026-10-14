@@ -13,7 +13,8 @@ const TIPOS = {
 
 
 /**
- * Aviso flutuante. O anúncio para leitores de tela é feito pelas regiões vivas do
+ * Aviso flutuante. Erros NÃO somem sozinhos (WCAG 2.2.1/2.2.3): ficam até a pessoa fechar.
+ * O anúncio para leitores de tela é feito pelas regiões vivas do
  * ToastContainer (fixas no DOM), então o item não tem role/aria-live — evita anúncios duplos.
  * O tempo pausa com o mouse em cima ou com o foco dentro (WCAG 2.2.1).
  */
@@ -26,15 +27,17 @@ function ToastItem({ id, message, type = 'success', duration = 4000 }) {
   // A saída animada é do AnimatePresence do contêiner: aqui só tiramos o item da lista.
   const close = useCallback(() => dismiss(id), [dismiss, id]);
 
+  const semTempo = type === 'error';
+
   useEffect(() => {
-    if (pausado) return undefined;
+    if (pausado || semTempo) return undefined;
     inicio.current = Date.now();
     const t = setTimeout(close, restante.current);
     return () => {
       clearTimeout(t);
       restante.current = Math.max(0, restante.current - (Date.now() - inicio.current));
     };
-  }, [pausado, close]);
+  }, [pausado, close, semTempo]);
 
   const tipo = TIPOS[type] ?? TIPOS.info;
   const { Icone } = tipo;
@@ -66,12 +69,12 @@ function ToastItem({ id, message, type = 'success', duration = 4000 }) {
       >
         <X className="w-4 h-4" aria-hidden="true" />
       </button>
-      {/* Tempo restante: barra que encolhe e pausa junto com o relógio */}
-      <div
+      {/* Tempo restante: barra que encolhe e pausa junto com o relógio (erros não têm tempo) */}
+      {!semTempo && <div
         aria-hidden="true"
         className={cn('absolute bottom-0 inset-x-0 h-0.5 opacity-70 origin-left', tipo.fio)}
         style={{ animation: `progressBar ${duration}ms linear forwards`, animationPlayState: pausado ? 'paused' : 'running' }}
-      />
+      />}
     </div>
   );
 }

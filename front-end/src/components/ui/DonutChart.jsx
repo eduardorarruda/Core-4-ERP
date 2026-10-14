@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { formatarNumero } from '../../lib/formatters';
-import { corSerie } from '../../lib/chartTheme';
+import { corSerie, usePadroesGrafico } from '../../lib/chartTheme';
+import { useMovimentoReduzido } from '../../hooks/useAcessibilidade';
 import GraficoAcessivel from './GraficoAcessivel';
 
 /**
@@ -27,7 +28,7 @@ export default function DonutChart({
   legenda = true,
   className,
 }) {
-  const reduzir = useReducedMotion();
+  const reduzir = useMovimentoReduzido();
   const [foco, setFoco] = useState(null);
   const formatar = typeof formato === 'function' ? formato : (v) => formatarNumero(v, formato);
   const dados = fatias
@@ -35,6 +36,8 @@ export default function DonutChart({
     .map((f, i) => ({ ...f, cor: f.cor ?? corSerie(i) }));
   const total = dados.reduce((s, f) => s + Number(f.valor), 0);
   const focada = dados.find((f) => f.id === foco);
+  // Modo daltonismo / "padrões nos gráficos": cada fatia ganha textura além da cor (WCAG 1.4.1)
+  const padroes = usePadroesGrafico(dados.length ? dados.map((f) => f.cor) : undefined);
 
   const espessura = tamanho * 0.13;
   const r = tamanho / 2 - espessura / 2 - 4;
@@ -58,6 +61,7 @@ export default function DonutChart({
       >
         <div style={{ width: tamanho, height: tamanho }} className="relative">
           <svg width={tamanho} height={tamanho} viewBox={`0 0 ${tamanho} ${tamanho}`} className="-rotate-90">
+            {padroes.defs && <defs>{padroes.defs}</defs>}
             <circle cx={tamanho / 2} cy={tamanho / 2} r={r} fill="none" stroke="color-mix(in srgb, var(--color-text-primary) 6%, transparent)" strokeWidth={espessura} />
             {dados.map((f, i) => {
               const comprimento = (Number(f.valor) / total) * circ;
@@ -71,7 +75,7 @@ export default function DonutChart({
                   cy={tamanho / 2}
                   r={r}
                   fill="none"
-                  stroke={f.cor}
+                  stroke={padroes.preencher(i)}
                   strokeLinecap="butt"
                   strokeDasharray={`${visivel} ${circ - visivel}`}
                   strokeDashoffset={-inicio}
@@ -112,7 +116,7 @@ export default function DonutChart({
 
       {legenda && dados.length > 0 && (
         <ul className="w-full min-w-0 space-y-1" aria-hidden="true">
-          {dados.map((f) => (
+          {dados.map((f, i) => (
             <li
               key={f.id}
               onPointerEnter={() => setFoco(f.id)}
@@ -123,10 +127,10 @@ export default function DonutChart({
                 foco === f.id && 'bg-text-primary/[0.05]'
               )}
             >
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: f.cor }} />
+              <span className={cn('shrink-0', padroes.ativo ? 'w-3.5 h-3.5 rounded-[3px] ring-1 ring-text-primary/30' : 'w-2.5 h-2.5 rounded-full')} style={padroes.estiloAmostra(i)} />
               <span className="flex-1 truncate text-text-primary/80">{f.nome}</span>
               <span className="tabular-nums font-medium valor-privado">{formatar(f.valor)}</span>
-              <span className="w-10 text-right tabular-nums text-xs text-text-primary/55">
+              <span className="w-10 text-right tabular-nums text-xs text-text-primary/70">
                 {formatarNumero((f.valor / total) * 100, 'percent', { casas: 0 })}
               </span>
             </li>

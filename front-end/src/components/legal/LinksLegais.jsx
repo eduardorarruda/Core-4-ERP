@@ -2,9 +2,9 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 
-const LINK = 'underline-offset-2 hover:underline hover:text-text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+const LINK = 'inline-flex items-center min-h-6 underline-offset-2 hover:underline hover:text-text-primary rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
-/** Linha de links "Política de Privacidade · Termos de Uso" para rodapés e formulários. */
+/** Linha de links "Privacidade · Termos · Acessibilidade" para rodapés e formulários. */
 export default function LinksLegais({ className, novaAba = false }) {
   const extra = novaAba ? { target: '_blank', rel: 'noopener' } : {};
   return (
@@ -12,6 +12,8 @@ export default function LinksLegais({ className, novaAba = false }) {
       <Link to="/privacidade" className={LINK} {...extra}>Política de Privacidade</Link>
       <span aria-hidden="true" className="mx-2">·</span>
       <Link to="/termos" className={LINK} {...extra}>Termos de Uso</Link>
+      <span aria-hidden="true" className="mx-2">·</span>
+      <Link to="/acessibilidade" className={LINK} {...extra}>Acessibilidade</Link>
     </nav>
   );
 }

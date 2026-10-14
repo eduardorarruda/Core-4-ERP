@@ -5,6 +5,7 @@ import BrandLogo from '../ui/BrandLogo';
 import LinksLegais from '../legal/LinksLegais';
 import FundoVivo from '../layout/FundoVivo';
 import AuthHero from './AuthHero';
+import BotaoAcessibilidade from '../acessibilidade/BotaoAcessibilidade';
 
 /**
  * Moldura das telas públicas de acesso: coluna do formulário (logo, conteúdo, rodapé legal)
@@ -17,14 +18,17 @@ export default function AuthLayout({ children, heroTitulo, heroSubtitulo, largur
     <div className="relative min-h-dvh flex bg-surface text-text-primary">
       <div className="lg:hidden"><FundoVivo /></div>
 
-      <section className="relative z-[1] w-full lg:w-[min(46%,600px)] lg:shrink-0 min-h-dvh flex flex-col px-5 sm:px-10 lg:px-14 pt-safe pb-safe">
+      <div className="relative z-[1] w-full lg:w-[min(46%,600px)] lg:shrink-0 min-h-dvh flex flex-col px-5 sm:px-10 lg:px-14 pt-safe pb-safe">
         <header className="flex items-center justify-between py-6 sm:py-8">
-          <Link to="/login" aria-label="Core 4 — ir para o login" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          <Link to="/login" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <BrandLogo size="sm" as="span" />
+            <span className="sr-only">, ir para o login</span>
           </Link>
+          {/* Acessibilidade disponível antes do login (Alt+A) */}
+          <BotaoAcessibilidade variante="rotulo" />
         </header>
 
-        <main id="main-content" className={cn('w-full mx-auto flex-1 flex flex-col justify-center py-6', larguraForm)}>
+        <main id="main-content" tabIndex={-1} className={cn('outline-none w-full mx-auto flex-1 flex flex-col justify-center py-6', larguraForm)}>
           {children}
         </main>
 
@@ -32,9 +36,9 @@ export default function AuthLayout({ children, heroTitulo, heroSubtitulo, largur
           <span>© 2026 Core 4</span>
           <LinksLegais />
         </footer>
-      </section>
+      </div>
 
-      <aside aria-label="Sobre o Core 4" className="hidden lg:block flex-1 min-w-0 sticky top-0 h-dvh border-l border-border">
+      <aside aria-label="Sobre o Core 4" data-decorativo="" className="hidden lg:block flex-1 min-w-0 sticky top-0 h-dvh border-l border-border">
         <AuthHero titulo={heroTitulo} subtitulo={heroSubtitulo} />
       </aside>
     </div>

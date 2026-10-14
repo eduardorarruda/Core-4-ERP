@@ -1,809 +1,433 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FileText, Plus, Trash2, CheckCircle, Filter, RotateCcw, ChevronDown, Loader2, Pencil, ArrowRightLeft, History, Sparkles } from 'lucide-react';
-import { contas as api, categorias as catApi, parceiros as parApi, contasCorrentes as ccApi, assinaturas as assinaturasApi } from '../lib/api';
-import ConfirmModal from '../components/ui/ConfirmModal';
-import FormField, { inputCls } from '../components/ui/FormField';
-import CategoriaOptions from '../components/ui/CategoriaOptions';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CircleCheckBig, Plus, Receipt } from 'lucide-react';
+import { endOfMonth } from 'date-fns';
+import { contas as api, categorias as catApi, parceiros as parApi } from '../lib/api';
+import { formatarMoeda, formatDate } from '../lib/formatters';
+import { useCarga } from '../hooks/useCarga';
+import { useConfirm } from '../hooks/useConfirm';
+import { useToast } from '../hooks/useToast';
+import { usePermissao } from '../hooks/usePermissao';
+import { usePeriodoUrl } from '../hooks/usePeriodoUrl';
 import PageHeader from '../components/ui/PageHeader';
-import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
-import Pagination from '../components/ui/Pagination';
-import { brl, formatDate } from '../lib/formatters';
-import { useToast } from '../hooks/useToast';
-import { cn } from '../lib/utils';
+import Drawer from '../components/ui/Drawer';
+import EmptyState from '../components/ui/EmptyState';
+import FilterBar from '../components/ui/FilterBar';
+import GroupedList from '../components/ui/GroupedList';
+import AlertaErro from '../components/ui/AlertaErro';
+import PeriodoSelector from '../components/ui/PeriodoSelector';
 import PermissaoGuard from '../components/ui/PermissaoGuard';
+import CategoriaOptions from '../components/ui/CategoriaOptions';
+import { FormSelect } from '../components/ui/FormField';
+import KpiCard, { KpiGrid } from '../components/ui/KpiCard';
+import Tabs, { SegmentedControl } from '../components/ui/Tabs';
+import ContaForm from '../components/forms/ContaForm';
+import BaixaForm from '../components/forms/BaixaForm';
+import LinhaConta, { AcoesConta, StatusConta, ValorConta } from '../components/financeiro/LinhaConta';
+import { ChipCategoria } from '../components/financeiro/IconesCategoria';
+import { agruparPorUrgencia, dataLocal, totalPorTipo } from '../components/financeiro/utilsFinanceiro';
 
-const STATUS_VARIANT = { PENDENTE: 'warning', ATRASADO: 'error', PAGO: 'success', RECEBIDO: 'info' };
+/* Limite de linhas por consulta: cobre meses de contas sem paginar; acima disso pedimos para filtrar */
+const LIMITE = 500;
+const ID_ABAS = 'contas';
 
-const emptyForm = { descricao: '', valorOriginal: '', dataVencimento: '', tipo: 'PAGAR', categoriaId: '', parceiroId: '', quantidadeParcelas: 1, dividirValor: false, numeroDocumento: '', acrescimo: '', desconto: '' };
-const emptyBaixa = { contaCorrenteId: '', dataPagamento: '', juros: 0, multa: 0, acrescimo: 0, desconto: 0 };
-const emptyFiltros = { tipo: '', status: '', numeroDocumento: '', vencimentoInicio: '', vencimentoFim: '', parceiroId: '', valorMin: '', valorMax: '', categoriaId: '' };
-const emptyTransf = { contaOrigemId: '', contaDestinoId: '', valor: '', dataTransferencia: '' };
-
-const COLUMNS = [
-  { key: 'descricao', label: 'Descrição', render: (v, row) => (
-    <div>
-      <p className="font-medium text-text-primary">{v}</p>
-      {row.totalParcelas > 1 && <span className="text-xs text-text-primary/60">{row.numeroParcela}/{row.totalParcelas}</span>}
-      {row.numeroDocumento && <p className="text-xs text-text-primary/60">{row.numeroDocumento}</p>}
-    </div>
-  )},
-  { key: 'valorOriginal', label: 'Valor', sortable: true, render: (v) => `R$ ${brl(v)}` },
-  { key: 'dataVencimento', label: 'Vencimento', sortable: true, render: (v) => formatDate(v) },
-  { key: 'tipo', label: 'Tipo', render: (v) => <Badge variant={v === 'PAGAR' ? 'error' : 'info'}>{v === 'PAGAR' ? 'Pagar' : 'Receber'}</Badge> },
-  { key: 'status', label: 'Status', render: (v) => <Badge variant={STATUS_VARIANT[v] ?? 'neutral'} dot={v === 'ATRASADO'}>{v}</Badge> },
+const ABAS = [
+  { value: 'abertas', label: 'Em aberto' },
+  { value: 'todas', label: 'Todas' },
 ];
+
+const TIPOS = [
+  { value: '', label: 'Todas' },
+  { value: 'PAGAR', label: 'A pagar', icon: ArrowUpRight },
+  { value: 'RECEBER', label: 'A receber', icon: ArrowDownLeft },
+];
+
+const STATUS = [
+  { value: '', label: 'Todos os status' },
+  { value: 'PENDENTE', label: 'Pendentes' },
+  { value: 'ATRASADO', label: 'Atrasadas' },
+  { value: 'PAGO', label: 'Pagas' },
+  { value: 'RECEBIDO', label: 'Recebidas' },
+];
+
+/** Monta os parâmetros da API sem campos vazios. */
+function params(base) {
+  return Object.fromEntries(Object.entries(base).filter(([, v]) => v !== '' && v != null));
+}
+
+function combinaBusca(conta, termo) {
+  if (!termo) return true;
+  return [conta.descricao, conta.numeroDocumento, conta.parceiroNome, conta.categoriaDescricao]
+    .some((t) => t && String(t).toLowerCase().includes(termo));
+}
+
+/** KPIs a partir das contas em aberto: a pagar e a receber até o fim do mês + atrasadas. */
+function calcularKpis(abertas) {
+  const hoje = new Date();
+  const fimMes = endOfMonth(hoje);
+  hoje.setHours(0, 0, 0, 0);
+  const ateFimMes = abertas.filter((c) => dataLocal(c.dataVencimento) <= fimMes);
+  const atrasadas = abertas.filter((c) => dataLocal(c.dataVencimento) < hoje);
+  const mes = totalPorTipo(ateFimMes);
+  const atr = totalPorTipo(atrasadas);
+  return {
+    pagarMes: mes.pagar,
+    receberMes: mes.receber,
+    qtdPagarMes: ateFimMes.filter((c) => c.tipo !== 'RECEBER').length,
+    qtdReceberMes: ateFimMes.filter((c) => c.tipo === 'RECEBER').length,
+    qtdAtrasadas: atrasadas.length,
+    atrasadoPagar: atr.pagar,
+    atrasadoReceber: atr.receber,
+  };
+}
 
 export default function ContasFinanceiras() {
   const toast = useToast();
-  const [contas, setContas] = useState([]);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
-  const PAGE_SIZE = 20;
-  const [cats, setCats] = useState([]);
-  const [pars, setPars] = useState([]);
-  const [ccs, setCcs] = useState([]);
-  const [assinaturasAtivas, setAssinaturasAtivas] = useState([]);
-  const [form, setForm] = useState(emptyForm);
-  const [editId, setEditId] = useState(null);
-  const [editForm, setEditForm] = useState({});
-  const [salvandoEdit, setSalvandoEdit] = useState(false);
-  const [editErrors, setEditErrors] = useState({});
-  const [baixaId, setBaixaId] = useState(null);
-  const [baixaForm, setBaixaForm] = useState(emptyBaixa);
-  const [filtros, setFiltros] = useState(emptyFiltros);
-  const [showFiltros, setShowFiltros] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [salvando, setSalvando] = useState(false);
-  const [salvandoBaixa, setSalvandoBaixa] = useState(false);
-  const [sugerindoCat, setSugerindoCat] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [errors, setErrors] = useState({});
-  const [transferencias, setTransferencias] = useState([]);
-  const [transf, setTransf] = useState(emptyTransf);
-  const [editTransfId, setEditTransfId] = useState(null);
-  const [showTransf, setShowTransf] = useState(false);
-  const [salvandoTransf, setSalvandoTransf] = useState(false);
+  const confirmar = useConfirm();
+  const pode = usePermissao();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [periodo, setPeriodo] = usePeriodoUrl('mes');
 
-  useEffect(() => {
-    Promise.all([
-      catApi.listar().catch(() => []),
-      parApi.listar().catch(() => []),
-      ccApi.listar().catch(() => []),
-      assinaturasApi.listarAtivas().catch(() => []),
-      ccApi.transferencias.listar().catch(() => []),
-    ]).then(([c, p, cc, a, t]) => {
-      setCats(c);
-      setPars(p);
-      setCcs(cc);
-      setAssinaturasAtivas(a);
-      setTransferencias(t);
-    });
-  }, []);
+  // Estado da tela na URL: aba (?ver=todas) e formulário de criação (?novo=PAGAR|RECEBER)
+  const aba = searchParams.get('ver') === 'todas' ? 'todas' : 'abertas';
+  const novoParam = searchParams.get('novo');
+  const novoTipo = novoParam === 'RECEBER' ? 'RECEBER' : 'PAGAR';
+  const criando = Boolean(novoParam) && pode('CONTA_CRIAR');
 
-  const carregar = useCallback(async (f = filtros, pageArg = 0) => {
-    setLoading(true);
-    try {
-      const p = { page: pageArg, size: PAGE_SIZE };
-      if (f.tipo) p.tipo = f.tipo;
-      if (f.status) p.status = f.status;
-      if (f.numeroDocumento.trim()) p.numeroDocumento = f.numeroDocumento.trim();
-      if (f.vencimentoInicio) p.vencimentoInicio = f.vencimentoInicio;
-      if (f.vencimentoFim) p.vencimentoFim = f.vencimentoFim;
-      if (f.parceiroId) p.parceiroId = f.parceiroId;
-      if (f.valorMin) p.valorMin = f.valorMin;
-      if (f.valorMax) p.valorMax = f.valorMax;
-      if (f.categoriaId) p.categoriaId = f.categoriaId;
-      const res = await api.listar(p);
-      setContas(res.content || []);
-      setPage(res.number ?? pageArg);
-      setTotalPages(res.totalPages ?? 0);
-      setTotalElements(res.totalElements ?? 0);
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [filtros, toast]);
+  const setParam = useCallback((chave, valor) => {
+    setSearchParams((atual) => {
+      const p = new URLSearchParams(atual);
+      if (valor) p.set(chave, valor); else p.delete(chave);
+      return p;
+    }, { replace: true });
+  }, [setSearchParams]);
 
-  // Carga inicial com filtros vazios. `carregar` muda a cada filtro digitado; o ref garante que
-  // a busca automática rode só na montagem (os filtros são aplicados pelo botão).
-  const carregarInicial = useRef(carregar);
-  useEffect(() => { carregarInicial.current(emptyFiltros); }, []);
+  const [busca, setBusca] = useState('');
+  const [tipo, setTipo] = useState('');
+  const [status, setStatus] = useState('');
+  const [categoriaId, setCategoriaId] = useState('');
+  const [parceiroId, setParceiroId] = useState('');
+  const [editando, setEditando] = useState(null);
+  const [baixando, setBaixando] = useState(null);
 
-  const irParaPagina = (novaPagina) => carregar(filtros, novaPagina);
-  const setTipo = (tipo) => { const novo = { ...filtros, tipo }; setFiltros(novo); carregar(novo, 0); };
-  const aplicarFiltros = () => carregar(filtros, 0);
-  const limparFiltros = () => { setFiltros(emptyFiltros); carregar(emptyFiltros, 0); };
+  const auxiliares = useCarga(
+    () => Promise.all([catApi.listar().catch(() => []), parApi.listar().catch(() => [])]),
+    [],
+    { inicial: [[], []] },
+  );
+  const [cats, pars] = auxiliares.dados ?? [[], []];
 
-  const valorLiquido = (parseFloat(form.valorOriginal) || 0) + (parseFloat(form.acrescimo) || 0) - (parseFloat(form.desconto) || 0);
-  const parsFiltered = pars.filter((p) => form.tipo === 'PAGAR' ? p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS' : p.tipo === 'CLIENTE' || p.tipo === 'AMBOS');
+  const filtrosServidor = { tipo, categoriaId, parceiroId };
 
-  function validateForm() {
-    const errs = {};
-    if (!form.descricao.trim()) errs.descricao = 'Obrigatório';
-    if (!form.valorOriginal || parseFloat(form.valorOriginal) <= 0) errs.valorOriginal = 'Maior que zero';
-    if (!form.dataVencimento) errs.dataVencimento = 'Obrigatório';
-    if (!form.categoriaId) errs.categoriaId = 'Obrigatório';
-    if (!form.parceiroId) errs.parceiroId = 'Obrigatório';
-    if (Number(form.quantidadeParcelas) < 1) errs.quantidadeParcelas = 'Mínimo 1';
-    if (valorLiquido <= 0) errs.valorOriginal = 'Valor líquido inválido';
-    return errs;
-  }
-
-  async function sugerirCategoria() {
-    if (!form.descricao.trim()) { toast.error('Descreva a conta antes de pedir uma sugestão.'); return; }
-    setSugerindoCat(true);
-    try {
-      const par = pars.find((p) => String(p.id) === String(form.parceiroId));
-      const nomePar = par ? (par.nomeFantasia || par.razaoSocial) : null;
-      const s = await catApi.sugerir({ descricao: form.descricao, parceiroNome: nomePar });
-      if (s.encontrou) {
-        setF('categoriaId')(String(s.categoriaId));
-        toast.success(`Sugestão: ${s.categoriaDescricao}`);
-      } else {
-        toast.info('Não consegui sugerir uma categoria com segurança. Escolha manualmente.');
-      }
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSugerindoCat(false);
-    }
-  }
-
-  async function criar(e) {
-    e.preventDefault();
-    const errs = validateForm();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setErrors({});
-    setSalvando(true);
-    try {
-      await api.criar({ ...form, valorOriginal: parseFloat(form.valorOriginal), categoriaId: Number(form.categoriaId), parceiroId: form.parceiroId ? Number(form.parceiroId) : null, quantidadeParcelas: Number(form.quantidadeParcelas), acrescimo: parseFloat(form.acrescimo) || 0, desconto: parseFloat(form.desconto) || 0 });
-      setForm(emptyForm);
-      setShowForm(false);
-      toast.success('Conta criada!');
-      await carregar();
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  const deletar = useCallback((id) => {
-    setConfirmAction({
-      title: 'Excluir conta',
-      message: 'Deseja excluir esta conta permanentemente?',
-      confirmLabel: 'Excluir',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        try { await api.deletar(id); await carregar(); toast.success('Conta excluída!'); }
-        catch (e) { toast.error(e.message); }
-      },
-    });
-  }, [carregar, toast]);
-
-  const estornar = useCallback((id) => {
-    setConfirmAction({
-      title: 'Estornar quitação',
-      message: 'Cancelar a quitação desta conta? O saldo da conta corrente será estornado.',
-      confirmLabel: 'Estornar',
-      variant: 'warning',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        try { await api.estornar(id); await carregar(); toast.success('Quitação cancelada!'); }
-        catch (e) { toast.error(e.message); }
-      },
-    });
-  }, [carregar, toast]);
-
-  const carregarTransferencias = useCallback(async () => {
-    try { setTransferencias(await ccApi.transferencias.listar()); }
-    catch (e) { toast.error(e.message); }
-  }, [toast]);
-
-  async function salvarTransferencia(e) {
-    e.preventDefault();
-    setSalvandoTransf(true);
-    const dto = {
-      contaOrigemId: Number(transf.contaOrigemId),
-      contaDestinoId: Number(transf.contaDestinoId),
-      valor: parseFloat(transf.valor),
-      dataTransferencia: transf.dataTransferencia,
+  // Em aberto: atrasadas + pendentes, sem limite de data (base dos KPIs e da lista por urgência)
+  const abertas = useCarga(async () => {
+    const base = { ...params(filtrosServidor), size: LIMITE, sort: 'dataVencimento,asc' };
+    const [atr, pen] = await Promise.all([
+      api.listar({ ...base, status: 'ATRASADO' }),
+      api.listar({ ...base, status: 'PENDENTE' }),
+    ]);
+    return {
+      itens: [...(atr.content ?? []), ...(pen.content ?? [])],
+      excedeu: (atr.totalElements ?? 0) > LIMITE || (pen.totalElements ?? 0) > LIMITE,
     };
-    try {
-      if (editTransfId) {
-        await ccApi.transferencias.atualizar(editTransfId, dto);
-        toast.success('Transferência atualizada!');
-      } else {
-        await ccApi.transferir(dto);
-        toast.success('Transferência realizada!');
-      }
-      setTransf(emptyTransf);
-      setEditTransfId(null);
-      setShowTransf(false);
-      await Promise.all([carregar(), carregarTransferencias()]);
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setSalvandoTransf(false);
-    }
-  }
+  }, [tipo, categoriaId, parceiroId]);
 
-  function editarTransferencia(t) {
-    setTransf({
-      contaOrigemId: String(t.contaOrigemId),
-      contaDestinoId: String(t.contaDestinoId),
-      valor: String(t.valor),
-      dataTransferencia: t.dataTransferencia,
-    });
-    setEditTransfId(t.id);
-    setShowTransf(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  // Todas: filtros completos com período de vencimento
+  const todas = useCarga(
+    () => api.listar({
+      ...params({ ...filtrosServidor, status, vencimentoInicio: periodo.inicio, vencimentoFim: periodo.fim }),
+      size: LIMITE,
+      sort: 'dataVencimento,asc',
+    }),
+    [tipo, categoriaId, parceiroId, status, periodo.inicio, periodo.fim],
+    { ativo: aba === 'todas' },
+  );
 
-  function cancelarTransferencia() {
-    setTransf(emptyTransf);
-    setEditTransfId(null);
-    setShowTransf(false);
-  }
+  const recarregar = () => { abertas.recarregar(); if (aba === 'todas') todas.recarregar(); };
 
-  const deletarTransferencia = useCallback((id) => {
-    setConfirmAction({
-      title: 'Excluir transferência',
-      message: 'A transferência será removida e os saldos estornados. Deseja continuar?',
-      confirmLabel: 'Excluir',
+  const termo = busca.trim().toLowerCase();
+  const listaAbertas = useMemo(() => (abertas.dados?.itens ?? []), [abertas.dados]);
+  const kpis = useMemo(() => calcularKpis(listaAbertas), [listaAbertas]);
+  const grupos = useMemo(
+    () => agruparPorUrgencia(listaAbertas.filter((c) => combinaBusca(c, termo))),
+    [listaAbertas, termo],
+  );
+  const listaTodas = useMemo(
+    () => (todas.dados?.content ?? []).filter((c) => combinaBusca(c, termo)),
+    [todas.dados, termo],
+  );
+
+  const filtrosAtivos = [busca, tipo, categoriaId, parceiroId, aba === 'todas' ? status : ''].filter(Boolean).length;
+  const limpar = () => { setBusca(''); setTipo(''); setStatus(''); setCategoriaId(''); setParceiroId(''); };
+
+  async function estornar(conta) {
+    const ok = await confirmar({
+      title: 'Estornar baixa?',
+      message: `"${conta.descricao}" volta a ficar em aberto e o valor ${conta.tipo === 'RECEBER' ? 'sai da' : 'volta para a'} conta bancária usada na baixa.`,
+      confirmLabel: 'Estornar baixa',
       variant: 'warning',
-      onConfirm: async () => {
-        setConfirmAction(null);
-        try {
-          await ccApi.transferencias.deletar(id);
-          await Promise.all([carregar(), carregarTransferencias()]);
-          toast.success('Transferência excluída e saldos estornados!');
-        } catch (e) {
-          toast.error(e.message);
-        }
-      },
     });
-  }, [carregar, carregarTransferencias, toast]);
-
-  async function baixar(e) {
-    e.preventDefault();
-    setSalvandoBaixa(true);
+    if (!ok) return;
     try {
-      await api.baixar(baixaId, { ...baixaForm, contaCorrenteId: Number(baixaForm.contaCorrenteId), juros: parseFloat(baixaForm.juros || 0), multa: parseFloat(baixaForm.multa || 0), acrescimo: parseFloat(baixaForm.acrescimo || 0), desconto: parseFloat(baixaForm.desconto || 0) });
-      setBaixaId(null);
-      setBaixaForm(emptyBaixa);
-      toast.success('Baixa registrada!');
-      await carregar();
+      await api.estornar(conta.id);
+      toast.success('Baixa estornada. A conta voltou a ficar em aberto.');
+      recarregar();
     } catch (e) {
       toast.error(e.message);
-    } finally {
-      setSalvandoBaixa(false);
     }
   }
 
-  const abrirEdit = useCallback((row) => {
-    setEditId(row.id);
-    setEditErrors({});
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setEditForm({
-      descricao: row.descricao,
-      valorOriginal: String(row.valorOriginal),
-      dataVencimento: row.dataVencimento,
-      tipo: row.tipo,
-      categoriaId: String(row.categoriaId ?? ''),
-      parceiroId: String(row.parceiroId ?? ''),
+  async function excluir(conta) {
+    const ok = await confirmar({
+      title: 'Excluir conta?',
+      message: `"${conta.descricao}" (${formatarMoeda(conta.valorOriginal)}, vence em ${formatDate(conta.dataVencimento)}) será excluída.`,
+      confirmLabel: 'Excluir',
     });
-  }, []);
-
-  async function salvarEdit(e) {
-    e.preventDefault();
-    const errs = {};
-    if (!editForm.descricao?.trim()) errs.descricao = 'Obrigatório';
-    if (!editForm.valorOriginal || parseFloat(editForm.valorOriginal) <= 0) errs.valorOriginal = 'Maior que zero';
-    if (!editForm.dataVencimento) errs.dataVencimento = 'Obrigatório';
-    if (!editForm.categoriaId) errs.categoriaId = 'Obrigatório';
-    if (!editForm.parceiroId) errs.parceiroId = 'Obrigatório';
-    if (Object.keys(errs).length) { setEditErrors(errs); return; }
-    setEditErrors({});
-    setSalvandoEdit(true);
+    if (!ok) return;
     try {
-      await api.atualizar(editId, {
-        descricao: editForm.descricao,
-        valorOriginal: parseFloat(editForm.valorOriginal),
-        dataVencimento: editForm.dataVencimento,
-        tipo: editForm.tipo,
-        categoriaId: Number(editForm.categoriaId),
-        parceiroId: Number(editForm.parceiroId),
-        quantidadeParcelas: 1,
-      });
-      setEditId(null);
-      toast.success('Conta atualizada!');
-      await carregar();
+      await api.deletar(conta.id);
+      toast.success('Conta excluída.');
+      recarregar();
     } catch (e) {
       toast.error(e.message);
-    } finally {
-      setSalvandoEdit(false);
     }
   }
 
-  const setF = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+  const acoes = {
+    onBaixar: setBaixando,
+    onEditar: setEditando,
+    onEstornar: estornar,
+    onExcluir: excluir,
+  };
 
-  const columns = [
-    ...COLUMNS,
+  const colunas = [
     {
-      key: 'id',
-      label: 'Ações',
-      render: (id, row) => (
-        <div className="flex gap-1">
-          {(row.status === 'PENDENTE' || row.status === 'ATRASADO') && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => { setBaixaId(row.id); setBaixaForm(emptyBaixa); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              aria-label="Baixar conta"
-              title="Baixar"
-              className="text-text-primary/70 hover:text-primary"
-            >
-              <CheckCircle className="w-5 h-5" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => !row.conciliada && abrirEdit(row)}
-            aria-label="Editar conta"
-            title={row.conciliada ? 'Conta conciliada — edição bloqueada' : 'Editar'}
-            disabled={row.conciliada}
-            className="text-text-primary/70 hover:text-secondary"
-          >
-            <Pencil className="w-5 h-5" />
-          </Button>
-          {(row.status === 'PAGO' || row.status === 'RECEBIDO') && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => !row.conciliada && estornar(row.id)}
-              aria-label="Estornar quitação"
-              title={row.conciliada ? 'Conta conciliada — estorno bloqueado' : 'Estornar'}
-              disabled={row.conciliada}
-              className="text-text-primary/70 hover:text-warning"
-            >
-              <RotateCcw className="w-5 h-5" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => deletar(row.id)}
-            aria-label="Excluir conta"
-            title="Excluir"
-            className="text-text-primary/70 hover:text-error"
-          >
-            <Trash2 className="w-5 h-5" />
-          </Button>
+      key: 'descricao',
+      label: 'Descrição',
+      sortable: true,
+      render: (v, c) => (
+        <div className="flex items-center gap-3 min-w-0">
+          <ChipCategoria icone={c.categoriaIcone} tom={c.tipo === 'RECEBER' ? 'income' : 'expense'} tamanho="sm" />
+          <div className="min-w-0">
+            <p className="font-medium text-text-primary truncate max-w-[18rem]">
+              {v}
+              {c.totalParcelas > 1 && <span className="ml-2 text-xs text-text-primary/60 tabular-nums">{c.numeroParcela}/{c.totalParcelas}</span>}
+            </p>
+            <p className="text-xs text-text-primary/60 truncate max-w-[18rem]">
+              {[c.parceiroNome, c.categoriaDescricao, c.numeroDocumento].filter(Boolean).join(' · ')}
+            </p>
+          </div>
         </div>
       ),
     },
+    { key: 'dataVencimento', label: 'Vencimento', sortable: true, render: (v) => <span className="tabular-nums">{formatDate(v)}</span> },
+    { key: 'status', label: 'Status', render: (v) => <StatusConta status={v} /> },
+    { key: 'valorOriginal', label: 'Valor', sortable: true, className: 'text-right', render: (_v, c) => <ValorConta conta={c} /> },
+    { key: 'id', label: <span className="sr-only">Ações</span>, render: (_id, c) => <div className="flex justify-end"><AcoesConta conta={c} {...acoes} /></div> },
   ];
 
-  /* Summary por status — conta apenas os itens da página atual (a API paginada não
-     retorna contagens por status). Os rótulos deixam isso explícito; o total real
-     vem de totalElements (backend). */
-  const countByStatus = contas.reduce((acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; }, {});
-  const statusChips = [
-    { label: 'Pendentes', key: 'PENDENTE', active: 'bg-warning text-surface', idle: 'bg-warning/10 text-warning border border-warning/20' },
-    { label: 'Atrasadas', key: 'ATRASADO', active: 'bg-error text-surface', idle: 'bg-error/10 text-error border border-error/20', pulse: true },
-    { label: 'Pagas',     key: 'PAGO',     active: 'bg-primary text-on-primary', idle: 'bg-primary/10 text-primary border border-primary/20' },
-    { label: 'Recebidas', key: 'RECEBIDO', active: 'bg-secondary text-surface', idle: 'bg-secondary/10 text-secondary border border-secondary/20' },
-  ];
-
-  const transfColumns = [
-    { key: 'dataTransferencia', label: 'Data', render: (v) => <span className="font-mono text-xs text-text-primary/60">{formatDate(v)}</span> },
-    { key: 'contaOrigemDescricao', label: 'Origem', render: (v) => <span className="font-medium text-text-primary/80">{v}</span> },
-    { key: 'contaDestinoDescricao', label: 'Destino', render: (v) => <span className="font-medium text-text-primary/80">{v}</span> },
-    { key: 'valor', label: 'Valor', render: (v) => <span className="font-bold text-primary font-mono">R$ {brl(v)}</span> },
-    {
-      key: 'id',
-      label: 'Ações',
-      render: (id, t) => (
-        <div className="flex gap-1 md:justify-end">
-          <Button variant="ghost" size="icon" onClick={() => editarTransferencia(t)} aria-label="Editar transferência" title="Editar" className="text-text-primary/70 hover:text-primary">
-            <Pencil className="w-5 h-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => deletarTransferencia(t.id)} aria-label="Excluir transferência" title="Excluir" className="text-text-primary/70 hover:text-error">
-            <Trash2 className="w-5 h-5" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  const erroAtual = aba === 'todas' ? todas.erro : abertas.erro;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Lançamentos"
-        subtitle="Contas a pagar e a receber"
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <PermissaoGuard permissao="CONTA_CORRENTE_TRANSFERIR">
-              <Button
-                variant="secondary"
-                onClick={() => { setShowTransf((v) => !v); if (showTransf) cancelarTransferencia(); }}
-                leftIcon={<ArrowRightLeft className="w-4 h-4" />}
-              >
-                <span className="sm:hidden">Transferir</span>
-                <span className="hidden sm:inline">Nova Transferência</span>
-              </Button>
-            </PermissaoGuard>
-            <PermissaoGuard permissao="CONTA_CRIAR">
-              <Button
-                onClick={() => setShowForm((v) => !v)}
-                leftIcon={<Plus className="w-4 h-4" />}
-                className="bg-gradient-primary text-on-primary"
-              >
-                <span className="sm:hidden">Nova</span>
-                <span className="hidden sm:inline">Nova Conta</span>
-              </Button>
-            </PermissaoGuard>
-          </div>
-        }
+        title="Contas a pagar e receber"
+        subtitle="O que vence, o que atrasou e o que já foi pago ou recebido."
+        icon={Receipt}
+        actions={(
+          <PermissaoGuard permissao="CONTA_CRIAR">
+            <Button onClick={() => setParam('novo', 'PAGAR')} leftIcon={<Plus className="w-4 h-4" aria-hidden="true" />}>
+              Nova conta
+            </Button>
+          </PermissaoGuard>
+        )}
       />
 
-      {/* Formulário de transferência */}
-      {showTransf && (
-        <form onSubmit={salvarTransferencia} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">
-            {editTransfId ? `Editar Transferência #${editTransfId}` : 'Transferência entre Contas'}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <FormField label="Origem" required>
-              <select className={`${inputCls} appearance-none`} value={transf.contaOrigemId} onChange={(e) => setTransf((f) => ({ ...f, contaOrigemId: e.target.value }))} required>
-                <option value="">Selecione</option>
-                {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Destino" required>
-              <select className={`${inputCls} appearance-none`} value={transf.contaDestinoId} onChange={(e) => setTransf((f) => ({ ...f, contaDestinoId: e.target.value }))} required>
-                <option value="">Selecione</option>
-                {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — Ag. {c.agencia}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Valor (R$)" required>
-              <input type="number" step="0.01" min="0.01" className={inputCls} value={transf.valor} onChange={(e) => setTransf((f) => ({ ...f, valor: e.target.value }))} required />
-            </FormField>
-            <FormField label="Data da Transferência" required>
-              <input type="date" className={inputCls} value={transf.dataTransferencia} onChange={(e) => setTransf((f) => ({ ...f, dataTransferencia: e.target.value }))} required />
-            </FormField>
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={salvandoTransf} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-              {salvandoTransf ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
-              {salvandoTransf ? (editTransfId ? 'Salvando...' : 'Transferindo...') : (editTransfId ? 'Salvar' : 'Transferir')}
-            </button>
-            <button type="button" onClick={cancelarTransferencia} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Status summary chips — a contagem é da página atual (rótulo explícito);
-          o total real vem do backend (totalElements). */}
-      {!loading && contas.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold uppercase tracking-widest font-mono text-text-primary/60">
-            Nesta página:
-          </span>
-          {statusChips.map((s) => {
-            const count = countByStatus[s.key] || 0;
-            if (!count) return null;
-            const ativo = filtros.status === s.key;
-            return (
-              <button
-                key={s.key}
-                onClick={() => { const novo = { ...filtros, status: ativo ? '' : s.key }; setFiltros(novo); carregar(novo); }}
-                className={cn(
-                  'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono transition-all hover:scale-105',
-                  ativo ? s.active : s.idle
-                )}
-              >
-                {s.pulse && count > 0 && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse-dot" />}
-                {count} {s.label}
-              </button>
-            );
-          })}
-          <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono text-text-primary/60 border border-text-primary/10">
-            {totalElements} no total
-          </span>
-        </div>
-      )}
-
-      {/* Filtros */}
-      <div className="rounded-[18px] overflow-hidden bg-surface-medium border border-text-primary/5">
-        <button
-          type="button"
-          onClick={() => setShowFiltros((v) => !v)}
-          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-high/40 transition-colors"
+      <KpiGrid cols={3}>
+        <KpiCard
+          label="A pagar"
+          valor={kpis.pagarMes}
+          tom="expense"
+          icon={ArrowUpRight}
+          loading={abertas.carregandoInicial}
+          ajuda="Contas a pagar em aberto com vencimento até o último dia deste mês, incluindo as atrasadas."
         >
-          <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5" /> Filtros avançados
-          </span>
-          <ChevronDown className={cn('w-4 h-4 text-text-primary/60 transition-transform duration-200', showFiltros && 'rotate-180')} />
-        </button>
+          {kpis.qtdPagarMes} {kpis.qtdPagarMes === 1 ? 'conta' : 'contas'} até o fim do mês
+        </KpiCard>
+        <KpiCard
+          label="A receber"
+          valor={kpis.receberMes}
+          tom="income"
+          icon={ArrowDownLeft}
+          loading={abertas.carregandoInicial}
+          ajuda="Contas a receber em aberto com vencimento até o último dia deste mês, incluindo as atrasadas."
+        >
+          {kpis.qtdReceberMes} {kpis.qtdReceberMes === 1 ? 'conta' : 'contas'} até o fim do mês
+        </KpiCard>
+        <KpiCard
+          label="Atrasadas"
+          valor={kpis.qtdAtrasadas}
+          formato="numero"
+          tom={kpis.qtdAtrasadas ? 'expense' : 'neutro'}
+          icon={AlertTriangle}
+          loading={abertas.carregandoInicial}
+          ajuda="Contas em aberto com vencimento antes de hoje."
+        >
+          {kpis.qtdAtrasadas
+            ? (
+              <span className="tabular-nums valor-privado">
+                {[kpis.atrasadoPagar ? `${formatarMoeda(kpis.atrasadoPagar)} a pagar` : null, kpis.atrasadoReceber ? `${formatarMoeda(kpis.atrasadoReceber)} a receber` : null].filter(Boolean).join(' · ')}
+              </span>
+            )
+            : 'Nada atrasado'}
+        </KpiCard>
+      </KpiGrid>
 
-        {showFiltros && (
-          <div className="px-6 pb-6 space-y-4 border-t border-text-primary/5">
-            <div className="flex flex-wrap items-center gap-2 pt-4">
-              {['', 'PAGAR', 'RECEBER'].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTipo(t)}
-                  className={cn(
-                    'px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest font-mono transition-all',
-                    filtros.tipo === t
-                      ? 'bg-gradient-primary text-on-primary'
-                      : 'border border-text-primary/10 text-text-primary/70 hover:text-text-primary'
-                  )}
-                >
-                  {t || 'Todos'}
-                </button>
-              ))}
+      <div className="space-y-4">
+        <Tabs idBase={ID_ABAS} label="Visão das contas" value={aba} onChange={(v) => setParam('ver', v === 'todas' ? 'todas' : '')} items={ABAS} />
+
+        <FilterBar
+          busca={{ value: busca, onChange: setBusca, placeholder: 'Descrição, documento, parceiro…', label: 'Buscar contas' }}
+          periodo={aba === 'todas' ? (
+            <PeriodoSelector value={periodo} onChange={setPeriodo} granularidade="dia" atalhos={['mes', 'mes-passado', '3m', '6m', '12m', 'ano']} label="Vencimento" />
+          ) : null}
+          filtrosAtivos={filtrosAtivos}
+          onLimpar={limpar}
+        >
+          <SegmentedControl label="Tipo" items={TIPOS} value={tipo} onChange={setTipo} size="sm" />
+          {aba === 'todas' && (
+            <div className="md:w-44">
+              <FormSelect small aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}>
+                {STATUS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </FormSelect>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 [&>*]:min-w-0">
-              <FormField label="Nº Documento">
-                <input className={inputCls} value={filtros.numeroDocumento} onChange={(e) => setFiltros((f) => ({ ...f, numeroDocumento: e.target.value }))} placeholder="NF-001, Boleto..." />
-              </FormField>
-              <FormField label="Vencimento de">
-                <input type="date" className={inputCls} value={filtros.vencimentoInicio} onChange={(e) => setFiltros((f) => ({ ...f, vencimentoInicio: e.target.value }))} />
-              </FormField>
-              <FormField label="Vencimento até">
-                <input type="date" className={inputCls} value={filtros.vencimentoFim} onChange={(e) => setFiltros((f) => ({ ...f, vencimentoFim: e.target.value }))} />
-              </FormField>
-              <FormField label="Parceiro">
-                <select className={`${inputCls} appearance-none`} value={filtros.parceiroId} onChange={(e) => setFiltros((f) => ({ ...f, parceiroId: e.target.value }))}>
-                  <option value="">Todos</option>
-                  {pars.map((p) => <option key={p.id} value={p.id}>{p.razaoSocial}{p.nomeFantasia ? ` (${p.nomeFantasia})` : ''}</option>)}
-                </select>
-              </FormField>
-              <FormField label="Valor de (R$)">
-                <input type="number" step="0.01" min="0" className={inputCls} value={filtros.valorMin} onChange={(e) => setFiltros((f) => ({ ...f, valorMin: e.target.value }))} placeholder="0,00" />
-              </FormField>
-              <FormField label="Valor até (R$)">
-                <input type="number" step="0.01" min="0" className={inputCls} value={filtros.valorMax} onChange={(e) => setFiltros((f) => ({ ...f, valorMax: e.target.value }))} placeholder="0,00" />
-              </FormField>
-              <FormField label="Categoria">
-                <select className={`${inputCls} appearance-none`} value={filtros.categoriaId} onChange={(e) => setFiltros((f) => ({ ...f, categoriaId: e.target.value }))}>
-                  <option value="">Todas</option>
-                  <CategoriaOptions cats={cats} />
-                </select>
-              </FormField>
-            </div>
-            <div className="flex gap-3">
-              <button type="button" onClick={aplicarFiltros} className="bg-gradient-primary text-on-primary font-bold px-5 py-2 rounded-xl flex items-center gap-2 text-xs uppercase tracking-widest font-mono">
-                <Filter className="w-3.5 h-3.5" /> Filtrar
-              </button>
-              <button type="button" onClick={limparFiltros} className="px-5 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary flex items-center gap-2 text-xs uppercase tracking-widest font-mono transition-colors">
-                <RotateCcw className="w-3.5 h-3.5" /> Limpar
-              </button>
-            </div>
+          )}
+          <div className="md:w-48">
+            <FormSelect small aria-label="Categoria" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
+              <option value="">Todas as categorias</option>
+              <CategoriaOptions cats={cats} />
+            </FormSelect>
           </div>
-        )}
+          <div className="md:w-48">
+            <FormSelect small aria-label="Parceiro" value={parceiroId} onChange={(e) => setParceiroId(e.target.value)}>
+              <option value="">Todos os parceiros</option>
+              {pars.map((p) => <option key={p.id} value={p.id}>{p.nomeFantasia || p.razaoSocial}</option>)}
+            </FormSelect>
+          </div>
+        </FilterBar>
+
+        <div role="tabpanel" id={Tabs.painelId(ID_ABAS, aba)} aria-labelledby={Tabs.abaId(ID_ABAS, aba)} className="space-y-3">
+          {erroAtual && <AlertaErro mensagem={erroAtual.message} onTentarNovamente={recarregar} />}
+
+          {!erroAtual && aba === 'abertas' && (
+            abertas.carregandoInicial ? (
+              <DataTable caption="Contas em aberto" columns={colunas} data={[]} loading />
+            ) : grupos.some((g) => g.itens.length) ? (
+              <>
+                <p className="text-xs text-text-primary/60">Tudo o que falta pagar ou receber, sem limite de data, do mais urgente ao mais distante.</p>
+                <GroupedList grupos={grupos} keyItem={(c) => c.id} renderItem={(c) => <LinhaConta conta={c} mostrarStatus={false} {...acoes} />} />
+                {abertas.dados?.excedeu && (
+                  <p className="text-xs text-warning" role="status">Mostrando as primeiras {LIMITE} contas de cada situação. Use os filtros para ver o restante.</p>
+                )}
+              </>
+            ) : (
+              <div className="c4-card">
+                <EmptyState
+                  icon={CircleCheckBig}
+                  tom="income"
+                  title={filtrosAtivos ? 'Nenhuma conta em aberto com esses filtros' : 'Nada em aberto'}
+                  description={filtrosAtivos ? 'Mude ou limpe os filtros para ver outras contas.' : 'Tudo pago e recebido. Novas contas aparecem aqui assim que forem cadastradas.'}
+                  action={filtrosAtivos ? { label: 'Limpar filtros', onClick: limpar } : undefined}
+                />
+              </div>
+            )
+          )}
+
+          {!erroAtual && aba === 'todas' && (
+            <>
+              <DataTable
+                caption="Contas a pagar e receber"
+                columns={colunas}
+                data={listaTodas}
+                loading={todas.carregandoInicial}
+                keyExtractor={(c) => c.id}
+                renderCard={(c) => <LinhaConta conta={c} {...acoes} semCartao />}
+                emptyState={(
+                  <EmptyState
+                    icon={Receipt}
+                    title="Nenhuma conta neste período"
+                    description="Mude o período de vencimento ou os filtros acima."
+                    action={filtrosAtivos ? { label: 'Limpar filtros', onClick: limpar } : undefined}
+                  />
+                )}
+              />
+              {(todas.dados?.totalElements ?? 0) > LIMITE && (
+                <p className="text-xs text-warning" role="status">
+                  Mostrando {LIMITE} de {todas.dados.totalElements} contas. Escolha um período menor para ver todas.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Form */}
-      {showForm && (
-        <div className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">Nova Conta</h2>
-          <form onSubmit={criar}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 [&>*]:min-w-0">
-              {assinaturasAtivas.length > 0 && (
-                <FormField label="Preencher de Assinatura">
-                  <select className={`${inputCls} appearance-none`} value="" onChange={(e) => {
-                    const id = Number(e.target.value);
-                    if (!id) return;
-                    const assin = assinaturasAtivas.find((a) => a.id === id);
-                    if (!assin) return;
-                    const hoje = new Date();
-                    let venc = new Date(hoje.getFullYear(), hoje.getMonth(), assin.diaVencimento);
-                    if (venc < hoje) venc = new Date(hoje.getFullYear(), hoje.getMonth() + 1, assin.diaVencimento);
-                    setForm((f) => ({ ...f, descricao: assin.descricao, valorOriginal: String(assin.valor), categoriaId: String(assin.categoriaId), parceiroId: assin.parceiroId ? String(assin.parceiroId) : '', dataVencimento: venc.toISOString().split('T')[0], tipo: 'PAGAR' }));
-                  }}>
-                    <option value="">— Selecionar assinatura —</option>
-                    {assinaturasAtivas.map((a) => <option key={a.id} value={a.id}>{a.descricao} — R$ {brl(a.valor)} (dia {a.diaVencimento})</option>)}
-                  </select>
-                </FormField>
-              )}
-              <FormField label="Nº Documento">
-                <input className={inputCls} value={form.numeroDocumento} onChange={(e) => setF('numeroDocumento')(e.target.value)} placeholder="NF-001..." />
-              </FormField>
-              <FormField label="Descrição" required error={errors.descricao}>
-                <input className={inputCls} value={form.descricao} onChange={(e) => setF('descricao')(e.target.value)} required />
-              </FormField>
-              <FormField label="Tipo" required>
-                <select className={`${inputCls} appearance-none`} value={form.tipo} onChange={(e) => setF('tipo')(e.target.value)}>
-                  <option value="PAGAR">A Pagar</option>
-                  <option value="RECEBER">A Receber</option>
-                </select>
-              </FormField>
-              <FormField label="Categoria" required error={errors.categoriaId}>
-                <div className="flex gap-2">
-                  <select className={`${inputCls} appearance-none flex-1`} value={form.categoriaId} onChange={(e) => setF('categoriaId')(e.target.value)} required>
-                    <option value="">Selecione</option>
-                    <CategoriaOptions cats={cats} />
-                  </select>
-                  <button
-                    type="button"
-                    onClick={sugerirCategoria}
-                    disabled={sugerindoCat}
-                    title="Sugerir categoria com base na descrição"
-                    className="shrink-0 px-3 rounded-xl border border-primary/30 text-primary text-xs font-bold hover:bg-primary/10 disabled:opacity-50 flex items-center gap-1"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    {sugerindoCat ? '...' : 'Sugerir'}
-                  </button>
-                </div>
-              </FormField>
-              <FormField label={form.tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'} required error={errors.parceiroId}>
-                <select className={`${inputCls} appearance-none`} value={form.parceiroId} onChange={(e) => setF('parceiroId')(e.target.value)}>
-                  <option value="">— Selecionar —</option>
-                  {parsFiltered.map((p) => <option key={p.id} value={p.id}>{p.razaoSocial}{p.nomeFantasia ? ` (${p.nomeFantasia})` : ''}</option>)}
-                </select>
-              </FormField>
-              <FormField label="Vencimento" required error={errors.dataVencimento}>
-                <input type="date" className={inputCls} value={form.dataVencimento} onChange={(e) => setF('dataVencimento')(e.target.value)} required />
-              </FormField>
-              <FormField label="Valor (R$)" required error={errors.valorOriginal}>
-                <input type="number" step="0.01" min="0.01" className={inputCls} value={form.valorOriginal} onChange={(e) => setF('valorOriginal')(e.target.value)} required />
-              </FormField>
-              <FormField label="Acréscimo (R$)">
-                <input type="number" step="0.01" min="0" className={inputCls} value={form.acrescimo} onChange={(e) => setF('acrescimo')(e.target.value)} placeholder="0,00" />
-              </FormField>
-              <FormField label="Desconto (R$)">
-                <input type="number" step="0.01" min="0" className={inputCls} value={form.desconto} onChange={(e) => setF('desconto')(e.target.value)} placeholder="0,00" />
-              </FormField>
-              <FormField label="Valor Líquido (R$)">
-                <input type="text" readOnly className={`${inputCls} opacity-50 cursor-not-allowed`} value={brl(valorLiquido)} />
-              </FormField>
-              <FormField label="Nº Parcelas" error={errors.quantidadeParcelas}>
-                <input type="number" min="1" className={inputCls} value={form.quantidadeParcelas} onChange={(e) => setF('quantidadeParcelas')(e.target.value)} />
-              </FormField>
-              <div className="flex items-center gap-2 pt-6">
-                <input type="checkbox" id="dividir" checked={form.dividirValor} onChange={(e) => setForm((f) => ({ ...f, dividirValor: e.target.checked }))} className="w-4 h-4 accent-primary" />
-                <label htmlFor="dividir" className="text-sm text-text-primary/60">Dividir valor entre parcelas</label>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button type="submit" disabled={salvando} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                {salvando ? 'Criando...' : 'Criar'}
-              </button>
-              <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <Drawer
+        open={criando}
+        onClose={() => setParam('novo', '')}
+        title="Nova conta"
+        description="Cadastre uma conta a pagar ou a receber."
+      >
+        {criando && (
+          <ContaForm
+            key={novoTipo}
+            tipo={novoTipo}
+            categorias={cats}
+            parceiros={pars}
+            onCancelar={() => setParam('novo', '')}
+            onSalvo={(criadas) => {
+              const n = Array.isArray(criadas) ? criadas.length : 1;
+              toast.success(n > 1 ? `${n} parcelas criadas.` : 'Conta criada.');
+              setParam('novo', '');
+              recarregar();
+            }}
+          />
+        )}
+      </Drawer>
 
-      {/* Editar conta */}
-      {editId && (
-        <div className="bg-surface-medium border border-secondary/20 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-secondary flex items-center gap-2">
-            <Pencil className="w-4 h-4" /> Editar Conta #{editId}
-          </h2>
-          <form onSubmit={salvarEdit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4 [&>*]:min-w-0">
-              <FormField label="Descrição" required error={editErrors.descricao}>
-                <input className={inputCls} value={editForm.descricao ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, descricao: e.target.value }))} required />
-              </FormField>
-              <FormField label="Tipo" required>
-                <select className={`${inputCls} appearance-none`} value={editForm.tipo ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, tipo: e.target.value }))}>
-                  <option value="PAGAR">A Pagar</option>
-                  <option value="RECEBER">A Receber</option>
-                </select>
-              </FormField>
-              <FormField label="Categoria" required error={editErrors.categoriaId}>
-                <select className={`${inputCls} appearance-none`} value={editForm.categoriaId ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, categoriaId: e.target.value }))} required>
-                  <option value="">Selecione</option>
-                  <CategoriaOptions cats={cats} />
-                </select>
-              </FormField>
-              <FormField label={editForm.tipo === 'PAGAR' ? 'Fornecedor' : 'Cliente'} required error={editErrors.parceiroId}>
-                <select className={`${inputCls} appearance-none`} value={editForm.parceiroId ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, parceiroId: e.target.value }))}>
-                  <option value="">— Selecionar —</option>
-                  {pars.filter((p) => editForm.tipo === 'PAGAR' ? p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS' : p.tipo === 'CLIENTE' || p.tipo === 'AMBOS').map((p) => (
-                    <option key={p.id} value={p.id}>{p.razaoSocial}{p.nomeFantasia ? ` (${p.nomeFantasia})` : ''}</option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label="Vencimento" required error={editErrors.dataVencimento}>
-                <input type="date" className={inputCls} value={editForm.dataVencimento ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, dataVencimento: e.target.value }))} required />
-              </FormField>
-              <FormField label="Valor (R$)" required error={editErrors.valorOriginal}>
-                <input type="number" step="0.01" min="0.01" className={inputCls} value={editForm.valorOriginal ?? ''} onChange={(e) => setEditForm((f) => ({ ...f, valorOriginal: e.target.value }))} required />
-              </FormField>
-            </div>
-            <div className="flex gap-3">
-              <button type="submit" disabled={salvandoEdit} className="bg-gradient-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                {salvandoEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
-                {salvandoEdit ? 'Salvando...' : 'Salvar'}
-              </button>
-              <button type="button" onClick={() => setEditId(null)} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+      <Drawer open={Boolean(editando)} onClose={() => setEditando(null)} title="Editar conta" description={editando?.descricao}>
+        {editando && (
+          <ContaForm
+            key={editando.id}
+            modo="editar"
+            inicial={editando}
+            categorias={cats}
+            parceiros={pars}
+            onCancelar={() => setEditando(null)}
+            onSalvo={() => { toast.success('Conta atualizada.'); setEditando(null); recarregar(); }}
+          />
+        )}
+      </Drawer>
 
-      {/* Baixa */}
-      {baixaId && (
-        <form onSubmit={baixar} className="bg-surface-medium border border-primary/20 rounded-2xl p-6 space-y-4 animate-scale-in">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-primary">Baixar Conta #{baixaId}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 [&>*]:min-w-0">
-            <FormField label="Conta Corrente" required>
-              <select className={`${inputCls} appearance-none`} value={baixaForm.contaCorrenteId} onChange={(e) => setBaixaForm((f) => ({ ...f, contaCorrenteId: e.target.value }))} required>
-                <option value="">Selecione</option>
-                {ccs.map((c) => <option key={c.id} value={c.id}>{c.descricao} — {c.numeroConta}</option>)}
-              </select>
-            </FormField>
-            <FormField label={contas.find((c) => c.id === baixaId)?.tipo === 'RECEBER' ? 'Data do Recebimento' : 'Data do Pagamento'} required>
-              <input type="date" className={inputCls} value={baixaForm.dataPagamento} onChange={(e) => setBaixaForm((f) => ({ ...f, dataPagamento: e.target.value }))} required />
-            </FormField>
-            {[['Juros', 'juros'], ['Multa', 'multa'], ['Acréscimo', 'acrescimo'], ['Desconto', 'desconto']].map(([lbl, key]) => (
-              <FormField key={key} label={lbl}>
-                <input type="number" step="0.01" min="0" className={inputCls} value={baixaForm[key]} onChange={(e) => setBaixaForm((f) => ({ ...f, [key]: e.target.value }))} />
-              </FormField>
-            ))}
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={salvandoBaixa} className="bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-              {salvandoBaixa ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              {salvandoBaixa ? 'Registrando...' : 'Confirmar Baixa'}
-            </button>
-            <button type="button" onClick={() => { setBaixaId(null); setBaixaForm(emptyBaixa); }} className="px-6 py-2.5 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary transition-colors">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Tabela */}
-      <DataTable
-        caption="Lançamentos a pagar e a receber"
-        columns={columns}
-        data={contas}
-        loading={loading}
-        aria-label="Lista de contas"
-      />
-
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        totalElements={totalElements}
-        onChange={irParaPagina}
-      />
-
-      {/* Histórico de transferências */}
-      {transferencias.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-text-primary/40" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono">
-              Histórico de Transferências
-            </h2>
-          </div>
-          {/* O DataTable já alterna sozinho: tabela no desktop, cards no celular */}
-          <DataTable caption="Transferências entre contas" columns={transfColumns} data={transferencias} keyExtractor={(t) => t.id} />
-        </div>
-      )}
-
-      {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
+      <Drawer
+        open={Boolean(baixando)}
+        onClose={() => setBaixando(null)}
+        title={baixando?.tipo === 'RECEBER' ? 'Registrar recebimento' : 'Registrar pagamento'}
+      >
+        {baixando && (
+          <BaixaForm
+            key={baixando.id}
+            conta={baixando}
+            onCancelar={() => setBaixando(null)}
+            onSalvo={() => {
+              toast.success(baixando.tipo === 'RECEBER' ? 'Recebimento registrado.' : 'Pagamento registrado.');
+              setBaixando(null);
+              recarregar();
+            }}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }
