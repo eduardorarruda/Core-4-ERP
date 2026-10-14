@@ -1,6 +1,7 @@
 package br.com.core4erp.chat.config;
 
 import br.com.core4erp.chat.service.ConfirmacaoNecessariaException;
+import br.com.core4erp.exception.AcessoNegadoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.execution.ToolExecutionException;
@@ -30,6 +31,15 @@ public class ChatToolErrorConfig {
             // modelo, sem stack trace no log.
             if (causa instanceof ConfirmacaoNecessariaException confirmacao) {
                 return confirmacao.getMessage();
+            }
+            // Falta de permissão não é falha técnica: o PermissaoAspect já registrou o evento de
+            // segurança. A mensagem da exceção traz o código interno (ex.: CONTA_DELETAR), que
+            // nunca deve chegar ao usuário — o modelo recebe só a orientação em linguagem simples.
+            if (causa instanceof AcessoNegadoException) {
+                log.warn("[CHAT-TOOL-SEM-PERMISSAO] tool={}", tool);
+                return "O usuário não tem permissão para esta ação ('" + tool + "'). NÃO tente de novo"
+                        + " nem por outra ferramenta. Explique em linguagem simples que ele não tem acesso"
+                        + " a essa funcionalidade e que pode pedir a liberação ao administrador da empresa.";
             }
             log.error("[CHAT-TOOL-ERRO] tool={} causa={}: {}",
                     tool, causa.getClass().getName(), causa.getMessage(), causa);
