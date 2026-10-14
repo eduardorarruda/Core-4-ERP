@@ -22,7 +22,7 @@ export default function KpiCards({ kpis, carregando }) {
             <kpi.icon className="w-20 h-20" />
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono truncate">
+            <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono truncate">
               {kpi.label}
             </span>
             <span

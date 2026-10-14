@@ -2,6 +2,7 @@ package br.com.core4erp.cartaoCredito.repository;
 
 import br.com.core4erp.cartaoCredito.entity.LancamentoCartao;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,7 +13,13 @@ import java.util.Optional;
 
 public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCartao, Long> {
 
-    List<LancamentoCartao> findAllByCartaoCreditoIdAndEmpresaId(Long cartaoId, Long empresaId);
+    /**
+     * Listagem "todas as faturas" do cartão: os 500 lançamentos mais recentes (teto de segurança —
+     * a tela não pagina e espera um array; por mês/ano use o filtro de fatura). Categoria e parceiro
+     * já carregados (o DTO usa ambos — sem N+1).
+     */
+    @EntityGraph(attributePaths = {"categoria", "parceiro"})
+    List<LancamentoCartao> findTop500ByCartaoCreditoIdAndEmpresaIdOrderByDataCompraDescIdDesc(Long cartaoId, Long empresaId);
 
     List<LancamentoCartao> findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(
             Long cartaoId, Long empresaId, Integer mes, Integer ano);
@@ -122,16 +129,21 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
     """)
     BigDecimal sumLancamentosEmFaturasAbertasByEmpresa(@Param("eid") Long eid);
 
+    /**
+     * Conciliação de cartão em LOTE: lançamentos do cartão na janela de datas de TODO o OFX
+     * (± janela), com o parceiro já carregado (usado no score). Uma query por importação.
+     */
     @Query("""
         SELECT l FROM LancamentoCartao l
+        LEFT JOIN FETCH l.parceiro
         WHERE l.cartaoCredito.id = :cartaoId
         AND l.empresaId = :eid
         AND l.dataCompra BETWEEN :dataMin AND :dataMax
     """)
-    List<LancamentoCartao> findCandidatasParaConciliacao(@Param("cartaoId") Long cartaoId,
-                                                         @Param("eid") Long eid,
-                                                         @Param("dataMin") java.time.LocalDate dataMin,
-                                                         @Param("dataMax") java.time.LocalDate dataMax);
+    List<LancamentoCartao> findCandidatasParaConciliacaoComParceiro(@Param("cartaoId") Long cartaoId,
+                                                                    @Param("eid") Long eid,
+                                                                    @Param("dataMin") java.time.LocalDate dataMin,
+                                                                    @Param("dataMax") java.time.LocalDate dataMax);
 
     // Roll-up de subcategorias no total da categoria-pai (COALESCE). LEFT JOIN no pai
     // preserva lançamentos em categorias raiz (join implícito em categoriaPai os excluiria).
@@ -156,23 +168,32 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
 
     // ── §2 — Busca por texto em lançamentos ───────────────────────────────────
 
+    /**
+     * Busca textual (descrição/categoria/parceiro) com teto de resultados — os mais recentes primeiro
+     * ({@code pageable} define o limite; ver CartaoCreditoService). LEFT JOIN: lançamentos sem
+     * categoria/parceiro também casam pela descrição (o caminho implícito virava INNER JOIN).
+     */
     @Query("""
         SELECT l FROM LancamentoCartao l
+        LEFT JOIN FETCH l.categoria cat
+        LEFT JOIN FETCH l.parceiro p
         WHERE l.cartaoCredito.id = :cartaoId
         AND l.empresaId = :eid
         AND (:mes IS NULL OR l.mesFatura = :mes)
         AND (:ano IS NULL OR l.anoFatura = :ano)
         AND (:busca IS NULL
              OR LOWER(l.descricao) LIKE LOWER(CONCAT('%', :busca, '%'))
-             OR LOWER(l.categoria.descricao) LIKE LOWER(CONCAT('%', :busca, '%'))
-             OR LOWER(l.parceiro.nomeFantasia) LIKE LOWER(CONCAT('%', :busca, '%'))
-             OR LOWER(l.parceiro.razaoSocial) LIKE LOWER(CONCAT('%', :busca, '%')))
+             OR LOWER(cat.descricao) LIKE LOWER(CONCAT('%', :busca, '%'))
+             OR LOWER(p.nomeFantasia) LIKE LOWER(CONCAT('%', :busca, '%'))
+             OR LOWER(p.razaoSocial) LIKE LOWER(CONCAT('%', :busca, '%')))
+        ORDER BY l.dataCompra DESC, l.id DESC
     """)
     List<LancamentoCartao> filtrar(@Param("cartaoId") Long cartaoId,
                                    @Param("eid") Long eid,
                                    @Param("mes") Integer mes,
                                    @Param("ano") Integer ano,
-                                   @Param("busca") String busca);
+                                   @Param("busca") String busca,
+                                   Pageable pageable);
 
     // ── §7 — Queries BI ───────────────────────────────────────────────────────
 

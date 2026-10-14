@@ -9,10 +9,10 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb, icon,
           <div className="flex items-center gap-1.5 mb-2">
             {breadcrumb.map((crumb, i) => (
               <React.Fragment key={i}>
-                {i > 0 && <span className="text-text-primary/20 text-[10px] font-mono">·</span>}
+                {i > 0 && <span className="text-text-primary/60 text-xs font-mono">·</span>}
                 <span className={cn(
-                  'text-[10px] font-bold uppercase tracking-widest font-mono',
-                  i === breadcrumb.length - 1 ? 'text-primary' : 'text-text-primary/40'
+                  'text-xs font-bold uppercase tracking-widest font-mono',
+                  i === breadcrumb.length - 1 ? 'text-primary' : 'text-text-primary/60'
                 )}>
                   {crumb}
                 </span>
@@ -33,7 +33,7 @@ export default function PageHeader({ title, subtitle, actions, breadcrumb, icon,
           </h1>
         </div>
         {subtitle && (
-          <p className="text-[10px] uppercase tracking-widest text-text-primary/40 font-mono pl-[17px]">
+          <p className="text-xs uppercase tracking-widest text-text-primary/60 font-mono pl-[17px]">
             {subtitle}
           </p>
         )}

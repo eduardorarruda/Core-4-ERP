@@ -1,7 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import React, { useEffect, useId, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isValid, parse, isAfter, isBefore, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Modal from './Modal';
+import Button from './Button';
+
+const FOCO = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 function parseInputDate(str) {
   if (!str || str.length < 8) return null;
@@ -10,8 +14,11 @@ function parseInputDate(str) {
 }
 
 function DateInput({ label, value, onChange, error }) {
+  const id = useId();
+  const erroId = `${id}-erro`;
   const [raw, setRaw] = useState(value ? format(value, 'dd/MM/yyyy') : '');
 
+  // Sincroniza o texto quando a data muda pelo calendário
   useEffect(() => {
     setRaw(value ? format(value, 'dd/MM/yyyy') : '');
   }, [value]);
@@ -25,29 +32,36 @@ function DateInput({ label, value, onChange, error }) {
     else if (v.length === 0) onChange(null);
   }
 
-  const base = 'w-full rounded-xl px-3 py-2.5 text-sm font-mono bg-surface border outline-none transition-colors placeholder:text-text-primary/25';
-  const borderCls = error ? 'border-red-500/50 focus:border-red-400' : 'border-text-primary/10 focus:border-primary/50';
+  const borderCls = error ? 'border-error/60' : 'border-text-primary/15 focus:border-primary/50';
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-bold uppercase tracking-widest text-text-primary/50">{label}</label>
+      <label htmlFor={id} className="text-xs font-bold uppercase tracking-wider text-text-primary/70">{label}</label>
       <input
+        id={id}
         type="text"
         inputMode="numeric"
         placeholder="dd/mm/aaaa"
         value={raw}
         onChange={handleChange}
-        className={`${base} ${borderCls} text-text-primary`}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? erroId : undefined}
+        className={`w-full min-h-11 rounded-xl px-3 py-2.5 text-sm font-mono bg-surface border outline-none transition-colors placeholder:text-text-primary/50 text-text-primary ${borderCls} ${FOCO}`}
         maxLength={10}
       />
-      {error && <p className="text-xs text-red-400">{error}</p>}
+      {error && <p id={erroId} role="alert" className="text-xs text-error">{error}</p>}
     </div>
   );
 }
 
+const WEEKDAYS = [
+  ['D', 'Domingo'], ['S', 'Segunda'], ['T', 'Terça'], ['Q', 'Quarta'], ['Q', 'Quinta'], ['S', 'Sexta'], ['S', 'Sábado'],
+];
+
 function MiniCalendar({ month, rangeStart, rangeEnd, onSelect, onPrev, onNext }) {
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
   const firstDow = getDay(startOfMonth(month));
+  const titulo = format(month, 'MMMM yyyy', { locale: ptBR });
 
   function dayClass(day) {
     const isStart = rangeStart && isSameDay(day, rangeStart);
@@ -55,40 +69,44 @@ function MiniCalendar({ month, rangeStart, rangeEnd, onSelect, onPrev, onNext })
     const inRange = rangeStart && rangeEnd && isAfter(day, rangeStart) && isBefore(day, rangeEnd);
     if (isStart || isEnd) return 'bg-primary text-on-primary font-bold rounded-lg';
     if (inRange) return 'bg-primary/15 text-primary';
-    return 'hover:bg-surface-highest rounded-lg text-text-primary/70';
+    return 'hover:bg-surface-highest rounded-lg text-text-primary/80';
   }
-
-  const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
   return (
     <div className="select-none">
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={onPrev} className="p-1 rounded-lg hover:bg-surface-highest transition-colors">
-          <ChevronLeft className="w-4 h-4 text-text-primary/50" />
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={onPrev} aria-label="Mês anterior" className={`min-w-11 min-h-11 grid place-items-center rounded-lg hover:bg-surface-highest transition-colors ${FOCO}`}>
+          <ChevronLeft className="w-4 h-4 text-text-primary/70" aria-hidden="true" />
         </button>
-        <span className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono">
-          {format(month, 'MMMM yyyy', { locale: ptBR })}
+        <span className="text-xs font-bold uppercase tracking-wider text-text-primary/80 font-mono" aria-live="polite">
+          {titulo}
         </span>
-        <button onClick={onNext} className="p-1 rounded-lg hover:bg-surface-highest transition-colors">
-          <ChevronRight className="w-4 h-4 text-text-primary/50" />
+        <button type="button" onClick={onNext} aria-label="Próximo mês" className={`min-w-11 min-h-11 grid place-items-center rounded-lg hover:bg-surface-highest transition-colors ${FOCO}`}>
+          <ChevronRight className="w-4 h-4 text-text-primary/70" aria-hidden="true" />
         </button>
       </div>
-      <div className="grid grid-cols-7 gap-0.5 mb-1">
-        {WEEKDAYS.map((d, i) => (
-          <div key={i} className="text-center text-[10px] font-bold text-text-primary/30 font-mono py-1">{d}</div>
+      <div className="grid grid-cols-7 gap-0.5 mb-1" aria-hidden="true">
+        {WEEKDAYS.map(([d], i) => (
+          <div key={i} className="text-center text-xs font-bold text-text-primary/60 font-mono py-1">{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-0.5">
         {Array.from({ length: firstDow }).map((_, i) => <div key={`e${i}`} />)}
-        {days.map((day) => (
-          <button
-            key={day.toISOString()}
-            onClick={() => onSelect(day)}
-            className={`text-center text-xs py-1.5 transition-colors cursor-pointer ${dayClass(day)}`}
-          >
-            {day.getDate()}
-          </button>
-        ))}
+        {days.map((day) => {
+          const selecionado = (rangeStart && isSameDay(day, rangeStart)) || (rangeEnd && isSameDay(day, rangeEnd));
+          return (
+            <button
+              type="button"
+              key={day.toISOString()}
+              onClick={() => onSelect(day)}
+              aria-label={format(day, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              aria-pressed={Boolean(selecionado)}
+              className={`text-center text-xs min-h-9 transition-colors cursor-pointer ${dayClass(day)} ${FOCO}`}
+            >
+              {day.getDate()}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -100,23 +118,15 @@ export default function DateRangeModal({ onApply, onCancel }) {
   const [calMonth, setCalMonth] = useState(new Date());
   const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    const handleKey = (e) => { if (e.key === 'Escape') onCancel(); };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onCancel]);
-
   function handleCalSelect(day) {
     if (!inicio || (inicio && fim)) {
       setInicio(day);
       setFim(null);
+    } else if (isBefore(day, inicio)) {
+      setFim(inicio);
+      setInicio(day);
     } else {
-      if (isBefore(day, inicio)) {
-        setFim(inicio);
-        setInicio(day);
-      } else {
-        setFim(day);
-      }
+      setFim(day);
     }
     setErrors({});
   }
@@ -125,7 +135,7 @@ export default function DateRangeModal({ onApply, onCancel }) {
     const errs = {};
     if (!inicio) errs.inicio = 'Informe a data de início';
     if (!fim) errs.fim = 'Informe a data de fim';
-    if (inicio && fim && isAfter(inicio, fim)) errs.fim = 'Data de fim deve ser após o início';
+    if (inicio && fim && isAfter(inicio, fim)) errs.fim = 'A data de fim deve ser depois do início';
     if (Object.keys(errs).length) { setErrors(errs); return; }
     onApply({
       mesInicio: inicio.getMonth() + 1,
@@ -136,57 +146,29 @@ export default function DateRangeModal({ onApply, onCancel }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-fade-in" onClick={onCancel} />
-      <div className="relative bg-surface-low border border-text-primary/10 rounded-2xl shadow-2xl w-full max-w-sm animate-scale-in">
-        <button
-          onClick={onCancel}
-          aria-label="Fechar"
-          className="absolute top-3 right-3 text-text-primary/40 hover:text-text-primary transition-colors p-1.5 rounded-lg hover:bg-surface-medium"
-        >
-          <X className="w-4 h-4" />
-        </button>
-
-        <div className="p-6 space-y-5">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-secondary" />
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/60 font-mono">
-              Período personalizado
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <DateInput label="De" value={inicio} onChange={(d) => { setInicio(d); setErrors((e) => ({ ...e, inicio: undefined })); }} error={errors.inicio} />
-            <DateInput label="Até" value={fim} onChange={(d) => { setFim(d); setErrors((e) => ({ ...e, fim: undefined })); }} error={errors.fim} />
-          </div>
-
-          <div className="border border-text-primary/8 rounded-xl p-4 bg-surface/40">
-            <MiniCalendar
-              month={calMonth}
-              rangeStart={inicio}
-              rangeEnd={fim}
-              onSelect={handleCalSelect}
-              onPrev={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-              onNext={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-1">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 rounded-xl border border-text-primary/10 text-text-primary/60 hover:text-text-primary hover:border-text-primary/20 transition-all text-sm font-medium"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleApply}
-              className="px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-bold hover:opacity-90 transition-opacity"
-            >
-              Aplicar
-            </button>
-          </div>
+    <Modal open onClose={onCancel} size="sm" title="Período personalizado">
+      <div className="space-y-5">
+        <div className="grid grid-cols-2 gap-3">
+          <DateInput label="De" value={inicio} onChange={(d) => { setInicio(d); setErrors((e) => ({ ...e, inicio: undefined })); }} error={errors.inicio} />
+          <DateInput label="Até" value={fim} onChange={(d) => { setFim(d); setErrors((e) => ({ ...e, fim: undefined })); }} error={errors.fim} />
         </div>
+
+        <div className="border border-text-primary/10 rounded-xl p-3 bg-surface/40">
+          <MiniCalendar
+            month={calMonth}
+            rangeStart={inicio}
+            rangeEnd={fim}
+            onSelect={handleCalSelect}
+            onPrev={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+            onNext={() => setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+          />
+        </div>
+
+        <Modal.Footer>
+          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button onClick={handleApply}>Aplicar</Button>
+        </Modal.Footer>
       </div>
-    </div>
+    </Modal>
   );
 }

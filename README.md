@@ -9,8 +9,8 @@ Contas, cartões, conciliação, investimentos, relatórios e a Áurea — uma a
 e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclusão de Curso (TCC).
 
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue)](LICENSE)
-[![Java 17](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)](core4erp/build.gradle)
-[![Spring Boot 3.3.2](https://img.shields.io/badge/Spring%20Boot-3.3.2-6DB33F?logo=springboot&logoColor=white)](core4erp/build.gradle)
+[![Java 21](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](core4erp/build.gradle)
+[![Spring Boot 3.5.16](https://img.shields.io/badge/Spring%20Boot-3.5.16-6DB33F?logo=springboot&logoColor=white)](core4erp/build.gradle)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](front-end/package.json)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?logo=postgresql&logoColor=white)](docker-compose.yml)
 [![Status: pré-projeto](https://img.shields.io/badge/status-pr%C3%A9--projeto-orange)](#-status-do-projeto)
@@ -115,7 +115,7 @@ e lança dados por conversa. Pré-projeto desenvolvido como Trabalho de Conclus�
 ```mermaid
 flowchart LR
     U([Usuário<br/>navegador / PWA]) --> FE[Front-end<br/>React 19 + Vite]
-    FE -- "/api (cookie JWT)" --> BE[API<br/>Spring Boot 3.3]
+    FE -- "/api (cookie JWT)" --> BE[API<br/>Spring Boot 3.5]
     BE --> PG[(PostgreSQL<br/>Flyway)]
     BE --> QD[(Qdrant<br/>RAG)]
     BE --> OAI[OpenAI<br/>chat + embeddings]
@@ -132,7 +132,7 @@ preservando permissões, isolamento por empresa e auditoria.
 
 | Pasta | O que tem |
 |---|---|
-| [`core4erp/`](core4erp) | Backend Spring Boot (Java 17, Gradle). Um pacote por domínio (`conta`, `cartaoCredito`, `chat`, `relatorio`…), migrations Flyway em `src/main/resources/db/migration` e a configuração de monitoramento em `monitoring/` |
+| [`core4erp/`](core4erp) | Backend Spring Boot (Java 21, Gradle). Um pacote por domínio (`conta`, `cartaoCredito`, `chat`, `relatorio`…), migrations Flyway em `src/main/resources/db/migration` e a configuração de monitoramento em `monitoring/` |
 | [`front-end/`](front-end) | SPA React 19 + Vite 6 + Tailwind CSS 4, PWA, servida por nginx em produção |
 | [`n8n/`](n8n) | Workflows do n8n (chat orquestrado, ingestão RAG, eventos), contratos de payload e guia de montagem |
 | [`docs/`](docs) | Planos de engenharia e documentos de apoio |
@@ -144,7 +144,7 @@ preservando permissões, isolamento por empresa e auditoria.
 
 | Ferramenta | Versão |
 |---|---|
-| Java (JDK) | 17 |
+| Java (JDK) | 21 |
 | Node.js | 20+ |
 | PostgreSQL | 15+ |
 | Qdrant | 1.18 (RAG — o backend cria a coleção na inicialização) |
@@ -167,6 +167,8 @@ O backend lê o `.env` do diretório onde é iniciado.
 | `SECRET_KEY` | Chave HMAC do JWT — mínimo 64 caracteres (`openssl rand -hex 64`) | — |
 | `OPENAI_API_KEY` | Chave da OpenAI (chat, classificação e embeddings) | — |
 | `CORS_ORIGINS` | Origens permitidas, separadas por vírgula; a primeira também é a base do link de redefinição de senha | `http://localhost:5173,http://localhost:3000` |
+| `DATA_ENCRYPTION_KEY` / `DATA_HMAC_KEY` | Chaves (32 bytes em base64, `openssl rand -base64 32`) da criptografia em repouso de CPF/CNPJ e dados bancários e do índice cego de busca. O backend não sobe sem elas. **Perder ou trocar a chave deixa esses dados ilegíveis** — guarde uma cópia fora do servidor | — |
+| `QDRANT_API_KEY` | API key do Qdrant (obrigatória no Docker Compose; vazia num Qdrant local sem autenticação) | — |
 
 **Opcionais**
 
@@ -178,9 +180,14 @@ O backend lê o `.env` do diretório onde é iniciado.
 | `OPENAI_EMBEDDING_MODEL` | Modelo de embeddings do RAG | `text-embedding-3-small` |
 | `QDRANT_HOST` / `QDRANT_PORT` | Endereço gRPC do Qdrant | `qdrant` / `6334` |
 | `CHAT_ORQUESTRADOR` | `interno`, `shadow` (só admin) ou `n8n` | `interno` |
-| `N8N_WEBHOOK_URL`, `N8N_EVENTOS_WEBHOOK_URL`, `N8N_AUREA_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET` | Integração com o n8n (vazio = desligada) | — |
+| `N8N_WEBHOOK_URL`, `N8N_EVENTOS_WEBHOOK_URL`, `N8N_AUREA_WEBHOOK_URL` | Webhooks do n8n (vazio = integração desligada) | — |
+| `N8N_WEBHOOK_SECRET` | Header `X-Webhook-Secret` das chamadas ao n8n. Obrigatória no Docker Compose (com `N8N_ENCRYPTION_KEY`, `N8N_DB_USER`, `N8N_DB_PASSWORD`); no perfil `prod` sem ela as chamadas ao n8n ficam desligadas | — |
+| `CRYPTO_MIGRAR_NA_SUBIDA` | Cifra na inicialização os valores legados ainda em texto puro (idempotente) | `true` |
 | `MAIL_ENABLED`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP para redefinição de senha e convites | `MAIL_ENABLED=false` |
-| `TRUSTED_PROXY` | Confia no `X-Forwarded-For` para o rate limit — só atrás de um proxy conhecido | `false` |
+| `TRUSTED_PROXY` | Usa `CF-Connecting-IP`/`X-Real-IP` como IP do cliente (rate limit, logs) — só atrás de um proxy conhecido | `false` |
+| `COOKIE_SAME_SITE` | Atributo SameSite do cookie de sessão (`None` só com front e API em sites diferentes) | `Lax` |
+| `LOG_FORMAT` | `texto` (legível) ou `json` (ECS, para o Loki; forçado no perfil `prod`) | `texto` |
+| `MANAGEMENT_PORT` | Porta do Actuator (health/Prometheus), só rede interna | `8081` |
 | `APP_ENV` | Ambiente, como tag nas métricas | `development` |
 | `HIBERNATE_STATS_ENABLED` | Estatísticas do Hibernate (útil para caçar N+1) | `false` |
 | `PORT` | Porta HTTP do backend | `8080` |
@@ -233,7 +240,7 @@ App em `http://localhost:3000`.
 ### Com Docker Compose
 
 O [`docker-compose.yml`](docker-compose.yml) é o mesmo usado no servidor: PostgreSQL 16, backend,
-front-end (nginx), Qdrant, n8n, Prometheus, Grafana, Loki/Promtail e um túnel `cloudflared`.
+front-end (nginx), Qdrant, n8n, Prometheus, Alertmanager, Grafana, Loki/Promtail e um túnel `cloudflared`.
 Nele o front-end não publica porta no host — o acesso externo é pelo túnel. Para desenvolver,
 suba só o que precisa:
 
@@ -264,7 +271,7 @@ O processo de deploy em produção está em [`DEPLOY.md`](DEPLOY.md).
 | `/api/dashboard`, `/api/relatorios` | Painéis e relatórios (Excel e `/dados` em JSON) |
 | `/api/chat` | Chat da Áurea: streaming, anexos, conversas, histórico e RAG |
 | `/api/notificacoes`, `/api/busca`, `/api/auditoria` | Notificações, busca global e auditoria |
-| `/actuator/health` | Público. Demais endpoints do Actuator exigem `ADMIN` |
+| `/actuator/health`, `/actuator/prometheus` | Só na porta de gerenciamento `8081` (rede interna); a porta 8080 nega `/actuator/**` |
 
 A documentação completa e interativa está no Swagger UI.
 
@@ -342,7 +349,7 @@ in Information Systems and Software Engineering at UNIALFA (Goiânia, Brazil, 20
 payables and receivables, bank accounts and transfers, credit cards with statements and spreadsheet
 import, OFX reconciliation, investments, subscriptions, reports (Excel/PDF) and dashboards, plus
 Áurea, an AI assistant (OpenAI via Spring AI) that queries and records data through chat, reads
-attached files and uses RAG over Qdrant. The stack is Spring Boot 3.3 (Java 17), React 19 with Vite,
+attached files and uses RAG over Qdrant. The stack is Spring Boot 3.5 (Java 21), React 19 with Vite,
 and PostgreSQL, with per-company multi-tenancy, RBAC, JWT in HttpOnly cookies, Prometheus/Grafana
 metrics and optional OpenTelemetry traces and n8n automations. **It is a pre-project and academic
 prototype, not a production-ready product**, and it is not maintained as one. Use it at your own

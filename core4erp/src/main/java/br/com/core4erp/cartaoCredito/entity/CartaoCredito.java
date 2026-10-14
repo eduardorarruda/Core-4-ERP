@@ -1,9 +1,12 @@
 package br.com.core4erp.cartaoCredito.entity;
 
 import br.com.core4erp.config.auditing.TenantEntity;
+import br.com.core4erp.config.crypto.CampoCriptografadoConverter;
+import br.com.core4erp.config.crypto.IndiceCego;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -33,8 +36,15 @@ public class CartaoCredito extends TenantEntity {
     @Column(nullable = false)
     private Integer diaVencimento;
 
-    @Column(length = 100)
+    /** ACCTID do OFX cifrado em repouso. Casamento arquivo → cartão via {@link #acctIdOfxHash}. */
+    @Convert(converter = CampoCriptografadoConverter.class)
+    @Column(name = "acct_id_ofx", length = 255)
     private String acctIdOfx;
+
+    /** Índice cego (HMAC-SHA256) do ACCTID — UNIQUE (acct_id_ofx_hash, empresa_id) na V51. */
+    @Setter(AccessLevel.NONE)
+    @Column(name = "acct_id_ofx_hash", length = 64)
+    private String acctIdOfxHash;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "conta_corrente_id", nullable = false)
@@ -43,4 +53,10 @@ public class CartaoCredito extends TenantEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
+
+    /** Mantém o índice cego sempre sincronizado com o ACCTID. */
+    public void setAcctIdOfx(String acctIdOfx) {
+        this.acctIdOfx = acctIdOfx;
+        this.acctIdOfxHash = IndiceCego.acctIdCartao(acctIdOfx);
+    }
 }

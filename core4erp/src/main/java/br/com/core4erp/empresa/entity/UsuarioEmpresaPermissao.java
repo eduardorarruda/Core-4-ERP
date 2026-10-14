@@ -31,7 +31,8 @@ public class UsuarioEmpresaPermissao {
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    // LAZY: os repositórios carregam via @EntityGraph("permissao") onde o código é lido
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "permissao_id", nullable = false)
     private Permissao permissao;
 

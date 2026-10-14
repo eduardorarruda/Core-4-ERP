@@ -43,14 +43,15 @@ export default function Parceiros() {
   const [camposAuto, setCamposAuto] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { carregar(); }, []);
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
     finally { setLoading(false); }
-  }
+  }, [toast]);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   // Abas que contêm ao menos um campo com erro — usado para o indicador visual nas abas.
   const tabsComErro = new Set(Object.keys(errors).map((f) => FIELD_TAB[f]).filter(Boolean));
@@ -124,7 +125,9 @@ export default function Parceiros() {
       }));
       setCamposAuto(auto);
       setAutoPreenchido(true);
-    } catch (_) { /* CNPJ não encontrado */ }
+    } catch {
+      // CNPJ não encontrado na Receita: o usuário preenche os campos manualmente
+    }
     finally { setBuscandoCnpj(false); }
   }, []);
 
@@ -205,12 +208,12 @@ export default function Parceiros() {
       label: 'Razão Social',
       render: (v, row) => (
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-surface-highest flex items-center justify-center shrink-0 text-[11px] font-bold text-text-primary/60">
+          <div className="w-8 h-8 rounded-full bg-surface-highest flex items-center justify-center shrink-0 text-xs font-bold text-text-primary/60">
             {getInitials(v)}
           </div>
           <div>
             <p className="font-medium text-text-primary">{v}</p>
-            {row.nomeFantasia && <p className="text-xs text-text-primary/40">{row.nomeFantasia}</p>}
+            {row.nomeFantasia && <p className="text-xs text-text-primary/60">{row.nomeFantasia}</p>}
           </div>
         </div>
       ),
@@ -223,10 +226,10 @@ export default function Parceiros() {
       label: 'Ações',
       render: (id, row) => (
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => editar(row)} aria-label="Editar parceiro" className="text-text-primary/40 hover:text-primary hover:bg-primary/10">
+          <Button variant="ghost" size="icon" onClick={() => editar(row)} aria-label="Editar parceiro" className="text-text-primary/60 hover:text-primary hover:bg-primary/10">
             <Pencil className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => deletar(id)} aria-label="Excluir parceiro" className="text-text-primary/40 hover:text-error hover:bg-error/10">
+          <Button variant="ghost" size="icon" onClick={() => deletar(id)} aria-label="Excluir parceiro" className="text-text-primary/60 hover:text-error hover:bg-error/10">
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
@@ -251,7 +254,7 @@ export default function Parceiros() {
       {/* Form com abas */}
       {showForm && (
         <div className="rounded-[18px] p-6 space-y-5 animate-scale-in bg-surface-medium border border-text-primary/5 shadow-elevated">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70 font-mono">
             {editId ? 'Editar' : 'Novo'} Parceiro
           </h2>
 
@@ -262,10 +265,10 @@ export default function Parceiros() {
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  'flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all font-mono flex items-center justify-center gap-1.5',
+                  'flex-1 px-3 min-h-11 rounded-lg text-xs font-bold transition-all font-mono flex items-center justify-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   activeTab === tab
                     ? 'bg-gradient-primary text-on-primary'
-                    : 'text-text-primary/40 hover:text-text-primary/70'
+                    : 'text-text-primary/70 hover:text-text-primary'
                 )}
               >
                 {tab}
@@ -358,6 +361,7 @@ export default function Parceiros() {
       </div>
 
       <DataTable
+        caption="Parceiros cadastrados"
         columns={columns}
         data={listaFiltrada}
         loading={loading}

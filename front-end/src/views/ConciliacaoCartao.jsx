@@ -47,7 +47,7 @@ export default function ConciliacaoCartao() {
       .catch((e) => { if (!ignore) toast.error(e.message); })
       .finally(() => { if (!ignore) setLoadingSessao(false); });
     return () => { ignore = true; };
-  }, [sessionId]);
+  }, [sessionId, toast]);
 
   async function enviarArquivo(cartaoId) {
     if (!arquivo) { toast.error('Selecione um arquivo .ofx'); return; }
@@ -154,14 +154,14 @@ export default function ConciliacaoCartao() {
       />
 
       {!sessao && loadingSessao && (
-        <div className="flex items-center justify-center py-20 gap-3 text-text-primary/40">
+        <div className="flex items-center justify-center py-20 gap-3 text-text-primary/60">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span className="text-sm">Carregando sessão...</span>
         </div>
       )}
 
       {!sessao && !loadingSessao && sessionId && (
-        <p className="text-center text-sm text-text-primary/40 py-20">
+        <p className="text-center text-sm text-text-primary/60 py-20">
           Sessão não encontrada.{' '}
           <button onClick={() => navigate('/cartoes/conciliacao/historico')} className="text-primary hover:underline font-bold">
             Ver histórico
@@ -171,7 +171,7 @@ export default function ConciliacaoCartao() {
 
       {!sessao && !sessionId && (
         <div className="rounded-[18px] p-4 sm:p-6 space-y-4 bg-surface-low border border-text-primary/10 shadow-sm">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">1. Selecione o arquivo OFX do cartão</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">1. Selecione o arquivo OFX do cartão</h2>
           <OfxCartaoUploadZone onFile={setArquivo} />
 
           {mostrarSelecaoCartao && (
@@ -214,7 +214,7 @@ export default function ConciliacaoCartao() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="font-bold text-text-primary">{sessao.cartaoCreditoNome}</h2>
-                <p className="text-sm text-text-primary/50 mt-1">
+                <p className="text-sm text-text-primary/70 mt-1">
                   {sessao.dataInicioOfx && sessao.dataFimOfx
                     ? `Período: ${formatDate(sessao.dataInicioOfx)} a ${formatDate(sessao.dataFimOfx)} · `
                     : ''}
@@ -255,13 +255,13 @@ export default function ConciliacaoCartao() {
                     'flex items-center gap-1.5 px-3 min-h-11 rounded-xl text-xs font-bold transition-all border',
                     filtroAtivo === f
                       ? 'bg-primary text-on-primary border-transparent'
-                      : 'border-text-primary/10 text-text-primary/50 hover:text-text-primary'
+                      : 'border-text-primary/10 text-text-primary/70 hover:text-text-primary'
                   )}
                 >
                   {FILTRO_LABEL[f]}
                   <span className={cn(
-                    'rounded-full px-1.5 py-0.5 text-[10px]',
-                    filtroAtivo === f ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-highest text-text-primary/40'
+                    'rounded-full px-1.5 py-0.5 text-xs',
+                    filtroAtivo === f ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-highest text-text-primary/60'
                   )}>
                     {count}
                   </span>
@@ -273,12 +273,12 @@ export default function ConciliacaoCartao() {
           <div className="bg-surface-medium border border-text-primary/5 rounded-2xl overflow-hidden">
             <div className="hidden md:grid grid-cols-[90px_1fr_110px_1fr_auto] gap-3 px-4 py-2.5 border-b border-text-primary/5">
               {['Data', 'Descrição OFX', 'Valor', 'Lançamento vinculado', ''].map((h, i) => (
-                <span key={i} className="text-[10px] font-bold uppercase tracking-widest text-text-primary/30">{h}</span>
+                <span key={i} className="text-xs font-bold uppercase tracking-widest text-text-primary/60">{h}</span>
               ))}
             </div>
 
             {itensFiltrados.length === 0 ? (
-              <p className="text-center text-sm text-text-primary/40 py-12">Nenhuma transação neste filtro</p>
+              <p className="text-center text-sm text-text-primary/60 py-12">Nenhuma transação neste filtro</p>
             ) : (
               <div className="divide-y divide-text-primary/5">
                 {itensFiltrados.map((item) => (

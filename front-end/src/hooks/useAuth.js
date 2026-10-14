@@ -1,37 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getLoginState, getEmpresaAtiva, auth, clearAuth } from '../lib/api';
+import { auth, clearAuth } from '../lib/api';
+import { useAuthContext, empresaAtivaDe } from '../context/AuthContext';
 
+/**
+ * Leitura do estado de autenticação. O estado e o polling de permissões vivem no
+ * AuthProvider (um único intervalo para o app inteiro); este hook só deriva valores.
+ */
 export function useAuth() {
   const navigate = useNavigate();
-  const [loginState, setLoginStateLocal] = useState(getLoginState);
-
-  useEffect(() => {
-    const sync = () => setLoginStateLocal(getLoginState());
-    window.addEventListener('auth-change', sync);
-    return () => window.removeEventListener('auth-change', sync);
-  }, []);
-
-  // Atualiza permissões a cada 30s para refletir mudanças feitas por administradores
-  // sem exigir logout do usuário
-  useEffect(() => {
-    const refresh = async () => {
-      try {
-        const data = await auth.refreshPermissoes();
-        const current = getLoginState();
-        // S.11: atualiza as permissões da empresa ATIVA (não assume índice 0)
-        const ativa = getEmpresaAtiva();
-        const alvo = current?.empresas?.find((e) => e.id === ativa?.id) ?? current?.empresas?.[0];
-        if (alvo && data?.permissoes) {
-          alvo.permissoes = data.permissoes;
-          if (data.perfilNome) alvo.perfilNome = data.perfilNome;
-          setLoginState(current);
-        }
-      } catch { /* 401 handler em api.js já faz logout e redirecionamento */ }
-    };
-    const id = setInterval(refresh, 30_000);
-    return () => clearInterval(id);
-  }, []);
+  const { loginState } = useAuthContext();
 
   // CR-F2: logout não silencia erro — sessão do servidor deve ser invalidada
   const logout = useCallback(async () => {
@@ -41,19 +19,21 @@ export function useAuth() {
   }, [navigate]);
 
   // Permissões efetivas da empresa ATIVA (S.11: empresa selecionada, com fallback ao 1º vínculo)
-  const empresaAtiva = getEmpresaAtiva();
-  const permissoes = new Set(empresaAtiva?.permissoes ?? loginState?.empresas?.[0]?.permissoes ?? []);
+  const permissoes = useMemo(
+    () => new Set(empresaAtivaDe(loginState)?.permissoes ?? []),
+    [loginState],
+  );
 
-  // CR-F7: deps completas — permissoes incluída para evitar stale closure
-  const temPermissao = useCallback((codigo) => {
-    if (loginState?.adminSistema) return true;
-    return permissoes.has(codigo);
-  }, [loginState, permissoes]);
+  const adminSistema = loginState?.adminSistema ?? false;
+  const temPermissao = useCallback(
+    (codigo) => adminSistema || permissoes.has(codigo),
+    [adminSistema, permissoes],
+  );
 
   return {
     usuario: loginState?.usuario ?? null,
     tipoConta: loginState?.usuario?.tipoConta ?? null,
-    adminSistema: loginState?.adminSistema ?? false,
+    adminSistema,
     senhaProvisoria: loginState?.senhaProvisoria ?? false,
     permissoes,
     temPermissao,

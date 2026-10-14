@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { gerarPDF } from '../../lib/pdfUtils';
 import BentoCard from '../ui/BentoCard';
 import PeriodoFilter from './PeriodoFilter';
 import FormatButtons from './FormatButtons';
@@ -63,6 +62,7 @@ export default function ReportCard({
       setLoadingKey('pdf', true);
       try {
         const dados = await onGetData(periodo.inicio, periodo.fim, params);
+        const { gerarPDF } = await import('../../lib/pdfUtils');
         gerarPDF(title, periodo, dados);
         toast.success('Relatório em PDF gerado com sucesso.');
       } catch (e) {
@@ -103,7 +103,7 @@ export default function ReportCard({
             </div>
             <div>
               <h3 className="font-bold text-text-primary text-sm">{title}</h3>
-              <p className="text-xs text-text-primary/50 leading-relaxed">{description}</p>
+              <p className="text-xs text-text-primary/70 leading-relaxed">{description}</p>
             </div>
           </div>
 

@@ -67,6 +67,7 @@ public class ChatService {
     private final ObjectMapper objectMapper;
     private final TenantContext tenantCtx;
     private final N8nChatOrquestradorService n8nOrquestrador;
+    private final AcoesCriticasPendentes acoesCriticas;
     private final String orquestrador;
     private final int maxHistorico;
     private final double precoInputPorMilhao;   // USD por 1M tokens de entrada (prompt)
@@ -113,6 +114,7 @@ public class ChatService {
                        ObjectMapper objectMapper,
                        TenantContext tenantCtx,
                        N8nChatOrquestradorService n8nOrquestrador,
+                       AcoesCriticasPendentes acoesCriticas,
                        @Value("${chat.orquestrador:interno}") String orquestrador,
                        @Value("${chat.historico.max-mensagens:20}") int maxHistorico,
                        @Value("${chat.preco.input-usd-por-milhao:0.15}") double precoInputPorMilhao,
@@ -133,6 +135,7 @@ public class ChatService {
         this.objectMapper = objectMapper;
         this.tenantCtx = tenantCtx;
         this.n8nOrquestrador = n8nOrquestrador;
+        this.acoesCriticas = acoesCriticas;
         this.orquestrador = orquestrador;
         this.maxHistorico = maxHistorico;
         this.precoInputPorMilhao = precoInputPorMilhao;
@@ -149,6 +152,10 @@ public class ChatService {
      * {@code true} apenas quando {@code chat.orquestrador=n8n}. Enquanto for {@code interno}
      * (padrão), TODO o comportamento de delegação ao n8n fica dormente — o pipeline interno
      * (Spring AI in-process) roda exatamente como antes.
+     *
+     * <p>Atenção: no modo n8n as tools são chamadas via REST com o JWT do usuário, então o
+     * {@link GateAcaoCriticaAspect} (confirmação técnica de ações críticas) NÃO se aplica — lá a
+     * confirmação é só instrução de prompt. Em produção, prefira {@code interno} (padrão).
      */
     private boolean usarN8n() {
         // 'n8n' → todos os usuários; 'shadow' → só admin do sistema (validação em produção sem
@@ -156,6 +163,21 @@ public class ChatService {
         if ("n8n".equalsIgnoreCase(orquestrador)) return true;
         if ("shadow".equalsIgnoreCase(orquestrador)) return tenantCtx.isAdminSistema();
         return false;
+    }
+
+    /**
+     * Abre o turno do pipeline interno para o {@link GateAcaoCriticaAspect}: número sequencial na
+     * conversa + se a mensagem é confirmação explícita ("sim"). Prompt montado pelo servidor (anexo)
+     * ou turno com anexo NUNCA conta como confirmação — o conteúdo do arquivo não pode dizer "sim".
+     * Só o pipeline interno usa: no modo n8n as tools são chamadas via REST e a confirmação de ações
+     * críticas segue apenas como instrução de prompt (ver CLAUDE.md §23).
+     */
+    private TurnoChatHolder.Turno abrirTurno(Long conversaId, Long usuarioId, String mensagemUsuario,
+                                             boolean promptMontado) {
+        boolean confirmacao = !promptMontado
+                && !TurnoAnexoHolder.isTurnoComAnexo()
+                && ConfirmacaoUsuario.isConfirmacaoExplicita(mensagemUsuario);
+        return acoesCriticas.iniciarTurno(conversaId, usuarioId, confirmacao);
     }
 
     /**
@@ -192,7 +214,7 @@ public class ChatService {
     }
 
     public ChatResponseDto processar(ChatRequestDto request) {
-        return processar(request, null, false);
+        return processar(request, null, 0);
     }
 
     /**
@@ -202,34 +224,34 @@ public class ChatService {
      *   como contexto em toda mensagem seguinte, estourando o limite de tokens/min (429).
      */
     public ChatResponseDto processar(ChatRequestDto request, String textoParaHistorico) {
-        return processar(request, textoParaHistorico, false);
+        return processar(request, textoParaHistorico, 0);
     }
 
     /**
-     * @param jaSanitizado quando {@code true}, a mensagem NÃO passa pelo {@link ChatInputSanitizer}.
-     *   Usado pelo anexo: o prompt já é montado pelo servidor em {@code ChatAnexoService.processarAnexo}
-     *   e já é limitado por {@code chat.anexo.max-chars}/{@code MAX_EXTRACT_CHARS}. Re-sanitizar aqui
-     *   truncaria o conteúdo do arquivo em 4000 chars (teto do sanitizer), estrangulando extratos/
-     *   planilhas e anulando o modo Pensamento Estendido. O fluxo de texto livre do usuário (UI de
-     *   chat) SEMPRE chega com {@code false} e permanece sanitizado.
+     * @param limitePromptMontado {@code 0} = mensagem digitada pelo usuário (sanitização completa,
+     *   teto de {@link ChatInputSanitizer#MAX_CHARS}). {@code > 0} = prompt montado pelo servidor para
+     *   um anexo ({@code ChatAnexoService}), cujas partes variáveis já foram sanitizadas e delimitadas
+     *   como conteúdo não confiável; aqui aplica-se só o teto informado (proporcional ao anexo) —
+     *   nunca há bypass do {@link ChatInputSanitizer}.
      */
-    public ChatResponseDto processar(ChatRequestDto request, String textoParaHistorico, boolean jaSanitizado) {
+    public ChatResponseDto processar(ChatRequestDto request, String textoParaHistorico, int limitePromptMontado) {
         chatMetrics.registrarMensagem();
         Timer.Sample timer = chatMetrics.iniciarTimer();
 
-        String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
         ChatMensagem.Canal canal = request.canalResolvido();
         Long conversaId = conversaService.resolverOuCriar(canal, request.conversaId()).getId();
         String systemPrompt = promptBuilder.build(securityCtx.getUsuario(), isPensamentoEstendido());
-        String mensagemUsuario = jaSanitizado
-                ? (request.mensagem() != null ? request.mensagem() : "")
+        String mensagemUsuario = limitePromptMontado > 0
+                ? sanitizer.limitarPromptMontado(request.mensagem(), limitePromptMontado)
                 : sanitizer.sanitize(request.mensagem());
 
         // Ramo n8n (DORMENTE por padrão): só entra quando chat.orquestrador=n8n E há JWT na
         // requisição. Delega a orquestração ao WF-ROUTER; em qualquer falha/ausência de JWT cai
         // no pipeline interno abaixo (fallback). Com orquestrador=interno, nada aqui executa.
-        if (usarN8n()) {
+        // Turno com anexo NUNCA é delegado: o portão de escrita (GateEscritaAnexoAspect) só existe
+        // no pipeline interno — no n8n as tools voltariam pela API sem esse bloqueio.
+        if (usarN8n() && !TurnoAnexoHolder.isTurnoComAnexo()) {
             String jwt = jwtDaRequisicao();
             if (jwt != null) {
                 Optional<String> respN8n = n8nOrquestrador.orquestrar(conversaId, usuarioId,
@@ -241,7 +263,7 @@ public class ChatService {
                     memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.USER,
                             textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
                     memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
-                    conversaService.aposMensagem(conversaId, mensagemUsuario);
+                    conversaService.aposMensagem(conversaId, textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
                     chatMetrics.finalizarTimer(timer);
                     return new ChatResponseDto(respostaTexto, extrairDownloadUrl(respostaTexto), List.of());
                 }
@@ -257,6 +279,7 @@ public class ChatService {
 
         try {
             OrigemIaHolder.marcarIa(); // auditoria grava is_ai_action=true nas escritas das tools
+            TurnoChatHolder.definir(abrirTurno(conversaId, usuarioId, mensagemUsuario, limitePromptMontado > 0));
             ChatResponse response = chatClient.prompt()
                     .messages(allMessages)
                     .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
@@ -267,9 +290,10 @@ public class ChatService {
             String downloadUrl = RelatorioDownloadHolder.getAndClear(usuarioId);
             respostaTexto = anexarDownload(respostaTexto, downloadUrl);
 
-            registrarUsage(response, email);
+            registrarUsage(response, usuarioId);
             memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, respostaTexto);
-            conversaService.aposMensagem(conversaId, mensagemUsuario);
+            // Título da conversa: no anexo, o resumo curto (nunca o prompt com o conteúdo do arquivo).
+            conversaService.aposMensagem(conversaId, textoParaHistorico != null ? textoParaHistorico : mensagemUsuario);
 
             if (downloadUrl == null) {
                 downloadUrl = extrairDownloadUrl(respostaTexto);
@@ -280,6 +304,7 @@ public class ChatService {
             throw e;
         } finally {
             OrigemIaHolder.limpar();
+            TurnoChatHolder.limpar();
             chatMetrics.finalizarTimer(timer);
         }
     }
@@ -289,6 +314,7 @@ public class ChatService {
         try {
             return tenantCtx.isAdminSistema();
         } catch (Exception e) {
+            log.debug("[CHAT] contexto de tenant indisponível — sem pensamento estendido: {}", e.getMessage());
             return false;
         }
     }
@@ -298,7 +324,6 @@ public class ChatService {
         chatMetrics.incrementarSessoes();
 
         // Captura identidade e contexto na thread da requisição (HTTP), antes do hand-off.
-        String email = securityCtx.getEmail();
         Long usuarioId = securityCtx.getUsuarioId();
         ChatMensagem.Canal canal = request.canalResolvido();
         Long conversaId = conversaService.resolverOuCriar(canal, request.conversaId()).getId();
@@ -367,6 +392,8 @@ public class ChatService {
                 // cliente imediatamente, dando feedback incremental em vez da tela em branco até o fim.
                 // toStream() consome de forma bloqueante NESTA thread, mantendo o SecurityContext
                 // ativo durante toda a execução (inclusive das tools) e a limpeza correta no finally.
+                // O turno (gate de ações críticas) é propagado às threads do Reactor como os demais.
+                TurnoChatHolder.definir(abrirTurno(conversaId, usuarioId, mensagemUsuario, false));
                 chatClient.prompt()
                         .messages(allMessages)
                         .tools(consultaTools, lancamentoTools, relatorioTools, cadastroTools, gestaoFinanceiraTools)
@@ -395,27 +422,28 @@ public class ChatService {
                     enviarDelta(emitter, aviso);
                 }
 
-                registrarUsage(usageRef.get(), email);
+                registrarUsage(usageRef.get(), usuarioId);
                 memoryService.registrar(usuarioId, conversaId, canal, ChatMensagem.Role.ASSISTANT, full.toString());
                 conversaService.aposMensagem(conversaId, mensagemUsuario);
 
                 emitter.complete();
             } catch (Exception e) {
                 chatMetrics.registrarErro();
-                log.error("[CHAT-STREAM] erro ao processar mensagem de {}: {}", email, e.getMessage(), e);
+                log.error("[CHAT-STREAM] erro ao processar mensagem usuarioId={}: {}", usuarioId, e.getMessage(), e);
                 try {
                     // Em vez de derrubar o stream (tela em branco), envia uma mensagem amigável —
                     // ex.: limite de tokens/min da OpenAI (429) vira "aguarde e tente de novo".
                     if (full.length() == 0) enviarDelta(emitter, mensagemAmigavelErro(e));
                     emitter.complete();
-                } catch (Exception ignored) {
-                    // emitter já encerrado
+                } catch (Exception emitterEncerrado) {
+                    log.debug("[CHAT-STREAM] emitter já encerrado ao enviar erro: {}", emitterEncerrado.getMessage());
                 }
             } finally {
                 chatMetrics.decrementarSessoes();
                 RelatorioDownloadHolder.clear(usuarioId);
                 RequestContextHolder.resetRequestAttributes();
                 OrigemIaHolder.limpar();
+                TurnoChatHolder.limpar();
                 TenantContext.removeState();
                 SecurityContextHolder.clearContext();
             }
@@ -436,8 +464,9 @@ public class ChatService {
             synchronized (emitter) {
                 try {
                     emitter.send(SseEmitter.event().comment("keepalive"));
-                } catch (Exception ignored) {
-                    // emitter encerrado ou cliente desconectado — nada a fazer aqui.
+                } catch (Exception desconectado) {
+                    // Emitter encerrado ou cliente desconectado — esperado; o finally cancela o agendador.
+                    log.debug("[CHAT-STREAM] keepalive não enviado (cliente desconectado): {}", desconectado.getMessage());
                 }
             }
         }, 15, 15, TimeUnit.SECONDS);
@@ -517,14 +546,14 @@ public class ChatService {
         return texto != null ? texto : "";
     }
 
-    private void registrarUsage(ChatResponse response, String email) {
+    private void registrarUsage(ChatResponse response, Long usuarioId) {
         if (response == null || response.getMetadata() == null) {
             return;
         }
-        registrarUsage(response.getMetadata().getUsage(), email);
+        registrarUsage(response.getMetadata().getUsage(), usuarioId);
     }
 
-    private void registrarUsage(Usage usage, String email) {
+    private void registrarUsage(Usage usage, Long usuarioId) {
         if (usage == null) {
             return;
         }
@@ -534,8 +563,9 @@ public class ChatService {
         double custo = (prompt / 1_000_000.0) * precoInputPorMilhao
                      + (completion / 1_000_000.0) * precoOutputPorMilhao;
         chatMetrics.registrarCusto(custo);
-        log.info("[CHAT-USAGE] user={} promptTokens={} completionTokens={} custoUsd={}",
-                email, prompt, completion, String.format(java.util.Locale.US, "%.6f", custo));
+        // LGPD: identifica o usuário pelo id (nunca e-mail em log).
+        log.info("[CHAT-USAGE] usuarioId={} promptTokens={} completionTokens={} custoUsd={}",
+                usuarioId, prompt, completion, String.format(java.util.Locale.US, "%.6f", custo));
     }
 
     /** Traduz erros técnicos (ex.: 429 da OpenAI) em uma frase clara para o usuário no stream. */

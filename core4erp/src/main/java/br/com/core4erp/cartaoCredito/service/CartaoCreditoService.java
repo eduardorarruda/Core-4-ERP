@@ -59,6 +59,9 @@ import org.springframework.data.domain.PageRequest;
 @Service
 public class CartaoCreditoService {
 
+    /** Teto da busca textual de lançamentos (mais recentes primeiro) — a tela espera um array, sem paginação. */
+    static final int LIMITE_BUSCA_LANCAMENTOS = 500;
+
     private final CartaoCreditoRepository cartaoRepo;
     private final LancamentoCartaoRepository lancamentoRepo;
     private final FaturaCartaoRepository faturaRepo;
@@ -100,6 +103,7 @@ public class CartaoCreditoService {
 
     // ── Cartões ───────────────────────────────────────────────────────────────
 
+    @Requer("CARTAO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public Page<CartaoCreditoResponseDto> listar(Pageable pageable) {
         Long eid = tenantCtx.getEmpresaId();
@@ -124,6 +128,7 @@ public class CartaoCreditoService {
                 limitesUsados.getOrDefault(c.getId(), BigDecimal.ZERO)));
     }
 
+    @Requer("CARTAO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public CartaoCreditoResponseDto buscarPorId(Long id) {
         CartaoCredito c = findOwnedCartao(id);
@@ -163,15 +168,16 @@ public class CartaoCreditoService {
 
     // ── Lançamentos ───────────────────────────────────────────────────────────
 
+    @Requer("CARTAO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public List<LancamentoResponseDto> listarLancamentos(Long cartaoId, Integer mes, Integer ano, String busca) {
         Long eid = tenantCtx.getEmpresaId();
         findOwnedCartao(cartaoId);
         List<LancamentoCartao> lista = (busca != null && !busca.isBlank())
-                ? lancamentoRepo.filtrar(cartaoId, eid, mes, ano, busca.trim())
+                ? lancamentoRepo.filtrar(cartaoId, eid, mes, ano, busca.trim(), PageRequest.of(0, LIMITE_BUSCA_LANCAMENTOS))
                 : (mes != null && ano != null)
                         ? lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaIdAndMesFaturaAndAnoFatura(cartaoId, eid, mes, ano)
-                        : lancamentoRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid);
+                        : lancamentoRepo.findTop500ByCartaoCreditoIdAndEmpresaIdOrderByDataCompraDescIdDesc(cartaoId, eid);
 
         Set<String> fechadas = faturaRepo.findAllByCartaoCreditoIdAndEmpresaId(cartaoId, eid).stream()
                 .filter(f -> f.getStatus() == StatusFatura.FECHADA)
@@ -432,6 +438,7 @@ public class CartaoCreditoService {
         }
     }
 
+    @Requer("CARTAO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public List<CartaoDashboardResumoDto> dashboardResumo(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
         if ((mesInicio != null) != (anoInicio != null))
@@ -454,6 +461,7 @@ public class CartaoCreditoService {
         )).toList();
     }
 
+    @Requer("CARTAO_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public CartaoDashboardBIResponseDto dashboardBI(Integer mesInicio, Integer anoInicio, Integer mesFim, Integer anoFim) {
         if ((mesInicio != null) != (anoInicio != null))

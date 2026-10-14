@@ -62,7 +62,7 @@ export default function Dashboard() {
   const isDark = theme === 'dark';
   // Paleta categórica derivada dos tokens do tema (sem hex duplicado por tema).
   const COLORS = useMemo(() => [
-    readCssVar('--color-primary', isDark ? '#6EFFC0' : '#059669'),
+    readCssVar('--color-chart-1', isDark ? '#6EFFC0' : '#047857'),
     readCssVar('--color-secondary', isDark ? '#ACC7FF' : '#2563EB'),
     readCssVar('--color-error', isDark ? '#FFB4AB' : '#DC2626'),
     readCssVar('--color-warning', isDark ? '#FFD37A' : '#B45309'),
@@ -71,7 +71,7 @@ export default function Dashboard() {
   ], [isDark]);
   const emptyPieColor = readCssVar('--color-surface-highest', isDark ? '#353534' : '#D4D4D8');
 
-  const fluxoMensal = dados?.fluxoMensal ?? [];
+  const fluxoMensal = useMemo(() => dados?.fluxoMensal ?? [], [dados]);
 
   const cashFlowData = useMemo(() => fluxoMensal.map((m) => ({
     name: MESES_ABREV[m.mes - 1],
@@ -132,7 +132,7 @@ export default function Dashboard() {
         subtitle="Visão geral do seu ecossistema financeiro"
         actions={
           <div className="flex items-center gap-3">
-            <span className="text-xs text-text-primary/30 hidden sm:block">
+            <span className="text-xs text-text-primary/60 hidden sm:block">
               Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </span>
             <Button
@@ -161,7 +161,7 @@ export default function Dashboard() {
               Verifique sua conexão com a internet e tente novamente.
             </p>
           </div>
-          <Button variant="secondary" onClick={() => fetchAll()} loading={carregando} leftIcon={RefreshCw}>
+          <Button variant="secondary" onClick={() => fetchAll()} loading={carregando} leftIcon={<RefreshCw className="w-4 h-4" aria-hidden="true" />}>
             Tentar novamente
           </Button>
         </div>

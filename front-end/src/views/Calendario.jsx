@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, CalendarDays, Repeat, X, CheckCircle, AlertCircle } from 'lucide-react';
 import { contas as contasApi, assinaturas as assinaturasApi, contasCorrentes as ccApi } from '../lib/api';
 import FormField, { inputCls } from '../components/ui/FormField';
@@ -11,6 +11,22 @@ import { MESES_COMPLETOS } from '../lib/constants';
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = MESES_COMPLETOS;
+
+const STATUS_LABEL = {
+  PENDENTE: 'Pendente',
+  ATRASADO: 'Atrasado',
+  PAGO: 'Pago',
+  RECEBIDO: 'Recebido',
+};
+
+// Limite de segurança por mês (a busca já é filtrada pelo período visível)
+const LIMITE_CONTAS_MES = 500;
+
+/** Intervalo [1º dia, último dia] do mês em ISO (yyyy-MM-dd) para o filtro da API. */
+function intervaloDoMes(ano, mes) {
+  const ultimo = new Date(ano, mes + 1, 0).getDate();
+  return { vencimentoInicio: isoDate(ano, mes + 1, 1), vencimentoFim: isoDate(ano, mes + 1, ultimo) };
+}
 
 const STATUS_VARIANT = {
   PENDENTE: 'warning',
@@ -40,11 +56,11 @@ function ContaCard({ conta, ccs, baixaAbertaId, onToggleBaixa, baixaForm, setBai
         <div className="min-w-0">
           <p className="text-sm font-semibold text-text-primary truncate">{c.descricao}</p>
           {c.parceiroNome && <p className="text-xs text-text-primary/60 truncate">{c.parceiroNome}</p>}
-          {c.categoriaDescricao && <p className="text-xs text-text-primary/40 truncate">{c.categoriaDescricao}</p>}
+          {c.categoriaDescricao && <p className="text-xs text-text-primary/60 truncate">{c.categoriaDescricao}</p>}
         </div>
         <div className="text-right shrink-0 space-y-1">
           <p className={`text-sm font-bold ${valorCor}`}>R$ {brl(c.valorOriginal)}</p>
-          <Badge variant={STATUS_VARIANT[c.status] ?? 'neutral'} size="sm">{c.status}</Badge>
+          <Badge variant={STATUS_VARIANT[c.status] ?? 'neutral'} size="sm">{STATUS_LABEL[c.status] ?? c.status}</Badge>
         </div>
       </div>
 
@@ -110,7 +126,7 @@ function AssinaturaCard({ assinatura: a }) {
     <div className="rounded-xl p-3 flex items-center justify-between bg-primary/5 border border-primary/20">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-text-primary truncate">{a.descricao}</p>
-        {a.categoriaDescricao && <p className="text-xs text-text-primary/40 truncate">{a.categoriaDescricao}</p>}
+        {a.categoriaDescricao && <p className="text-xs text-text-primary/60 truncate">{a.categoriaDescricao}</p>}
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
         <Repeat className="w-4 h-4 text-primary/70" />
@@ -140,22 +156,22 @@ export default function Calendario() {
   const ano = mesAtual.getFullYear();
   const mes = mesAtual.getMonth();
 
+  // Só as contas do mês exibido (antes: até 500 contas de todos os períodos a cada visita)
   const carregarContas = useCallback(async () => {
-    const res = await contasApi.listar({ size: 500 });
+    const res = await contasApi.listar({ ...intervaloDoMes(ano, mes), size: LIMITE_CONTAS_MES });
     setContas(res.content || []);
-  }, []);
+  }, [ano, mes]);
 
   const carregarTudo = useCallback(async () => {
     setCarregando(true);
     setErroCarga(false);
     const resultados = await Promise.allSettled([
-      contasApi.listar({ size: 500 }),
+      carregarContas(),
       assinaturasApi.listar(),
       ccApi.listar(),
     ]);
     const [rc, ra, rcc] = resultados;
-    let falhou = false;
-    if (rc.status === 'fulfilled') setContas(rc.value?.content || []); else falhou = true;
+    let falhou = rc.status !== 'fulfilled';
     if (ra.status === 'fulfilled') setAssinaturas(ra.value || []); else falhou = true;
     if (rcc.status === 'fulfilled') setCcs(rcc.value || []); else falhou = true;
     if (falhou) {
@@ -163,32 +179,32 @@ export default function Calendario() {
       toast.error('Não foi possível carregar todos os dados do calendário. Verifique sua conexão e tente novamente.');
     }
     setCarregando(false);
-  }, [toast]);
+  }, [toast, carregarContas]);
 
   useEffect(() => {
     carregarTudo();
   }, [carregarTudo]);
 
-  const contasDoMes = contas.filter((c) => {
-    if (!c.dataVencimento) return false;
-    const d = new Date(c.dataVencimento + 'T00:00:00');
-    return d.getFullYear() === ano && d.getMonth() === mes;
-  });
+  // Agrupamentos derivados — recalculados só quando os dados ou o mês mudam
+  const contasPorDia = useMemo(() => {
+    const porDia = {};
+    for (const c of contas) {
+      if (!c.dataVencimento) continue;
+      const [a, m, d] = c.dataVencimento.split('-').map(Number);
+      if (a !== ano || m !== mes + 1) continue;
+      (porDia[d] ??= []).push(c);
+    }
+    return porDia;
+  }, [contas, ano, mes]);
 
-  const contasPorDia = {};
-  for (const c of contasDoMes) {
-    const dia = parseInt(c.dataVencimento.split('-')[2], 10);
-    if (!contasPorDia[dia]) contasPorDia[dia] = [];
-    contasPorDia[dia].push(c);
-  }
-
-  const assinPorDia = {};
-  for (const a of assinaturas) {
-    if (!a.ativa) continue;
-    const d = a.diaVencimento;
-    if (!assinPorDia[d]) assinPorDia[d] = [];
-    assinPorDia[d].push(a);
-  }
+  const assinPorDia = useMemo(() => {
+    const porDia = {};
+    for (const a of assinaturas) {
+      if (!a.ativa) continue;
+      (porDia[a.diaVencimento] ??= []).push(a);
+    }
+    return porDia;
+  }, [assinaturas]);
 
   const primeiroDia = new Date(ano, mes, 1).getDay();
   const ultimoDia = new Date(ano, mes + 1, 0).getDate();
@@ -316,7 +332,7 @@ export default function Calendario() {
           <div className="hidden lg:block">
             <div className="grid grid-cols-7 mb-2">
               {DIAS_SEMANA.map((d) => (
-                <div key={d} className="text-center text-xs font-bold uppercase tracking-widest text-text-primary/40 py-2">
+                <div key={d} className="text-center text-xs font-bold uppercase tracking-widest text-text-primary/60 py-2">
                   {d}
                 </div>
               ))}
@@ -365,7 +381,7 @@ export default function Calendario() {
                     </div>
 
                     {totalDia > 0 && (
-                      <p className="text-xs text-text-primary/50 mt-1 leading-tight truncate">R$ {brl(totalDia)}</p>
+                      <p className="text-xs text-text-primary/70 mt-1 leading-tight truncate">R$ {brl(totalDia)}</p>
                     )}
                   </button>
                 );
@@ -376,9 +392,9 @@ export default function Calendario() {
           {/* ── Agenda em lista (somente mobile < lg) ── */}
           <div className="lg:hidden">
             {carregando ? (
-              <p className="text-sm text-text-primary/50 text-center py-10">Carregando eventos…</p>
+              <p className="text-sm text-text-primary/70 text-center py-10">Carregando eventos…</p>
             ) : diasComEventos.length === 0 ? (
-              <p className="text-sm text-text-primary/50 text-center py-10">
+              <p className="text-sm text-text-primary/70 text-center py-10">
                 {erroCarga ? 'Não foi possível carregar os eventos deste mês.' : 'Nenhuma conta ou assinatura neste mês.'}
               </p>
             ) : (
@@ -398,7 +414,7 @@ export default function Calendario() {
                           {DIAS_SEMANA[dow]}, {formatDate(iso)}
                         </span>
                         {hoje && <Badge variant="success" size="sm">Hoje</Badge>}
-                        <span className="ml-auto text-xs text-text-primary/40">
+                        <span className="ml-auto text-xs text-text-primary/60">
                           {totalEventos} {totalEventos === 1 ? 'item' : 'itens'}
                         </span>
                       </div>
@@ -422,19 +438,19 @@ export default function Calendario() {
           <div className="flex flex-wrap gap-4 mt-5 pt-4 border-t border-text-primary/10">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full inline-block bg-error" />
-              <span className="text-xs text-text-primary/50 uppercase tracking-wider">A Pagar</span>
+              <span className="text-xs text-text-primary/70 uppercase tracking-wider">A Pagar</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full inline-block bg-secondary" />
-              <span className="text-xs text-text-primary/50 uppercase tracking-wider">A Receber</span>
+              <span className="text-xs text-text-primary/70 uppercase tracking-wider">A Receber</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full inline-block bg-primary" />
-              <span className="text-xs text-text-primary/50 uppercase tracking-wider">Pago/Recebido</span>
+              <span className="text-xs text-text-primary/70 uppercase tracking-wider">Pago/Recebido</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Repeat className="w-3 h-3 text-primary/70" />
-              <span className="text-xs text-text-primary/50 uppercase tracking-wider">Assinatura</span>
+              <span className="text-xs text-text-primary/70 uppercase tracking-wider">Assinatura</span>
             </div>
           </div>
         </div>
@@ -447,7 +463,7 @@ export default function Calendario() {
                 <h2 className="text-sm font-bold text-text-primary">
                   {formatDate(isoDate(ano, mes + 1, diaSelecionado))}
                 </h2>
-                <p className="text-xs text-text-primary/40 uppercase tracking-widest mt-0.5">
+                <p className="text-xs text-text-primary/60 uppercase tracking-widest mt-0.5">
                   {contasDia.length + assinDia.length} evento{contasDia.length + assinDia.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -462,12 +478,12 @@ export default function Calendario() {
             </div>
 
             {contasDia.length === 0 && assinDia.length === 0 && (
-              <p className="text-sm text-text-primary/40 text-center py-8">Nenhum evento neste dia.</p>
+              <p className="text-sm text-text-primary/60 text-center py-8">Nenhum evento neste dia.</p>
             )}
 
             {contasDia.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-text-primary/40 mb-2">Contas</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60 mb-2">Contas</p>
                 {contasDia.map((c) => (
                   <ContaCard key={c.id} conta={c} {...baixaProps} />
                 ))}
@@ -476,7 +492,7 @@ export default function Calendario() {
 
             {assinDia.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-widest text-text-primary/40 mb-2">Assinaturas</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60 mb-2">Assinaturas</p>
                 {assinDia.map((a) => (
                   <AssinaturaCard key={a.id} assinatura={a} />
                 ))}

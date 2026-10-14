@@ -3,11 +3,18 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { convites } from '../lib/api';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
-import PasswordRules, { senhaValida } from '../components/ui/PasswordRules';
+import PasswordRules from '../components/ui/PasswordRules';
+import { senhaValida } from '../lib/senha';
 import Button from '../components/ui/Button';
-import { BrandMark } from '../components/login/HeroPane';
+import BrandMark from '../components/ui/BrandMark';
+import { usePageMeta } from '../hooks/usePageMeta';
+import LinksLegais from '../components/legal/LinksLegais';
+import { VERSAO_TERMOS } from '../content/legal';
+
+const LINK_TEXTO = 'text-primary underline underline-offset-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
 export default function AceitarConvite() {
+  usePageMeta({ title: 'Aceitar convite', noindex: true });
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const token = params.get('token') ?? '';
@@ -20,6 +27,8 @@ export default function AceitarConvite() {
   const [erro, setErro] = useState('');
   const [loading, setLoading] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  const [aceite, setAceite] = useState(false);
+  const [erroAceite, setErroAceite] = useState('');
 
   useEffect(() => {
     if (!token) { setErroConvite('Token de convite não informado.'); setLoadingConvite(false); return; }
@@ -36,9 +45,13 @@ export default function AceitarConvite() {
     setErro('');
     if (form.senha !== form.confirmarSenha) { setErro('As senhas não coincidem.'); return; }
     if (!senhaValida(form.senha)) { setErro('A senha não atende a todos os requisitos.'); return; }
+    if (!aceite) {
+      setErroAceite('Para criar a conta, é preciso aceitar os Termos de Uso e a Política de Privacidade.');
+      return;
+    }
     setLoading(true);
     try {
-      await convites.aceitar({ token, nome: form.nome, senha: form.senha });
+      await convites.aceitar({ token, nome: form.nome, senha: form.senha, aceiteTermos: true, versaoTermos: VERSAO_TERMOS });
       setSucesso(true);
       setTimeout(() => navigate('/login'), 2500);
     } catch (err) {
@@ -68,7 +81,7 @@ export default function AceitarConvite() {
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-error"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
             </div>
             <h2 className="font-display text-[22px] font-bold text-text-primary mb-2">Convite Inválido</h2>
-            <p className="text-sm text-text-primary/50 mb-6">{erroConvite}</p>
+            <p className="text-sm text-text-primary/70 mb-6">{erroConvite}</p>
             <Link to="/login" className="text-primary text-[13px] hover:opacity-80 transition-opacity">Voltar ao login</Link>
           </div>
         </div>
@@ -84,7 +97,7 @@ export default function AceitarConvite() {
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5"/></svg>
           </div>
           <h2 className="font-display text-[28px] font-bold text-text-primary mb-2">Conta criada!</h2>
-          <p className="text-text-primary/50 text-sm">Redirecionando para o login…</p>
+          <p className="text-text-primary/70 text-sm">Redirecionando para o login…</p>
         </div>
       </div>
     );
@@ -109,25 +122,25 @@ export default function AceitarConvite() {
           <div className="bg-primary/[.06] border border-primary/15 rounded-2xl px-4 py-3.5 mt-4 mb-6 text-center">
             {convite.emailConvidado && (
               <div className="text-[13px] text-text-primary/80 font-body mb-1 break-all">
-                <span className="text-text-primary/50">E-mail: </span>
+                <span className="text-text-primary/70">E-mail: </span>
                 <strong className="text-text-primary">{convite.emailConvidado}</strong>
               </div>
             )}
-            <div className="text-xs text-text-primary/50 font-body mb-1">
+            <div className="text-xs text-text-primary/70 font-body mb-1">
               Perfil: <strong className="text-primary">{convite.perfilNome}</strong>
             </div>
             {convite.convidadoPorEmail && (
-              <div className="text-xs text-text-primary/50 font-body mb-1 break-all">
+              <div className="text-xs text-text-primary/70 font-body mb-1 break-all">
                 Convidado por: <strong className="text-text-primary/80">{convite.convidadoPorEmail}</strong>
               </div>
             )}
-            <div className="text-[11px] text-text-primary/35 font-mono">
+            <div className="text-xs text-text-primary/60 font-mono">
               Expira em: {new Date(convite.expiraEm).toLocaleDateString('pt-BR')}
             </div>
           </div>
         )}
 
-        <p className="text-[13px] text-text-primary/50 mb-6 text-center">
+        <p className="text-[13px] text-text-primary/70 mb-6 text-center">
           Crie sua conta para aceitar o convite e começar a usar o Core 4.
         </p>
 
@@ -145,6 +158,35 @@ export default function AceitarConvite() {
             <FloatingPasswordInput id="confirmarSenha" label="Confirmar senha" value={form.confirmarSenha} onChange={set('confirmarSenha')} autoComplete="new-password" required />
           </div>
 
+          {/* Consentimento (LGPD art. 8º): caixa desmarcada por padrão, obrigatória — mesmo padrão do cadastro */}
+          <div className="mt-4">
+            <div className="flex items-start gap-3">
+              <input
+                id="aceiteTermos"
+                type="checkbox"
+                checked={aceite}
+                onChange={(e) => { setAceite(e.target.checked); setErroAceite(''); }}
+                required
+                aria-invalid={erroAceite ? true : undefined}
+                aria-describedby={erroAceite ? 'aceiteTermos-erro' : undefined}
+                className="mt-0.5 w-5 h-5 shrink-0 accent-[var(--color-primary)] cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+              <label htmlFor="aceiteTermos" className="text-[13px] text-text-primary/80 leading-relaxed cursor-pointer">
+                Li e aceito os{' '}
+                <Link to="/termos" target="_blank" rel="noopener" className={LINK_TEXTO}>
+                  Termos de Uso<span className="sr-only"> (abre em nova aba)</span>
+                </Link>
+                {' '}e a{' '}
+                <Link to="/privacidade" target="_blank" rel="noopener" className={LINK_TEXTO}>
+                  Política de Privacidade<span className="sr-only"> (abre em nova aba)</span>
+                </Link>.
+              </label>
+            </div>
+            {erroAceite && (
+              <p id="aceiteTermos-erro" role="alert" className="text-xs text-error mt-1.5">{erroAceite}</p>
+            )}
+          </div>
+
           {erro && (
             <div className="px-3.5 py-2.5 rounded-xl bg-error/10 border border-error/20 text-error text-[13px] mt-3">
               {erro}
@@ -155,6 +197,8 @@ export default function AceitarConvite() {
             {loading ? 'Criando conta…' : 'Aceitar Convite'}
           </Button>
         </form>
+
+        <LinksLegais className="mt-6 text-center" novaAba />
       </div>
     </div>
   );

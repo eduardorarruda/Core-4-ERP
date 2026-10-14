@@ -11,7 +11,7 @@ export default function EmptyState({ icon: Icon, title, description, action, cla
       )}
       <h3 className="text-sm font-bold text-text-primary font-display mb-1">{title}</h3>
       {description && (
-        <p className="text-sm text-text-primary/50 max-w-xs leading-relaxed">{description}</p>
+        <p className="text-sm text-text-primary/70 max-w-xs leading-relaxed">{description}</p>
       )}
       {action && (
         <button

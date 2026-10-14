@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Repeat, Plus, Pencil, Trash2 } from 'lucide-react';
 import { assinaturas as api, categorias as catApi, parceiros as parApi, cartoes as cartoesApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -27,19 +27,24 @@ export default function Assinaturas() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    catApi.listar().then(setCats).catch(() => {});
-    parApi.listar().then((data) => setPars(data.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'))).catch(() => {});
-    cartoesApi.listar().then(setCartoes).catch(() => {});
-    carregar();
-  }, []);
-
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
     finally { setLoading(false); }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    // Listas dos seletores: se uma falhar, o formulário continua utilizável (campo fica vazio)
+    // e o usuário é avisado uma única vez.
+    const avisar = () => toast.error('Algumas opções do formulário não carregaram. Recarregue a página.');
+    Promise.all([
+      catApi.listar().then(setCats),
+      parApi.listar().then((data) => setPars(data.filter((p) => p.tipo === 'FORNECEDOR' || p.tipo === 'AMBOS'))),
+      cartoesApi.listar().then(setCartoes),
+    ]).catch(avisar);
+    carregar();
+  }, [carregar, toast]);
 
   function setF(k) { return (v) => setForm((f) => ({ ...f, [k]: v })); }
 
@@ -144,7 +149,7 @@ export default function Assinaturas() {
           { label: 'Custo Anual',        value: totalMensal * 12,  currency: true,  accent: 'text-amber-400',  card: 'bg-amber-400/[0.07] border-amber-400/20' },
         ].map((s, i) => (
           <div key={s.label} className={cn('anim-in rounded-[18px] px-5 py-4 border backdrop-blur-sm', `d${i + 1}`, s.card)}>
-            <p className={cn('text-[9px] font-bold uppercase tracking-widest font-mono mb-2', s.accent)}>{s.label}</p>
+            <p className={cn('text-xs font-bold uppercase tracking-widest font-mono mb-2', s.accent)}>{s.label}</p>
             <p className={cn('text-2xl font-bold font-display', s.accent)}>
               {s.currency ? `R$ ${brl(s.value)}` : s.value}
             </p>
@@ -238,7 +243,7 @@ export default function Assinaturas() {
         <>
           {ativas.length > 0 && (
             <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-text-primary/50 mb-4">Ativas ({ativas.length})</p>
+              <p className="text-sm font-bold uppercase tracking-widest text-text-primary/70 mb-4">Ativas ({ativas.length})</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {ativas.map((a) => (
                   <AssinaturaCard key={a.id} a={a} onEdit={editar} onDelete={setConfirmId} />
@@ -248,7 +253,7 @@ export default function Assinaturas() {
           )}
           {inativas.length > 0 && (
             <div>
-              <p className="text-sm font-bold uppercase tracking-widest text-text-primary/50 mb-4">Inativas ({inativas.length})</p>
+              <p className="text-sm font-bold uppercase tracking-widest text-text-primary/70 mb-4">Inativas ({inativas.length})</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 opacity-60">
                 {inativas.map((a) => (
                   <AssinaturaCard key={a.id} a={a} onEdit={editar} onDelete={setConfirmId} />
@@ -269,13 +274,13 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-bold text-text-primary text-sm truncate">{a.descricao}</p>
-          {a.parceiroNome && <p className="text-xs text-text-primary/40 truncate mt-0.5">{a.parceiroNome}</p>}
+          {a.parceiroNome && <p className="text-xs text-text-primary/60 truncate mt-0.5">{a.parceiroNome}</p>}
         </div>
         <div className="flex gap-1 shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => onEdit(a)} aria-label="Editar assinatura" className="text-text-primary/40 hover:text-primary hover:bg-primary/10">
+          <Button variant="ghost" size="icon" onClick={() => onEdit(a)} aria-label="Editar assinatura" className="text-text-primary/60 hover:text-primary hover:bg-primary/10">
             <Pencil className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => onDelete(a.id)} aria-label="Remover assinatura" className="text-text-primary/40 hover:text-error hover:bg-error/10">
+          <Button variant="ghost" size="icon" onClick={() => onDelete(a.id)} aria-label="Remover assinatura" className="text-text-primary/60 hover:text-error hover:bg-error/10">
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
@@ -283,18 +288,18 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
 
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-[10px] text-text-primary/40 uppercase tracking-wider">
+          <p className="text-xs text-text-primary/60 uppercase tracking-wider">
             {a.cartaoCreditoNome ? 'Cobrança dia' : 'Vence dia'}
           </p>
           <p className="text-lg font-bold text-text-primary font-display">{a.diaVencimento}</p>
           {a.cartaoCreditoNome && (
-            <p className="text-[10px] text-primary/70 mt-0.5">{a.cartaoCreditoNome}</p>
+            <p className="text-xs text-primary/70 mt-0.5">{a.cartaoCreditoNome}</p>
           )}
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-text-primary/40 uppercase tracking-wider">Por mês</p>
+          <p className="text-xs text-text-primary/60 uppercase tracking-wider">Por mês</p>
           <p className="text-lg font-bold text-primary font-display">R$ {brl(a.valor)}</p>
-          <p className="text-[10px] text-text-primary/30">R$ {brl(custoDiario)}/dia</p>
+          <p className="text-xs text-text-primary/60">R$ {brl(custoDiario)}/dia</p>
         </div>
       </div>
 
@@ -307,7 +312,7 @@ function AssinaturaCard({ a, onEdit, onDelete }) {
             <Badge variant="info">Cartão</Badge>
           )}
         </div>
-        <span className="text-[10px] text-text-primary/40">{a.categoriaDescricao}</span>
+        <span className="text-xs text-text-primary/60">{a.categoriaDescricao}</span>
       </div>
     </div>
   );

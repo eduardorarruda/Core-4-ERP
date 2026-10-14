@@ -5,16 +5,29 @@ global:
 rule_files:
   - "alert_rules.yml"
 
+# Alertas → Alertmanager (serviço `alertmanager` do compose, rede `monitoring`).
+# Os destinatários (e-mail/webhook) ficam em core4erp/monitoring/alertmanager/ e vêm do .env.
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
+        - targets: ['alertmanager:9093']
 
 scrape_configs:
+  # Backend: o Actuator roda na porta de GESTÃO 8081 (management.server.port), que NÃO é
+  # publicada no host nem roteada pelo nginx — só é alcançável na rede docker `monitoring`.
+  # Por isso o scrape é sem token (o isolamento é de rede, não de credencial).
   - job_name: 'core4erp'
     metrics_path: '/actuator/prometheus'
     scrape_interval: 10s
     static_configs:
-      - targets: ['backend:8080']
-    # Se protegido por token JWT ADMIN, descomente e preencha:
-    # bearer_token: 'seu-token-aqui'
+      - targets: ['backend:8081']
+        labels:
+          service: 'backend'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']

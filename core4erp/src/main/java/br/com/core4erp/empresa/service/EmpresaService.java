@@ -1,6 +1,10 @@
 package br.com.core4erp.empresa.service;
 
+import br.com.core4erp.config.rbac.EscaladaPrivilegioValidator;
 import br.com.core4erp.config.rbac.PermissaoCalculadora;
+import br.com.core4erp.config.rbac.Requer;
+import br.com.core4erp.config.security.EventoSeguranca;
+import br.com.core4erp.config.tenant.PermissaoCacheService;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.empresa.dto.*;
 import br.com.core4erp.empresa.entity.*;
@@ -9,7 +13,6 @@ import br.com.core4erp.exception.AcessoNegadoException;
 import br.com.core4erp.exception.BusinessException;
 import br.com.core4erp.usuario.entity.Usuario;
 import br.com.core4erp.usuario.repository.UsuarioRepository;
-import com.github.benmanes.caffeine.cache.Cache;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -33,7 +36,8 @@ public class EmpresaService {
     private final UsuarioRepository usuarioRepository;
     private final PermissaoCalculadora permissaoCalculadora;
     private final TenantContext tenantCtx;
-    private final Cache<String, Set<String>> permissaoCache;
+    private final PermissaoCacheService permissaoCacheService;
+    private final PerfilAtribuicaoService perfilAtribuicaoService;
 
     public List<EmpresaResumoDto> minhas(String email) {
         return usuarioEmpresaRepository.findByUsuario_EmailAndAtivoTrue(email)
@@ -73,7 +77,7 @@ public class EmpresaService {
 
         empresa = empresaRepository.save(empresa);
 
-        PerfilAcesso proprietario = perfilAcessoRepository.findByNome("PROPRIETARIO")
+        PerfilAcesso proprietario = perfilAcessoRepository.findByNomeAndEmpresaIdIsNull("PROPRIETARIO")
             .orElseThrow(() -> new IllegalStateException("Perfil PROPRIETARIO não encontrado"));
 
         UsuarioEmpresa ue = new UsuarioEmpresa();
@@ -85,6 +89,7 @@ public class EmpresaService {
         return EmpresaResponseDto.from(empresa);
     }
 
+    @Requer("CONFIGURACAO_EDITAR") // defense-in-depth: o controller também exige
     @Transactional
     public EmpresaResponseDto atualizar(Long id, EmpresaRequestDto dto) {
         validarAcesso(id);
@@ -99,15 +104,16 @@ public class EmpresaService {
 
     // Gestão de membros
 
+    @Requer("USUARIO_VISUALIZAR")
     public Page<MembroResponseDto> listarMembros(Pageable pageable) {
         return usuarioEmpresaRepository.findByEmpresaIdAndAtivoTrue(tenantCtx.getEmpresaId(), pageable)
             .map(MembroResponseDto::from);
     }
 
+    @Requer("USUARIO_CONVIDAR")
     @Transactional
     public MembroResponseDto convidarMembro(ConvidarMembroRequestDto dto) {
-        PerfilAcesso perfil = perfilAcessoRepository.findById(dto.perfilId())
-            .orElseThrow(() -> new EntityNotFoundException("Perfil não encontrado"));
+        PerfilAcesso perfil = perfilAtribuicaoService.resolverParaAtribuir(dto.perfilId());
 
         Usuario usuario = findUsuarioByEmail(dto.email());
 
@@ -125,26 +131,43 @@ public class EmpresaService {
         return MembroResponseDto.from(usuarioEmpresaRepository.save(ue));
     }
 
+    @Requer("USUARIO_EDITAR")
     @Transactional
     public MembroResponseDto alterarPerfil(Long usuarioId, AlterarPerfilRequestDto dto) {
+        perfilAtribuicaoService.bloquearAutoAlteracao(usuarioId);
         UsuarioEmpresa ue = buscarMembro(usuarioId);
         validarNaoEhProprietario(ue);
 
-        PerfilAcesso novoPerfil = perfilAcessoRepository.findById(dto.perfilId())
-            .orElseThrow(() -> new EntityNotFoundException("Perfil não encontrado"));
-        ue.setPerfil(novoPerfil);
-
+        PerfilAcesso novoPerfil = perfilAtribuicaoService.resolverParaAtribuir(dto.perfilId());
+        String perfilAnterior = ue.getPerfil().getNome();
+        // Invalidar ANTES de persistir (e de novo após o commit)
         invalidarCache(ue.getUsuario().getEmail());
-        return MembroResponseDto.from(usuarioEmpresaRepository.save(ue));
+        ue.setPerfil(novoPerfil);
+        MembroResponseDto resposta = MembroResponseDto.from(usuarioEmpresaRepository.save(ue));
+        EventoSeguranca.info(EventoSeguranca.PERFIL_ALTERADO)
+            .addKeyValue("usuarioId", tenantCtx.getUsuarioId())
+            .addKeyValue("empresaId", tenantCtx.getEmpresaId())
+            .addKeyValue("alvoUsuarioId", usuarioId)
+            .addKeyValue("perfilAnterior", perfilAnterior)
+            .addKeyValue("perfilNovo", novoPerfil.getNome())
+            .log("Perfil de acesso de membro alterado");
+        return resposta;
     }
 
+    @Requer("USUARIO_REMOVER")
     @Transactional
     public void removerMembro(Long usuarioId) {
+        perfilAtribuicaoService.bloquearAutoAlteracao(usuarioId);
         UsuarioEmpresa ue = buscarMembro(usuarioId);
         validarNaoEhProprietario(ue);
+        invalidarCache(ue.getUsuario().getEmail());
         ue.setAtivo(false);
         usuarioEmpresaRepository.save(ue);
-        invalidarCache(ue.getUsuario().getEmail());
+        EventoSeguranca.info(EventoSeguranca.MEMBRO_REMOVIDO)
+            .addKeyValue("usuarioId", tenantCtx.getUsuarioId())
+            .addKeyValue("empresaId", tenantCtx.getEmpresaId())
+            .addKeyValue("alvoUsuarioId", usuarioId)
+            .log("Membro removido da empresa");
     }
 
     // Helpers
@@ -156,7 +179,7 @@ public class EmpresaService {
 
     private Usuario findUsuarioByEmail(String email) {
         return usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado: " + email));
+            .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado."));
     }
 
     private UsuarioEmpresa buscarMembro(Long usuarioId) {
@@ -166,7 +189,7 @@ public class EmpresaService {
     }
 
     private void validarNaoEhProprietario(UsuarioEmpresa ue) {
-        if ("PROPRIETARIO".equals(ue.getPerfil().getNome())) {
+        if (EscaladaPrivilegioValidator.PERFIL_PROPRIETARIO.equals(ue.getPerfil().getNome())) {
             throw new BusinessException("OPERACAO_INVALIDA", "Não é possível alterar o proprietário da empresa");
         }
     }
@@ -176,11 +199,12 @@ public class EmpresaService {
             .findByUsuarioIdAndEmpresaIdAndAtivoTrue(tenantCtx.getUsuarioId(), empresaId)
             .isPresent();
         if (!temAcesso) {
-            throw new AcessoNegadoException("Acesso negado à empresa " + empresaId);
+            throw new AcessoNegadoException("Você não tem acesso a esta empresa.");
         }
     }
 
     private void invalidarCache(String email) {
-        permissaoCache.invalidate(email + ":" + tenantCtx.getEmpresaId());
+        // Chave única (hash de email+empresa) — antes usava email + ":" + empresaId e não invalidava nada
+        permissaoCacheService.invalidar(email, tenantCtx.getEmpresaId());
     }
 }

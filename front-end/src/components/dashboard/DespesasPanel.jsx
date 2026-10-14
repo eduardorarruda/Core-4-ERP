@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import BentoCard from '../ui/BentoCard';
 import { brl } from '../../lib/formatters';
 import { chartTheme } from './chartTheme';
+import GraficoAcessivel from '../ui/GraficoAcessivel';
 
 export default function DespesasPanel({ pieData, totalDespesasCat, carregando, isDark }) {
   const { tooltipStyle } = chartTheme(isDark);
@@ -12,7 +13,10 @@ export default function DespesasPanel({ pieData, totalDespesasCat, carregando, i
       loading={carregando}
       title="Despesas por Categoria"
     >
-      <div className="relative w-full max-w-[200px] aspect-square mt-4">
+      <GraficoAcessivel
+        className="relative w-full max-w-[200px] aspect-square mt-4"
+        resumo={`Gráfico de rosca das despesas do mês por categoria, total R$ ${brl(totalDespesasCat)}. ${pieData.map((d) => `${d.name}: R$ ${brl(d.value)}`).join('; ')}.`}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie data={pieData} cx="50%" cy="50%" innerRadius="62%" outerRadius="82%" paddingAngle={5} dataKey="value" stroke="none">
@@ -25,9 +29,9 @@ export default function DespesasPanel({ pieData, totalDespesasCat, carregando, i
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-xl font-bold text-primary font-display">R$ {brl(totalDespesasCat)}</span>
-          <span className="text-xs text-text-primary/50 uppercase font-bold tracking-tighter">Mês Atual</span>
+          <span className="text-xs text-text-primary/70 uppercase font-bold tracking-tighter">Mês Atual</span>
         </div>
-      </div>
+      </GraficoAcessivel>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 w-full mt-8">
         {pieData.map((entry) => (
           <div key={entry.name} className="flex items-center gap-2 min-w-0" title={entry.name}>

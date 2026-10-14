@@ -35,4 +35,13 @@ public interface UsuarioEmpresaRepository extends JpaRepository<UsuarioEmpresa, 
 
     @EntityGraph(attributePaths = {"usuario", "perfil", "perfil.permissoes"})
     Page<UsuarioEmpresa> findByEmpresaId(Long empresaId, Pageable pageable);
+
+    boolean existsByPerfilId(Long perfilId);
+
+    /** Todos os vínculos do usuário (ativos e inativos) — exportação/exclusão de conta (LGPD). */
+    @EntityGraph(attributePaths = {"empresa", "perfil"})
+    List<UsuarioEmpresa> findByUsuarioId(Long usuarioId);
+
+    /** Membros ativos da empresa exceto o usuário informado. */
+    long countByEmpresaIdAndAtivoTrueAndUsuarioIdNot(Long empresaId, Long usuarioId);
 }

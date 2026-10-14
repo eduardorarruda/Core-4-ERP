@@ -15,6 +15,8 @@ import { FileText, ChevronUp, ChevronDown } from 'lucide-react';
  * - onRowClick:  callback ao clicar/ativar uma linha (acessível por teclado)
  * - keyExtractor: (row) => key única
  * - className:   classes extras no wrapper
+ * - caption:     título da tabela para leitores de tela (vira <caption> oculto e rótulo da lista em cards)
+ * - ariaLabel:   rótulo alternativo (também aceita a prop `aria-label`)
  *
  * Responsividade (aditivo, retrocompatível):
  * - Por padrão o componente é AUTOMÁTICO por breakpoint: renderiza a tabela em
@@ -42,7 +44,11 @@ export default function DataTable({
   renderCard,
   keyExtractor,
   serverSort = false,
+  caption,
+  ariaLabel,
+  'aria-label': ariaLabelAttr,
 }) {
+  const rotulo = ariaLabel ?? ariaLabelAttr ?? caption ?? 'Tabela de dados';
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
 
@@ -136,7 +142,7 @@ export default function DataTable({
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               {columns.map((col) => (
                 <div key={col.key} className={cn('min-w-0', col.className)}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-primary/40 mb-0.5">{col.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60 mb-0.5">{col.label}</p>
                   <div className="text-sm text-text-primary">
                     {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
                   </div>
@@ -152,7 +158,8 @@ export default function DataTable({
   const renderTable = (wrapperClass) => (
     <div className={cn('rounded-2xl overflow-hidden border border-text-primary/5', wrapperClass)}>
       <div className="overflow-x-auto">
-        <table className="w-full" aria-label="Tabela de dados">
+        <table className="w-full" aria-label={caption ? undefined : rotulo}>
+          {caption && <caption className="sr-only">{caption}</caption>}
           <thead className="bg-surface-medium backdrop-blur-sm">
             <tr>
               {columns.map((col) => {
@@ -166,7 +173,7 @@ export default function DataTable({
                     scope="col"
                     aria-sort={ariaSort}
                     className={cn(
-                      'px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-text-primary/50 whitespace-nowrap',
+                      'px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-text-primary/70 whitespace-nowrap',
                       col.className
                     )}
                   >

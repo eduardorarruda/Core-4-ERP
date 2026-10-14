@@ -14,7 +14,7 @@ export default function ReportFilters({ config = [], values, onChange, open, onT
         try {
           const opts = await f.fetchFn();
           setAsyncOptions(prev => ({ ...prev, [f.key]: opts }));
-        } catch (_) {
+        } catch {
           // Não engolir a falha: avisa o usuário para que ele saiba que o filtro
           // pode estar incompleto, em vez de mostrar uma lista vazia silenciosa.
           onError?.(`Não foi possível carregar as opções do filtro "${f.label}". Tente reabrir os filtros.`);
@@ -37,7 +37,7 @@ export default function ReportFilters({ config = [], values, onChange, open, onT
         <SlidersHorizontal className="w-3.5 h-3.5" />
         Filtros
         {activeCount > 0 && (
-          <span className="ml-1 bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+          <span className="ml-1 bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-xs font-bold">
             {activeCount}
           </span>
         )}

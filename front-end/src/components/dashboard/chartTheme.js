@@ -20,7 +20,8 @@ export function readCssVar(name, fallback = '') {
  */
 export function chartTheme(isDark) {
   const gridColor = readCssVar('--color-surface-high', isDark ? '#2A2A2A' : '#D4D4D8');
-  const axisColor = readCssVar('--color-surface-highest', isDark ? '#52525b' : '#71717a');
+  // Texto dos eixos precisa de contraste (WCAG 1.4.3); antes usava a cor de superfície
+  const axisColor = readCssVar('--color-chart-axis', isDark ? '#A1A1AA' : '#52525B');
   const tooltipBg = readCssVar('--color-surface-medium', isDark ? '#1C1B1B' : '#FFFFFF');
   const tooltipTextColor = readCssVar('--color-text-primary', isDark ? '#FAFAFA' : '#18181B');
 

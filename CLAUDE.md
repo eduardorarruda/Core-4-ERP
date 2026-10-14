@@ -44,17 +44,17 @@ Sistema ERP de gestão financeira pessoal full-stack. Permite controle de contas
 | Componente | Tecnologia | Versão |
 |---|---|---|
 | Linguagem | Java | 21 |
-| Framework | Spring Boot | 3.3.2 |
+| Framework | Spring Boot | 3.5.16 |
 | Build | Gradle | 8.10.2 |
-| ORM | Spring Data JPA + Hibernate | via Boot 3.3.2 |
+| ORM | Spring Data JPA + Hibernate | via Boot 3.5.16 |
 | Banco de Dados | PostgreSQL | 15+ |
-| Migrations | Flyway | via Boot 3.3.2 |
-| Autenticação | JWT (JJWT) | 0.12.6 |
-| IA | Spring AI + OpenAI | gpt-4o-mini |
-| Docs API | SpringDoc OpenAPI | 2.6.0 |
-| Rate Limiting | Bucket4j | 8.7.0 |
+| Migrations | Flyway | via Boot 3.5.16 (configurado em `PrimaryJpaConfig`, lê `spring.flyway.*`) |
+| Autenticação | JWT (JJWT) | 0.12.7 |
+| IA | Spring AI + OpenAI + Qdrant (RAG) | 1.1.8 · gpt-4o-mini |
+| Docs API | SpringDoc OpenAPI | 2.8.x (desligado em `prod`) |
+| Rate Limiting | Bucket4j | 8.10.1 |
 | Cache | Caffeine | via Boot |
-| Relatórios Excel | Apache POI | 5.3.0 |
+| Relatórios Excel | Apache POI | 5.5.1 |
 | Métricas | Micrometer + Prometheus | via Boot |
 
 ### Frontend
@@ -62,9 +62,9 @@ Sistema ERP de gestão financeira pessoal full-stack. Permite controle de contas
 |---|---|---|
 | Linguagem | JavaScript (JSX) | ES2022+ |
 | Framework | React | 19.0.0 |
-| Build | Vite | 6.2.0 |
+| Build | Vite | 6.4.x |
 | Estilização | Tailwind CSS | 4.1.14 |
-| Roteamento | React Router DOM | 7.13.2 |
+| Roteamento | React Router DOM | 7.18.x |
 | Ícones | Lucide React | latest |
 | Animações | Motion | latest |
 | Gráficos | Recharts | 3.8.1 |
@@ -75,7 +75,8 @@ Sistema ERP de gestão financeira pessoal full-stack. Permite controle de contas
 ### Infraestrutura
 - Docker + Docker Compose (multi-stage builds)
 - Nginx (serve SPA + proxy `/api/` → backend)
-- Observabilidade: Prometheus, Grafana, Loki, Promtail
+- Observabilidade: Prometheus + Alertmanager, Grafana, Loki + Promtail (logs JSON do stdout), traces OTel → Painel EBPÓS
+- n8n (orquestração opcional da Áurea) + Qdrant (vector store do RAG)
 
 ### Comandos rápidos
 ```bash
@@ -110,7 +111,7 @@ Cada módulo de domínio segue a mesma estrutura interna:
 ```
 
 **Módulos de domínio existentes:**
-`auth`, `usuario`, `empresa`, `categoria`, `parceiro`, `conta`, `contaCorrente`, `cartaoCredito`, `investimento`, `assinatura`, `conciliacao`, `conciliacaoCartao`, `notificacao`, `chat`, `relatorio`, `dashboard`
+`auth`, `usuario`, `empresa`, `categoria`, `parceiro`, `conta`, `contaCorrente`, `cartaoCredito`, `investimento`, `assinatura`, `conciliacao`, `conciliacaoCartao`, `notificacao`, `chat`, `relatorio`, `dashboard`, `busca`, `plano`
 
 **Infraestrutura transversal:**
 ```
@@ -120,11 +121,13 @@ config/
   security/   → JwtService, JwtFilter, SecurityConfig, RateLimitFilter
   tenant/     → TenantContext, TenantFilter
   rbac/       → Requer, PermissaoAspect, PermissaoCalculadora
-  web/        → DataSource, configuração multi-datasource
+  crypto/     → CriptografiaCampos (AES-GCM), IndiceCego (HMAC), CampoCriptografadoConverter, MigradorCriptografiaCampos
+  observabilidade/ → RequestContextFilter (requestId/ip no MDC + access log), FiltroFormatoLog
+  web/        → CorsConfig, OpenApiConfig
+  PrimaryJpaConfig → DataSource/Hikari, Flyway (lê spring.flyway.*) e EntityManagerFactory
 enums/        → enumerações globais
 exception/    → GlobalExceptionHandler + modelos de erro
 utils/        → CNPJ, telefone, contexto de requisição
-observabilidade/ → logging estruturado + métricas Prometheus
 ```
 
 ### Frontend: `front-end/src/`
@@ -144,8 +147,12 @@ lib/          → utilitários puros (api.js, formatters.js, pdfUtils.js, permis
 
 **Arquivos-chave do frontend:**
 ```
-src/hooks/useAuth.js         — hook central: temPermissao(), adminSistema, senhaProvisoria, logout
+src/context/AuthContext.jsx  — AuthProvider: fonte única do estado de auth + UM polling de permissões (pausa com a aba oculta)
+src/hooks/useAuth.js         — hook de leitura: temPermissao(), adminSistema, senhaProvisoria, logout
 src/lib/api.js               — fetch com credentials:include; getLoginState() com try-catch
+src/lib/safeUrl.js           — valida href vindo de dados (IA/cadastros): só relativo, http(s), mailto
+src/views/Privacidade.jsx, Termos.jsx — páginas públicas /privacidade e /termos (LGPD; versão aceita no registro)
+src/components/ui/GraficoAcessivel.jsx — envolve gráficos Recharts com resumo + tabela sr-only (acessibilidade)
 src/lib/routeUtils.js        — ROUTE_PRIORITY + getFirstAccessibleRoute(temPermissao)
 src/App.jsx                  — AdminRoute, PermissaoRoute, ContaEmpresaRoute, NavigateToFirstAccessible, ProtectedLayout
 src/components/layout/
@@ -273,10 +280,12 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 **Regras de aplicação:**
 - **Defense-in-depth**: `@Requer` deve estar no controller **e** na service.
 - **TenantContext** é `@Scope(REQUEST)` — nunca compartilhado entre requisições.
-- **Cache de permissões**: Caffeine cache com chave `Objects.hash(email, empresaId)` (hex). Invalidar **antes** de persistir mudanças.
+- **Cache de permissões**: sempre via `PermissaoCacheService` (chave `Objects.hash(email, empresaId)` em hex; `invalidar(email, empresaId)` / `invalidarTodos()` — invalida antes de persistir e de novo após o commit). Nunca acessar o `Cache` Caffeine direto.
 - **adminSistema bypass**: `exigirPermissao()` retorna imediatamente se `adminSistema=true`.
 - **PROPRIETARIO** nunca pode ter permissões alteradas individualmente.
-- **Escalada de privilégio**: admin não pode conceder permissão que ele mesmo não possui (validado em `UsuarioPermissaoService.validarEscaladaDePrivilegio()`).
+- **Escalada de privilégio**: regra única em `config/rbac/EscaladaPrivilegioValidator` — ninguém concede permissão que não possui (permissão direta, perfil criado/editado ou perfil atribuído). Exceções: adminSistema e PROPRIETARIO (vínculo com o perfil **de sistema** `empresa_id IS NULL`).
+- **Atribuição de perfil**: sempre via `PerfilAtribuicaoService.resolverParaAtribuir()` (perfil do sistema ou da própria empresa — `findAtribuivelNaEmpresa`, nunca `findById`; nunca PROPRIETARIO) e `bloquearAutoAlteracao()` (ninguém altera/remove o próprio vínculo).
+- Nomes de perfis do sistema são reservados (criar **e** renomear); perfil em uso (membro ou convite pendente) não pode ser excluído (409).
 
 **Rotas frontend:**
 - `/admin/planos` → `AdminRoute`
@@ -301,15 +310,25 @@ DASHBOARD_CARTAO_VISUALIZAR                        ← V31 (GET /api/dashboard/s
 
 ## 5. Autenticação e Segurança
 
-- JWT armazenado em **HttpOnly cookie** (não no localStorage) — imune a XSS.
-- Algoritmo: HS256. Segredo via variável de ambiente `SECRET_KEY` (mínimo 64 caracteres).
-- Rate limiting via Bucket4j: 10 tentativas por IP por minuto em `/api/auth/login`.
-  - `RateLimitFilter.shouldNotFilter()` retorna `false` para `/api/auth/login` — o rate limit **já está ativo**.
-- Login com lockout após tentativas falhas (`V7__add_login_lockout.sql`).
-- Password reset via token com validade (gerenciado por `V12__add_reset_token.sql`).
-- CORS configurado via `CORS_ORIGINS` no `.env`.
+- JWT armazenado em **HttpOnly cookie** `access_token` (não no localStorage); `Authorization: Bearer` só como fallback (n8n).
+- **Assinatura (`JwtService`)**: com `JWT_PRIVATE_KEY` + `JWT_PUBLIC_KEY` (PEM PKCS#8/X.509) usa **EdDSA (Ed25519)** ou **ES256 (P-256)**; sem elas, HMAC com `SECRET_KEY` (WARN em `prod`). O parser aceita **só o algoritmo configurado** (sem alg confusion / `none`).
+- **Claims**: `sub` (e-mail), `tv` (versão de token), `jti`, `iat`, `exp`. Token legado sem `tv` = versão 0.
+- **Revogação**: `tb_usuario.token_version` (V45). `JwtFilter` compara `tv` com a versão do usuário (`SessaoUsuarioService`, Caffeine 30 s, invalidado na mudança e após o commit). Incrementam a versão: troca de senha (`PATCH /api/auth/senha` reemite o cookie), redefinição de senha, `POST /api/auth/logout-todos` e exclusão de conta. `POST /api/auth/logout` só limpa o cookie (este dispositivo).
+- **Senha**: BCrypt custo 12. Todo DTO que CRIA senha (registro, troca, redefinição, aceite de convite) usa `@SenhaForte` (`auth/validation`): 8–72 caracteres com maiúscula, minúscula e número (72 = limite do BCrypt, CVE-2025-22228); espelhada em `front-end/src/lib/senha.js`. Troca de senha **só** por `PATCH /api/auth/senha` (exige a atual) — `PUT /api/auth/perfil` altera apenas nome/foto. Token de reset guardado como **hash SHA-256** (V49), comparado em tempo constante.
+- **Senha provisória (backend)**: `SenhaProvisoriaFilter` responde 403 `{codigo:"SENHA_PROVISORIA"}` em todo `/api/**`, exceto `/api/auth/me`, `/me/permissoes`, `/senha`, `/logout`, `/trocar-empresa`.
+- **Não autenticado** → 401 JSON `NAO_AUTENTICADO` (front redireciona ao login).
+- **CSRF (defesa em profundidade)**: cookie `SameSite=Lax` + `OrigemRequisicaoFilter` — POST/PUT/PATCH/DELETE em `/api/**` com o cookie exigem `Origin`/`Referer` na allowlist do `CORS_ORIGINS`. Bearer sem cookie não é afetado.
+- **IP do cliente**: sempre via `ClientIpResolver` — com `TRUSTED_PROXY=true` usa `CF-Connecting-IP` → `X-Real-IP` → `remoteAddr`; **nunca** o `X-Forwarded-For` mais à esquerda. O nginx (módulo realip) só aceita o `CF-Connecting-IP` vindo do `cloudflared` (IP fixo `172.31.10.10` na rede `edge`) e **sobrescreve** `CF-Connecting-IP`/`X-Real-IP`/`X-Forwarded-For` com o IP resolvido.
+- **CORS**: origem fora do `CORS_ORIGINS` → 403 JSON `ORIGEM_NAO_PERMITIDA` (`CorsProcessorJson`), não texto puro.
+- **Rate limiting (Bucket4j)**: login/registro 10/min por IP; esqueci/redefinir senha, convite (`/convite/**`, `aceitar-convite`), `PATCH /senha`, `DELETE /me` e `POST /api/empresas`: 5 a cada 15 min por IP e rota; chat 30/min; upload OFX 10/h.
+- **Login**: toda recusa é o mesmo 401 genérico (senha errada, e-mail inexistente, conta bloqueada) — sem enumeração; o bloqueio vira evento `LOGIN_BLOQUEADO`. Bloqueio do dia a dia é por **(e-mail + IP)** em memória (`TentativasLoginService`, Caffeine): 5 falhas → 1 min, dobrando até 15 min — atacante em outro IP não tranca o dono. Bloqueio por conta no banco só como rede de segurança (`AuthService.MAX_FALHAS_CONTA` = 20, 15 min). `noRollbackFor` no `login` (sem isso o contador do banco era revertido).
+- **Actuator só na porta de gerenciamento 8081** (rede interna do compose; `health`, `prometheus`). A porta 8080 nega `/actuator/**`. Healthcheck/Prometheus devem usar a 8081.
+- **Registro e aceite de convite exigem** `aceiteTermos=true` + `versaoTermos` (LGPD art. 8º) → `termos_aceitos_em`/`termos_versao`.
+- **LGPD**: `GET /api/auth/me/dados` (exportação JSON) e `DELETE /api/auth/me` `{senha}` (anonimiza; 409 se for PROPRIETARIO de empresa com outros membros ativos; dados financeiros da empresa são mantidos).
+- **Eventos de segurança**: `EventoSeguranca` (logger `br.com.core4erp.seguranca`, API fluente com `evento=...`): login sucesso/falha/bloqueio, registro, senha, logout-todos, token revogado, permissão negada, escalada negada, cross-tenant, admin via `X-Empresa-Id`, perfil/permissão/membro, convite, exportação, exclusão. E-mail só como `EventoSeguranca.hashEmail()`. MDC: `usuarioId`/`empresaId` (Jwt/TenantFilter), `requestId`/`ip` (`RequestContextFilter`).
+- Auto-cadastro sempre recebe `ROLE_USER` (V46 normalizou); o poder do dono vem do perfil PROPRIETARIO, não de role global.
 - **Nunca expor o `usuarioId` em URLs públicas** — use sempre o JWT como fonte da identidade.
-- `X-Empresa-Id` header: para usuários regulares é validado via `findByUsuario_EmailAndEmpresaId` (HTTP 403 se não pertencer); para `adminSistema` sem validação de membership, mas logado em `DEBUG`.
+- `X-Empresa-Id`: usuário regular validado via `findByUsuario_EmailAndEmpresaId` (403 JSON se não pertencer); `adminSistema` sem validação de membership, registrado como evento `ADMIN_ACESSO_EMPRESA`.
 
 ---
 
@@ -351,7 +370,8 @@ tb_convite
 - `spring.jpa.hibernate.ddl-auto=validate` — DDL gerenciado exclusivamente pelo Flyway.
 - Ao adicionar coluna NOT NULL em tabela existente, forneça DEFAULT ou faça em 2 migrations.
 - Descrição no nome do arquivo deve ser legível: `V30__add_campo_observacao_conta.sql`
-- **Próxima migration disponível: V45** (V44 `create_tb_rag_sync` já aplicada em 2026-07).
+- **Próxima migration disponível: V52** (conferir a pasta antes de criar).
+- Flyway é configurado em código (`PrimaryJpaConfig`, o `FlywayAutoConfiguration` está excluído) mas **lê `spring.flyway.*`**: dev é tolerante (`out-of-order=true`, `ignore-migration-patterns=*:missing`); `prod` é estrito (`out-of-order=false`, `*:future`).
 
 **Sequência de migrations:**
 ```
@@ -397,9 +417,32 @@ V41     create_tb_chat_conversa
 V42     add_categoria_pai_e_soft_delete   (subcategorias: categoria_pai_id + ativo)
 V43     add_classificacao_ia              (flags classificada_por_ia/confianca_ia em conta e lançamento)
 V44     create_tb_rag_sync                (estado incremental da vetorização RAG)
+V45     add_token_version_e_consentimento_usuario (token_version, termos_aceitos_em, termos_versao)
+V46     normalizar_role_usuarios          (ROLE_USER para todo não-adminSistema)
+V47     criptografia_campos_sensiveis     (CPF/CNPJ, CNPJ, nº conta/agência → VARCHAR(255) + colunas *_hash)
+V48     indices_fk_quentes
+V49     reset_token_hash                  (reset_token passa a ser SHA-256; invalida pendentes)
+V50     add_tipo_notificacao_membro_adicionado
+V51     criptografia_dados_bancarios_ofx  (agência/conta do OFX, acct_id do cartão + acct_id_ofx_hash)
 ```
 
-Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` e `tb_log_performance`.
+Não existe banco de log: os logs vão para o stdout (ver §10).
+
+### Criptografia de campos em repouso (V47/V51)
+
+- **Cifrados (AES-256-GCM, `v1:<base64>`, `@Convert(CampoCriptografadoConverter)`)**: `tb_parceiro.cpf_cnpj`,
+  `tb_empresa.cnpj`, `tb_conta_corrente.numero_conta`/`agencia`, `tb_cartao_credito.acct_id_ofx`,
+  `tb_conciliacao.agencia`/`numero_conta_ofx`, `tb_conciliacao_cartao.acct_id_ofx`.
+- **Índice cego (HMAC-SHA256, `IndiceCego`)** para busca exata/unicidade: `cpf_cnpj_hash`, `cnpj_hash`,
+  `numero_conta_hash` (casa o OFX com a conta corrente), `acct_id_ofx_hash` (casa o OFX com o cartão). O
+  setter da entidade mantém o hash; repositórios buscam por `*Hash` (`buscarPorNumeroConta`, `buscarPorAcctIdOfx`).
+- **Nunca** usar coluna cifrada em `WHERE`/`LIKE`/`ORDER BY`: o valor muda a cada gravação. Busca **parcial** por
+  CPF/CNPJ no banco não funciona mais (só exata via hash) e ordenar parceiros por `cpfCnpj` foi removido da whitelist
+  (`ParceiroService.CAMPOS_ORDENAVEIS`); filtros parciais são feitos no front sobre o valor já decifrado.
+- Chaves `DATA_ENCRYPTION_KEY` / `DATA_HMAC_KEY` (32 bytes base64, obrigatórias — fail fast). **Perder ou trocar a chave
+  sem re-cifrar = dados ilegíveis/índices inúteis, de forma irreversível.** Guardar fora do servidor.
+- Legado em texto puro é cifrado na subida por `MigradorCriptografiaCampos` (idempotente pelo prefixo `v1:`;
+  `CRYPTO_MIGRAR_NA_SUBIDA=false` desliga). Nova coluna cifrada = migration + entrada em `MigradorCriptografiaCampos.alvos()`.
 
 ### Categorias hierárquicas + classificação por IA (V42–V44, 2026-07)
 
@@ -444,7 +487,8 @@ Banco de log (`db/migration-log/`) tem migrations separadas para `tb_log_geral` 
 ### Tratamento de Erros
 - `GlobalExceptionHandler` (`@RestControllerAdvice`) centraliza todos os erros.
 - Nunca lance exceções genéricas — use `ResponseStatusException` ou crie exceções de domínio específicas.
-- Resposta de erro padrão: `{ "status": 4xx, "mensagem": "...", "timestamp": "..." }`
+- Resposta de erro padrão: `{ "codigo": "...", "mensagem": "...", "timestamp": "..." }` (`ErrorResponseDto`).
+- Erros de requisição do cliente nunca viram 500: JSON malformado/corpo ausente, parâmetro ausente ou de tipo errado → 400 `REQUISICAO_INVALIDA` (log WARN); método errado → 405; `Content-Type` errado → 415; rota inexistente → 404.
 - Validações de entrada: use Bean Validation (`@NotNull`, `@NotBlank`, `@NotEmpty`, `@Valid`) nos DTOs. Use `@NotEmpty` para `Collection` e `Set` — `@NotNull` não impede coleções vazias.
 
 ### Mensagens ao Usuário — Regra de Clareza
@@ -581,24 +625,33 @@ O assistente usa **Spring AI com OpenAI (gpt-4o-mini)** e um padrão de **tools*
 ### Estrutura de Tools
 ```
 chat/tools/
-  consulta/   → tools de leitura (saldos, lançamentos, categorias)
-  lancamento/ → tools de escrita (criar conta, parceiro, etc.)
-  relatorio/  → tools de geração de relatório
+  consulta/   → tools de leitura (prefixo `consultar*`)
+  cadastro/   → cadastros (categoria, parceiro…)
+  lancamento/ → contas a pagar/receber: criar, editar, baixar, estornar, excluir
+  gestao/     → conta corrente, cartão, lançamento de cartão, assinatura, categoria, parceiro, investimento (inclui exclusões)
+  relatorio/  → geração de relatório (prefixo `gerarRelatorio*`)
 ```
 
-- Cada tool é um `@Component` com métodos anotados com `@Tool`.
+- Cada tool é um `@Component` com métodos anotados com `@Tool`; os services chamados têm `@Requer` (RBAC vale também para a IA).
 - Tools de escrita devem revalidar o `usuarioId` do contexto de segurança.
-- Cache de histórico de conversa via Caffeine (em memória, por sessão).
+- Histórico por conversa persistido em banco (`ChatMemoryService`); ver §23 para exclusões e prompt injection.
 - Métricas de uso do chat em `chat/metrics/`.
 
 ---
 
 ## 10. Módulo de Observabilidade
 
-- `PerformanceMetricsFilter` — filtro mais externo; gera `requestId`; grava `tb_log_performance` por requisição.
-- `DatabaseLogAppender` (Logback) — enfileira logs em `LinkedBlockingQueue(1000)`; drena em batch a cada 500ms.
-- `LogQueueConsumer` — consome a fila e persiste em `tb_log_geral` com `saveAll()`.
-- MDC propagado: `requestId`, `usuarioId`, `empresaId`, `ipAddress`, `httpMethod`, `endpoint`.
+- **Logs só no stdout** (`logback-spring.xml`, 12-factor): `LOG_FORMAT=json` → JSON **ECS** nativo do Boot 3.5
+  (`@timestamp` UTC, MDC e pares `addKeyValue` como campos); `texto` em dev. Perfil `prod`/compose força JSON.
+  Docker → **promtail** → **Loki** (retenção no Loki) → Grafana. Não há appender de banco nem `tb_log_*`.
+- `RequestContextFilter` (`config/observabilidade`, precedência máxima): `X-Request-Id` validado ou UUID novo
+  (devolvido no response), MDC `requestId` e `ip` (via regra do `TRUSTED_PROXY`), uma linha de access log por
+  requisição (sem query string; ignora `/actuator`). `JwtFilter`/`TenantFilter` acrescentam `usuarioId`/`empresaId`.
+- Eventos de segurança: logger dedicado `br.com.core4erp.seguranca` (`EventoSeguranca`, campo `evento=...`) — base
+  de alertas/consultas no Loki. Use `log.atWarn().addKeyValue("evento", ...)` para eventos estruturados.
+- Métricas: Actuator/Micrometer na porta de gerenciamento 8081 → **Prometheus** (`monitoring/prometheus.yml`,
+  regras em `alert_rules.yml`) → **Alertmanager** (e-mail `ALERT_EMAIL_TO`/SMTP e/ou `ALERT_WEBHOOK_URL`).
+- LGPD: nunca logar e-mail (use `hashEmail`), CPF/CNPJ, tokens, conteúdo de mensagens/anexos.
 
 ### Traces distribuídos → Painel EBPÓS (nmon) — OpenTelemetry
 
@@ -669,11 +722,25 @@ Todas definidas no `.env` (root). Nunca hardcode valores de configuração no c�
 | `TOKEN_EXPIRATION` | Validade do JWT em ms (default: 7 dias) |
 | `CORS_ORIGINS` | Origins permitidas pelo CORS |
 | `OPENAI_API_KEY` | Chave da API OpenAI |
-| `MAIL_ENABLED` | Liga/desliga envio de email |
+| `MAIL_ENABLED` | Liga/desliga envio de email (`app.mail.enabled`) e o health do SMTP (`management.health.mail.enabled`). `false`: não envia; fora de `prod` o link de reset/convite vai para o log INFO (demo) |
+| `OPENAI_EMBEDDING_DIMENSIONS` | Dimensão da coleção do Qdrant (default 1536). A coleção + índice `empresaId` são criados na subida pelo `QdrantColecaoInicializador` (sem chamar a OpenAI; `initialize-schema=false`) |
 | `MAIL_HOST/PORT/USERNAME/PASSWORD/FROM` | Config SMTP |
 | `VITE_API_URL` | Base URL do backend (frontend) |
-| `TRUSTED_PROXY=true` | Ativa leitura de `X-Forwarded-For` no `RateLimitFilter` — só em deploy atrás de proxy confiável |
-| `security.cookie.same-site` | `None` (cross-domain) ou `Strict` (same-domain) — default `None` |
+| `TRUSTED_PROXY=true` | `ClientIpResolver` passa a confiar em `CF-Connecting-IP`/`X-Real-IP` — só atrás de proxy confiável (compose já fixa) |
+| `JWT_PRIVATE_KEY` / `JWT_PUBLIC_KEY` | Par PEM Ed25519 ou EC P-256 para JWT assimétrico (opcional; sem ele usa `SECRET_KEY`) |
+| `COOKIE_SAME_SITE` | `security.cookie.same-site`, default `Lax` (CSRF). `None` só se front e API estiverem em **sites** diferentes |
+| `MANAGEMENT_PORT` | Porta do Actuator (default 8081, só rede interna) |
+| `DATA_ENCRYPTION_KEY` / `DATA_HMAC_KEY` | **Obrigatórias.** AES-256 e HMAC dos campos cifrados (`openssl rand -base64 32`). Perda = dados ilegíveis |
+| `CRYPTO_MIGRAR_NA_SUBIDA` | Cifra o legado em texto puro na subida (default `true`, idempotente) |
+| `LOG_FORMAT` | `json` (ECS, produção) ou `texto` (dev, default) |
+| `QDRANT_API_KEY` | **Obrigatória.** API key do Qdrant (backend, n8n e backup) |
+| `N8N_WEBHOOK_SECRET` | **Obrigatória.** Header `X-Webhook-Secret` backend → n8n (sem ela, em `prod` as chamadas ao n8n ficam desligadas) |
+| `N8N_ENCRYPTION_KEY`, `N8N_DB_USER` / `N8N_DB_PASSWORD` | **Obrigatórias** no compose (credenciais do n8n e role Postgres dedicado) |
+| `N8N_WEBHOOK_URL` / `N8N_EVENTOS_WEBHOOK_URL` / `N8N_AUREA_WEBHOOK_URL` | Webhooks rag-ingest / evento / aurea (defaults do compose apontam para `http://n8n:5678`) |
+| `CHAT_ORQUESTRADOR` | `interno` (default) \| `shadow` \| `n8n` |
+| `ALERT_EMAIL_TO`, `ALERT_SMTP_*`, `ALERT_WEBHOOK_URL` | Destinos do Alertmanager |
+
+Lista completa e comentada: `.env.example` (raiz).
 
 ---
 
@@ -719,7 +786,7 @@ O language server do NetBeans não consegue processar Lombok. Todos os erros do 
 
 ### Cache key de permissões
 
-A chave usa `Objects.hash(email, empresaId)` formatado como hex. **Não** usar `email + ":" + empresaId` — emails com `:` causam colisão de chave.
+A chave usa `Objects.hash(email, empresaId)` formatado como hex — use sempre `PermissaoCacheService`. **Não** usar `email + ":" + empresaId` (o `EmpresaService` fazia isso e não invalidava nada).
 
 ### TenantContext.isPopulado()
 
@@ -727,7 +794,7 @@ Retorna `empresaId != null`. O `PermissaoAspect` verifica `isPopulado() || isAdm
 
 ### RateLimitFilter já cobre /api/auth/login
 
-`shouldNotFilter()` retorna `false` para `/api/auth/login` — o rate limit **já está ativo**. O RateLimitFilter usa Bucket4j com 10 tentativas por IP por minuto.
+`shouldNotFilter()` retorna `false` para `/api/auth/login` — o rate limit **já está ativo** (10/min por IP; rotas sensíveis de conta 5/15 min — ver §5). Filtros de segurança usam `RespostaErroJson.caminho(request)` (servletPath + pathInfo) para casar rotas.
 
 ### Hibernate 6 + `@Query` com ORDER BY + Pageable com sort
 
@@ -1005,7 +1072,7 @@ CANCELADA           (terminal — não pode ser reativada)
 ### CNPJ e CPF em Parceiros
 - Validação obrigatória com dígito verificador — nunca aceitar apenas formato `XX.XXX.XXX/XXXX-XX`.
 - CNPJ/CPF são únicos **por empresa** (`empresa_id`), não globalmente — duas empresas diferentes podem cadastrar o mesmo CNPJ.
-- Armazenar apenas dígitos (sem máscara) no banco; formatar na exibição via `formatters.js`.
+- Armazenar apenas dígitos (sem máscara), **cifrado** (ver §6 › Criptografia); unicidade e busca exata via `cpf_cnpj_hash`. Formatar na exibição via `formatters.js`.
 
 ### Formatação de dados sensíveis (LGPD)
 - Emails **nunca** em logs em plaintext — usar `hashEmail(email)` (veja padrão na seção 7).
@@ -1103,9 +1170,8 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 - Temperatura e parâmetros de geração configurados no `ChatClient` — não hardcoded por chamada.
 
 ### Gerenciamento de contexto
-- Histórico de conversa armazenado em **Caffeine cache** (em memória, por `sessionId`).
-- Cache expira após inatividade — ao expirar, nova conversa começa sem histórico anterior.
-- System prompt: estático, definido no `ChatClient` builder — descreve capacidades e restrições do assistente.
+- Histórico persistido por conversa (`tb_chat_conversa`/`tb_chat_mensagem`, `ChatMemoryService`): contexto = últimas 20 mensagens, teto 8.000 chars.
+- System prompt montado por `SystemPromptBuilder` — capacidades, regras de confirmação e de conteúdo não confiável.
 - User prompt: dinâmico, inclui mensagem do usuário + resultado das tools invocadas.
 - **Nunca incluir dados de outros usuários no contexto** — sempre filtrar por `usuarioId` antes de passar dados ao modelo.
 
@@ -1117,10 +1183,43 @@ O projeto **não usa envelope genérico** — cada endpoint retorna `ResponseEnt
 - Resultado de tools deve ser validado antes de repassar ao agente — se retornar null ou lista vazia, retornar mensagem descritiva, não null cru.
 
 ### Segurança e contenção
-- O assistente **não tem permissão para deletar dados** — tools de escrita são limitadas a criar e atualizar.
+- **O assistente PODE excluir/estornar**: há tools `excluirConta`, `estornarConta` (`LancamentoTools`) e
+  `excluirContaCorrente`/`excluirCartaoCredito`/`excluirLancamentoCartao`/`excluirAssinatura`/`excluirCategoria`/
+  `excluirParceiro`/`excluirInvestimento` (`GestaoFinanceiraTools`); no n8n, o EXECUTOR expõe `excluirConta`/`estornarConta`.
+  Garantias **técnicas**: RBAC (`@Requer` nos services + `tenantCtx.exigirPermissao` em tools, ex. `CONTA_DELETAR`), tenant, regras do service
+  (ex.: conta baixada não pode ser excluída), auditoria (`ChatAuditoriaService`) e o portão de confirmação abaixo.
+- **Confirmação técnica em 2 turnos (pipeline interno)** — `GateAcaoCriticaAspect` (`@Order(1)`, antes do gate de anexo):
+  toda tool anotada com **`@AcaoCritica("descrição")`** — hoje: `excluirConta`, `estornarConta`, `baixarConta`,
+  `transferirEntreContas`, `registrarTransacaoInvestimento` (`LancamentoTools`); `fecharFatura`, `excluirContaCorrente`,
+  `excluirCartaoCredito`, `excluirLancamentoCartao`, `excluirAssinatura`, `excluirCategoria`, `excluirParceiro`,
+  `excluirInvestimento` (`GestaoFinanceiraTools`).
+  1. 1ª chamada: **não executa**; registra pendência em `AcoesCriticasPendentes` (Caffeine, chave usuário + conversa +
+     tool + SHA-256 canônico dos argumentos — `BigDecimal` sem zeros à direita, strings sem caixa/espaços; TTL
+     `chat.acao-critica.ttl-minutos`, padrão 10) e lança `ConfirmacaoNecessariaException` → o `ChatToolErrorConfig`
+     devolve ao modelo "CONFIRMAÇÃO NECESSÁRIA" + resumo ("Excluir a conta a pagar/receber (contaId=12)").
+  2. Executa só se: pendência com a mesma tool+args, registrada no turno **imediatamente anterior** (contador de turno
+     por conversa, aberto pelo `ChatService` a cada mensagem — `TurnoChatHolder`, propagado às threads do Reactor pelo
+     accessor em `ChatAiConfig`), e a mensagem atual é **confirmação explícita** (`ConfirmacaoUsuario`: começa com
+     "sim"/"confirmo"/"pode"/"ok"/"isso mesmo"…, sem negação "não"/"cancela"/"espera"…, sem "?", ≤ 12 palavras).
+     Prompt montado de anexo nunca conta como confirmação. A pendência é consumida atomicamente (uso único).
+  3. Repetir no mesmo turno, "não", argumentos diferentes, TTL expirado, outro usuário/conversa → bloqueia (nova pendência).
+  - Sem turno do chat na thread (ex.: tools publicadas via **MCP**) → ação crítica sempre bloqueada (fail-safe).
+  - Estado em memória da instância: com várias réplicas sem afinidade, a confirmação pode cair em outra e ser pedida de novo.
+  - **Tool nova destrutiva ou que movimenta saldo DEVE ter `@AcaoCritica`**; o `GateAcaoCriticaAspectTest` trava a lista
+    exata e falha se uma tool `excluir*/estornar*/baixar*/pagar*/transferir*/fechar*/...` ficar sem a anotação.
+  - O prompt (`SystemPromptBuilder`) manda o modelo chamar a tool direto, mostrar o resumo, perguntar "Posso prosseguir?"
+    e, após o "sim", repetir a MESMA chamada com os mesmos argumentos.
+- **Modo n8n (`CHAT_ORQUESTRADOR=n8n`/`shadow`)**: o n8n chama os endpoints REST com o JWT do usuário — o
+  `GateAcaoCriticaAspect` **não se aplica**; lá a confirmação de exclusão/estorno continua **apenas instrução de prompt**
+  (ver `n8n/CONTRATOS.md`). **Em produção use `CHAT_ORQUESTRADOR=interno` (padrão).** Turno com anexo nunca vai ao n8n.
+- **Prompt injection via anexo/RAG**: conteúdo de arquivo vai entre `<documento_nao_confiavel>` e trechos do RAG entre
+  `<material_referencia_nao_confiavel>` (`ConteudoNaoConfiavel` neutraliza tags internas); o prompt manda tratá-los como
+  dado. **Portão técnico** `GateEscritaAnexoAspect`: num turno com anexo (`TurnoAnexoHolder`), toda tool que não começa
+  com `consultar`/`gerarRelatorio` lança `ConfirmacaoNecessariaException` — escrita só no turno seguinte, após o "sim"
+  (o histórico guarda só um resumo do arquivo). Tool nova é escrita por padrão (fail-safe).
 - Output do modelo não deve ser retornado diretamente ao usuário sem sanitização de XSS (frontend já usa React que escapa por padrão).
 - Custo por requisição: configurar `maxTokens` no `ChatClient` para evitar respostas excessivamente longas.
-- Logar apenas `sessionId` e latência — **nunca** logar o conteúdo das mensagens do usuário (dados financeiros pessoais).
+- Logar apenas metadados (conversa, tamanho, latência) — **nunca** o conteúdo das mensagens ou anexos (dados financeiros pessoais).
 
 ### Fallback
 - Se o modelo retornar JSON malformado em tool calls: logar erro com `requestId`, retornar HTTP 502 com mensagem genérica ao usuário.
@@ -1156,7 +1255,7 @@ Antes de abrir PR que adiciona ou modifica uma integração externa:
 - [ ] Cenários de falha cobertos: timeout, 429, 5xx, payload inválido
 - [ ] Nenhuma chamada real a serviços externos em testes unitários
 
-> **Nota sobre cobertura atual:** O projeto possui apenas `Core4erpApplicationTests.java` (context load). Não há testes unitários ou de integração implementados. Novas integrações não precisam ter cobertura completa no primeiro PR, mas devem ao menos ter o caminho feliz coberto com mock.
+> **Nota sobre cobertura atual:** há testes unitários (JUnit 5 + Mockito, `./gradlew test`) em auth, chat, crypto, conciliação etc.; `Core4erpApplicationTests.contextLoads` exige `DB_URL`/banco. Novas integrações devem ao menos ter o caminho feliz coberto com mock.
 
 **Multi-Tenancy**
 - [ ] Dados retornados pela integração filtrados por `empresaId` antes de persistir

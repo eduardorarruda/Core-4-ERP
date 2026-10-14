@@ -32,7 +32,7 @@ import java.util.*;
 @Service
 public class RelatorioService {
 
-    private static final DateTimeFormatter LABEL_FMT = DateTimeFormatter.ofPattern("MMM/yyyy", new Locale("pt", "BR"));
+    private static final DateTimeFormatter LABEL_FMT = DateTimeFormatter.ofPattern("MMM/yyyy", Locale.of("pt", "BR"));
     private static final List<StatusConta> PAGOS = List.of(StatusConta.PAGO, StatusConta.RECEBIDO);
     private static final List<StatusConta> ABERTOS = List.of(StatusConta.PENDENTE, StatusConta.ATRASADO);
 

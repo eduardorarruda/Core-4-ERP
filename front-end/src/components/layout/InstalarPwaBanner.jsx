@@ -71,7 +71,7 @@ export default function InstalarPwaBanner() {
                   <button
                     type="button"
                     onClick={dispensar}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary/60 hover:text-text-primary transition-colors"
+                    className="rounded-lg px-3 min-h-11 text-xs font-medium text-text-primary/70 hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     Agora não
                   </button>
@@ -90,7 +90,7 @@ export default function InstalarPwaBanner() {
                   <button
                     type="button"
                     onClick={dispensar}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-text-primary/60 hover:text-text-primary transition-colors"
+                    className="rounded-lg px-3 min-h-11 text-xs font-medium text-text-primary/70 hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     Entendi
                   </button>
@@ -102,8 +102,8 @@ export default function InstalarPwaBanner() {
           <button
             type="button"
             onClick={dispensar}
-            aria-label="Dispensar"
-            className="flex-shrink-0 rounded-lg p-1 text-text-primary/60 hover:text-text-primary hover:bg-white/5 transition-colors"
+            aria-label="Dispensar aviso de instalação"
+            className="flex-shrink-0 min-w-11 min-h-11 -m-2 grid place-items-center rounded-lg text-text-primary/70 hover:text-text-primary hover:bg-text-primary/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <X className="w-4 h-4" />
           </button>

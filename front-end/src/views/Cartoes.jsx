@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { CreditCard, Plus, Trash2, X, Pencil, Lock, Loader2, Repeat, Upload, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { cartoes as api, contasCorrentes as ccApi, categorias as catApi, parceiros as parApi } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
+import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import FormField, { inputCls } from '../components/ui/FormField';
 import CategoriaOptions from '../components/ui/CategoriaOptions';
@@ -371,7 +372,7 @@ export default function Cartoes() {
             disabled={row.faturaFechada}
             aria-label="Editar lançamento"
             title={row.faturaFechada ? 'Fatura fechada' : 'Editar'}
-            className="text-text-primary/40 hover:text-primary hover:bg-primary/10"
+            className="text-text-primary/60 hover:text-primary hover:bg-primary/10"
           >
             <Pencil className="w-4 h-4" />
           </Button>
@@ -382,7 +383,7 @@ export default function Cartoes() {
             disabled={row.faturaFechada}
             aria-label="Excluir lançamento"
             title={row.faturaFechada ? 'Fatura fechada' : 'Excluir'}
-            className="text-text-primary/40 hover:text-error hover:bg-error/10"
+            className="text-text-primary/60 hover:text-error hover:bg-error/10"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -411,8 +412,8 @@ export default function Cartoes() {
 
       {/* Form novo cartão */}
       {!cartaoSel && showForm && (
-        <div className="rounded-[18px] p-6 space-y-4 animate-scale-in" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)', boxShadow: '0 1px 3px rgba(0,0,0,.3),0 8px 32px rgba(0,0,0,.2)' }}>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Cartão</h2>
+        <div className="rounded-[18px] p-6 space-y-4 animate-scale-in bg-surface-low border border-text-primary/10 shadow-card">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70 font-mono">Novo Cartão</h2>
           <form onSubmit={criarCartao}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
               <FormField label="Nome" required error={errors.nome}>
@@ -458,26 +459,34 @@ export default function Cartoes() {
               return (
                 <div
                   key={c.id}
-                  onClick={() => abrirCartao(c)}
-                  className="group relative rounded-2xl overflow-hidden cursor-pointer hover:shadow-elevated transition-all hover:-translate-y-0.5"
+                  className="group relative rounded-2xl overflow-hidden hover:shadow-elevated transition-all hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-surface"
                 >
                   <div className={`bg-gradient-to-br ${cardGradient(c.id)} p-5 space-y-4`}>
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-bold text-white text-base drop-shadow">{c.nome}</p>
-                        <p className="text-white/60 text-xs mt-0.5">Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}</p>
-                        <p className="text-white/50 text-xs">{c.contaCorrenteDescricao}</p>
+                        {/* Botão "esticado": o cartão inteiro é clicável e acessível por teclado */}
+                        <button
+                          type="button"
+                          onClick={() => abrirCartao(c)}
+                          className="font-bold text-white text-base drop-shadow text-left outline-none after:absolute after:inset-0 after:content-['']"
+                        >
+                          {c.nome}
+                          <span className="sr-only">: abrir lançamentos do cartão</span>
+                        </button>
+                        <p className="text-white/80 text-xs mt-0.5">Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}</p>
+                        <p className="text-white/70 text-xs">{c.contaCorrenteDescricao}</p>
                       </div>
                       <button
-                        onClick={(ev) => { ev.stopPropagation(); deletarCartao(c.id); }}
-                        aria-label="Excluir cartão"
-                        className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                        type="button"
+                        onClick={() => deletarCartao(c.id)}
+                        aria-label={`Excluir cartão ${c.nome}`}
+                        className="relative z-10 min-w-11 min-h-11 grid place-items-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </div>
 
-                    <CreditCard className="w-8 h-8 text-white/25" />
+                    <CreditCard className="w-8 h-8 text-white/25" aria-hidden="true" />
 
                     <div className="space-y-1.5">
                       <div className="flex justify-between text-xs text-white/70">
@@ -506,17 +515,17 @@ export default function Cartoes() {
       {/* Detalhe do cartão selecionado */}
       {cartaoSel && (
         <div className="space-y-6 animate-fade-in">
-          <div className="rounded-[18px] p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-3 justify-between" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
+          <div className="rounded-[18px] p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-3 justify-between bg-surface-low border border-text-primary/10">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="live-dot" style={{ width: 5, height: 5 }} />
                 <h2 className="text-lg font-bold text-text-primary font-display truncate">{cartaoSel.nome}</h2>
               </div>
-              <p className="text-xs text-text-primary/40 font-mono uppercase tracking-widest mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
+              <p className="text-xs text-text-primary/60 font-mono uppercase tracking-widest mt-1.5 flex flex-wrap gap-x-2 gap-y-1">
                 <span>Limite <span className="text-text-primary/70">R$ {brl(cartaoSel.limite)}</span></span>
-                <span className="text-text-primary/20 hidden sm:inline">·</span>
+                <span className="text-text-primary/60 hidden sm:inline">·</span>
                 <span>Usado <span className="text-error/80">R$ {brl(cartaoSel.limiteUsado)}</span></span>
-                <span className="text-text-primary/20 hidden sm:inline">·</span>
+                <span className="text-text-primary/60 hidden sm:inline">·</span>
                 <span>Livre <span className="text-primary/80">R$ {brl(cartaoSel.limiteLivre)}</span></span>
               </p>
             </div>
@@ -534,7 +543,7 @@ export default function Cartoes() {
                 size="icon"
                 onClick={fecharCartao}
                 aria-label="Fechar cartão"
-                className="text-text-primary/40 hover:text-text-primary bg-surface-high/40"
+                className="text-text-primary/60 hover:text-text-primary bg-surface-high/40"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -548,11 +557,11 @@ export default function Cartoes() {
                 <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-primary">Editar Lançamento</h3>
                 <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold self-start sm:self-auto">
                   <button type="button" onClick={() => setEditForm((f) => ({ ...f, tipo: 'SAIDA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
                     Saída
                   </button>
                   <button type="button" onClick={() => setEditForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${editForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
                     Entrada
                   </button>
                 </div>
@@ -595,16 +604,16 @@ export default function Cartoes() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Novo lançamento */}
-            <form onSubmit={criarLancamento} className="rounded-[18px] p-6 space-y-3" style={{ background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)', backdropFilter: 'blur(8px)' }}>
+            <form onSubmit={criarLancamento} className="rounded-[18px] p-6 space-y-3 bg-surface-low border border-text-primary/10">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/50 font-mono">Novo Lançamento</h3>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-text-primary/70 font-mono">Novo Lançamento</h3>
                 <div className="flex rounded-lg border border-text-primary/10 overflow-hidden text-xs font-bold">
                   <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'SAIDA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'SAIDA' ? 'bg-error/20 text-error' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
                     Saída
                   </button>
                   <button type="button" onClick={() => setLancForm((f) => ({ ...f, tipo: 'ENTRADA' }))}
-                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/40 hover:text-text-primary/70'}`}>
+                    className={`min-h-[44px] px-4 flex items-center transition-colors ${lancForm.tipo === 'ENTRADA' ? 'bg-primary/20 text-primary' : 'text-text-primary/60 hover:text-text-primary/70'}`}>
                     Entrada
                   </button>
                 </div>
@@ -648,18 +657,18 @@ export default function Cartoes() {
             <div className="rounded-[18px] p-6 space-y-3 bg-warning/5 border border-warning/20" style={{ backdropFilter: 'blur(8px)' }}>
               <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-warning">Fatura em Aberto</h3>
               {faturasAbertas.length === 0 ? (
-                <p className="text-sm text-text-primary/50 py-6 text-center">Nenhuma fatura em aberto neste cartão.</p>
+                <p className="text-sm text-text-primary/70 py-6 text-center">Nenhuma fatura em aberto neste cartão.</p>
               ) : (
                 <div className="space-y-2">
                   {faturasAbertas.map((f, i) => (
-                    <div key={`${f.ano}-${f.mes}`} className="flex items-center justify-between gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(250,250,250,.06)' }}>
+                    <div key={`${f.ano}-${f.mes}`} className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 bg-surface-medium/40 border border-text-primary/10">
                       <div className="min-w-0">
-                        <p className="text-xs text-text-primary/50 font-mono uppercase tracking-widest">
+                        <p className="text-xs text-text-primary/70 font-mono uppercase tracking-widest">
                           Fatura {String(f.mes).padStart(2, '0')}/{f.ano}
                           {i === 0 && faturasAbertas.length > 1 && <span className="text-primary/70"> · atual</span>}
                         </p>
                         <p className="text-xl font-bold text-text-primary font-mono">R$ {brl(f.total)}</p>
-                        <p className="text-xs text-text-primary/40">{f.qtd} lançamento{f.qtd > 1 ? 's' : ''}</p>
+                        <p className="text-xs text-text-primary/60">{f.qtd} lançamento{f.qtd > 1 ? 's' : ''}</p>
                       </div>
                       <button
                         type="button"
@@ -680,7 +689,7 @@ export default function Cartoes() {
 
           {/* Filtro de lançamentos */}
           <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-xs font-bold uppercase tracking-widest text-text-primary/40">Filtrar:</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60">Filtrar:</p>
             <select
               className={`${inputCls} !w-auto min-w-[90px]`}
               value={filterMes}
@@ -706,7 +715,7 @@ export default function Cartoes() {
               onChange={(e) => { setBusca(e.target.value); recarregarLancamentos({ mes: filterMes || undefined, ano: filterAno || undefined, busca: e.target.value || undefined }); }}
             />
             {(filterMes || filterAno || busca) && (
-              <button onClick={() => { setFilterMes(''); setFilterAno(''); setBusca(''); recarregarLancamentos(); }} className="text-xs text-text-primary/40 hover:text-text-primary transition-colors underline underline-offset-2">
+              <button onClick={() => { setFilterMes(''); setFilterAno(''); setBusca(''); recarregarLancamentos(); }} className="text-xs text-text-primary/60 hover:text-text-primary transition-colors underline underline-offset-2">
                 Limpar filtros
               </button>
             )}
@@ -716,35 +725,25 @@ export default function Cartoes() {
             columns={columns}
             data={lancsFiltrados}
             loading={carregandoLancamentos}
-            aria-label="Lançamentos do cartão"
+            caption="Lançamentos do cartão"
             emptyState={<EmptyState icon={CreditCard} title="Nenhum lançamento" description="Adicione o primeiro lançamento neste cartão." />}
           />
         </div>
       )}
 
-      {showImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
-             onClick={() => !importing && setShowImport(false)}>
-          <div className="w-full max-w-lg rounded-[20px] p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-scale-in"
-               style={{ background: 'rgba(20,20,22,.96)', border: '1px solid rgba(250,250,250,.09)' }}
-               onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <FileSpreadsheet className="w-5 h-5 text-primary" />
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-widest font-mono text-text-primary">Importar planilha</h3>
-                  <p className="text-xs text-text-primary/40 mt-0.5">Cartão {cartaoSel?.nome}</p>
-                </div>
-              </div>
-              <button type="button" onClick={() => !importing && setShowImport(false)} aria-label="Fechar"
-                      className="text-text-primary/40 hover:text-text-primary">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+      <Modal
+        open={showImport}
+        onClose={() => { if (!importing) setShowImport(false); }}
+        closeOnEsc={!importing}
+        closeOnOverlay={!importing}
+        title="Importar planilha"
+        description={`Cartão ${cartaoSel?.nome ?? ''}`}
+      >
+          <div className="space-y-5">
             {!importResult ? (
               <>
-                <div className="text-xs text-text-primary/55 leading-relaxed rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
+                <div className="text-xs text-text-primary/70 leading-relaxed rounded-xl p-3 bg-surface-high/30 border border-text-primary/10">
+                  <FileSpreadsheet className="w-4 h-4 text-primary inline mr-1.5 -mt-0.5" aria-hidden="true" />
                   A planilha (.xlsx) deve ter as colunas: <span className="text-text-primary/80 font-medium">Data da Compra, Descrição, Valor, Categoria, CGC PARCEIRO, Número de Parcelas</span>.
                   <br />Categorias e parceiros que não existirem são criados automaticamente (parceiro pelo CNPJ, com dados da Receita).
                 </div>
@@ -772,14 +771,14 @@ export default function Cartoes() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl p-3 bg-primary/10 border border-primary/20">
                     <p className="text-2xl font-bold text-primary">{importResult.lancamentosCriados}</p>
-                    <p className="text-xs text-text-primary/50">lançamentos criados</p>
+                    <p className="text-xs text-text-primary/70">lançamentos criados</p>
                   </div>
                   <div className="rounded-xl p-3 bg-surface-high/30 border border-text-primary/8">
-                    <p className="text-2xl font-bold text-text-primary/80">{importResult.linhasImportadas}<span className="text-sm text-text-primary/40">/{importResult.totalLinhas}</span></p>
-                    <p className="text-xs text-text-primary/50">linhas importadas</p>
+                    <p className="text-2xl font-bold text-text-primary/80">{importResult.linhasImportadas}<span className="text-sm text-text-primary/60">/{importResult.totalLinhas}</span></p>
+                    <p className="text-xs text-text-primary/70">linhas importadas</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-primary/55">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-primary/70">
                   {importResult.categoriasCriadas > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.categoriasCriadas} categoria(s) nova(s)</span>}
                   {importResult.parceirosCriados > 0 && <span><CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-primary/70" />{importResult.parceirosCriados} parceiro(s) novo(s)</span>}
                   {importResult.ignorados > 0 && <span>{importResult.ignorados} já existiam (ignoradas)</span>}
@@ -791,7 +790,7 @@ export default function Cartoes() {
                     </p>
                     <ul className="space-y-1 text-xs text-text-primary/60">
                       {importResult.erros.map((er, i) => (
-                        <li key={i}><span className="text-text-primary/40">Linha {er.linha}:</span> {er.motivo}</li>
+                        <li key={i}><span className="text-text-primary/60">Linha {er.linha}:</span> {er.motivo}</li>
                       ))}
                     </ul>
                   </div>
@@ -806,8 +805,7 @@ export default function Cartoes() {
               </>
             )}
           </div>
-        </div>
-      )}
+      </Modal>
 
       {confirmAction && <ConfirmModal {...confirmAction} onCancel={() => setConfirmAction(null)} />}
     </div>

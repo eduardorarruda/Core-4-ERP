@@ -11,31 +11,36 @@ import DateRangeModal from '../components/ui/DateRangeModal';
 import { ThemeContext } from '../context/ThemeContext';
 import { useToast } from '../hooks/useToast';
 import { brl } from '../lib/formatters';
+import { chartTheme as temaGrafico, readCssVar } from '../components/dashboard/chartTheme';
+import GraficoAcessivel from '../components/ui/GraficoAcessivel';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, LineChart, Line, PieChart, Pie, Cell,
 } from 'recharts';
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-// Paleta das séries dos gráficos. Mantida como array fixo (Recharts precisa de cores
-// concretas por série); os valores foram escolhidos para funcionar em tema claro e escuro.
-// As cores de UI dos gráficos (tooltip/eixos/grid) derivam do tema via chartTheme().
-const COLORS = ['#6EFFC0', '#ACC7FF', '#FFB4AB', '#FFD580', '#C8A4FF', '#80E5FF', '#FF9F80'];
+// Paleta das séries: 4 primeiras vêm dos tokens --color-chart-* (contraste ≥ 3:1 no tema
+// claro e no escuro); as demais são complementares por tema.
+function paleta(dark) {
+  return [
+    readCssVar('--color-chart-1', dark ? '#6EFFC0' : '#047857'),
+    readCssVar('--color-chart-2', dark ? '#ACC7FF' : '#2563EB'),
+    readCssVar('--color-chart-3', dark ? '#FFD37A' : '#B45309'),
+    readCssVar('--color-chart-4', dark ? '#FFB4AB' : '#DC2626'),
+    dark ? '#C8A4FF' : '#7C3AED',
+    dark ? '#80E5FF' : '#0E7490',
+    dark ? '#FF9F80' : '#C2410C',
+  ];
+}
 
-// Cores de tooltip, eixos e grid derivadas do tema atual — alinhadas ao padrão dos
-// demais dashboards (ver useChartColors em FluxoCaixaChart).
+// Cores de tooltip, eixos e grid derivadas dos tokens do tema (mesmo helper do Dashboard)
 function chartTheme(dark) {
+  const t = temaGrafico(dark);
   return {
-    grid: dark ? 'rgba(255,255,255,.05)' : '#E4E4E7',
-    tick: dark ? 'rgba(255,255,255,.4)' : '#71717a',
-    tickStrong: dark ? 'rgba(255,255,255,.6)' : '#52525b',
-    tooltip: {
-      background: dark ? '#1C1B1B' : '#FFFFFF',
-      border: dark ? '1px solid rgba(255,255,255,.1)' : '1px solid #E4E4E7',
-      borderRadius: 12,
-      fontSize: 12,
-      color: dark ? '#FAFAFA' : '#18181B',
-    },
+    grid: t.gridColor,
+    tick: t.axisColor,
+    tickStrong: t.tooltipTextColor,
+    tooltip: { ...t.tooltipStyle, borderRadius: 12 },
   };
 }
 
@@ -77,8 +82,9 @@ function buildChartData(resumo) {
   };
 }
 
-const cardSurface = { background: 'rgba(255,255,255,.025)', border: '1px solid rgba(250,250,250,.07)' };
-const h2Cls = 'text-xs font-bold uppercase tracking-widest text-text-primary/40 font-mono mb-4';
+// Superfície dos cartões de conteúdo (tokens do tema: funciona no claro e no escuro)
+const cardSurface = 'bg-surface-low border border-text-primary/10';
+const h2Cls = 'text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono mb-4';
 function periodoMesesAtras(meses) {
   const now = new Date();
   const past = new Date(now.getFullYear(), now.getMonth() - meses, 1);
@@ -96,6 +102,7 @@ export default function CartaoDashboard() {
   const { theme } = useContext(ThemeContext);
   const isDark = theme === 'dark';
   const ct = chartTheme(isDark);
+  const cores = paleta(isDark);
   const isMobile = useIsMobile();
   const [cartoes, setCartoes] = useState([]);
   const [resumo, setResumo] = useState([]);
@@ -151,15 +158,15 @@ export default function CartaoDashboard() {
   const { data: chartData, cats } = buildChartData(resumo);
 
   const metricas = [
-    { label: 'Total de Cartões', value: cartoes.length, icon: CreditCard, color: 'text-text-primary', bg: 'rgba(255,255,255,.04)', border: 'rgba(250,250,250,.08)' },
-    { label: 'Limite Total', value: `R$ ${brl(totalLimite)}`, icon: Wallet, color: 'text-primary', bg: 'rgba(110,255,192,.07)', border: 'rgba(110,255,192,.2)' },
-    { label: 'Limite Usado', value: `R$ ${brl(totalUsado)}`, icon: TrendingUp, color: 'text-error', bg: 'rgba(255,180,171,.07)', border: 'rgba(255,180,171,.2)' },
-    { label: 'Disponível', value: `R$ ${brl(totalDisponivel)}`, icon: AlertCircle, color: 'text-secondary', bg: 'rgba(172,199,255,.07)', border: 'rgba(172,199,255,.2)' },
+    { label: 'Total de Cartões', value: cartoes.length, icon: CreditCard, color: 'text-text-primary', card: 'bg-surface-low border-text-primary/10' },
+    { label: 'Limite Total', value: `R$ ${brl(totalLimite)}`, icon: Wallet, color: 'text-primary', card: 'bg-primary/[.07] border-primary/20' },
+    { label: 'Limite Usado', value: `R$ ${brl(totalUsado)}`, icon: TrendingUp, color: 'text-error', card: 'bg-error/[.07] border-error/20' },
+    { label: 'Disponível', value: `R$ ${brl(totalDisponivel)}`, icon: AlertCircle, color: 'text-secondary', card: 'bg-secondary/[.07] border-secondary/20' },
   ];
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 gap-3 text-text-primary/40">
+      <div className="flex items-center justify-center py-20 gap-3 text-text-primary/60">
         <Loader2 className="w-5 h-5 animate-spin" />
         <span className="text-sm">Carregando...</span>
       </div>
@@ -184,10 +191,10 @@ export default function CartaoDashboard() {
 
       {/* §8 — Alertas de fechamento iminente */}
       {bi?.alertasFechamento?.length > 0 && (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-warning mt-0.5 shrink-0" aria-hidden="true" />
           <div>
-            <p className="text-sm font-bold text-amber-300">Faturas fechando em breve</p>
+            <p className="text-sm font-bold text-warning">Faturas fechando em breve</p>
             <ul className="mt-1 space-y-0.5">
               {bi.alertasFechamento.map((a) => (
                 <li key={a.cartaoId} className="text-xs text-text-primary/70">
@@ -202,10 +209,10 @@ export default function CartaoDashboard() {
       {/* Métricas */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {metricas.map((m) => (
-          <div key={m.label} className="rounded-2xl p-5" style={{ background: m.bg, border: `1px solid ${m.border}` }}>
+          <div key={m.label} className={`rounded-2xl p-5 border ${m.card}`}>
             <div className="flex items-center gap-2 mb-3">
               <m.icon className={`w-4 h-4 shrink-0 ${m.color}`} />
-              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/40 font-mono truncate">{m.label}</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-text-primary/60 font-mono truncate">{m.label}</span>
             </div>
             <p className={`text-xl sm:text-2xl font-bold font-mono truncate ${m.color}`} title={String(m.value)}>{m.value}</p>
           </div>
@@ -221,13 +228,13 @@ export default function CartaoDashboard() {
               const usado = parseFloat(c.limiteUsado ?? 0);
               const limite = parseFloat(c.limite ?? 0);
               const pct = limite > 0 ? Math.min(100, (usado / limite) * 100) : 0;
-              const corBarra = pct >= 80 ? '#FFB4AB' : pct >= 50 ? '#FFD580' : '#6EFFC0';
+              const corBarra = pct >= 80 ? 'bg-error' : pct >= 50 ? 'bg-warning' : 'bg-primary';
               return (
-                <div key={c.id} className="rounded-2xl p-5 space-y-4" style={cardSurface}>
+                <div key={c.id} className={`rounded-2xl p-5 space-y-4 ${cardSurface}`}>
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-bold text-text-primary">{c.nome}</p>
-                      <p className="text-xs text-text-primary/40 mt-0.5">
+                      <p className="text-xs text-text-primary/60 mt-0.5">
                         Fecha dia {c.diaFechamento} · Vence dia {c.diaVencimento}
                       </p>
                     </div>
@@ -235,13 +242,13 @@ export default function CartaoDashboard() {
                   </div>
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs font-mono">
-                      <span className="text-text-primary/50">Usado</span>
+                      <span className="text-text-primary/70">Usado</span>
                       <span className="text-text-primary font-bold">R$ {brl(usado)} / R$ {brl(limite)}</span>
                     </div>
-                    <div className="h-2 bg-surface-highest rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: corBarra }} />
+                    <div className="h-2 bg-surface-highest rounded-full overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={`Limite usado do cartão ${c.nome}`}>
+                      <div className={`h-full rounded-full transition-all duration-500 ${corBarra}`} style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-xs text-text-primary/40 font-mono text-right">{pct.toFixed(1)}% utilizado</p>
+                    <p className="text-xs text-text-primary/60 font-mono text-right">{pct.toFixed(1)}% utilizado</p>
                   </div>
                   <button onClick={() => navigate('/cartoes')} className="w-full text-center text-xs font-bold uppercase tracking-widest text-primary hover:underline py-1">
                     Ver lançamentos →
@@ -255,29 +262,31 @@ export default function CartaoDashboard() {
 
       {/* Gráfico por categoria (resumo) */}
       {chartData.length > 0 && cats.length > 0 && (
-        <div className="rounded-2xl p-6" style={cardSurface}>
+        <div className={`rounded-2xl p-6 ${cardSurface}`}>
           <h2 className={h2Cls}>Gastos por Categoria (período recente)</h2>
+          <GraficoAcessivel resumo={`Gráfico de barras empilhadas dos gastos por categoria em cada mês. ${chartData.map((m) => `${m.mes}: R$ ${brl(cats.reduce((s, c) => s + (m[c] || 0), 0))}`).join('; ')}.`}>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
               <Tooltip contentStyle={ct.tooltip} formatter={(v, name) => [`R$ ${brl(v)}`, name]} />
-              <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'monospace', paddingTop: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'monospace', paddingTop: 12 }} />
               {cats.map((cat, idx) => (
-                <Bar key={cat} dataKey={cat} stackId="a" fill={COLORS[idx % COLORS.length]} radius={idx === cats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                <Bar key={cat} dataKey={cat} stackId="a" fill={cores[idx % cores.length]} radius={idx === cats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
               ))}
             </BarChart>
           </ResponsiveContainer>
+          </GraficoAcessivel>
         </div>
       )}
 
       {/* ── §7 — Painéis BI ──────────────────────────────────────────── */}
-      <div className="rounded-2xl p-6" style={cardSurface}>
+      <div className={`rounded-2xl p-6 ${cardSurface}`}>
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-secondary" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/50 font-mono">Análise BI</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-text-primary/70 font-mono">Análise BI</h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {FILTROS_RAPIDOS.map(({ id, label, meses }) => (
@@ -287,7 +296,7 @@ export default function CartaoDashboard() {
                 className={`min-h-[44px] px-4 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                   activeFilter === id
                     ? 'bg-primary/20 text-primary border border-primary/30'
-                    : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary hover:border-text-primary/20'
+                    : 'border border-text-primary/10 text-text-primary/70 hover:text-text-primary hover:border-text-primary/20'
                 }`}
               >
                 {label}
@@ -298,7 +307,7 @@ export default function CartaoDashboard() {
               className={`flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
                 activeFilter === 'custom'
                   ? 'bg-secondary/20 text-secondary border border-secondary/30'
-                  : 'border border-text-primary/10 text-text-primary/50 hover:text-text-primary hover:border-text-primary/20'
+                  : 'border border-text-primary/10 text-text-primary/70 hover:text-text-primary hover:border-text-primary/20'
               }`}
             >
               <SlidersHorizontal className="w-3 h-3" /> Personalizado
@@ -311,7 +320,7 @@ export default function CartaoDashboard() {
         </div>
 
         {loadingBi ? (
-          <div className="flex items-center justify-center py-12 gap-3 text-text-primary/40">
+          <div className="flex items-center justify-center py-12 gap-3 text-text-primary/60">
             <Loader2 className="w-5 h-5 animate-spin" /> <span className="text-sm">Carregando análises...</span>
           </div>
         ) : bi ? (
@@ -321,15 +330,17 @@ export default function CartaoDashboard() {
             {bi.evolucaoMensal?.length > 0 && (
               <div>
                 <h3 className={h2Cls}>Evolução Mensal da Fatura</h3>
+                <GraficoAcessivel resumo={`Gráfico de linha da evolução mensal da fatura. ${bi.evolucaoMensal.map((d) => `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}: R$ ${brl(d.totalLiquido)}`).join('; ')}.`}>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={bi.evolucaoMensal.map((d) => ({ ...d, label: `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}`, total: parseFloat(d.totalLiquido) }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
                     <Tooltip contentStyle={ct.tooltip} formatter={(v) => [`R$ ${brl(v)}`, 'Total líquido']} />
-                    <Line type="monotone" dataKey="total" stroke="#6EFFC0" strokeWidth={2} dot={{ fill: '#6EFFC0', r: 3 }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey="total" stroke={cores[0]} strokeWidth={2} dot={{ fill: cores[0], r: 3 }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
+                </GraficoAcessivel>
               </div>
             )}
 
@@ -339,6 +350,7 @@ export default function CartaoDashboard() {
               {bi.distribuicaoLimite?.length > 0 && (
                 <div>
                   <h3 className={h2Cls}>Distribuição de Limite</h3>
+                  <GraficoAcessivel resumo={`Gráfico de pizza da distribuição do limite entre cartões. ${bi.distribuicaoLimite.map((d) => `${d.nomeCartao}: R$ ${brl(d.limite)}`).join('; ')}.`}>
                   <ResponsiveContainer width="100%" height={isMobile ? 220 : 180}>
                     <PieChart>
                       <Pie
@@ -347,12 +359,13 @@ export default function CartaoDashboard() {
                         label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        {bi.distribuicaoLimite.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        {bi.distribuicaoLimite.map((_, i) => <Cell key={i} fill={cores[i % cores.length]} />)}
                       </Pie>
-                      {isMobile && <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'monospace' }} />}
+                      {isMobile && <Legend wrapperStyle={{ fontSize: 12, fontFamily: 'monospace' }} />}
                       <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={ct.tooltip} />
                     </PieChart>
                   </ResponsiveContainer>
+                  </GraficoAcessivel>
                 </div>
               )}
 
@@ -360,18 +373,20 @@ export default function CartaoDashboard() {
               {bi.gastosPorParceiro?.length > 0 && (
                 <div>
                   <h3 className={h2Cls}>Top 10 Parceiros</h3>
+                  <GraficoAcessivel resumo={`Gráfico de barras dos 10 parceiros com mais gastos. ${bi.gastosPorParceiro.map((d) => `${d.nomeParceiro}: R$ ${brl(d.total)}`).join('; ')}.`}>
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={bi.gastosPorParceiro.map((d) => {
                       const max = isMobile ? 10 : 15;
                       return { nome: d.nomeParceiro.length > max ? d.nomeParceiro.slice(0, max) + '…' : d.nomeParceiro, total: parseFloat(d.total) };
                     })} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                      <XAxis type="number" tick={{ fontSize: 10, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
-                      <YAxis type="category" dataKey="nome" width={isMobile ? 70 : 90} tick={{ fontSize: 10, fill: ct.tickStrong, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                      <XAxis type="number" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+                      <YAxis type="category" dataKey="nome" width={isMobile ? 70 : 90} tick={{ fontSize: 12, fill: ct.tickStrong, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={ct.tooltip} formatter={(v) => [`R$ ${brl(v)}`, 'Total']} />
-                      <Bar dataKey="total" fill="#ACC7FF" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="total" fill={cores[1]} radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                  </GraficoAcessivel>
                 </div>
               )}
             </div>
@@ -384,7 +399,7 @@ export default function CartaoDashboard() {
                   <h3 className={h2Cls}>Próximas Faturas</h3>
                   <ul className="space-y-2">
                     {bi.proximasFaturas.map((f, i) => {
-                      const cor = f.diasRestantes <= 3 ? 'text-error border-error/20 bg-error/5' : f.diasRestantes <= 7 ? 'text-amber-400 border-amber-400/20 bg-amber-400/5' : 'text-primary border-primary/20 bg-primary/5';
+                      const cor = f.diasRestantes <= 3 ? 'text-error border-error/20 bg-error/5' : f.diasRestantes <= 7 ? 'text-warning border-warning/20 bg-warning/5' : 'text-primary border-primary/20 bg-primary/5';
                       return (
                         <li key={i} className={`rounded-xl px-4 py-3 border ${cor} flex justify-between items-center`}>
                           <div>
@@ -409,13 +424,13 @@ export default function CartaoDashboard() {
                       { label: 'Média diária', value: bi.projecaoMes.mediaDiaria, color: 'text-secondary' },
                       { label: 'Projeção final', value: bi.projecaoMes.projecaoFinal, color: 'text-error' },
                     ].map((item) => (
-                      <div key={item.label} className="flex justify-between items-center p-3 rounded-xl" style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' }}>
+                      <div key={item.label} className="flex justify-between items-center p-3 rounded-xl bg-surface-medium/40 border border-text-primary/10">
                         <span className="text-xs text-text-primary/60">{item.label}</span>
                         <span className={`font-mono font-bold text-sm ${item.color}`}>R$ {brl(item.value)}</span>
                       </div>
                     ))}
                     <div className="mt-2">
-                      <div className="flex justify-between text-xs text-text-primary/40 mb-1">
+                      <div className="flex justify-between text-xs text-text-primary/60 mb-1">
                         <span>{bi.projecaoMes.diasDecorridos} dias decorridos</span>
                         <span>{bi.projecaoMes.diasRestantes} dias restantes</span>
                       </div>
@@ -433,15 +448,17 @@ export default function CartaoDashboard() {
             {bi.impactoParcelamentos?.length > 0 && (
               <div>
                 <h3 className={h2Cls}>Comprometimento Futuro por Parcelamentos</h3>
+                <GraficoAcessivel resumo={`Gráfico de barras do valor já comprometido com parcelas nos próximos meses. ${bi.impactoParcelamentos.map((d) => `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}: R$ ${brl(d.totalComprometido)}`).join('; ')}.`}>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={bi.impactoParcelamentos.map((d) => ({ label: `${MONTH_NAMES[d.mes - 1]}/${String(d.ano).slice(2)}`, total: parseFloat(d.totalComprometido), parcelas: d.qtdParcelas }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke={ct.grid} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
+                    <XAxis dataKey="label" tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: ct.tick, fontFamily: 'monospace' }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${brl(v)}`} />
                     <Tooltip contentStyle={ct.tooltip} formatter={(v, name) => [name === 'total' ? `R$ ${brl(v)}` : v, name === 'total' ? 'Total comprometido' : 'Qtd parcelas']} />
-                    <Bar dataKey="total" fill="#C8A4FF" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" fill={cores[4]} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                </GraficoAcessivel>
               </div>
             )}
 
@@ -450,6 +467,7 @@ export default function CartaoDashboard() {
               <div>
                 <h3 className={h2Cls}>Assinaturas vs. Gastos Avulsos</h3>
                 <div className="flex flex-col md:flex-row items-center gap-6">
+                  <GraficoAcessivel className="w-full" resumo={`Gráfico de pizza: assinaturas R$ ${brl(bi.assinaturasVsAvulsos.totalAssinaturas)} e gastos avulsos R$ ${brl(bi.assinaturasVsAvulsos.totalAvulsos)}.`}>
                   <ResponsiveContainer width="100%" height={160}>
                     <PieChart>
                       <Pie
@@ -461,12 +479,13 @@ export default function CartaoDashboard() {
                         label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        <Cell fill="#6EFFC0" />
-                        <Cell fill="#ACC7FF" />
+                        <Cell fill={cores[0]} />
+                        <Cell fill={cores[1]} />
                       </Pie>
                       <Tooltip formatter={(v) => `R$ ${brl(v)}`} contentStyle={ct.tooltip} />
                     </PieChart>
                   </ResponsiveContainer>
+                  </GraficoAcessivel>
                   <div className="space-y-2 text-sm w-full md:w-auto">
                     <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-primary inline-block shrink-0" /><span className="text-text-primary/60">Assinaturas:</span><span className="font-mono font-bold text-primary">R$ {brl(bi.assinaturasVsAvulsos.totalAssinaturas)}</span></div>
                     <div className="flex items-center gap-3"><span className="w-3 h-3 rounded-full bg-secondary inline-block shrink-0" /><span className="text-text-primary/60">Avulsos:</span><span className="font-mono font-bold text-secondary">R$ {brl(bi.assinaturasVsAvulsos.totalAvulsos)}</span></div>
@@ -488,12 +507,12 @@ export default function CartaoDashboard() {
             </button>
           </div>
         ) : (
-          <p className="text-sm text-text-primary/40 text-center py-8">Sem dados para o período selecionado.</p>
+          <p className="text-sm text-text-primary/60 text-center py-8">Sem dados para o período selecionado.</p>
         )}
       </div>
 
       {cartoes.length === 0 && (
-        <div className="text-center py-20 text-text-primary/40 space-y-3">
+        <div className="text-center py-20 text-text-primary/60 space-y-3">
           <CreditCard className="w-10 h-10 mx-auto opacity-20" />
           <p className="text-sm">Nenhum cartão cadastrado ainda.</p>
           <button onClick={() => navigate('/cartoes')} className="text-primary font-bold text-xs uppercase tracking-widest hover:underline">

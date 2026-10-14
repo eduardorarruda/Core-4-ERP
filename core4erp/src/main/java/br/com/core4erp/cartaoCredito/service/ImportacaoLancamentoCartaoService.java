@@ -93,7 +93,7 @@ public class ImportacaoLancamentoCartaoService {
 
             Sheet sheet = wb.getNumberOfSheets() > 0 ? wb.getSheetAt(0) : null;
             if (sheet == null) throw new IllegalArgumentException("A planilha está vazia.");
-            DataFormatter fmt = new DataFormatter(new Locale("pt", "BR"));
+            DataFormatter fmt = new DataFormatter(Locale.of("pt", "BR"));
 
             Row header = sheet.getRow(sheet.getFirstRowNum());
             if (header == null) throw new IllegalArgumentException("A planilha não tem cabeçalho.");
@@ -196,7 +196,7 @@ public class ImportacaoLancamentoCartaoService {
                                   Map<String, Long> cache, int[] criados) {
         Long id = cache.get(cnpj);
         if (id != null) return id;
-        id = parceiroRepo.findFirstByCpfCnpjAndEmpresaId(cnpj, empresaId)
+        id = parceiroRepo.buscarPorDocumento(cnpj, empresaId)
                 .map(p -> p.getId())
                 .orElse(null);
         if (id == null) {
@@ -267,7 +267,7 @@ public class ImportacaoLancamentoCartaoService {
         try {
             return new BigDecimal(s).setScale(2, RoundingMode.HALF_UP);
         } catch (NumberFormatException e) {
-            return null;
+            return null; // célula não numérica: o chamador reporta "valor inválido" na linha
         }
     }
 
@@ -299,7 +299,7 @@ public class ImportacaoLancamentoCartaoService {
             int n = Integer.parseInt(digits);
             return n >= 1 ? Math.min(n, 72) : 1;
         } catch (NumberFormatException e) {
-            return 1;
+            return 1; // número de parcelas ilegível (ex.: overflow): assume à vista
         }
     }
 

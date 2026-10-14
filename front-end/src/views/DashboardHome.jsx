@@ -52,13 +52,13 @@ export default function DashboardHome() {
                 aria-selected={ativo}
                 onClick={() => selecionar(t.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 min-h-11 rounded-lg text-xs font-bold uppercase tracking-widest font-mono transition-colors',
+                  'flex items-center gap-2 px-4 py-2 min-h-11 rounded-lg text-xs font-bold uppercase tracking-widest font-mono transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   ativo
                     ? 'bg-primary/15 text-primary'
-                    : 'text-text-primary/50 hover:text-text-primary hover:bg-surface-medium'
+                    : 'text-text-primary/70 hover:text-text-primary hover:bg-surface-medium'
                 )}
               >
-                <t.icon className="w-4 h-4" />
+                <t.icon className="w-4 h-4" aria-hidden="true" />
                 {t.label}
               </button>
             );

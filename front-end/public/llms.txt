@@ -1,0 +1,33 @@
+# Core 4 ERP
+
+> Aplicativo web (PWA) de gestão financeira para pessoas físicas e pequenas empresas, em português do Brasil. Reúne contas a pagar e a receber, contas correntes, cartões de crédito, conciliação bancária, investimentos, relatórios e uma assistente com IA. É um projeto acadêmico (TCC) de código aberto, sob licença MIT.
+
+O Core 4 ERP é um protótipo funcional, não um produto comercial. Os dados de cada empresa (ou pessoa física) ficam isolados, com perfis de acesso, permissões e trilha de auditoria.
+
+## Funcionalidades
+
+- Contas a pagar e a receber, com baixa, estorno e status
+- Contas correntes, com transferências entre contas
+- Cartões de crédito: lançamentos, parcelamento, fechamento de fatura e conciliação da fatura por arquivo OFX
+- Conciliação bancária por arquivo OFX
+- Categorias (até 2 níveis) e parceiros (clientes e fornecedores)
+- Assinaturas recorrentes
+- Investimentos
+- Calendário de vencimentos e notificações
+- Dashboard geral e painel dos cartões
+- Relatórios (DRE, fluxo de caixa, extrato, posição financeira e outros) em tela, Excel ou PDF
+- Multiempresa, com perfis de acesso, permissões e auditoria das alterações
+- Áurea: assistente de chat com IA que consulta e lança dados por conversa; as mensagens são processadas pela OpenAI
+- Tema claro e escuro; instalável no celular e no computador
+
+## Páginas públicas
+
+- [Entrar](https://front.core4erp.codes/login): acesso à conta
+- [Criar conta](https://front.core4erp.codes/register): cadastro de pessoa física ou empresa
+- [Política de Privacidade](https://front.core4erp.codes/privacidade): como os dados são tratados
+- [Termos de Uso](https://front.core4erp.codes/termos): condições de uso do serviço
+
+## Projeto
+
+- [Autor principal no GitHub](https://github.com/eduardorarruda): Eduardo Ribeiro Arruda
+- Licença: MIT

@@ -1,0 +1,8 @@
+# ATENÇÃO — PLACEHOLDER: o Contact abaixo é um remetente técnico (noreply) e NÃO é lido por ninguém.
+# DEVE ser substituído por um e-mail real de contato de segurança ANTES do deploy (ver DEPLOY.md ›
+# "Antes do primeiro deploy"). Atualize também CONTATO_EMAIL em src/content/legal.js.
+Contact: mailto:noreply@core4erp.com
+Expires: 2027-10-13T00:00:00.000Z
+Preferred-Languages: pt, en
+Policy: https://front.core4erp.codes/privacidade
+Canonical: https://front.core4erp.codes/.well-known/security.txt

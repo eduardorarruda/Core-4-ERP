@@ -74,7 +74,7 @@ export default function BottomNav({ onAbrirMenu }) {
           </span>
           <span
             className={cn(
-              'text-[11px] font-semibold',
+              'text-xs font-semibold',
               isAtivo('/assistente') ? 'text-primary' : 'text-text-primary/60'
             )}
           >
@@ -102,7 +102,7 @@ export default function BottomNav({ onAbrirMenu }) {
           className="flex flex-col items-center justify-center gap-1 min-h-11 min-w-11 shrink-0 text-text-primary/60 active:text-text-primary transition-colors"
         >
           <Menu className="w-5 h-5" />
-          <span className="text-[11px] font-medium">Menu</span>
+          <span className="text-xs font-medium">Menu</span>
         </button>
       </div>
     </nav>
@@ -124,7 +124,7 @@ function SlotLink({ to, icon: Icon, label, ativo }) {
       )}
     >
       <Icon className="w-5 h-5" />
-      <span className="text-[11px] font-medium">{label}</span>
+      <span className="text-xs font-medium">{label}</span>
     </Link>
   );
 }

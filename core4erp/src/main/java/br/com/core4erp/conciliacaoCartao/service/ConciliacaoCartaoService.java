@@ -26,8 +26,12 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ConciliacaoCartaoService {
@@ -71,7 +75,7 @@ public class ConciliacaoCartaoService {
     @Transactional(readOnly = true)
     public List<ConciliacaoCartaoResponseDto> listar() {
         return conciliacaoRepo
-                .findAllByEmpresaIdOrderByDataConciliacaoDesc(tenantCtx.getEmpresaId())
+                .findTop200ByEmpresaIdOrderByDataConciliacaoDesc(tenantCtx.getEmpresaId())
                 .stream()
                 .map(ConciliacaoCartaoResponseDto::fromSemItens)
                 .toList();
@@ -102,6 +106,34 @@ public class ConciliacaoCartaoService {
         return ConciliacaoCartaoRelatorioDto.from(c, ignorados, manuais, dtos);
     }
 
+    /** Uma única query: lançamentos do cartão entre (menor data − janela) e (maior data + janela). */
+    private List<LancamentoCartao> carregarCandidatos(Long cartaoId, Long empresaId, List<OfxTransacaoDto> transacoes) {
+        LocalDate min = null;
+        LocalDate max = null;
+        for (OfxTransacaoDto t : transacoes) {
+            if (t.getData() == null) continue;
+            min = min == null || t.getData().isBefore(min) ? t.getData() : min;
+            max = max == null || t.getData().isAfter(max) ? t.getData() : max;
+        }
+        if (min == null) {
+            return List.of();
+        }
+        return lancamentoRepo.findCandidatasParaConciliacaoComParceiro(cartaoId, empresaId,
+                min.minusDays(JANELA_DIAS), max.plusDays(JANELA_DIAS));
+    }
+
+    /** Mesmo critério da antiga query por transação: dataCompra BETWEEN inicio AND fim (inclusivo). */
+    static List<LancamentoCartao> filtrarPorJanela(List<LancamentoCartao> candidatos, LocalDate inicio, LocalDate fim) {
+        List<LancamentoCartao> filtrados = new ArrayList<>();
+        for (LancamentoCartao l : candidatos) {
+            LocalDate d = l.getDataCompra();
+            if (d != null && !d.isBefore(inicio) && !d.isAfter(fim)) {
+                filtrados.add(l);
+            }
+        }
+        return filtrados;
+    }
+
     @Transactional
     public ConciliacaoCartaoResponseDto processar(MultipartFile arquivo, Long cartaoIdForcado) {
         validarArquivo(arquivo);
@@ -123,13 +155,16 @@ public class ConciliacaoCartaoService {
         if (cartaoIdForcado != null) {
             cartao = cartaoRepo.findByIdAndEmpresaId(cartaoIdForcado, empresaId)
                     .orElseThrow(() -> new EntityNotFoundException("Cartão não encontrado"));
-            if (cartao.getAcctIdOfx() == null && ofxDados.getNumeroConta() != null) {
+            // Vincula o ACCTID ao cartão só se nenhum outro cartão da empresa já o usa
+            // (UNIQUE acct_id_ofx_hash + empresa_id na V51).
+            if (cartao.getAcctIdOfx() == null && ofxDados.getNumeroConta() != null
+                    && cartaoRepo.buscarPorAcctIdOfx(ofxDados.getNumeroConta(), empresaId).isEmpty()) {
                 cartao.setAcctIdOfx(ofxDados.getNumeroConta());
                 cartaoRepo.save(cartao);
             }
         } else {
             String acctId = ofxDados.getNumeroConta();
-            cartao = cartaoRepo.findByAcctIdOfxAndEmpresaId(acctId, empresaId)
+            cartao = cartaoRepo.buscarPorAcctIdOfx(acctId, empresaId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.UNPROCESSABLE_ENTITY,
                             "CARTAO_NAO_ENCONTRADO:" + acctId));
@@ -154,9 +189,15 @@ public class ConciliacaoCartaoService {
         int totalSugeridos = 0;
         int totalNaoIdentificados = 0;
 
+        // Performance (antes N+1: 2 queries por transação do OFX): ofxIds já registrados e os
+        // lançamentos candidatos de TODA a janela de datas do arquivo (± JANELA_DIAS, com parceiro)
+        // são carregados uma única vez; o filtro por transação é feito em memória.
+        Set<String> ofxIdsProcessados = new HashSet<>(itemRepo.findOfxIdsByConciliacaoCartaoId(conciliacao.getId()));
+        List<LancamentoCartao> todosCandidatos = carregarCandidatos(cartao.getId(), empresaId, ofxDados.getTransacoes());
+
         for (OfxTransacaoDto ofxTrn : ofxDados.getTransacoes()) {
-            if (itemRepo.existsByConciliacaoCartaoIdAndOfxId(conciliacao.getId(), ofxTrn.getOfxId())) {
-                continue;
+            if (!ofxIdsProcessados.add(ofxTrn.getOfxId())) {
+                continue; // ofxId repetido no arquivo (ou já registrado) — mesmo comportamento anterior
             }
 
             ConciliacaoCartaoItem item = new ConciliacaoCartaoItem();
@@ -177,10 +218,8 @@ public class ConciliacaoCartaoService {
             }
 
             if (ofxTrn.getData() != null) {
-                List<LancamentoCartao> candidatos = lancamentoRepo.findCandidatasParaConciliacao(
-                        cartao.getId(), empresaId,
-                        ofxTrn.getData().minusDays(JANELA_DIAS),
-                        ofxTrn.getData().plusDays(JANELA_DIAS));
+                List<LancamentoCartao> candidatos = filtrarPorJanela(todosCandidatos,
+                        ofxTrn.getData().minusDays(JANELA_DIAS), ofxTrn.getData().plusDays(JANELA_DIAS));
 
                 LancamentoCartao melhor = null;
                 int melhorScore = 0;

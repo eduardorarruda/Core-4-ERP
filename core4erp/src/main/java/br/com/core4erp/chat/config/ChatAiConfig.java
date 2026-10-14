@@ -1,6 +1,8 @@
 package br.com.core4erp.chat.config;
 
 import br.com.core4erp.chat.service.OrigemIaHolder;
+import br.com.core4erp.chat.service.TurnoAnexoHolder;
+import br.com.core4erp.chat.service.TurnoChatHolder;
 import br.com.core4erp.config.tenant.TenantContext;
 import io.micrometer.context.ContextRegistry;
 import jakarta.annotation.PostConstruct;
@@ -29,6 +31,8 @@ public class ChatAiConfig {
     static final String SECURITY_CONTEXT_KEY = "core4erp.security.context";
     static final String TENANT_CONTEXT_KEY = "core4erp.tenant.context";
     static final String ORIGEM_IA_KEY = "core4erp.origem.ia";
+    static final String TURNO_ANEXO_KEY = "core4erp.turno.anexo";
+    static final String TURNO_CHAT_KEY = "core4erp.turno.chat";
 
     @PostConstruct
     void registrarPropagacaoDeContexto() {
@@ -53,5 +57,20 @@ public class ChatAiConfig {
                 OrigemIaHolder::currentState,
                 OrigemIaHolder::restoreState,
                 OrigemIaHolder::removeState);
+
+        // Propaga a marca "turno com anexo" — o GateEscritaAnexoAspect bloqueia escritas nas tools.
+        registry.registerThreadLocalAccessor(
+                TURNO_ANEXO_KEY,
+                TurnoAnexoHolder::currentState,
+                TurnoAnexoHolder::restoreState,
+                TurnoAnexoHolder::removeState);
+
+        // Propaga o turno do chat (conversa/usuário/nº do turno/confirmação) — o GateAcaoCriticaAspect
+        // decide com ele se uma ação crítica (exclusão, estorno, baixa...) pode executar.
+        registry.registerThreadLocalAccessor(
+                TURNO_CHAT_KEY,
+                TurnoChatHolder::currentState,
+                TurnoChatHolder::restoreState,
+                TurnoChatHolder::removeState);
     }
 }

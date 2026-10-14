@@ -14,6 +14,7 @@ import br.com.core4erp.cartaoCredito.service.CartaoCreditoService;
 import br.com.core4erp.categoria.dto.CategoriaRequestDto;
 import br.com.core4erp.categoria.dto.CategoriaResponseDto;
 import br.com.core4erp.categoria.service.CategoriaService;
+import br.com.core4erp.chat.service.AcaoCritica;
 import br.com.core4erp.chat.service.ChatAuditoriaService;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.conta.dto.ContaResponseDto;
@@ -136,8 +137,9 @@ public class GestaoFinanceiraTools {
 
     @Tool(description = """
             Exclui uma conta corrente (pela descrição/nome). Bloqueado se houver transferências,
-            baixas, conciliações ou cartão vinculados. Confirme antes.
+            baixas, conciliações ou cartão vinculados. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir a conta corrente")
     public String excluirContaCorrente(
             @ToolParam(description = "Descrição/nome da conta corrente a excluir") String conta) {
         ContaCorrenteResponseDto alvo = acharContaCorrente(conta);
@@ -189,8 +191,9 @@ public class GestaoFinanceiraTools {
 
     @Tool(description = """
             Exclui um cartão de crédito (pelo nome). Bloqueado se houver lançamentos associados.
-            Confirme antes.
+            Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir o cartão de crédito")
     public String excluirCartaoCredito(@ToolParam(description = "Nome do cartão a excluir") String cartao) {
         CartaoCreditoResponseDto alvo = acharCartao(cartao);
         audit("excluirCartaoCredito", "id=" + alvo.id());
@@ -249,8 +252,9 @@ public class GestaoFinanceiraTools {
 
     @Tool(description = """
             Exclui um lançamento de cartão (nome do cartão + ID do lançamento de
-            consultarLancamentosCartao). BLOQUEADO se a fatura estiver fechada. Confirme antes.
+            consultarLancamentosCartao). BLOQUEADO se a fatura estiver fechada. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir o lançamento do cartão de crédito")
     public String excluirLancamentoCartao(
             @ToolParam(description = "Nome do cartão") String cartao,
             @ToolParam(description = "ID do lançamento a excluir") Long lancamentoId) {
@@ -305,7 +309,8 @@ public class GestaoFinanceiraTools {
                 (cartao != null && !cartao.isBlank()) ? acharCartaoId(cartao) : atual.cartaoCreditoId()));
     }
 
-    @Tool(description = "Exclui uma assinatura (pela descrição). Confirme antes.")
+    @Tool(description = "Exclui uma assinatura (pela descrição). Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).")
+    @AcaoCritica("Excluir a assinatura")
     public String excluirAssinatura(
             @ToolParam(description = "Descrição da assinatura a excluir") String assinatura) {
         AssinaturaResponseDto alvo = acharAssinatura(assinatura);
@@ -319,8 +324,9 @@ public class GestaoFinanceiraTools {
     @Tool(description = """
             Fecha a fatura de um cartão para um mês/ano. Gera uma conta a pagar com o total líquido
             (SAÍDAS − ENTRADAS). Não fecha se o total for zero/negativo ou se já estiver fechada.
-            Use o NOME do cartão. Confirme com o usuário antes de executar.
+            Use o NOME do cartão. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Fechar a fatura do cartão, gerando a conta a pagar do total")
     public ContaResponseDto fecharFatura(
             @ToolParam(description = "Nome do cartão") String cartao,
             @ToolParam(description = "Mês da fatura (1 a 12)") Integer mes,
@@ -373,8 +379,9 @@ public class GestaoFinanceiraTools {
 
     @Tool(description = """
             Exclui uma categoria (pela descrição). Bloqueado se houver lançamentos/contas usando a
-            categoria. Confirme antes de executar.
+            categoria. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir a categoria")
     public String excluirCategoria(@ToolParam(description = "Descrição da categoria a excluir") String categoria) {
         CategoriaResponseDto alvo = acharCategoria(categoria);
         audit("excluirCategoria", "id=" + alvo.id());
@@ -416,8 +423,9 @@ public class GestaoFinanceiraTools {
 
     @Tool(description = """
             Exclui um parceiro (pelo nome/razão social). Bloqueado se houver lançamentos/contas
-            vinculados a ele. Confirme antes de executar.
+            vinculados a ele. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir o parceiro")
     public String excluirParceiro(@ToolParam(description = "Razão social/nome do parceiro a excluir") String parceiro) {
         ParceiroResponseDto alvo = acharParceiro(parceiro);
         audit("excluirParceiro", "id=" + alvo.id());
@@ -480,8 +488,9 @@ public class GestaoFinanceiraTools {
 
     @Tool(description = """
             Exclui uma carteira de investimento (pelo nome). BLOQUEADO se já houver transações
-            (aportes/resgates) registradas nela. Confirme antes de executar.
+            (aportes/resgates) registradas nela. Ação crítica: o sistema pede a confirmação do usuário (1ª chamada retorna CONFIRMAÇÃO NECESSÁRIA).
             """)
+    @AcaoCritica("Excluir a carteira de investimento")
     public String excluirInvestimento(
             @ToolParam(description = "Nome da carteira a excluir") String investimento) {
         ContaInvestimentoResponseDto alvo = acharInvestimento(investimento);
@@ -573,7 +582,8 @@ public class GestaoFinanceiraTools {
     }
 
     private void audit(String ferramenta, String detalhe) {
-        log.info("[CHAT-AUDIT] user={} tool={} {}", securityCtx.getUsuarioId(), ferramenta, detalhe);
+        // O detalhe (nomes/descrições informados) vai só para a auditoria do banco — não para o log (LGPD).
+        log.info("[CHAT-AUDIT] user={} tool={}", securityCtx.getUsuarioId(), ferramenta);
         auditoria.registrar(ferramenta, detalhe);
     }
 }

@@ -2,6 +2,7 @@ package br.com.core4erp.conciliacao.entity;
 
 import br.com.core4erp.conciliacao.enums.StatusConciliacao;
 import br.com.core4erp.config.auditing.TenantEntity;
+import br.com.core4erp.config.crypto.CampoCriptografadoConverter;
 import br.com.core4erp.contaCorrente.entity.ContaCorrente;
 import br.com.core4erp.usuario.entity.Usuario;
 import jakarta.persistence.*;
@@ -37,10 +38,14 @@ public class Conciliacao extends TenantEntity {
     @Column(length = 20)
     private String bancoId;
 
-    @Column(length = 20)
+    /** Agência informada no OFX — cifrada em repouso (não é pesquisada). */
+    @Convert(converter = CampoCriptografadoConverter.class)
+    @Column(name = "agencia", length = 255)
     private String agencia;
 
-    @Column(length = 50)
+    /** Número da conta informado no OFX — cifrado em repouso (não é pesquisado). */
+    @Convert(converter = CampoCriptografadoConverter.class)
+    @Column(name = "numero_conta_ofx", length = 255)
     private String numeroContaOfx;
 
     private LocalDate dataInicioOfx;

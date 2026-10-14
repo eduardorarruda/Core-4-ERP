@@ -1,26 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShieldCheck, TrendingUp, Zap, BarChart3 } from 'lucide-react';
+import { Receipt, GitMerge, CreditCard, FileBarChart } from 'lucide-react';
 import { auth, setLoginState } from '../lib/api';
 import { getFirstAccessibleRoute } from '../lib/routeUtils';
 import { FloatingInput, FloatingPasswordInput } from '../components/ui/FormField';
-import PasswordRules, { senhaValida } from '../components/ui/PasswordRules';
+import PasswordRules from '../components/ui/PasswordRules';
+import { senhaValida } from '../lib/senha';
 import Button from '../components/ui/Button';
-import { BrandMark } from '../components/login/HeroPane';
+import BrandMark from '../components/ui/BrandMark';
+import LinksLegais from '../components/legal/LinksLegais';
+import { VERSAO_TERMOS } from '../content/legal';
+import { usePageMeta } from '../hooks/usePageMeta';
+import { usePrefersReducedMotion } from '../hooks/useMediaQuery';
 
-const FEATURES = [
-  { icon: ShieldCheck, color: 'text-primary',   label: 'Segurança', value: 'JWT + BCrypt', sub: 'Dados protegidos' },
-  { icon: TrendingUp,  color: 'text-secondary', label: 'Módulos',   value: '10+',          sub: 'Módulos integrados' },
-  { icon: Zap,         color: 'text-warning',   label: 'Real-time', value: '100%',         sub: 'Dados em tempo real' },
-  { icon: BarChart3,   color: 'text-primary',   label: 'Relatórios',value: '∞',            sub: 'Exportação livre' },
+// O que o sistema faz de fato — sem números de marketing
+const RECURSOS = [
+  { icon: Receipt,      color: 'text-primary',   titulo: 'Contas a pagar e receber', texto: 'Vencimentos, baixas e categorias.' },
+  { icon: GitMerge,     color: 'text-secondary', titulo: 'Conciliação bancária',     texto: 'Importe o extrato OFX e vincule.' },
+  { icon: CreditCard,   color: 'text-warning',   titulo: 'Cartões de crédito',       texto: 'Parcelas, faturas e limite.' },
+  { icon: FileBarChart, color: 'text-primary',   titulo: 'Relatórios',               texto: 'DRE, fluxo de caixa, PDF e Excel.' },
 ];
 
+const LINK_TEXTO = 'text-primary underline underline-offset-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+
 export default function Register() {
+  usePageMeta({
+    title: 'Criar conta',
+    canonical: '/register',
+    description: 'Crie sua conta gratuita no Core 4 ERP e organize contas a pagar e receber, cartões de crédito, conciliação bancária e relatórios.',
+  });
   const navigate = useNavigate();
+  const reduzirMovimento = usePrefersReducedMotion();
   const [form, setForm] = useState({ nome: '', email: '', senha: '', confirmarSenha: '', telefone: '', tipoConta: 'EMPRESA', nomeEmpresa: '' });
+  const [aceite, setAceite] = useState(false);
   const [erro, setErro] = useState('');
   const [erroConfirmacao, setErroConfirmacao] = useState('');
   const [erroEmpresa, setErroEmpresa] = useState('');
+  const [erroAceite, setErroAceite] = useState('');
   const [carregando, setCarregando] = useState(false);
   const o1Ref   = useRef(null);
   const o2Ref   = useRef(null);
@@ -31,52 +47,69 @@ export default function Register() {
 
   const empresaFaltando = form.tipoConta === 'EMPRESA' && !form.nomeEmpresa.trim();
 
-  /* Mouse parallax */
+  /* Parallax do fundo: desligado com "reduzir movimento", 1 atualização por quadro */
   useEffect(() => {
-    const onMove = (e) => {
+    if (reduzirMovimento) return undefined;
+    let quadro = 0;
+    let ultimo = null;
+    const aplicar = () => {
+      quadro = 0;
+      if (!ultimo) return;
       const w = window.innerWidth, h = window.innerHeight;
-      const dx = (e.clientX / w - 0.5) * 2, dy = (e.clientY / h - 0.5) * 2;
+      const dx = (ultimo.x / w - 0.5) * 2, dy = (ultimo.y / h - 0.5) * 2;
       if (o1Ref.current) o1Ref.current.style.transform = `translate(${dx * 30}px, ${dy * 30}px)`;
       if (o2Ref.current) o2Ref.current.style.transform = `translate(${dx * -40}px, ${dy * -40}px)`;
       if (o3Ref.current) o3Ref.current.style.transform = `translate(${dx * 22}px, ${dy * 22}px)`;
       if (spotRef.current) {
-        spotRef.current.style.setProperty('--mx', `${e.clientX}px`);
-        spotRef.current.style.setProperty('--my', `${e.clientY}px`);
+        spotRef.current.style.setProperty('--mx', `${ultimo.x}px`);
+        spotRef.current.style.setProperty('--my', `${ultimo.y}px`);
       }
     };
-    window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
-  }, []);
+    const onMove = (e) => {
+      ultimo = { x: e.clientX, y: e.clientY };
+      if (!quadro) quadro = requestAnimationFrame(aplicar);
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      if (quadro) cancelAnimationFrame(quadro);
+    };
+  }, [reduzirMovimento]);
 
   const handleRegistrar = async (e) => {
     e.preventDefault();
     setErro('');
     setErroConfirmacao('');
     setErroEmpresa('');
+    setErroAceite('');
     if (empresaFaltando) {
       setErroEmpresa('Informe o nome da empresa para criar uma conta empresarial.');
       return;
     }
     if (form.senha !== form.confirmarSenha) {
-      setErroConfirmacao('Senha divergente da senha digitada anteriormente');
+      setErroConfirmacao('As senhas não coincidem.');
       return;
     }
     if (!senhaValida(form.senha)) {
-      setErro('A senha não atende aos requisitos mínimos de segurança');
+      setErro('A senha não atende aos requisitos mínimos de segurança.');
+      return;
+    }
+    if (!aceite) {
+      setErroAceite('Para criar a conta, é preciso aceitar os Termos de Uso e a Política de Privacidade.');
       return;
     }
     setCarregando(true);
     try {
       const telefone = form.telefone ? form.telefone.replace(/\D/g, '') : null;
       const nomeEmpresa = form.tipoConta === 'EMPRESA' ? form.nomeEmpresa.trim() : undefined;
-      await auth.registrar(form.nome, form.email, form.senha, telefone, form.tipoConta, nomeEmpresa);
+      await auth.registrar(form.nome, form.email, form.senha, telefone, form.tipoConta, nomeEmpresa, VERSAO_TERMOS);
       const result = await auth.login(form.email, form.senha);
       setLoginState(result);
       const permSet = new Set(result.empresas?.[0]?.permissoes ?? []);
       const check = (cod) => result.adminSistema || permSet.has(cod);
       navigate(getFirstAccessibleRoute(check));
     } catch (err) {
-      setErro(err.message || 'Erro ao criar conta');
+      setErro(err.message || 'Não foi possível criar a conta.');
     } finally {
       setCarregando(false);
     }
@@ -87,7 +120,7 @@ export default function Register() {
   return (
     <div className="relative min-h-dvh flex bg-surface overflow-hidden text-text-primary">
       {/* Background decorativo */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
+      <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
         <div
           className="absolute inset-0"
           style={{
@@ -112,37 +145,32 @@ export default function Register() {
         <BrandMark />
 
         <div className="w-full max-w-[380px] mx-auto py-8">
-          <div className="anim-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-text-primary/5 border border-text-primary/10 text-xs text-text-primary/60 mb-5">
-            <span className="live-dot" />
-            Crie seu workspace agora
-          </div>
-
           <h1 className="anim-in d1 font-display text-[32px] font-bold tracking-tight text-text-primary mb-2">
             Criar <em className="text-primary italic">conta</em>
           </h1>
-          <p className="anim-in d2 text-sm text-text-primary/50 mb-7">
-            Comece a gerenciar suas finanças com inteligência.
+          <p className="anim-in d2 text-sm text-text-primary/70 mb-7">
+            É gratuito. Leva menos de um minuto.
           </p>
 
-          <form onSubmit={handleRegistrar}>
+          <form onSubmit={handleRegistrar} noValidate>
             <div className="anim-in d2 mb-3">
               <FloatingInput id="nome" label="Nome completo" type="text" value={form.nome} onChange={set('nome')} autoComplete="name" required />
             </div>
             <div className="anim-in d3 mb-3">
-              <FloatingInput id="email" label="Email corporativo" type="email" value={form.email} onChange={set('email')} autoComplete="email" required />
+              <FloatingInput id="email" label="E-mail" type="email" value={form.email} onChange={set('email')} autoComplete="email" required />
             </div>
             <div className="anim-in d4 mb-3">
               <FloatingInput id="telefone" label="Telefone (opcional)" type="tel" value={form.telefone} onChange={set('telefone')} autoComplete="tel" />
             </div>
-            <div className="anim-in d4 mb-3">
-              <div className="text-[11px] text-text-primary/40 mb-2 font-body">Tipo de conta</div>
+            <fieldset className="anim-in d4 mb-3">
+              <legend className="text-xs text-text-primary/70 mb-2 font-body">Tipo de conta</legend>
               <div className="flex gap-2">
-                {[{ value: 'EMPRESA', label: 'Empresa' }, { value: 'PESSOA_FISICA', label: 'Uso Pessoal' }].map(({ value, label }) => {
+                {[{ value: 'EMPRESA', label: 'Empresa' }, { value: 'PESSOA_FISICA', label: 'Uso pessoal' }].map(({ value, label }) => {
                   const active = form.tipoConta === value;
                   return (
                     <label
                       key={value}
-                      className={`flex-1 flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border cursor-pointer text-[13px] font-body transition-colors ${active ? 'border-primary bg-primary/[.08] text-primary' : 'border-text-primary/10 bg-surface-low text-text-primary/60'}`}
+                      className={`flex-1 flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl border cursor-pointer text-[13px] font-body transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary ${active ? 'border-primary bg-primary/[.08] text-primary' : 'border-text-primary/15 bg-surface-low text-text-primary/70'}`}
                     >
                       <input type="radio" name="tipoConta" value={value} checked={active} onChange={(e) => { set('tipoConta')(e); setErroEmpresa(''); }} className="sr-only" />
                       {label}
@@ -150,7 +178,7 @@ export default function Register() {
                   );
                 })}
               </div>
-            </div>
+            </fieldset>
             {form.tipoConta === 'EMPRESA' && (
               <div className="anim-in d4 mb-3">
                 <FloatingInput
@@ -169,17 +197,49 @@ export default function Register() {
               <PasswordRules senha={form.senha} className="mt-1.5 ml-1" />
             </div>
             <div className="anim-in d6 mt-3">
-              <FloatingPasswordInput id="confirmarSenha" label="Confirmar senha" value={form.confirmarSenha} onChange={(e) => { set('confirmarSenha')(e); setErroConfirmacao(''); }} autoComplete="new-password" required />
-              {erroConfirmacao && (
-                <span className="text-[11px] text-error mt-1 block pl-1">
-                  {erroConfirmacao}
-                </span>
+              <FloatingPasswordInput
+                id="confirmarSenha"
+                label="Confirmar senha"
+                value={form.confirmarSenha}
+                onChange={(e) => { set('confirmarSenha')(e); setErroConfirmacao(''); }}
+                autoComplete="new-password"
+                error={erroConfirmacao || undefined}
+                required
+              />
+            </div>
+
+            {/* Consentimento (LGPD art. 8º): caixa desmarcada por padrão, obrigatória */}
+            <div className="anim-in d6 mt-4">
+              <div className="flex items-start gap-3">
+                <input
+                  id="aceiteTermos"
+                  type="checkbox"
+                  checked={aceite}
+                  onChange={(e) => { setAceite(e.target.checked); setErroAceite(''); }}
+                  required
+                  aria-invalid={erroAceite ? true : undefined}
+                  aria-describedby={erroAceite ? 'aceiteTermos-erro' : undefined}
+                  className="mt-0.5 w-5 h-5 shrink-0 accent-[var(--color-primary)] cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+                <label htmlFor="aceiteTermos" className="text-[13px] text-text-primary/80 leading-relaxed cursor-pointer">
+                  Li e aceito os{' '}
+                  <Link to="/termos" target="_blank" rel="noopener" className={LINK_TEXTO}>
+                    Termos de Uso<span className="sr-only"> (abre em nova aba)</span>
+                  </Link>
+                  {' '}e a{' '}
+                  <Link to="/privacidade" target="_blank" rel="noopener" className={LINK_TEXTO}>
+                    Política de Privacidade<span className="sr-only"> (abre em nova aba)</span>
+                  </Link>.
+                </label>
+              </div>
+              {erroAceite && (
+                <p id="aceiteTermos-erro" role="alert" className="text-xs text-error mt-1.5">{erroAceite}</p>
               )}
             </div>
 
             {erro && (
-              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-error/10 border border-error/20 text-error text-[13px] mt-3">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
+              <div role="alert" className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-error/10 border border-error/20 text-error text-[13px] mt-3">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
                 {erro}
               </div>
             )}
@@ -191,44 +251,39 @@ export default function Register() {
             </div>
           </form>
 
-          <div className="anim-in d7 text-center mt-6 text-[13px] text-text-primary/40">
+          <div className="anim-in d7 text-center mt-6 text-[13px] text-text-primary/70">
             Já tem uma conta?{' '}
-            <Link to="/login" className="text-primary font-semibold hover:opacity-80 transition-opacity">Fazer login</Link>
+            <Link to="/login" className="text-primary font-semibold hover:opacity-80 transition-opacity">Entrar</Link>
           </div>
         </div>
 
-        <footer className="text-[10px] text-text-primary/25 font-mono uppercase tracking-widest">
-          © 2026 Core 4 · LGPD compliant
+        <footer className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-primary/70">
+          <span>© 2026 Core 4 ERP</span>
+          <LinksLegais />
         </footer>
       </section>
 
-      {/* Hero pane */}
+      {/* Painel lateral (desktop) */}
       <div className="hidden lg:flex flex-1 relative z-[1] items-center justify-center pr-12 pl-6 py-10">
         <div className="max-w-[420px] w-full">
-          <div className="anim-in inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/[.08] border border-primary/20 text-[10px] text-primary font-mono tracking-widest uppercase mb-6">
-            <span className="live-dot" style={{ width: 5, height: 5 }} />
-            Comece hoje
-          </div>
-
           <h2 className="anim-in d1 font-display text-[40px] font-bold tracking-tight leading-[1.15] text-text-primary mb-4">
-            Controle Total das Suas{' '}
-            <em className="italic text-gradient-primary">Finanças</em>
+            Suas finanças{' '}
+            <em className="italic text-gradient-primary">em um só lugar</em>
           </h2>
 
-          <p className="anim-in d2 text-[15px] text-text-primary/50 leading-relaxed mb-8">
-            Gerencie contas, cartões, investimentos e parceiros em um único lugar inteligente.
+          <p className="anim-in d2 text-[15px] text-text-primary/70 leading-relaxed mb-8">
+            Para uso pessoal ou para a sua empresa, com perfis de acesso para quem trabalha com você.
           </p>
 
-          <div className="anim-in d3 grid grid-cols-2 gap-3">
-            {FEATURES.map(({ icon: Icon, color, label, value, sub }) => (
-              <div key={label} className="bg-text-primary/[.025] border border-text-primary/[.08] rounded-2xl p-5">
-                <Icon size={24} className={`${color} mb-3`} />
-                <div className="text-[10px] text-text-primary/40 font-mono tracking-widest uppercase mb-1">{label}</div>
-                <div className="font-display text-xl font-bold text-text-primary tracking-tight mb-0.5">{value}</div>
-                <div className="text-[11px] text-text-primary/40">{sub}</div>
-              </div>
+          <ul className="anim-in d3 grid grid-cols-2 gap-3">
+            {RECURSOS.map(({ icon: Icon, color, titulo, texto }) => (
+              <li key={titulo} className="bg-text-primary/[.025] border border-text-primary/[.08] rounded-2xl p-5">
+                <Icon size={24} className={`${color} mb-3`} aria-hidden="true" />
+                <div className="font-display text-sm font-bold text-text-primary tracking-tight mb-1">{titulo}</div>
+                <div className="text-xs text-text-primary/70">{texto}</div>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </div>
     </div>

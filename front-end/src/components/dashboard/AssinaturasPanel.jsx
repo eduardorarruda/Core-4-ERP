@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import BentoCard from '../ui/BentoCard';
 import { brl } from '../../lib/formatters';
 import { chartTheme } from './chartTheme';
+import GraficoAcessivel from '../ui/GraficoAcessivel';
 
 export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, pieAssinaturas, carregando, isDark }) {
   const { tooltipStyle } = chartTheme(isDark);
@@ -14,7 +15,7 @@ export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, 
       loading={carregando}
       title="Assinaturas Recorrentes"
       headerAction={
-        <Link to="/assinaturas" className="text-xs font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
+        <Link to="/assinaturas" className="text-xs font-bold uppercase tracking-widest text-text-primary/70 hover:text-primary transition-colors">
           Gerenciar →
         </Link>
       }
@@ -23,12 +24,13 @@ export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, 
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-error mb-0.5">Custo Mensal</p>
           <p className="text-2xl font-bold text-text-primary font-display">R$ {brl(totalMensalAssin)}</p>
-          <p className="text-xs text-text-primary/50 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
+          <p className="text-xs text-text-primary/70 mt-0.5">Anual: R$ {brl(totalMensalAssin * 12)}</p>
         </div>
         <Repeat className="w-8 h-8 text-error opacity-40" />
       </div>
 
       {pieAssinaturas.length > 0 && (
+        <GraficoAcessivel resumo={`Gráfico de rosca do custo mensal das assinaturas por categoria. ${pieAssinaturas.map((d) => `${d.name}: R$ ${brl(d.value)}`).join('; ')}.`}>
         <ResponsiveContainer width="100%" height={160}>
           <PieChart>
             <Pie data={pieAssinaturas} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value" stroke="none">
@@ -37,6 +39,7 @@ export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, 
             <Tooltip contentStyle={tooltipStyle} formatter={(v) => `R$ ${brl(v)}`} />
           </PieChart>
         </ResponsiveContainer>
+        </GraficoAcessivel>
       )}
 
       <div className="space-y-2 mt-2">
@@ -44,16 +47,16 @@ export default function AssinaturasPanel({ assinaturasAtivas, totalMensalAssin, 
           <div key={a.id} className="flex items-center justify-between bg-surface-low rounded-lg px-3 py-2">
             <div className="min-w-0">
               <p className="text-xs font-medium text-text-primary truncate">{a.descricao}</p>
-              <p className="text-xs text-text-primary/50">dia {a.diaVencimento}</p>
+              <p className="text-xs text-text-primary/70">dia {a.diaVencimento}</p>
             </div>
             <span className="text-xs font-bold text-error shrink-0 ml-2">R$ {brl(a.valor)}</span>
           </div>
         ))}
         {assinaturasAtivas.length > 4 && (
-          <p className="text-xs text-text-primary/40 text-center">+{assinaturasAtivas.length - 4} assinatura(s)</p>
+          <p className="text-xs text-text-primary/60 text-center">+{assinaturasAtivas.length - 4} assinatura(s)</p>
         )}
         {assinaturasAtivas.length === 0 && (
-          <p className="text-sm text-text-primary/50 text-center py-4">Nenhuma assinatura ativa</p>
+          <p className="text-sm text-text-primary/70 text-center py-4">Nenhuma assinatura ativa</p>
         )}
       </div>
     </BentoCard>

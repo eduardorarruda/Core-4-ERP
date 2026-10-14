@@ -16,8 +16,18 @@ public interface ContaBaixadaRepository extends JpaRepository<ContaBaixada, Long
     boolean existsByContaCorrenteId(Long contaCorrenteId);
     Optional<ContaBaixada> findByContaId(Long contaId);
 
+    /** Baixas do período com conta, categoria e conta corrente já carregadas (relatórios — sem N+1). */
+    @Query("""
+            SELECT cb FROM ContaBaixada cb
+            JOIN FETCH cb.conta c
+            LEFT JOIN FETCH c.categoria
+            LEFT JOIN FETCH cb.contaCorrente
+            WHERE cb.empresaId = :empresaId
+              AND cb.dataPagamento BETWEEN :inicio AND :fim
+            ORDER BY cb.dataPagamento
+            """)
     List<ContaBaixada> findByEmpresaIdAndDataPagamentoBetweenOrderByDataPagamento(
-            Long empresaId, LocalDate inicio, LocalDate fim);
+            @Param("empresaId") Long empresaId, @Param("inicio") LocalDate inicio, @Param("fim") LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(cb.valorFinal), 0) FROM ContaBaixada cb " +
            "WHERE cb.empresaId = :eid AND cb.conta.tipo = 'PAGAR'")

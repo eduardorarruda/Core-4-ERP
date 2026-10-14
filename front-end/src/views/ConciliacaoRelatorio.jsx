@@ -9,7 +9,6 @@ import DataTable from '../components/ui/DataTable';
 import EmptyState from '../components/ui/EmptyState';
 import { useToast } from '../hooks/useToast';
 import { brl, formatDate } from '../lib/formatters';
-import { exportarRelatorioConciliacaoPdf } from '../lib/pdfUtils';
 
 const STATUS_ITEM_LABEL = {
   SUGERIDO: 'Sugerido',
@@ -30,7 +29,7 @@ const STATUS_CONCILIACAO_VARIANT = { PENDENTE: 'warning', FINALIZADA: 'success',
 const STAT_STYLES = {
   neutral:   { wrap: 'bg-surface-highest border-text-primary/10', text: 'text-text-primary' },
   primary:   { wrap: 'bg-primary/10 border-primary/20',           text: 'text-primary' },
-  muted:     { wrap: 'bg-surface-high border-text-primary/5',     text: 'text-text-primary/40' },
+  muted:     { wrap: 'bg-surface-high border-text-primary/5',     text: 'text-text-primary/60' },
   secondary: { wrap: 'bg-secondary/10 border-secondary/20',       text: 'text-secondary' },
   error:     { wrap: 'bg-error/10 border-error/20',               text: 'text-error' },
 };
@@ -57,9 +56,9 @@ export default function ConciliacaoRelatorio() {
       })
       .finally(() => { if (!cancelado) setLoading(false); });
     return () => { cancelado = true; };
-  }, [id]);
+  }, [id, toast]);
 
-  function exportarPDF() {
+  async function exportarPDF() {
     if (!rel) return;
     setExportando(true);
     try {
@@ -73,6 +72,8 @@ export default function ConciliacaoRelatorio() {
         i.scoreVinculacao != null ? `${i.scoreVinculacao}pts` : '—',
       ]);
 
+      // jsPDF (~400 kB) só é baixado quando o usuário pede o PDF
+      const { exportarRelatorioConciliacaoPdf } = await import('../lib/pdfUtils');
       exportarRelatorioConciliacaoPdf({
         titulo: `Relatório de Conciliação #${rel.id}`,
         subtitulo: `${rel.contaCorrenteDescricao} — ${rel.contaCorrenteNumero}`,
@@ -89,7 +90,7 @@ export default function ConciliacaoRelatorio() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20 text-text-primary/40">Carregando...</div>;
+    return <div className="flex items-center justify-center py-20 text-text-primary/60">Carregando...</div>;
   }
 
   if (erro || !rel) {
@@ -129,9 +130,9 @@ export default function ConciliacaoRelatorio() {
       render: (v, row) => v ? (
         <div>
           <p className="text-sm text-text-primary">{v}</p>
-          {row.contaValor && <p className="text-xs text-text-primary/40">R$ {brl(row.contaValor)}</p>}
+          {row.contaValor && <p className="text-xs text-text-primary/60">R$ {brl(row.contaValor)}</p>}
         </div>
-      ) : <span className="text-text-primary/30">—</span>,
+      ) : <span className="text-text-primary/60">—</span>,
     },
     {
       key: 'statusItem', label: 'Status',
@@ -169,19 +170,19 @@ export default function ConciliacaoRelatorio() {
             { label: 'Período OFX', value: rel.dataInicioOfx ? `${formatDate(rel.dataInicioOfx)} – ${formatDate(rel.dataFimOfx)}` : '—' },
           ].map(({ label, value }) => (
             <div key={label}>
-              <p className="text-xs text-text-primary/30 uppercase tracking-widest font-mono mb-1">{label}</p>
+              <p className="text-xs text-text-primary/60 uppercase tracking-widest font-mono mb-1">{label}</p>
               <p className="font-bold text-text-primary font-mono">{value}</p>
             </div>
           ))}
           <div>
-            <p className="text-xs text-text-primary/30 uppercase tracking-widest font-mono mb-1">Status</p>
+            <p className="text-xs text-text-primary/60 uppercase tracking-widest font-mono mb-1">Status</p>
             <Badge variant={STATUS_CONCILIACAO_VARIANT[rel.status] ?? 'neutral'} size="md">
               {STATUS_CONCILIACAO_LABEL[rel.status] ?? rel.status}
             </Badge>
           </div>
           {rel.observacao && (
             <div className="col-span-2 md:col-span-4">
-              <p className="text-xs text-text-primary/30 uppercase tracking-widest font-mono mb-1">Observação</p>
+              <p className="text-xs text-text-primary/60 uppercase tracking-widest font-mono mb-1">Observação</p>
               <p className="text-text-primary text-sm">{rel.observacao}</p>
             </div>
           )}
@@ -196,7 +197,7 @@ export default function ConciliacaoRelatorio() {
               <div key={s.label} className={`rounded-xl p-3 text-center border ${scheme.wrap}`}>
                 {StatIcon && <StatIcon className={`w-4 h-4 mx-auto mb-1.5 ${scheme.text}`} aria-hidden="true" />}
                 <p className={`text-2xl font-bold font-mono ${scheme.text}`}>{s.value ?? 0}</p>
-                <p className="text-xs text-text-primary/30 uppercase tracking-widest font-mono mt-1">{s.label}</p>
+                <p className="text-xs text-text-primary/60 uppercase tracking-widest font-mono mt-1">{s.label}</p>
               </div>
             );
           })}
@@ -205,6 +206,7 @@ export default function ConciliacaoRelatorio() {
 
       {/* Tabela detalhada */}
       <DataTable
+        caption="Itens da conciliação bancária"
         columns={columns}
         data={rel.itens ?? []}
         aria-label="Itens da conciliação"

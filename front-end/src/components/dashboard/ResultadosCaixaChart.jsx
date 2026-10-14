@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, CartesianGrid, Tooltip, ResponsiveContainer } fro
 import BentoCard from '../ui/BentoCard';
 import { brl } from '../../lib/formatters';
 import { chartTheme, readCssVar } from './chartTheme';
+import GraficoAcessivel from '../ui/GraficoAcessivel';
 
 export default function ResultadosCaixaChart({ resultsData, carregando, isDark }) {
   const { gridColor, axisColor, tooltipStyle } = chartTheme(isDark);
@@ -14,7 +15,10 @@ export default function ResultadosCaixaChart({ resultsData, carregando, isDark }
       loading={carregando}
       title="Resultados de Caixa"
     >
-      <div className="w-full mt-4">
+      <GraficoAcessivel
+        className="w-full mt-4"
+        resumo={`Gráfico de barras com receitas e despesas por mês. ${resultsData.map((m) => `${m.name}: receitas R$ ${brl(m.income)}, despesas R$ ${brl(m.expense)}`).join('; ')}.`}
+      >
         <ResponsiveContainer width="100%" height={256}>
           <BarChart data={resultsData}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
@@ -24,8 +28,8 @@ export default function ResultadosCaixaChart({ resultsData, carregando, isDark }
             <Bar dataKey="expense" name="Despesas" fill={colorExpense} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
-      </div>
-      <div className="flex justify-center gap-8 mt-4 text-xs font-bold uppercase tracking-widest text-text-primary/50">
+      </GraficoAcessivel>
+      <div className="flex justify-center gap-8 mt-4 text-xs font-bold uppercase tracking-widest text-text-primary/70">
         <div className="flex items-center gap-2"><span className="w-3 h-3 bg-secondary rounded-full" /> Receitas</div>
         <div className="flex items-center gap-2"><span className="w-3 h-3 bg-error rounded-full" /> Despesas</div>
       </div>

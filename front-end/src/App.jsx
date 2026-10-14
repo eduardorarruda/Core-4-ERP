@@ -1,17 +1,21 @@
-import React, { lazy, Suspense, useState, useCallback, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import TopNav from './components/layout/TopNav';
 import PwaStatus from './components/layout/PwaStatus';
 import InstalarPwaBanner from './components/layout/InstalarPwaBanner';
-import ChatSidebar from './components/chat/ChatSidebar';
+import ChatLauncher from './components/chat/ChatLauncher';
 import BottomNav from './components/layout/BottomNav';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
 import { ConfirmProvider } from './hooks/useConfirm';
 import { ToastContainer } from './components/ui/Toast';
-import { getUsuario } from './lib/api';
 import { useAuth } from './hooks/useAuth';
+import { AuthProvider } from './context/AuthContext';
+import { useMediaQuery } from './hooks/useMediaQuery';
+import { setRobotsNoindex } from './hooks/usePageMeta';
+import Modal from './components/ui/Modal';
+import Button from './components/ui/Button';
 import { cn } from './lib/utils';
 import SkeletonCard from './components/ui/SkeletonCard';
 import { getFirstAccessibleRoute } from './lib/routeUtils';
@@ -45,6 +49,8 @@ const AceitarConvite     = lazy(() => import('./views/AceitarConvite'));
 const GestaoOperadores   = lazy(() => import('./views/GestaoOperadores'));
 const GestaoPerfis       = lazy(() => import('./views/GestaoPerfis'));
 const Ajuda              = lazy(() => import('./views/Ajuda'));
+const Privacidade        = lazy(() => import('./views/Privacidade'));
+const Termos             = lazy(() => import('./views/Termos'));
 
 function PageSkeleton() {
   return (
@@ -85,62 +91,99 @@ function ContaEmpresaRoute({ children }) {
   return children;
 }
 
-function SenhaProvisoriaModal({ onConfirm }) {
+function SenhaProvisoriaModal({ open, onConfirm, onSair }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center' }}>
-      <div style={{ background: '#161616', border: '1px solid rgba(255,255,255,.08)', borderRadius: 20, padding: 32, maxWidth: 400, width: '90%', textAlign: 'center' }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,193,7,.1)', border: '1px solid rgba(255,193,7,.2)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFD37A" strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700, color: '#fafafa', marginBottom: 8 }}>Troque sua Senha</h2>
-        <p style={{ fontSize: 14, color: 'rgba(250,250,250,.5)', lineHeight: 1.6, marginBottom: 24 }}>
-          Você está usando uma senha provisória. É obrigatório definir sua própria senha antes de continuar.
-        </p>
-        <button onClick={onConfirm} style={{ width: '100%', padding: '12px', borderRadius: 12, background: '#6EFFC0', border: 'none', color: '#003824', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Sora', sans-serif" }}>
-          Definir Minha Senha
-        </button>
-      </div>
-    </div>
+    <Modal
+      open={open}
+      onClose={() => {}}
+      closeOnEsc={false}
+      closeOnOverlay={false}
+      showClose={false}
+      size="sm"
+      title="Troque sua senha"
+      description="Você entrou com uma senha provisória. Defina uma senha sua para liberar o acesso ao sistema."
+    >
+      <Modal.Footer className="flex-col-reverse sm:flex-row">
+        <Button variant="ghost" onClick={onSair} className="w-full sm:w-auto">Sair</Button>
+        <Button onClick={onConfirm} className="w-full sm:w-auto">Definir minha senha</Button>
+      </Modal.Footer>
+    </Modal>
   );
 }
+
+const FOCAVEIS_DRAWER = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function ProtectedLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [showSenhaModal, setShowSenhaModal] = useState(false);
-  const { senhaProvisoria } = useAuth();
+  const { senhaProvisoria, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const desktop = useMediaQuery('(min-width: 1024px)');
+  const drawerRef = useRef(null);
+  const focoAntesDoDrawer = useRef(null);
   // Rotas "tela cheia": ocupam toda a área (sem padding/max-width) — ex.: a tela da Áurea, que
   // precisa dos 2 painéis do tamanho da janela, estilo ChatGPT.
   const fullBleed = pathname === '/assistente';
+  // Com senha provisória o backend bloqueia quase tudo: o modal fica aberto em qualquer tela,
+  // exceto em Configurações, onde a troca é feita.
+  const exibirModalSenha = senhaProvisoria && pathname !== '/configuracoes';
 
   const openCmd = useCallback(() => setCmdOpen(true), []);
   const closeCmd = useCallback(() => setCmdOpen(false), []);
+  const abrirMenu = useCallback(() => {
+    focoAntesDoDrawer.current = document.activeElement;
+    setIsSidebarOpen(true);
+  }, []);
+  const fecharMenu = useCallback(() => setIsSidebarOpen(false), []);
 
+  // Telas autenticadas não devem ser indexadas por buscadores
   useEffect(() => {
-    if (senhaProvisoria) setShowSenhaModal(true);
-  }, [senhaProvisoria]);
+    setRobotsNoindex(true);
+    return () => setRobotsNoindex(false);
+  }, []);
+
+  // Drawer mobile: foco entra no menu ao abrir, Esc fecha e o foco volta para quem abriu
+  const drawerAberto = isSidebarOpen && !desktop;
+  useEffect(() => {
+    if (!drawerAberto) return undefined;
+    drawerRef.current?.querySelector(FOCAVEIS_DRAWER)?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') setIsSidebarOpen(false); };
+    document.addEventListener('keydown', onKey);
+    const quemAbriu = focoAntesDoDrawer.current;
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      quemAbriu?.focus?.();
+    };
+  }, [drawerAberto]);
 
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="h-screen bg-surface flex relative overflow-hidden">
+    <div className="h-dvh bg-surface flex relative overflow-hidden">
       {/* Mobile sidebar overlay */}
       {isSidebarOpen && (
         <div
+          aria-hidden="true"
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
+          onClick={fecharMenu}
         />
       )}
 
-      {/* Sidebar */}
-      <div className={cn(
-        'fixed inset-y-0 left-0 transform lg:relative lg:translate-x-0 transition duration-200 ease-in-out z-50',
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
+      {/* Sidebar — no mobile vira drawer; fechado fica `inert` (fora do Tab e do leitor de tela) */}
+      <div
+        ref={drawerRef}
+        inert={!desktop && !isSidebarOpen ? true : undefined}
+        role={drawerAberto ? 'dialog' : undefined}
+        aria-modal={drawerAberto ? 'true' : undefined}
+        aria-label={drawerAberto ? 'Menu principal' : undefined}
+        className={cn(
+          'fixed inset-y-0 left-0 transform lg:relative lg:translate-x-0 transition duration-200 ease-in-out z-50',
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
         {/*
           expandido = drawer aberto no mobile → rótulos sempre visíveis (w-56).
           No desktop isSidebarOpen é sempre false → mantém o rail w-16 com hover/foco.
@@ -148,15 +191,15 @@ function ProtectedLayout({ children }) {
         */}
         <Sidebar
           expandido={isSidebarOpen}
-          onNavigate={() => setIsSidebarOpen(false)}
-          onClose={() => setIsSidebarOpen(false)}
+          onNavigate={fecharMenu}
+          onClose={fecharMenu}
         />
       </div>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         <TopNav
-          onMenuClick={() => setIsSidebarOpen(true)}
+          onMenuClick={abrirMenu}
           onCommandPaletteOpen={openCmd}
         />
         <PwaStatus />
@@ -178,10 +221,10 @@ function ProtectedLayout({ children }) {
         </main>
       </div>
 
-      <ChatSidebar />
+      <ChatLauncher />
 
       {/* Navegação inferior — apenas mobile (lg:hidden). Abre o mesmo drawer do Sidebar. */}
-      <BottomNav onAbrirMenu={() => setIsSidebarOpen(true)} />
+      <BottomNav onAbrirMenu={abrirMenu} />
 
       <ToastContainer />
 
@@ -192,11 +235,11 @@ function ProtectedLayout({ children }) {
         </Suspense>
       )}
 
-      {showSenhaModal && (
-        <SenhaProvisoriaModal
-          onConfirm={() => { setShowSenhaModal(false); navigate('/configuracoes'); }}
-        />
-      )}
+      <SenhaProvisoriaModal
+        open={exibirModalSenha}
+        onConfirm={() => navigate('/configuracoes?aba=seguranca')}
+        onSair={logout}
+      />
     </div>
   );
 }
@@ -204,6 +247,7 @@ function ProtectedLayout({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <AuthProvider>
       <ToastProvider>
         <ConfirmProvider>
           {/* Skip navigation for accessibility */}
@@ -221,6 +265,8 @@ export default function App() {
             <Route path="/register"           element={<Register />} />
             <Route path="/redefinir-senha"    element={<RedefinirSenha />} />
             <Route path="/aceitar-convite"    element={<AceitarConvite />} />
+            <Route path="/privacidade"        element={<Privacidade />} />
+            <Route path="/termos"             element={<Termos />} />
 
             <Route path="/dashboard"        element={<ProtectedLayout><PermissaoRoute permissao="DASHBOARD_VISUALIZAR"><DashboardHome /></PermissaoRoute></ProtectedLayout>} />
             <Route path="/conciliacao"              element={<ProtectedLayout><PermissaoRoute permissao="CONCILIACAO_VISUALIZAR"><Conciliacao /></PermissaoRoute></ProtectedLayout>} />
@@ -259,6 +305,7 @@ export default function App() {
           <InstalarPwaBanner />
         </ConfirmProvider>
       </ToastProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

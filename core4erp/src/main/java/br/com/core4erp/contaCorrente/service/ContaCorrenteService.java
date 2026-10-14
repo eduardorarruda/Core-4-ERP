@@ -54,12 +54,14 @@ public class ContaCorrenteService {
         this.dtoValidator = dtoValidator;
     }
 
+    @Requer("CONTA_CORRENTE_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public List<ContaCorrenteResponseDto> listar() {
         return repository.findAllByEmpresaId(tenantCtx.getEmpresaId())
                 .stream().map(ContaCorrenteResponseDto::from).toList();
     }
 
+    @Requer("CONTA_CORRENTE_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public ContaCorrenteResponseDto buscarPorId(Long id) {
         return ContaCorrenteResponseDto.from(findOwned(id));
@@ -70,7 +72,7 @@ public class ContaCorrenteService {
     public ContaCorrenteResponseDto criar(ContaCorrenteRequestDto dto) {
         dtoValidator.validar(dto);
         Long empresaId = tenantCtx.getEmpresaId();
-        if (repository.existsByNumeroContaAndEmpresaId(dto.numeroConta(), empresaId)) {
+        if (repository.existeNumeroConta(dto.numeroConta(), empresaId)) {
             throw new IllegalArgumentException("Número de conta já cadastrado");
         }
         validarSaldo(dto);
@@ -155,10 +157,11 @@ public class ContaCorrenteService {
         return TransferenciaResponseDto.from(transferenciaRepository.save(transferencia));
     }
 
+    @Requer("CONTA_CORRENTE_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public List<TransferenciaResponseDto> listarTransferencias() {
         return transferenciaRepository
-                .findAllByEmpresaIdOrderByDataTransferenciaDesc(tenantCtx.getEmpresaId())
+                .findTop500ByEmpresaIdOrderByDataTransferenciaDescIdDesc(tenantCtx.getEmpresaId())
                 .stream().map(TransferenciaResponseDto::from).toList();
     }
 

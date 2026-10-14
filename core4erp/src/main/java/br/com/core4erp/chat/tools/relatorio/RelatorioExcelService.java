@@ -1,9 +1,12 @@
 package br.com.core4erp.chat.tools.relatorio;
 
+import br.com.core4erp.config.rbac.Requer;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.entity.Conta;
 import br.com.core4erp.conta.repository.ContaRepository;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -23,10 +26,27 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @Service
 public class RelatorioExcelService {
+
+    /** Dono do arquivo gerado: só ele (na mesma empresa) pode baixar. */
+    record DonoRelatorio(Long usuarioId, Long empresaId) {}
+
+    private static final Pattern NOME_ARQUIVO = Pattern.compile(
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.xlsx$");
+    private static final String MSG_NAO_ENCONTRADO = "Relatório não encontrado ou expirado. Gere o relatório novamente.";
+
+    /**
+     * Índice arquivo → dono, com a MESMA validade do arquivo (chat.relatorios.ttl-minutes): depois
+     * disso o download responde 404 mesmo que a limpeza horária ainda não tenha apagado o arquivo.
+     * Em memória: após reiniciar, relatórios antigos deixam de ser baixáveis (basta gerar de novo).
+     */
+    private final Cache<String, DonoRelatorio> donos;
 
     private final ContaRepository contaRepository;
     private final SecurityContextUtils securityCtx;
@@ -37,13 +57,18 @@ public class RelatorioExcelService {
     @Value("${chat.relatorios.dir}")
     private String relatoriosDir;
 
-    @Value("${chat.relatorios.ttl-minutes:60}")
-    private int ttlMinutes;
+    private final int ttlMinutes;
 
     public RelatorioExcelService(ContaRepository contaRepository,
                                  SecurityContextUtils securityCtx,
                                  TenantContext tenantCtx,
-                                 MeterRegistry registry) {
+                                 MeterRegistry registry,
+                                 @Value("${chat.relatorios.ttl-minutes:60}") int ttlMinutes) {
+        this.ttlMinutes = ttlMinutes;
+        this.donos = Caffeine.newBuilder()
+                .expireAfterWrite(ttlMinutes, TimeUnit.MINUTES)
+                .maximumSize(10_000)
+                .build();
         this.contaRepository = contaRepository;
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
@@ -67,11 +92,16 @@ public class RelatorioExcelService {
      * (ex.: {@code conta.getCategoria()}) sejam carregadas mesmo quando executado fora do
      * dispatch HTTP — caso do chat por streaming, que roda numa thread de pool sem OSIV.
      */
+    @Requer("CONTA_VISUALIZAR") // o relatório expõe as contas a pagar/receber da empresa
     @Transactional(readOnly = true)
     public String gerarRelatorioDespesas(LocalDate inicio, LocalDate fim) {
         Timer.Sample sample = Timer.start();
-        Long uid = tenantCtx.getEmpresaId();
-        var contas = contaRepository.findAllByEmpresaIdAndDataVencimentoBetween(uid, inicio, fim);
+        Long empresaId = tenantCtx.getEmpresaId();
+        Long usuarioId = tenantCtx.getUsuarioId();
+        if (empresaId == null || usuarioId == null) {
+            throw new IllegalStateException("Não foi possível identificar a empresa para gerar o relatório.");
+        }
+        var contas = contaRepository.findAllByEmpresaIdAndDataVencimentoBetween(empresaId, inicio, fim);
 
         String fileName = UUID.randomUUID() + ".xlsx";
         Path filePath = Path.of(relatoriosDir, fileName);
@@ -98,12 +128,13 @@ public class RelatorioExcelService {
             int rowNum = 1;
             for (Conta conta : contas) {
                 Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(conta.getDescricao());
+                row.createCell(0).setCellValue(sanitizarCelula(conta.getDescricao()));
                 row.createCell(1).setCellValue(conta.getValorOriginal().doubleValue());
                 row.createCell(2).setCellValue(conta.getDataVencimento().toString());
                 row.createCell(3).setCellValue(conta.getTipo().name());
                 row.createCell(4).setCellValue(conta.getStatus().name());
-                row.createCell(5).setCellValue(conta.getCategoria().getDescricao());
+                row.createCell(5).setCellValue(sanitizarCelula(
+                        conta.getCategoria() != null ? conta.getCategoria().getDescricao() : ""));
                 row.createCell(6).setCellValue(
                         conta.getNumeroParcela() + "/" + conta.getTotalParcelas());
             }
@@ -119,21 +150,39 @@ public class RelatorioExcelService {
             sample.stop(tempoGeracaoRelatorio);
         }
 
+        donos.put(fileName, new DonoRelatorio(usuarioId, empresaId));
         totalRelatoriosGerados.increment();
         return fileName;
     }
 
-    public Resource getRelatorio(String email, String fileName) {
-        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
-            throw new IllegalArgumentException("Nome de arquivo inválido");
+    /**
+     * Defesa contra CSV/Formula injection: texto vindo do usuário que comece com
+     * {@code = + - @ TAB CR} seria interpretado como fórmula pelo Excel/LibreOffice — prefixa {@code '}.
+     */
+    static String sanitizarCelula(String valor) {
+        if (valor == null || valor.isEmpty()) return valor == null ? "" : valor;
+        char c = valor.charAt(0);
+        return (c == '=' || c == '+' || c == '-' || c == '@' || c == '\t' || c == '\r') ? "'" + valor : valor;
+    }
+
+    /**
+     * Download: só o usuário que gerou, na mesma empresa, enquanto o relatório não expirou.
+     * Qualquer outro caso responde 404 (sem revelar se o arquivo existe).
+     */
+    public Resource getRelatorio(Long usuarioId, Long empresaId, String fileName) {
+        if (fileName == null || !NOME_ARQUIVO.matcher(fileName).matches()) {
+            throw new jakarta.persistence.EntityNotFoundException(MSG_NAO_ENCONTRADO);
+        }
+        DonoRelatorio dono = donos.getIfPresent(fileName);
+        if (dono == null || !Objects.equals(dono.usuarioId(), usuarioId)
+                || !Objects.equals(dono.empresaId(), empresaId)) {
+            throw new jakarta.persistence.EntityNotFoundException(MSG_NAO_ENCONTRADO);
         }
 
         Path filePath = Path.of(relatoriosDir, fileName);
         if (!Files.exists(filePath)) {
-            throw new jakarta.persistence.EntityNotFoundException(
-                    "Relatório não encontrado ou expirado: " + fileName);
+            throw new jakarta.persistence.EntityNotFoundException(MSG_NAO_ENCONTRADO);
         }
-
         return new FileSystemResource(filePath);
     }
 

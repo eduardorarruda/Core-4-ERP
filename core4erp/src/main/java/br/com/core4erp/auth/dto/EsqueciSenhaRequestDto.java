@@ -1,8 +1,8 @@
 package br.com.core4erp.auth.dto;
 
-import jakarta.validation.constraints.Email;
+import br.com.core4erp.auth.validation.EmailEstrito;
 import jakarta.validation.constraints.NotBlank;
 
 public record EsqueciSenhaRequestDto(
-        @NotBlank @Email String email
+        @NotBlank(message = "Email é obrigatório") @EmailEstrito String email
 ) {}

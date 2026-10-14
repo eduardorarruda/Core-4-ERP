@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Landmark, Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { contasCorrentes as api } from '../lib/api';
 import ConfirmModal from '../components/ui/ConfirmModal';
@@ -23,14 +23,15 @@ export default function ContasCorrentes() {
   const [confirmAction, setConfirmAction] = useState(null);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { carregar(); }, []);
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setCarregando(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
     finally { setCarregando(false); }
-  }
+  }, [toast]);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   function validateForm() {
     const errs = {};
@@ -108,14 +109,14 @@ export default function ContasCorrentes() {
             <p className="text-xs uppercase tracking-widest text-primary font-bold font-mono">Saldo Consolidado — Todas as Contas</p>
           </div>
           <p className="text-3xl font-bold text-primary font-display">R$ {brl(total)}</p>
-          <p className="text-xs text-text-primary/40 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} cadastrada{lista.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-text-primary/60 font-mono mt-1">{lista.length} conta{lista.length !== 1 ? 's' : ''} cadastrada{lista.length !== 1 ? 's' : ''}</p>
         </div>
         <Landmark className="w-12 h-12 text-primary opacity-20" />
       </div>
 
       {/* Formulário de conta */}
       <form onSubmit={salvar} className="bg-surface-medium border border-text-primary/5 rounded-2xl p-6 space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">{editId ? 'Editar' : 'Nova'} Conta</h2>
+        <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">{editId ? 'Editar' : 'Nova'} Conta</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField label="Número da Conta" required error={errors.numeroConta}>
             <input className={inputCls} value={form.numeroConta} onChange={set('numeroConta')} required placeholder="Ex: 12345-6" />
@@ -178,15 +179,15 @@ export default function ContasCorrentes() {
                 <div className="flex justify-between items-start">
                   <div className="min-w-0">
                     <p className="font-bold text-text-primary font-display truncate">{c.descricao}</p>
-                    <p className="text-xs text-text-primary/40 mt-0.5 font-mono">
+                    <p className="text-xs text-text-primary/60 mt-0.5 font-mono">
                       Ag. {c.agencia} · Cc. {c.numeroConta}
                     </p>
                   </div>
                   <div className="flex gap-1 shrink-0 ml-2">
-                    <Button variant="ghost" size="icon" onClick={() => editar(c)} aria-label="Editar conta" title="Editar" className="text-text-primary/50 hover:text-primary">
+                    <Button variant="ghost" size="icon" onClick={() => editar(c)} aria-label="Editar conta" title="Editar" className="text-text-primary/70 hover:text-primary">
                       <Pencil className="w-5 h-5" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => deletar(c.id)} aria-label="Excluir conta" title="Excluir" className="text-text-primary/50 hover:text-error">
+                    <Button variant="ghost" size="icon" onClick={() => deletar(c.id)} aria-label="Excluir conta" title="Excluir" className="text-text-primary/70 hover:text-error">
                       <Trash2 className="w-5 h-5" />
                     </Button>
                   </div>
@@ -203,7 +204,7 @@ export default function ContasCorrentes() {
 
                 <div className="flex items-center justify-between gap-2">
                   {c.dataSaldoInicial && (
-                    <p className="text-xs text-text-primary/40 font-mono">Desde {c.dataSaldoInicial}</p>
+                    <p className="text-xs text-text-primary/60 font-mono">Desde {c.dataSaldoInicial}</p>
                   )}
                   {c.permitirSaldoNegativo && (
                     <span className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-full font-mono bg-warning/10 text-warning border border-warning/20">

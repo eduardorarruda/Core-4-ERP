@@ -1,39 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging do Core 4 ERP — tudo vai para STDOUT (12-factor). Em produção o Docker captura o stdout e o
+  promtail envia ao Loki; não há arquivo local (o antigo appender FILE com caminho fixo em
+  ${user.home}/Documentos/... foi removido).
+
+  Formatos (app.log.format — ver application*.properties / env LOG_FORMAT):
+    - json  → JSON estruturado nativo do Spring Boot 3.5 no padrão ECS (Elastic Common Schema):
+              @timestamp ISO-8601 em UTC ("...Z"), log.level, log.logger, message, MDC
+              (requestId, usuarioId, empresaId, ip) e os pares chave-valor do SLF4J
+              (log.atWarn().addKeyValue("evento", ...)) como campos de primeiro nível.
+              O JSON escapa CR/LF e aspas da mensagem — impede forjar linhas de log (log forging).
+    - texto → padrão legível para desenvolvimento local (default fora do perfil prod).
+  Perfil prod força json.
+
+  Retenção: definida no Loki (limits_config.retention_period — recomendado 30 dias para logs de
+  aplicação; trilhas de auditoria de negócio ficam em tb_auditoria). Logs não devem conter e-mail,
+  CPF/CNPJ, tokens ou conteúdo de mensagens/documentos (LGPD).
+-->
 <configuration>
 
-    <springProperty scope="context" name="springAppName" source="spring.application.name" defaultValue="core4erp"/>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
-    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [reqId=%X{requestId}] - %msg%n</pattern>
+    <springProperty scope="context" name="LOG_FORMAT_ATIVO" source="app.log.format" defaultValue="texto"/>
+
+    <!-- JSON (ECS) — usado quando app.log.format=json -->
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="br.com.core4erp.config.observabilidade.FiltroFormatoLog">
+            <formatoAtivo>${LOG_FORMAT_ATIVO}</formatoAtivo>
+            <formatoDoAppender>json</formatoDoAppender>
+        </filter>
+        <encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+            <format>ecs</format>
+            <charset>UTF-8</charset>
         </encoder>
     </appender>
 
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${user.home}/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/log.txt</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${user.home}/Documentos/Projetos/TCC/Core4erp_Producao/Core-4-ERP/log.%d{yyyy-MM-dd}.%i.txt</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>3</maxHistory>
-        </rollingPolicy>
+    <!-- Texto legível — usado quando app.log.format=texto (desenvolvimento) -->
+    <appender name="CONSOLE_TEXTO" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="br.com.core4erp.config.observabilidade.FiltroFormatoLog">
+            <formatoAtivo>${LOG_FORMAT_ATIVO}</formatoAtivo>
+            <formatoDoAppender>texto</formatoDoAppender>
+        </filter>
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [reqId=%X{requestId}] - %msg%n</pattern>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} [reqId=%X{requestId} usr=%X{usuarioId} emp=%X{empresaId}] - %msg %kvp%n</pattern>
+            <charset>UTF-8</charset>
         </encoder>
     </appender>
 
     <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="FILE"/>
+        <appender-ref ref="CONSOLE_JSON"/>
+        <appender-ref ref="CONSOLE_TEXTO"/>
     </root>
 
-    <logger name="org.hibernate" level="WARN" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
-    <logger name="org.flywaydb" level="WARN" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
-    <logger name="com.zaxxer.hikari" level="WARN" additivity="false">
-        <appender-ref ref="CONSOLE"/>
-    </logger>
+    <!-- Bibliotecas ruidosas: só WARN+, no MESMO appender da aplicação (herdam do root). -->
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.flywaydb" level="WARN"/>
+    <logger name="com.zaxxer.hikari" level="WARN"/>
 
 </configuration>

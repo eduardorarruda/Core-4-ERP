@@ -77,23 +77,23 @@ export default function UploadZoneBase({ onFile, titulo, subtitulo }) {
             <FileText className="w-10 h-10 text-primary" />
             <div className="text-center min-w-0 px-8">
               <p className="font-bold text-text-primary break-words">{arquivo.name}</p>
-              <p className="text-xs text-text-primary/50">{(arquivo.size / 1024).toFixed(1)} KB</p>
+              <p className="text-xs text-text-primary/70">{(arquivo.size / 1024).toFixed(1)} KB</p>
             </div>
             <button
               type="button"
               onClick={limpar}
               aria-label="Remover arquivo selecionado"
-              className="absolute top-2 right-2 w-11 h-11 grid place-items-center rounded-xl text-text-primary/40 hover:text-error hover:bg-error/10 transition-colors"
+              className="absolute top-2 right-2 w-11 h-11 grid place-items-center rounded-xl text-text-primary/60 hover:text-error hover:bg-error/10 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
           </>
         ) : (
           <>
-            <Upload className={cn('w-10 h-10 transition-colors', dragging ? 'text-primary' : 'text-text-primary/30')} />
+            <Upload className={cn('w-10 h-10 transition-colors', dragging ? 'text-primary' : 'text-text-primary/60')} />
             <div className="text-center">
               <p className="font-bold text-text-primary">{titulo}</p>
-              <p className="text-sm text-text-primary/50">{subtitulo}</p>
+              <p className="text-sm text-text-primary/70">{subtitulo}</p>
             </div>
           </>
         )}

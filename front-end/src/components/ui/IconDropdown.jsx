@@ -144,7 +144,7 @@ export default function IconDropdown({ value, onChange }) {
     ? TODOS_ICONES.filter((i) => i.nome.toLowerCase().includes(busca.toLowerCase()))
     : null;
 
-  const base = 'w-full rounded-xl px-3 py-2.5 text-sm bg-surface border border-text-primary/10 outline-none transition-colors';
+  const base = 'w-full min-h-11 rounded-xl px-3 py-2.5 text-sm bg-surface border border-text-primary/15 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary';
 
   return (
     <div ref={containerRef} className="relative">
@@ -157,7 +157,7 @@ export default function IconDropdown({ value, onChange }) {
           <IconeAtual nome={value} />
         </span>
         <span className="flex-1 text-xs text-text-primary/60 font-mono">{value || 'Selecionar ícone'}</span>
-        <ChevronDown className={cn('w-3.5 h-3.5 text-text-primary/30 transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('w-3.5 h-3.5 text-text-primary/60 transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
@@ -174,7 +174,7 @@ export default function IconDropdown({ value, onChange }) {
                 placeholder="Buscar ícone..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 rounded-lg text-xs bg-surface border border-text-primary/10 text-text-primary placeholder:text-text-primary/25 outline-none focus:border-primary/40"
+                className="w-full pl-8 pr-3 py-2 rounded-lg text-xs bg-surface border border-text-primary/10 text-text-primary placeholder:text-text-primary/50 outline-none focus:border-primary/40"
               />
             </div>
           </div>
@@ -193,7 +193,7 @@ export default function IconDropdown({ value, onChange }) {
                         'p-2 rounded-lg border transition-all hover:scale-105',
                         value === nome
                           ? 'bg-primary/20 border-primary text-primary'
-                          : 'border-text-primary/5 text-text-primary/50 hover:border-text-primary/20 hover:text-text-primary/80'
+                          : 'border-text-primary/5 text-text-primary/70 hover:border-text-primary/20 hover:text-text-primary/80'
                       )}
                     >
                       <Comp className="w-4 h-4 mx-auto" />
@@ -201,12 +201,12 @@ export default function IconDropdown({ value, onChange }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-text-primary/30 text-center py-4">Nenhum ícone encontrado</p>
+                <p className="text-xs text-text-primary/60 text-center py-4">Nenhum ícone encontrado</p>
               )
             ) : (
               GRUPOS.map(({ grupo, icones }) => (
                 <div key={grupo}>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-text-primary/30 mb-1.5">{grupo}</p>
+                  <p className="text-xs font-bold uppercase tracking-widest text-text-primary/60 mb-1.5">{grupo}</p>
                   <div className="grid grid-cols-7 gap-1">
                     {icones.map(({ nome, comp: Comp }) => (
                       <button
@@ -218,7 +218,7 @@ export default function IconDropdown({ value, onChange }) {
                           'p-2 rounded-lg border transition-all hover:scale-105',
                           value === nome
                             ? 'bg-primary/20 border-primary text-primary'
-                            : 'border-text-primary/5 text-text-primary/50 hover:border-text-primary/20 hover:text-text-primary/80'
+                            : 'border-text-primary/5 text-text-primary/70 hover:border-text-primary/20 hover:text-text-primary/80'
                         )}
                       >
                         <Comp className="w-4 h-4 mx-auto" />

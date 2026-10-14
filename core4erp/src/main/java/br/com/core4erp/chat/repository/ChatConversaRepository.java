@@ -9,8 +9,12 @@ import java.util.Optional;
 
 public interface ChatConversaRepository extends JpaRepository<ChatConversa, Long> {
 
-    /** Conversas do usuário no canal, mais recentes primeiro (para a lista lateral). */
-    List<ChatConversa> findByUsuarioIdAndCanalOrderByAtualizadoEmDescIdDesc(
+    /**
+     * Conversas do usuário no canal, mais recentes primeiro (para a lista lateral). Limitado às
+     * 200 mais recentes — a lista lateral não pagina e uma conta muito antiga não pode devolver
+     * milhares de linhas de uma vez.
+     */
+    List<ChatConversa> findTop200ByUsuarioIdAndCanalOrderByAtualizadoEmDescIdDesc(
             Long usuarioId, ChatMensagem.Canal canal);
 
     /** A conversa mais recente do canal — usada como "conversa ativa" quando nenhum id é enviado. */

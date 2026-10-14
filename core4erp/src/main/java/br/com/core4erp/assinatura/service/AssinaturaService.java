@@ -44,14 +44,16 @@ public class AssinaturaService {
         this.dtoValidator = dtoValidator;
     }
 
+    @Requer("ASSINATURA_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public List<AssinaturaResponseDto> listar() {
-        return assinaturaRepository.findAllByEmpresaId(tenantCtx.getEmpresaId())
+        return assinaturaRepository.findTop500ByEmpresaIdOrderByIdDesc(tenantCtx.getEmpresaId())
                 .stream()
                 .map(AssinaturaResponseDto::from)
                 .toList();
     }
 
+    @Requer("ASSINATURA_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public AssinaturaResponseDto buscarPorId(Long id) {
         return AssinaturaResponseDto.from(findOwned(id));
@@ -114,6 +116,7 @@ public class AssinaturaService {
         assinaturaRepository.delete(findOwned(id));
     }
 
+    @Requer("ASSINATURA_VISUALIZAR") // defense-in-depth — cobre também as tools do chat IA
     @Transactional(readOnly = true)
     public List<AssinaturaResponseDto> listarAtivas() {
         return assinaturaRepository.findAllByEmpresaIdAndAtiva(tenantCtx.getEmpresaId(), true)

@@ -14,7 +14,7 @@ export default function CarteiraPanel({ carteira, patrimonioTotal, carregando })
       loading={carregando}
       title="Carteira de Investimentos"
       headerAction={
-        <Link to="/investimentos" className="text-xs font-bold uppercase tracking-widest text-text-primary/50 hover:text-primary transition-colors">
+        <Link to="/investimentos" className="text-xs font-bold uppercase tracking-widest text-text-primary/70 hover:text-primary transition-colors">
           Ver tudo →
         </Link>
       }
@@ -29,7 +29,7 @@ export default function CarteiraPanel({ carteira, patrimonioTotal, carregando })
 
       {carteira.length === 0 ? (
         <div className="py-6 text-center">
-          <p className="text-sm text-text-primary/50">Nenhuma carteira cadastrada</p>
+          <p className="text-sm text-text-primary/70">Nenhuma carteira cadastrada</p>
           <Link to="/investimentos" className="text-xs text-primary hover:underline mt-1 block">Cadastrar investimento</Link>
         </div>
       ) : (
@@ -51,7 +51,7 @@ export default function CarteiraPanel({ carteira, patrimonioTotal, carregando })
                 <div className="h-1 w-full bg-surface-medium rounded-full overflow-hidden">
                   <div className="h-full bg-primary/60 rounded-full transition-all duration-700" style={{ width: `${pct.toFixed(1)}%` }} />
                 </div>
-                <p className="text-xs text-text-primary/40 text-right">{pct.toFixed(1)}% do total</p>
+                <p className="text-xs text-text-primary/60 text-right">{pct.toFixed(1)}% do total</p>
               </div>
             );
           })}

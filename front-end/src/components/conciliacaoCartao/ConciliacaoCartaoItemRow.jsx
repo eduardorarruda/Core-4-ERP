@@ -22,7 +22,7 @@ export default function ConciliacaoCartaoItemRow({ item, conciliacaoId, cartaoId
       // Créditos/estornos do cartão não geram despesa — só podem ser ignorados.
       somenteIgnorar={(it) => it.ofxTipo === 'CREDIT'}
       badgeExtra={(it) => it.ofxTipo === 'CREDIT' ? (
-        <span className="text-[10px] font-bold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded-full">Crédito</span>
+        <span className="text-xs font-bold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded-full">Crédito</span>
       ) : null}
       vincularLabel="Vincular a lançamento existente"
       criarLabel="Criar lançamento"

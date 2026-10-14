@@ -13,6 +13,9 @@ public interface AssinaturaRepository extends JpaRepository<Assinatura, Long> {
 
     List<Assinatura> findAllByEmpresaId(Long empresaId);
 
+    /** As 500 assinaturas mais recentes (teto de segurança da listagem — a tela espera um array). */
+    List<Assinatura> findTop500ByEmpresaIdOrderByIdDesc(Long empresaId);
+
     Optional<Assinatura> findByIdAndEmpresaId(Long id, Long empresaId);
 
     List<Assinatura> findAllByEmpresaIdAndAtiva(Long empresaId, boolean ativa);

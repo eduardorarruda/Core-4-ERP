@@ -1,5 +1,6 @@
 package br.com.core4erp.relatorio.service;
 
+import br.com.core4erp.utils.PlanilhaUtils;
 import br.com.core4erp.relatorio.dto.RelatorioResponseDto;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -33,7 +34,7 @@ public class ExcelRelatorioService {
             int row = 0;
             Row titleRow = sheet.createRow(row++);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue(inicio != null ? titulo + " — " + inicio + " a " + fim : titulo);
+            titleCell.setCellValue(PlanilhaUtils.textoSeguro(inicio != null ? titulo + " — " + inicio + " a " + fim : titulo));
             titleCell.setCellStyle(titleStyle);
             row++;
 
@@ -41,7 +42,7 @@ public class ExcelRelatorioService {
             List<String> cab = dados.cabecalho();
             for (int i = 0; i < cab.size(); i++) {
                 Cell c = headerRow.createCell(i);
-                c.setCellValue(cab.get(i));
+                c.setCellValue(PlanilhaUtils.textoSeguro(cab.get(i)));
                 c.setCellStyle(headerStyle);
             }
 
@@ -51,7 +52,7 @@ public class ExcelRelatorioService {
                     Object val = linha.get(i);
                     Cell c = dataRow.createCell(i);
                     if (val instanceof Number n) c.setCellValue(n.doubleValue());
-                    else c.setCellValue(String.valueOf(val));
+                    else c.setCellValue(PlanilhaUtils.textoSeguro(val)); // anti formula injection
                 }
             }
 
@@ -62,7 +63,7 @@ public class ExcelRelatorioService {
                     Cell c = totRow.createCell(i);
                     c.setCellStyle(headerStyle);
                     if (val instanceof Number n) c.setCellValue(n.doubleValue());
-                    else c.setCellValue(String.valueOf(val));
+                    else c.setCellValue(PlanilhaUtils.textoSeguro(val)); // anti formula injection
                 }
             }
 

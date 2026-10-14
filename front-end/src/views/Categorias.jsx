@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Tag, Plus, Pencil, Trash2,
   ShoppingCart, Home, Car, Utensils, Heart, Zap, Wifi,
@@ -103,8 +103,8 @@ function CategoriaLinha({ c, sub = false, onEditar, onDeletar }) {
   return (
     <div className="flex items-center gap-3 p-3 rounded-[12px] transition-all hover:bg-white/[.03] cursor-default">
       <div
-        className={cn('rounded-xl flex items-center justify-center shrink-0', sub ? 'w-8 h-8' : 'w-10 h-10')}
-        style={{ background: 'rgba(110,255,192,.1)', border: '1px solid rgba(110,255,192,.2)' }}
+        className={cn('rounded-xl flex items-center justify-center shrink-0 bg-primary/10 border border-primary/20', sub ? 'w-8 h-8' : 'w-10 h-10')}
+        aria-hidden="true"
       >
         <Icone className={cn('text-primary', sub ? 'w-4 h-4' : 'w-5 h-5')} />
       </div>
@@ -113,12 +113,12 @@ function CategoriaLinha({ c, sub = false, onEditar, onDeletar }) {
       </span>
       <div className="flex gap-1 shrink-0">
         <PermissaoGuard permissao="CATEGORIA_EDITAR">
-          <button onClick={() => onEditar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/30 hover:text-primary p-1.5 rounded-lg hover:bg-primary/10 transition-colors">
+          <button type="button" onClick={() => onEditar(c)} aria-label={`Editar ${c.descricao}`} className="text-text-primary/60 hover:text-primary min-w-11 min-h-11 grid place-items-center rounded-lg hover:bg-primary/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <Pencil className="w-3.5 h-3.5" />
           </button>
         </PermissaoGuard>
         <PermissaoGuard permissao="CATEGORIA_DELETAR">
-          <button onClick={() => onDeletar(c)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/30 hover:text-error p-1.5 rounded-lg hover:bg-error/10 transition-colors">
+          <button type="button" onClick={() => onDeletar(c)} aria-label={`Excluir ${c.descricao}`} className="text-text-primary/60 hover:text-error min-w-11 min-h-11 grid place-items-center rounded-lg hover:bg-error/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </PermissaoGuard>
@@ -139,14 +139,15 @@ export default function Categorias() {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => { carregar(); }, []);
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     setLoading(true);
     try { setLista(await api.listar()); }
     catch (e) { toast.error(e.message); }
     finally { setLoading(false); }
-  }
+  }, [toast]);
+
+  useEffect(() => { carregar(); }, [carregar]);
 
   function validar() {
     const errs = {};
@@ -231,7 +232,7 @@ export default function Categorias() {
         className="rounded-[18px] p-6 space-y-5 anim-in bg-surface-medium border border-text-primary/5 shadow-elevated"
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/50">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-text-primary/70">
             {editId ? 'Editar' : 'Nova'} Categoria
           </h2>
           {PreviewIcon && (
@@ -271,7 +272,7 @@ export default function Categorias() {
                 <option key={c.id} value={c.id}>{c.descricao}</option>
               ))}
             </select>
-            <p className="text-[11px] text-text-primary/40">Deixe em branco para criar uma categoria principal, ou escolha uma para criar uma subcategoria.</p>
+            <p className="text-xs text-text-primary/60">Deixe em branco para criar uma categoria principal, ou escolha uma para criar uma subcategoria.</p>
           </div>
         </div>
 
@@ -280,7 +281,7 @@ export default function Categorias() {
           <div className="sm:max-w-xs">
             <IconDropdown value={form.icone} onChange={(nome) => setForm((f) => ({ ...f, icone: nome }))} />
           </div>
-          <p className="text-[11px] text-text-primary/40">Use a busca para encontrar o ícone que melhor representa a categoria.</p>
+          <p className="text-xs text-text-primary/60">Use a busca para encontrar o ícone que melhor representa a categoria.</p>
         </div>
 
         <div className="flex gap-3">

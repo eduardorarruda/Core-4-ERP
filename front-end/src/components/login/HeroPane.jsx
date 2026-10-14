@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { usePrefersReducedMotion } from '../../hooks/useMediaQuery';
 
 function AnimatedNumber({ to, prefix = '', decimals = 0, duration = 1800 }) {
   const [v, setV] = useState(0);
@@ -6,7 +7,7 @@ function AnimatedNumber({ to, prefix = '', decimals = 0, duration = 1800 }) {
     let raf, start;
     const step = (ts) => {
       if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / duration);
+      const p = duration > 0 ? Math.min(1, (ts - start) / duration) : 1;
       const eased = 1 - Math.pow(1 - p, 3);
       setV(eased * to);
       if (p < 1) raf = requestAnimationFrame(step);
@@ -73,72 +74,93 @@ function CashflowChart({ entradas, saidas }) {
   );
 }
 
-export function BrandMark() {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="relative w-10 h-10 rounded-[10px] grid place-items-center overflow-hidden shrink-0 bg-primary/10 border border-primary/20">
-        <div
-          className="absolute inset-0 opacity-80"
-          style={{ background: 'radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--color-primary) 40%, transparent), transparent 60%)' }}
-        />
-        <svg width="20" height="20" viewBox="0 0 22 22" fill="none" className="relative z-[1]">
-          <rect x="1" y="1" width="9" height="9" rx="2" fill="var(--color-primary)" />
-          <rect x="12" y="1" width="9" height="9" rx="2" stroke="var(--color-primary)" strokeWidth="1.6" />
-          <rect x="1" y="12" width="9" height="9" rx="2" stroke="var(--color-primary)" strokeWidth="1.6" />
-          <rect x="12" y="12" width="9" height="9" rx="2" fill="var(--color-primary)" opacity=".4" />
-        </svg>
-      </div>
-      <div>
-        <div className="font-display font-bold tracking-tight text-base text-text-primary">
-          Core <span className="text-primary">4</span> ERP
-        </div>
-        <div className="font-mono text-[9px] text-text-primary/30 tracking-widest uppercase">
-          Enterprise Finance
-        </div>
-      </div>
-    </div>
-  );
-}
 
-export default function HeroPane() {
-  const cardRef = useRef(null);
-  const [now, setNow] = useState(new Date());
-  const [spark, setSpark] = useState([8, 12, 9, 15, 14, 18, 22, 20, 26, 28, 32, 30, 38]);
-
+/** Relógio isolado: só ele re-renderiza a cada segundo, não o painel inteiro. */
+function Relogio() {
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+  const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const date = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return (
+    <div className="anim-in d1 font-mono text-xs text-text-primary/70 tracking-wider mb-2.5 first-letter:uppercase">
+      {date} · <time>{time}</time>
+    </div>
+  );
+}
+
+const fmtNumero = (n, dec = 2) => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const direcao = (pct) => (parseFloat(pct) >= 0 ? 'up' : 'down');
+const sinal = (pct) => { const v = parseFloat(pct); return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; };
+
+/** Busca JSON público; em falha devolve null (o item fica com "…" e tenta de novo no próximo ciclo). */
+async function buscarJson(url) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (err) {
+    if (import.meta.env.DEV) console.warn('Cotação indisponível:', url, err);
+    return null;
+  }
+}
+
+const SERIES_BCB = [
+  { indice: 1, sigla: 'SELIC', serie: 432, sufixo: '% a.a.' },
+  { indice: 2, sigla: 'CDI', serie: 4389, sufixo: '% a.a.' },
+  { indice: 4, sigla: 'IPCA', serie: 433, sufixo: '% a.m.' },
+];
+
+export default function HeroPane() {
+  const cardRef = useRef(null);
+  const reduzirMovimento = usePrefersReducedMotion();
+  const [spark, setSpark] = useState([8, 12, 9, 15, 14, 18, 22, 20, 26, 28, 32, 30, 38]);
 
   useEffect(() => {
+    if (reduzirMovimento) return undefined;
     const id = setInterval(() => {
       setSpark(s => [...s.slice(1), Math.max(4, s[s.length - 1] + (Math.random() - 0.4) * 8)]);
     }, 2200);
     return () => clearInterval(id);
-  }, []);
+  }, [reduzirMovimento]);
 
+  // Inclinação 3D do cartão seguindo o mouse: 1 atualização por quadro; desligada com
+  // "reduzir movimento"
   useEffect(() => {
     const el = cardRef.current;
-    if (!el) return;
-    const onMove = (e) => {
+    if (!el || reduzirMovimento) return undefined;
+    let quadro = 0;
+    let ultimo = null;
+    const aplicar = () => {
+      quadro = 0;
+      if (!ultimo) return;
       const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;
-      const y = (e.clientY - r.top) / r.height;
-      const rx = (0.5 - y) * 6;
-      const ry = (x - 0.5) * 8;
-      el.style.transform = `perspective(1400px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+      const x = (ultimo.x - r.left) / r.width;
+      const y = (ultimo.y - r.top) / r.height;
+      el.style.transform = `perspective(1400px) rotateX(${(0.5 - y) * 6}deg) rotateY(${(x - 0.5) * 8}deg)`;
     };
-    const onLeave = () => { el.style.transform = ''; };
-    el.addEventListener('mousemove', onMove);
+    const onMove = (e) => {
+      ultimo = { x: e.clientX, y: e.clientY };
+      if (!quadro) quadro = requestAnimationFrame(aplicar);
+    };
+    const onLeave = () => {
+      ultimo = null;
+      if (quadro) { cancelAnimationFrame(quadro); quadro = 0; }
+      el.style.transform = '';
+    };
+    el.addEventListener('mousemove', onMove, { passive: true });
     el.addEventListener('mouseleave', onLeave);
-    return () => { el.removeEventListener('mousemove', onMove); el.removeEventListener('mouseleave', onLeave); };
-  }, []);
+    return () => {
+      el.removeEventListener('mousemove', onMove);
+      el.removeEventListener('mouseleave', onLeave);
+      if (quadro) cancelAnimationFrame(quadro);
+    };
+  }, [reduzirMovimento]);
 
   const entradas = useMemo(() => [12, 18, 14, 22, 19, 28, 24, 32, 30, 38, 36, 44], []);
   const saidas = useMemo(() => [10, 14, 12, 16, 17, 22, 20, 24, 23, 28, 26, 32], []);
-
-  const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const date = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase();
 
   const [tickerItems, setTickerItems] = useState([
     ['USD/BRL', '…', 'up', ''], ['SELIC', '…', 'neutral', ''],
@@ -147,69 +169,53 @@ export default function HeroPane() {
   ]);
 
   // Cotações reais (AwesomeAPI/BCB). Só faz polling quando a pane está de fato
-  // visível (lg+). No mobile ela é renderizada mas oculta via `hidden lg:flex`,
-  // então evitamos requisições de rede desnecessárias enquanto estiver oculta.
+  // visível (lg+) e a aba está em primeiro plano.
   useEffect(() => {
-    const fmt = (n, dec = 2) => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-    const dir = (pct) => parseFloat(pct) >= 0 ? 'up' : 'down';
-    const sign = (pct) => { const v = parseFloat(pct); return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`; };
+    const atualizarItem = (indice, item) => setTickerItems((prev) => prev.map((v, i) => (i === indice ? item : v)));
 
     async function fetchAll() {
-      const next = (prev) => [...prev];
-
-      try {
-        const awRes = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,BTC-BRL');
-        const aw = await awRes.json();
-        setTickerItems((prev) => {
-          const t = next(prev);
-          if (aw.USDBRL) { const pct = aw.USDBRL.pctChange; t[0] = ['USD/BRL', fmt(aw.USDBRL.bid, 4), dir(pct), sign(pct)]; }
-          if (aw.EURBRL) { const pct = aw.EURBRL.pctChange; t[5] = ['EUR/BRL', fmt(aw.EURBRL.bid, 4), dir(pct), sign(pct)]; }
-          if (aw.BTCBRL) { const pct = aw.BTCBRL.pctChange; const k = (Number(aw.BTCBRL.bid) / 1000).toFixed(1); t[3] = ['BTC/BRL', `R$${k}k`, dir(pct), sign(pct)]; }
-          return t;
-        });
-      } catch (_) {}
-
-      try {
-        const r = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json');
-        const [d] = await r.json();
-        if (d) setTickerItems((prev) => { const t = next(prev); t[1] = ['SELIC', `${fmt(d.valor, 2)}% a.a.`, 'neutral', '']; return t; });
-      } catch (_) {}
-
-      try {
-        const r = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json');
-        const [d] = await r.json();
-        if (d) setTickerItems((prev) => { const t = next(prev); t[2] = ['CDI', `${fmt(d.valor, 2)}% a.a.`, 'neutral', '']; return t; });
-      } catch (_) {}
-
-      try {
-        const r = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/1?formato=json');
-        const [d] = await r.json();
-        if (d) {
-          const v = parseFloat(d.valor);
-          setTickerItems((prev) => { const t = next(prev); t[4] = ['IPCA', `${fmt(v, 2)}% a.m.`, v >= 0 ? 'up' : 'down', '']; return t; });
-        }
-      } catch (_) {}
+      const aw = await buscarJson('https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL,BTC-BRL');
+      if (aw?.USDBRL) atualizarItem(0, ['USD/BRL', fmtNumero(aw.USDBRL.bid, 4), direcao(aw.USDBRL.pctChange), sinal(aw.USDBRL.pctChange)]);
+      if (aw?.EURBRL) atualizarItem(5, ['EUR/BRL', fmtNumero(aw.EURBRL.bid, 4), direcao(aw.EURBRL.pctChange), sinal(aw.EURBRL.pctChange)]);
+      if (aw?.BTCBRL) {
+        const k = (Number(aw.BTCBRL.bid) / 1000).toFixed(1);
+        atualizarItem(3, ['BTC/BRL', `R$${k}k`, direcao(aw.BTCBRL.pctChange), sinal(aw.BTCBRL.pctChange)]);
+      }
+      await Promise.all(SERIES_BCB.map(async ({ indice, sigla, serie, sufixo }) => {
+        const dados = await buscarJson(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados/ultimos/1?formato=json`);
+        const d = Array.isArray(dados) ? dados[0] : null;
+        if (!d) return;
+        const v = parseFloat(d.valor);
+        const dir = sigla === 'IPCA' ? (v >= 0 ? 'up' : 'down') : 'neutral';
+        atualizarItem(indice, [sigla, `${fmtNumero(v, 2)}${sufixo}`, dir, '']);
+      }));
     }
 
     const mq = window.matchMedia('(min-width: 1024px)');
     let intervalId = null;
     const start = () => {
-      if (intervalId) return;
+      if (intervalId || document.hidden || !mq.matches) return;
       fetchAll();
       intervalId = setInterval(fetchAll, 30_000);
     };
     const stop = () => { if (intervalId) { clearInterval(intervalId); intervalId = null; } };
-    const onChange = (e) => { e.matches ? start() : stop(); };
+    const reavaliar = () => { if (mq.matches && !document.hidden) start(); else stop(); };
 
-    if (mq.matches) start();
-    mq.addEventListener('change', onChange);
-    return () => { stop(); mq.removeEventListener('change', onChange); };
+    reavaliar();
+    mq.addEventListener('change', reavaliar);
+    document.addEventListener('visibilitychange', reavaliar);
+    return () => {
+      stop();
+      mq.removeEventListener('change', reavaliar);
+      document.removeEventListener('visibilitychange', reavaliar);
+    };
   }, []);
 
-  const allTicker = [...tickerItems, ...tickerItems];
+  // Com "reduzir movimento" a faixa não rola: mostra uma única cópia dos itens
+  const allTicker = reduzirMovimento ? tickerItems : [...tickerItems, ...tickerItems];
 
   return (
-    <aside className="flex-1 min-w-0 flex items-center justify-center overflow-hidden pl-3 pr-5 py-4">
+    <aside aria-label="Prévia ilustrativa do painel" className="flex-1 min-w-0 flex items-center justify-center overflow-hidden pl-3 pr-5 py-4">
       <div
         ref={cardRef}
         className="w-full max-w-[480px] rounded-3xl pt-[18px] px-5 pb-3.5 box-border backdrop-blur-md border border-text-primary/10 will-change-transform [transition:transform_.05s_linear]"
@@ -219,93 +225,87 @@ export default function HeroPane() {
         }}
       >
         <div className="anim-in flex items-center gap-2 mb-2">
-          <span className="live-dot" />
-          <span className="font-mono text-[10px] tracking-widest text-text-primary/50 uppercase">
-            CORE 4 · INTELLIGENCE LAYER
+          <span className="live-dot" aria-hidden="true" />
+          <span className="font-mono text-xs tracking-wider text-text-primary/70 uppercase">
+            Visão geral · exemplo
           </span>
         </div>
 
-        <div className="anim-in d1 font-mono text-[11px] text-text-primary/35 tracking-wider mb-2.5">
-          {date} · {time}
-        </div>
+        <Relogio />
 
         <h2 className="anim-in d2 font-display text-[22px] font-bold tracking-tight leading-tight text-text-primary mb-1.5">
-          A arquiteta da sua<br /><em className="text-primary italic">liberdade financeira.</em>
+          Contas, cartões e bancos<br /><em className="text-primary italic">no mesmo painel.</em>
         </h2>
 
-        <p className="anim-in d3 text-xs text-text-primary/50 leading-relaxed mb-3 max-w-[380px]">
-          Conciliação automática, fluxo de caixa em tempo real e relatórios que falam. Tudo em um único lugar.
+        <p className="anim-in d3 text-xs text-text-primary/70 leading-relaxed mb-3 max-w-[380px]">
+          Importe o extrato, concilie os lançamentos e acompanhe o fluxo de caixa sem planilhas paralelas.
         </p>
 
         <div className="anim-in d4 grid grid-cols-2 gap-2 mb-2.5">
           <div className="bg-text-primary/[.025] border border-text-primary/[.08] rounded-2xl p-3">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-[9px] text-text-primary/40 font-mono tracking-wider uppercase">Receita do mês</span>
-              <span className="text-[9px] font-semibold px-1.5 py-px rounded bg-primary/[.12] text-primary font-mono">▲ 24.8%</span>
+            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+              <span className="text-xs text-text-primary/70 font-mono tracking-wide uppercase">Receita do mês</span>
+              <span className="text-xs font-semibold px-1.5 py-px rounded bg-primary/[.12] text-primary font-mono">▲ 24,8%</span>
             </div>
             <div className="font-display text-lg font-bold tracking-tight text-text-primary mb-0.5">
-              <AnimatedNumber prefix="R$ " to={482931} duration={1800} />
+              <AnimatedNumber prefix="R$ " to={482931} duration={reduzirMovimento ? 0 : 1800} />
             </div>
-            <div className="text-[10px] text-text-primary/40">Meta atingida em 14 dias</div>
+            <div className="text-xs text-text-primary/70">Meta atingida em 14 dias</div>
           </div>
           <div className="bg-text-primary/[.025] border border-text-primary/[.08] rounded-2xl p-3">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-[9px] text-text-primary/40 font-mono tracking-wider uppercase">Saldo consolidado</span>
-              <span className="text-[9px] font-semibold px-1.5 py-px rounded bg-primary/[.12] text-primary font-mono">▲ 8.2%</span>
+            <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+              <span className="text-xs text-text-primary/70 font-mono tracking-wide uppercase">Saldo consolidado</span>
+              <span className="text-xs font-semibold px-1.5 py-px rounded bg-primary/[.12] text-primary font-mono">▲ 8,2%</span>
             </div>
             <div className="font-display text-[17px] font-bold tracking-tight text-text-primary mb-0.5">
-              <AnimatedNumber prefix="R$ " to={1284055} duration={2000} />
+              <AnimatedNumber prefix="R$ " to={1284055} duration={reduzirMovimento ? 0 : 2000} />
             </div>
             <Sparkline data={spark} />
           </div>
         </div>
 
         <div className="anim-in d5 bg-text-primary/[.02] border border-text-primary/[.06] rounded-2xl px-3 py-2.5 mb-2">
-          <div className="flex justify-between items-center mb-1.5">
+          <div className="flex justify-between items-center mb-1.5 gap-2">
             <div>
-              <div className="text-xs font-semibold text-text-primary/70">Fluxo de caixa · últimos 12 meses</div>
-              <div className="text-[10px] text-text-primary/30 mt-0.5 font-mono">Atualizado há 3 minutos</div>
+              <div className="text-xs font-semibold text-text-primary/80">Fluxo de caixa · últimos 12 meses</div>
             </div>
-            <div className="flex gap-3 text-[10px] text-text-primary/50 font-mono">
-              <span><span className="inline-block w-2 h-2 rounded-full bg-primary mr-1" />Entradas</span>
-              <span><span className="inline-block w-2 h-2 rounded-full bg-secondary mr-1" />Saídas</span>
+            <div className="flex gap-3 text-xs text-text-primary/70 font-mono">
+              <span><span className="inline-block w-2 h-2 rounded-full bg-primary mr-1" aria-hidden="true" />Entradas</span>
+              <span><span className="inline-block w-2 h-2 rounded-full bg-secondary mr-1" aria-hidden="true" />Saídas</span>
             </div>
           </div>
-          <CashflowChart entradas={entradas} saidas={saidas} />
+          <div role="img" aria-label="Gráfico ilustrativo: entradas crescendo acima das saídas ao longo de 12 meses">
+            <CashflowChart entradas={entradas} saidas={saidas} />
+          </div>
         </div>
 
         <div
           className="anim-in d6 rounded-[10px] border border-text-primary/[.08] overflow-hidden h-8 flex items-center mb-2.5"
           style={{ background: 'color-mix(in srgb, var(--color-surface) 25%, transparent)' }}
         >
-          <div className="shrink-0 px-2.5 font-mono text-[9px] tracking-widest uppercase text-primary border-r border-text-primary/[.08] h-full flex items-center gap-1.5 bg-primary/[.04]">
-            <span className="live-dot" style={{ width: 4, height: 4 }} />
-            LIVE
+          <div className="shrink-0 px-2.5 font-mono text-xs tracking-wider uppercase text-primary border-r border-text-primary/[.08] h-full flex items-center gap-1.5 bg-primary/[.04]">
+            <span className="live-dot" style={{ width: 4, height: 4 }} aria-hidden="true" />
+            Cotações
           </div>
           <div className="flex-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_4%,#000_96%,transparent)]">
-            <div className="ticker-scroll flex gap-6 items-center h-8 whitespace-nowrap font-mono text-[10px] pl-4">
+            <ul className={`${reduzirMovimento ? '' : 'ticker-scroll'} flex gap-6 items-center h-8 whitespace-nowrap font-mono text-xs pl-4`} aria-label="Cotações do dia (AwesomeAPI e Banco Central)">
               {allTicker.map(([sym, val, dir, pct], i) => (
-                <span key={i} className="text-text-primary/55">
-                  <b className="text-text-primary/80">{sym}</b> {val}{' '}
-                  <span className={dir === 'up' ? 'text-primary' : 'text-error'}>
-                    {dir === 'up' ? '▲' : '▼'} {pct}
-                  </span>
-                </span>
+                <li key={i} className="text-text-primary/70" aria-hidden={i >= tickerItems.length ? 'true' : undefined}>
+                  <b className="text-text-primary/90">{sym}</b> {val}{' '}
+                  {dir !== 'neutral' && (
+                    <span className={dir === 'up' ? 'text-primary' : 'text-error'}>
+                      {dir === 'up' ? '▲' : '▼'} {pct}
+                    </span>
+                  )}
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-end gap-3 text-[10px] text-text-primary/35 font-mono">
-            <span className="text-primary">🛡️</span> SOC 2
-            <span className="text-primary">🔒</span> LGPD
-            <span className="text-primary">⏱️</span> 99.98%
-          </div>
-          <p className="text-[9px] text-text-primary/20 font-mono tracking-wide text-right leading-normal">
-            * Valores e métricas exibidos são ilustrativos e não representam dados reais.
-          </p>
-        </div>
+        <p className="text-xs text-text-primary/60 tracking-wide text-right leading-normal">
+          Valores do painel são ilustrativos. As cotações são reais e públicas.
+        </p>
       </div>
     </aside>
   );

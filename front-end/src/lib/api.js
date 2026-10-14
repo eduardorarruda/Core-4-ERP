@@ -66,6 +66,23 @@ export function clearAuth() {
   window.dispatchEvent(new CustomEvent('auth-change'));
 }
 
+export const CODIGO_SENHA_PROVISORIA = 'SENHA_PROVISORIA';
+export const MSG_SENHA_PROVISORIA = 'Defina uma nova senha para continuar usando o sistema.';
+
+function criarErroApi(mensagem, status, codigo) {
+  const erro = new Error(mensagem);
+  erro.status = status;
+  erro.codigo = codigo ?? null;
+  return erro;
+}
+
+function marcarSenhaProvisoria() {
+  const state = getLoginState();
+  if (!state || state.senhaProvisoria) return;
+  localStorage.setItem('loginState', JSON.stringify({ ...state, senhaProvisoria: true }));
+  window.dispatchEvent(new CustomEvent('auth-change'));
+}
+
 async function request(path, options = {}) {
   const { skipAuthRedirect, timeout = 30000, blob: expectBlob = false, ...fetchOptions } = options;
   const isFormData = fetchOptions.body instanceof FormData;
@@ -104,7 +121,14 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ mensagem: res.statusText }));
-    throw new Error(traduzirErroPermissao(body.mensagem || `Erro ${res.status}`));
+    if (res.status === 403 && body?.codigo === CODIGO_SENHA_PROVISORIA) {
+      // Senha provisória: o backend bloqueia quase tudo até a troca. NÃO derruba a sessão —
+      // apenas garante que o modal de troca apareça. A mensagem é fixa para que o toast
+      // possa ignorá-la (evita uma enxurrada de erros enquanto o modal está aberto).
+      marcarSenhaProvisoria();
+      throw criarErroApi(MSG_SENHA_PROVISORIA, res.status, body.codigo);
+    }
+    throw criarErroApi(traduzirErroPermissao(body.mensagem || `Erro ${res.status}`), res.status, body?.codigo);
   }
 
   if (res.status === 204) return null;
@@ -135,8 +159,13 @@ export const auth = {
     clearAuth();
   },
 
-  registrar: (nome, email, senha, telefone, tipoConta, nomeEmpresa) =>
-    request('/api/auth/registrar', { method: 'POST', body: JSON.stringify({ nome, email, senha, telefone, tipoConta, nomeEmpresa }), skipAuthRedirect: true }),
+  // aceiteTermos/versaoTermos: registro do consentimento (LGPD art. 8º) — o backend recusa sem aceite
+  registrar: (nome, email, senha, telefone, tipoConta, nomeEmpresa, versaoTermos) =>
+    request('/api/auth/registrar', {
+      method: 'POST',
+      body: JSON.stringify({ nome, email, senha, telefone, tipoConta, nomeEmpresa, aceiteTermos: true, versaoTermos }),
+      skipAuthRedirect: true,
+    }),
 
   me: () => request('/api/auth/me'),
 
@@ -148,32 +177,26 @@ export const auth = {
   redefinirSenha: (token, novaSenha) =>
     request('/api/auth/redefinir-senha', { method: 'POST', body: JSON.stringify({ token, novaSenha }), skipAuthRedirect: true }),
 
+  // Só nome/foto — a senha é trocada por trocarSenha (PATCH /api/auth/senha, exige a senha atual)
   atualizarPerfil: (dto) =>
     request('/api/auth/perfil', { method: 'PUT', body: JSON.stringify(dto) }),
+
+  // Troca de senha com confirmação da senha atual; também libera a conta com senha provisória
+  trocarSenha: (senhaAtual, novaSenha) =>
+    request('/api/auth/senha', { method: 'PATCH', body: JSON.stringify({ senhaAtual, novaSenha }) }),
+
+  // LGPD art. 18 — portabilidade/acesso: arquivo JSON com os dados pessoais do titular
+  exportarDados: () => request('/api/auth/me/dados', { blob: true }),
+
+  // LGPD art. 18 — eliminação: anonimiza e desativa a conta; o backend limpa o cookie
+  excluirConta: (senha) =>
+    request('/api/auth/me', { method: 'DELETE', body: JSON.stringify({ senha }), skipAuthRedirect: true }),
 
   uploadFoto: (file) => {
     const formData = new FormData();
     formData.append('foto', file);
     return request('/api/auth/foto', { method: 'POST', body: formData });
   },
-};
-
-export function getUsuario() {
-  try {
-    return JSON.parse(localStorage.getItem('usuario') || sessionStorage.getItem('usuario') || 'null');
-  } catch {
-    return null;
-  }
-}
-
-// ── Planos ────────────────────────────────────────────────────────────────────
-export const planos = {
-  listarAtivos: () => request('/api/planos/ativos', { skipAuthRedirect: true }),
-  listarTodos: () => request('/api/planos'),
-  criar: (dto) => request('/api/planos', { method: 'POST', body: JSON.stringify(dto) }),
-  atualizar: (id, dto) => request(`/api/planos/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
-  desativar: (id) => request(`/api/planos/${id}/desativar`, { method: 'PATCH' }),
-  reativar: (id) => request(`/api/planos/${id}/reativar`, { method: 'PATCH' }),
 };
 
 // ── Convites ──────────────────────────────────────────────────────────────────
