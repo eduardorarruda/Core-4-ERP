@@ -5,6 +5,7 @@ import br.com.core4erp.assinatura.repository.AssinaturaRepository;
 import br.com.core4erp.cartaoCredito.repository.CartaoCreditoRepository;
 import br.com.core4erp.cartaoCredito.repository.FaturaCartaoRepository;
 import br.com.core4erp.cartaoCredito.repository.LancamentoCartaoRepository;
+import br.com.core4erp.cartaoCredito.service.LimiteCartaoService;
 import br.com.core4erp.config.security.SecurityContextUtils;
 import br.com.core4erp.config.tenant.TenantContext;
 import br.com.core4erp.conta.repository.ContaBaixadaRepository;
@@ -44,6 +45,7 @@ public class DashboardService {
     private final TransacaoInvestimentoRepository transacaoInvRepo;
     private final FaturaCartaoRepository faturaCartaoRepo;
     private final AssinaturaRepository assinaturaRepo;
+    private final LimiteCartaoService limiteCartaoService;
 
     public DashboardService(SecurityContextUtils securityCtx,
                             TenantContext tenantCtx,
@@ -55,7 +57,8 @@ public class DashboardService {
                             ContaBaixadaRepository baixadaRepo,
                             TransacaoInvestimentoRepository transacaoInvRepo,
                             FaturaCartaoRepository faturaCartaoRepo,
-                            AssinaturaRepository assinaturaRepo) {
+                            AssinaturaRepository assinaturaRepo,
+                            LimiteCartaoService limiteCartaoService) {
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
         this.contaCorrenteRepo = contaCorrenteRepo;
@@ -67,6 +70,7 @@ public class DashboardService {
         this.transacaoInvRepo = transacaoInvRepo;
         this.faturaCartaoRepo = faturaCartaoRepo;
         this.assinaturaRepo = assinaturaRepo;
+        this.limiteCartaoService = limiteCartaoService;
     }
 
     /**
@@ -92,13 +96,9 @@ public class DashboardService {
         BigDecimal limiteTotal = cartaoRepo.sumLimiteByEmpresaId(uid);
 
         YearMonth now = YearMonth.now();
-        YearMonth fim = (mesFim != null && anoFim != null) ? YearMonth.of(anoFim, mesFim) : now;
-        YearMonth inicio = (mesInicio != null && anoInicio != null) ? YearMonth.of(anoInicio, mesInicio) : fim.minusMonths(5);
 
-        BigDecimal limiteUsado = lancamentoRepo.sumValorByEmpresaAndPeriod(
-                uid,
-                inicio.getMonthValue(), inicio.getYear(),
-                fim.getMonthValue(), fim.getYear());
+        // Limite usado é uma posição (não um fluxo do período): faturas não pagas de todos os cartões.
+        BigDecimal limiteUsado = limiteCartaoService.limiteUsadoTotal(uid);
 
         LocalDate inicioFluxo = hoje.withDayOfMonth(1).minusMonths(5);
         LocalDate fimFluxo = hoje.withDayOfMonth(hoje.lengthOfMonth());

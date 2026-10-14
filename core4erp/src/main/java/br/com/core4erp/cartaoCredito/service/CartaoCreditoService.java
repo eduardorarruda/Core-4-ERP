@@ -48,7 +48,6 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,6 +73,7 @@ public class CartaoCreditoService {
     private final SecurityContextUtils securityCtx;
     private final TenantContext tenantCtx;
     private final DtoValidator dtoValidator;
+    private final LimiteCartaoService limiteCartaoService;
 
     public CartaoCreditoService(CartaoCreditoRepository cartaoRepo,
                                 LancamentoCartaoRepository lancamentoRepo,
@@ -86,7 +86,8 @@ public class CartaoCreditoService {
                                 ContaService contaService,
                                 SecurityContextUtils securityCtx,
                                 TenantContext tenantCtx,
-                                DtoValidator dtoValidator) {
+                                DtoValidator dtoValidator,
+                                LimiteCartaoService limiteCartaoService) {
         this.cartaoRepo = cartaoRepo;
         this.lancamentoRepo = lancamentoRepo;
         this.faturaRepo = faturaRepo;
@@ -99,6 +100,7 @@ public class CartaoCreditoService {
         this.securityCtx = securityCtx;
         this.tenantCtx = tenantCtx;
         this.dtoValidator = dtoValidator;
+        this.limiteCartaoService = limiteCartaoService;
     }
 
     // ── Cartões ───────────────────────────────────────────────────────────────
@@ -110,20 +112,8 @@ public class CartaoCreditoService {
         Page<CartaoCredito> page = cartaoRepo.findAllByEmpresaId(eid, pageable);
         if (page.isEmpty()) return page.map(c -> CartaoCreditoResponseDto.from(c, BigDecimal.ZERO));
 
-        YearMonth fim = YearMonth.now();
-        YearMonth inicio = fim.minusMonths(5);
-        List<Long> ids = page.getContent().stream().map(CartaoCredito::getId).toList();
-        Map<Long, BigDecimal> limitesUsados = new HashMap<>();
-        lancamentoRepo.sumValorByCartaoIdsAndPeriod(
-                ids, eid,
-                inicio.getMonthValue(), inicio.getYear(),
-                fim.getMonthValue(), fim.getYear()
-        ).forEach(row -> {
-            Long cartaoId = ((Number) row[0]).longValue();
-            BigDecimal soma = row[1] instanceof BigDecimal bd ? bd : new BigDecimal(row[1].toString());
-            limitesUsados.put(cartaoId, soma);
-        });
-
+        // Limite usado = faturas não pagas (aberta, fechadas pendentes e futuras) — ver LimiteCartaoService.
+        Map<Long, BigDecimal> limitesUsados = limiteCartaoService.limiteUsadoPorCartao(eid);
         return page.map(c -> CartaoCreditoResponseDto.from(c,
                 limitesUsados.getOrDefault(c.getId(), BigDecimal.ZERO)));
     }
@@ -373,12 +363,7 @@ public class CartaoCreditoService {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private BigDecimal calcularLimiteUsado(CartaoCredito cartao) {
-        YearMonth fim = YearMonth.now();
-        YearMonth inicio = fim.minusMonths(5);
-        return lancamentoRepo.sumValorByCartaoAndPeriod(
-                cartao.getId(),
-                inicio.getMonthValue(), inicio.getYear(),
-                fim.getMonthValue(), fim.getYear());
+        return limiteCartaoService.limiteUsado(tenantCtx.getEmpresaId(), cartao.getId());
     }
 
     private void preencherCartao(CartaoCredito c, CartaoCreditoRequestDto dto) {

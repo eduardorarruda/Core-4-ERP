@@ -61,20 +61,6 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
         SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
              - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
         FROM LancamentoCartao l
-        WHERE l.cartaoCredito.id = :cartaoId
-        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
-        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
-    """)
-    BigDecimal sumValorByCartaoAndPeriod(@Param("cartaoId") Long cartaoId,
-                                         @Param("mesInicio") Integer mesInicio,
-                                         @Param("anoInicio") Integer anoInicio,
-                                         @Param("mesFim") Integer mesFim,
-                                         @Param("anoFim") Integer anoFim);
-
-    @Query("""
-        SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
-             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
-        FROM LancamentoCartao l
         WHERE l.empresaId = :eid
         AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
         AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
@@ -96,24 +82,30 @@ public interface LancamentoCartaoRepository extends JpaRepository<LancamentoCart
                                                           @Param("mesFim") Integer mesFim,
                                                           @Param("anoFim") Integer anoFim);
 
-    /** Single query returning [cartaoId, totalLiquido] for a set of cards — avoids N+1 in listar(). */
+    /**
+     * Base do LIMITE USADO (§17 do CLAUDE.md): total líquido por cartão × fatura de TODOS os
+     * lançamentos do tenant — passado, fatura aberta, fechadas e futuras (parcelas 2..n) — com a
+     * flag {@code paga} = existe fatura desse cartão/mês/ano cuja conta gerada no fechamento está
+     * PAGO. Fatura sem linha em {@code tb_fatura_cartao} (aberta ou futura) = não paga. Uma consulta
+     * agregada só; a soma das não pagas e o piso em zero ficam em {@code LimiteCartaoService}.
+     */
     @Query("""
-        SELECT l.cartaoCredito.id,
+        SELECT new br.com.core4erp.cartaoCredito.repository.SaldoFaturaCartaoLinha(
+               l.cartaoCredito.id, l.anoFatura, l.mesFatura,
                COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)
-             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0)
+             - COALESCE(SUM(CASE WHEN l.tipo = 'ENTRADA' THEN l.valor ELSE 0 END), 0),
+               CASE WHEN EXISTS (
+                   SELECT 1 FROM FaturaCartao f JOIN f.conta c
+                   WHERE f.empresaId = :eid
+                     AND f.cartaoCredito.id = l.cartaoCredito.id
+                     AND f.mes = l.mesFatura AND f.ano = l.anoFatura
+                     AND c.status = br.com.core4erp.enums.StatusConta.PAGO
+               ) THEN true ELSE false END)
         FROM LancamentoCartao l
-        WHERE l.cartaoCredito.id IN :cartaoIds
-        AND l.empresaId = :eid
-        AND (l.anoFatura * 100 + l.mesFatura) >= (:anoInicio * 100 + :mesInicio)
-        AND (l.anoFatura * 100 + l.mesFatura) <= (:anoFim * 100 + :mesFim)
-        GROUP BY l.cartaoCredito.id
+        WHERE l.empresaId = :eid
+        GROUP BY l.cartaoCredito.id, l.anoFatura, l.mesFatura
     """)
-    List<Object[]> sumValorByCartaoIdsAndPeriod(@Param("cartaoIds") List<Long> cartaoIds,
-                                                @Param("eid") Long eid,
-                                                @Param("mesInicio") Integer mesInicio,
-                                                @Param("anoInicio") Integer anoInicio,
-                                                @Param("mesFim") Integer mesFim,
-                                                @Param("anoFim") Integer anoFim);
+    List<SaldoFaturaCartaoLinha> saldosPorFaturaDoCartao(@Param("eid") Long eid);
 
     @Query("""
         SELECT COALESCE(SUM(CASE WHEN l.tipo = 'SAIDA' THEN l.valor ELSE 0 END), 0)

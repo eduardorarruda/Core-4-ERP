@@ -1045,6 +1045,26 @@ total_fatura = Σ(valor de tb_lancamento_cartao onde fatura_id = X)
 - Recalcular e persistir em `tb_fatura_cartao.valor_total` sempre que um lançamento for adicionado ou removido.
 - Fatura fechada gera automaticamente um registro em `tb_conta` (despesa a pagar).
 
+### Limite usado / livre de cartão de crédito
+```
+limite_usado = max(0, Σ(SAIDA) − Σ(ENTRADA) dos lançamentos do cartão em faturas NÃO pagas)
+limite_livre = limite − limite_usado   (pode ficar negativo se o cartão estourou o limite)
+```
+- **Não paga** = fatura aberta, fechada com a conta do fechamento ainda pendente/atrasada, **e todas as faturas
+  futuras** — inclusive as parcelas 2..n de compras parceladas (o limite é comprometido inteiro na compra, como num
+  cartão real). Compra feita após o fechamento (cai na fatura seguinte) já consome limite.
+- **Paga** = existe `tb_fatura_cartao` do cartão/mês/ano cuja `conta_id` aponta para `tb_conta.status = PAGO`.
+  `StatusFatura` só tem `ABERTA`/`FECHADA` — **não existe estado PAGA**; o pagamento é a baixa da conta gerada no
+  fechamento (estorno volta a conta para PENDENTE e reabre a fatura → volta a consumir limite). Fatura sem linha em
+  `tb_fatura_cartao` (aberta ou futura) = não paga. Lançamento liga à fatura por `cartao + mes_fatura/ano_fatura` (não há `fatura_id`).
+- Sem janela de datas: o histórico inteiro entra, e faturas pagas saem pelo critério acima (a regra antiga — soma dos
+  últimos 6 meses até o mês atual — ignorava fatura seguinte/parcelas futuras e contava faturas já pagas).
+- Piso em zero **por cartão** (crédito sobrando num cartão não libera limite de outro); o total do Dashboard é a soma
+  dos cartões já com piso. É uma **posição**, não um fluxo: ignora o filtro de período do `GET /api/dashboard`.
+- Fonte única: `LimiteCartaoService` (1 consulta agregada por tenant, `LancamentoCartaoRepository.saldosPorFaturaDoCartao`,
+  sem N+1). Usado em `GET /api/cartoes` (listar/detalhe/atualizar), na tool `consultarCartoes` do chat (reaproveita o
+  listar) e em `DashboardService.limiteUsadoTotalCartoes`. Nada mais calcula limite usado — não recriar a soma em outro lugar.
+
 ### Arredondamento
 | Tipo | Casas decimais | Método |
 |---|---|---|
@@ -1086,6 +1106,9 @@ FECHADA → PAGA   (ao registrar pagamento da fatura)
 - `FECHADA`: lançamentos bloqueados; gera `tb_conta` de despesa automaticamente.
 - `PAGA`: terminal. Estorno recria fatura com status `ABERTA`.
 - Nunca fazer transição direta `ABERTA → PAGA`.
+- ⚠️ **Implementação atual:** o enum `StatusFatura` só tem `ABERTA`/`FECHADA`. "Paga" é derivado da conta do
+  fechamento (`tb_fatura_cartao.conta_id` → `tb_conta.status = PAGO`); `ContaService.estornar` reabre a fatura
+  (`FaturaCartaoService.reabrir`). Ver §17 › Limite usado.
 
 ### Conciliação Bancária e de Cartão (`status`)
 ```
